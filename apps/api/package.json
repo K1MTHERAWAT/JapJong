@@ -35,10 +35,13 @@
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",
+    "@nestjs/testing": "^11.2.8",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.0",
     "@types/qrcode": "^1.5.6",
+    "@types/supertest": "^7.2.1",
     "prisma": "^6.19.3",
+    "supertest": "^7.3.1",
     "tsx": "^4.23.15",
     "typescript": "^5.6.3"
   }

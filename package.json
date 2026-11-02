@@ -11,6 +11,7 @@
     "build": "pnpm build:shared && pnpm --filter @jongwen/api build && pnpm --filter @jongwen/web build",
     "start": "pnpm --parallel --filter @jongwen/api --filter @jongwen/web start",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "pnpm build:shared && pnpm -r typecheck",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
@@ -21,6 +22,7 @@
     "db:studio": "pnpm --filter @jongwen/api prisma:studio"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^5.0.5",
     "prisma": "6.19.3",
     "vitest": "^5.0.5"
   }
