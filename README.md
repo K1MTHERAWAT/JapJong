@@ -12,6 +12,7 @@
 * **Backend API**: NestJS 11 + Express + RESTful API + ValidationPipe (`class-validator`)
 * **Database**: รองรับทั้ง **Supabase PostgreSQL (Cloud)** และ **PostgreSQL 16 (Docker Compose)**
 * **ORM & Migrations**: Prisma ORM v6 + สคริปต์อัปเดตโครงสร้างฐานข้อมูลอัตโนมัติ (`migrate-supabase.ts`)
+* **Two-Factor Signing Verification**: ระบบยืนยันการลงนามเอกสาร 2 ชั้นด้วย **Email OTP (Resend SDK / Mock Mode)** + **รหัส PIN 6 หลักส่วนบุคคล** + **ลายมือชื่อดิจิทัลที่วาดจริง**
 * **Document Security**: ระบบตรวจสอบเอกสารดิจิทัล QR Code (`qrcode`, `html5-qrcode`), รหัสยืนยันสุ่ม 32-byte, SHA-256 Document Hashing และบันทึกประวัติการสแกน
 * **Shared Package**: `@jongwen/shared` (TypeScript Types, Labels, RBAC Logic, Date Helpers, Period Conflict Checks)
 * **Testing & CI/CD**: Vitest (Unit Tests) + GitHub Actions CI Pipeline + Multi-stage Dockerfile
@@ -41,12 +42,12 @@ BookingV1/
 ├── apps/
 │   ├── api/                    # @jongwen/api — NestJS REST API (:4000/api)
 │   │   ├── prisma/
-│   │   │   ├── schema.prisma       # Prisma Data Model (16 ตาราง รวม verifications, scan_logs, sessions)
+│   │   │   ├── schema.prisma       # Prisma Data Model (18 ตาราง รวม sign_otp_codes, sign_verified_sessions)
 │   │   │   ├── migrations/         # SQL Migration Files
 │   │   │   ├── migrate-supabase.ts # สคริปต์สร้างและอัปเดตตารางบน Supabase PostgreSQL
 │   │   │   └── seed.ts             # Standalone Seed Script (รองรับ argon2id hash)
 │   │   └── src/
-│   │       ├── auth/             # Login, Register, OTP, Profile & Address, Password, Signature, PIN
+│   │       ├── auth/             # Login, Register, Email OTP, Profile & Address, Password, Signature, PIN
 │   │       ├── resources/        # Venues, Equipment, Monthly Availability, Conflict & Stock Check
 │   │       ├── requests/         # Booking, Borrow, Repair, 3-Level Sign, Handover, Reschedule
 │   │       ├── documents/        # QR Code Verification, Document Hashing, Public & Staff Verify API
@@ -141,14 +142,14 @@ pnpm dev
 
 สามารถคลิกสลับบทบาทได้ทันทีจากแผง **One-Click Demo** ที่หน้า `/login`:
 
-| ชื่อผู้ใช้ (`username`) | ชื่อ-นามสกุล | บทบาท (`role`) | ตำแหน่งแสดงผล | รหัสผ่าน | PIN ลงนาม | หน้าเริ่มต้น |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `somchai` | สมชาย ใจดี | ผู้ใช้งานทั่วไป (`USER`) | ประชาชน | `1234` | `123456` | `/` |
-| `manee` | มานี มีนา | ผู้ใช้งานทั่วไป (`USER`) | ประชาชน | `1234` | `123456` | `/` |
-| `suda` | สุดา มีสุข | เจ้าหน้าที่ผู้ตรวจสอบ (`STAFF`) | เจ้าหน้าที่ธุรการ | `1234` | `123456` | `/staff` |
-| `wichai` | วิชัย รักถิ่น | ปลัดองค์การบริหารส่วนตำบล (`APPROVER_L2`) | ปลัดองค์การบริหารส่วนตำบล | `1234` | `123456` | `/approver` |
-| `prasert` | ประเสริฐ ศรีสุข | นายกองค์การบริหารส่วนตำบล (`APPROVER_L1`) | นายกองค์การบริหารส่วนตำบล | `1234` | `123456` | `/approver` |
-| `admin` | ผู้ดูแลระบบ | แอดมิน (`ADMIN`) | ผู้ดูแลระบบ | `1234` | `123456` | `/admin` |
+| ชื่อผู้ใช้ (`username`) | ชื่อ-นามสกุล | บทบาท (`role`) | อีเมลรับ OTP | ตำแหน่งแสดงผล | รหัสผ่าน | PIN ลงนาม | หน้าเริ่มต้น |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `somchai` | สมชาย ใจดี | ผู้ใช้งานทั่วไป (`USER`) | `somchai@namcham.go.th` | ประชาชน | `1234` | `123456` | `/` |
+| `manee` | มานี มีนา | ผู้ใช้งานทั่วไป (`USER`) | `manee@namcham.go.th` | ประชาชน | `1234` | `123456` | `/` |
+| `suda` | สุดา มีสุข | เจ้าหน้าที่ผู้ตรวจสอบ (`STAFF`) | `suda@namcham.go.th` | เจ้าหน้าที่ธุรการ | `1234` | `123456` | `/staff` |
+| `wichai` | วิชัย รักถิ่น | ปลัดองค์การบริหารส่วนตำบล (`APPROVER_L2`) | `wichai@namcham.go.th` | ปลัดองค์การบริหารส่วนตำบล | `1234` | `123456` | `/approver` |
+| `prasert` | ประเสริฐ ศรีสุข | นายกองค์การบริหารส่วนตำบล (`APPROVER_L1`) | `prasert@namcham.go.th` | นายกองค์การบริหารส่วนตำบล | `1234` | `123456` | `/approver` |
+| `admin` | ผู้ดูแลระบบ | แอดมิน (`ADMIN`) | `admin@namcham.go.th` | ผู้ดูแลระบบ | `1234` | `123456` | `/admin` |
 
 ---
 
@@ -175,6 +176,12 @@ pnpm dev
    - ฝัง QR Code ลงในเอกสารราชการทางการ (`OfficialGovFormDocument`) ที่มุมล่างขวา เชื่อมโยงตรงไปยัง URL ตรวจสอบสาธารณะ
    - **ประชาชนทั่วไป (`/verify/[token]`):** ตรวจสอบสถานะเอกสารได้ทันทีจากสมาร์ตโฟน โดยไม่เปิดเผยข้อมูลส่วนบุคคล (PII Safe) แสดงเฉพาะสถานะความถูกต้อง วันที่ออกเอกสาร และหน่วยงานผู้ออก (อบต.น้ำชำ)
    - **เจ้าหน้าที่ (`/staff/verify`):** สแกนผ่านกล้องมือถือสด (ตรวจจับกล้องหลังอัตโนมัติ), อัปโหลดรูปภาพ QR Code หรือค้นหาด้วยเลขที่เอกสาร แสดงข้อมูลระดับลึก เช่น ชื่อผู้ยื่น ลายมือชื่อการอนุมัติ พร้อมบันทึกประวัติการสแกนลงฐานข้อมูลอัตโนมัติ
+6. **ระบบยืนยันการลงนาม 2 ชั้น (Two-Factor Document Signing: Email OTP + รหัส PIN 6 หลัก):**
+   - ออกแบบกระบวนการลงนามเอกสารให้มีความน่าเชื่อถือและปลอดภัยตามหลักการลายมือชื่ออิเล็กทรอนิกส์:
+     - **ชั้นที่ 1 (Verified Session):** ยืนยันตัวตนด้วยรหัส Email OTP 6 หลัก (ส่งผ่าน Resend SDK พร้อมระบบ Mock OTP สำหรับสภาพแวดล้อมการพัฒนา) เมื่อยืนยันสำเร็จจะได้สิทธิ์เซสชันลงนามต่อเนื่อง 30 นาที ช่วยให้ตรวจคำขอและลงนามได้หลายฉบับในคิวโดยไม่ต้องขอ OTP ซ้ำ
+     - **ชั้นที่ 2 (PIN Authorization):** เมื่อคลิกลงนามในแต่ละเอกสาร ผู้ลงนามต้องกดรหัส PIN 6 หลักส่วนบุคคลผ่านแป้นตัวเลขจำลอง (`PinKeypad`) เพื่อยืนยันเจตนาการลงนาม
+     - **ลายมือชื่อดิจิทัลจริง:** ต้องวาดลายเซ็นสดบนหน้าจอสัมผัสหรือเมาส์ (ระบบไม่ถือว่า OTP หรือ PIN เป็นลายเซ็นดิจิทัลโดยอัตโนมัติ)
+     - รองรับครบวงจรในหน้าลงนามผู้อนุมัติ (`/approver/sign/[id]`), หน้าตรวจคำขอเจ้าหน้าที่ (`/staff/review`), หน้าตั้งค่า 3 ขั้นตอน (`/approver/settings`) และหน้าจัดการบัญชีส่วนตัว (`/account`)
 
 ---
 
@@ -192,6 +199,12 @@ pnpm dev
    - ตรวจสอบสถานะเอกสารแบบเรียลไทม์ผ่าน Backend (`VALID`, `REVOKED`, `INVALID`, `NOT_FOUND`)
    - รองรับการเพิกถอนสิทธิ์เอกสาร (`POST /documents/:id/revoke`) และการออกเอกสารฉบับใหม่ (Versioning) โดยฉบับเดิมจะสิ้นผลทันที
    - บันทึกประวัติการสแกนของเจ้าหน้าที่ (`DocumentScanLog`) พร้อม IP Address, User Agent และ Timestamp
+7. **ความปลอดภัยของระบบ OTP และ Signing Session (OTP & Session Integrity):**
+   - รหัส OTP มีอายุ 5 นาที และใช้ได้เพียงครั้งเดียว (Single-Use Token)
+   - จัดเก็บเป็นแฮช SHA-256 HMAC พร้อมเกลือลับ ป้องกันการดักจับหรืออ่านรหัสตรงจากฐานข้อมูล
+   - ป้องกัน Brute-force: จำกัดการกรอกผิดไม่เกิน 5 ครั้ง หากเกินระบบจะระงับรหัสทันที
+   - ป้องกัน Rate Abuse: หน่วงเวลาการขอรหัสใหม่ (Cooldown) ขั้นต่ำ 60 วินาที
+   - เซสชันการลงนาม (`sign_verified_sessions`) จะถูกเพิกถอนทันทีเมื่อออกจากระบบ (Logout), เซสชันหมดอายุ (30 นาที) หรือผู้ใช้กดเพิกถอนด้วยตนเอง
 
 ---
 
@@ -207,6 +220,8 @@ erDiagram
     accounts ||--o{ sessions : "account_id"
     accounts ||--o{ activity_logs : "actor_id"
     accounts ||--o{ document_scan_logs : "scanned_by"
+    accounts ||--o{ sign_otp_codes : "account_id"
+    accounts ||--o{ sign_verified_sessions : "account_id"
 
     requests ||--o{ request_venues : "request_id"
     requests ||--o{ request_periods : "request_id"
@@ -230,6 +245,8 @@ erDiagram
         string position
         string department
         string phone
+        string email
+        boolean email_verified
         string line_name
         string address_house_no
         string address_moo
@@ -421,5 +438,25 @@ erDiagram
         string ip_address
         string user_agent
         timestamptz scanned_at
+    }
+
+    sign_otp_codes {
+        string id PK
+        string account_id FK
+        string email
+        string otp_hash "sha256"
+        int failed_attempts
+        timestamptz expires_at
+        timestamptz consumed_at
+        timestamptz created_at
+    }
+
+    sign_verified_sessions {
+        string id PK
+        string account_id FK
+        string session_token UK
+        timestamptz expires_at
+        timestamptz revoked_at
+        timestamptz created_at
     }
 ```
