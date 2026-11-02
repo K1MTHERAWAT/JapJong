@@ -34,7 +34,7 @@ export function Sidebar({ items }: { items: NavItem[] }) {
 
   const navGroups = [
     items.filter((item) => ['/', '/booking', '/borrow', '/repair', '/borrow/my', '/history', '/account'].includes(item.href)),
-    items.filter((item) => ['/staff/review', '/staff/handover', '/staff/walk-in'].includes(item.href)),
+    items.filter((item) => ['/staff/review', '/staff/handover', '/staff/walk-in', '/staff/verify'].includes(item.href)),
     items.filter((item) => ['/approver'].includes(item.href)),
     items.filter((item) => ['/admin/resources', '/admin/permissions'].includes(item.href)),
   ].filter((group) => group.length > 0);

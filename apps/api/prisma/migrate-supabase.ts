@@ -23,8 +23,7 @@ if (!process.env.DATABASE_URL) {
 
 const prisma = new PrismaClient();
 
-async function runSqlFile(filePath: string) {
-  const sql = fs.readFileSync(filePath, 'utf-8');
+async function runSqlStatements(sql: string) {
   const statements = sql
     .split(/;\s*\r?\n/)
     .map((s) => s.replace(/--.*$/gm, '').trim())
@@ -35,13 +34,17 @@ async function runSqlFile(filePath: string) {
       await prisma.$executeRawUnsafe(stmt);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      // Ignore already exists errors if re-running
       if (msg.includes('already exists') || msg.includes('42710') || msg.includes('42P07') || msg.includes('42701')) {
         continue;
       }
       throw err;
     }
   }
+}
+
+async function runSqlFile(filePath: string) {
+  const sql = fs.readFileSync(filePath, 'utf-8');
+  await runSqlStatements(sql);
 }
 
 async function main() {
@@ -74,6 +77,48 @@ async function main() {
         "address_district" = 'สูงเม่น',
         "address_province" = 'แพร่'
     WHERE "id" = 'u-somchai' AND "address_house_no" IS NULL;
+  `);
+
+  console.log('📦 Applying migration 3 (document_verifications & document_scan_logs)...');
+  await runSqlStatements(`
+    CREATE TYPE "VerificationStatus" AS ENUM ('VALID', 'REVOKED', 'INVALID');
+
+    CREATE TABLE IF NOT EXISTS "document_verifications" (
+      "id" TEXT PRIMARY KEY,
+      "document_id" TEXT NOT NULL,
+      "verification_token" TEXT NOT NULL UNIQUE,
+      "document_number" TEXT NOT NULL,
+      "document_hash" TEXT NOT NULL,
+      "version" INTEGER NOT NULL DEFAULT 1,
+      "status" "VerificationStatus" NOT NULL DEFAULT 'VALID',
+      "document_type" TEXT NOT NULL,
+      "title" TEXT NOT NULL DEFAULT '',
+      "issuing_org" TEXT NOT NULL DEFAULT 'องค์การบริหารส่วนตำบลน้ำชำ',
+      "metadata" JSONB,
+      "issued_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "revoked_at" TIMESTAMPTZ(3),
+      "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updated_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS "document_scan_logs" (
+      "id" TEXT PRIMARY KEY,
+      "verification_id" TEXT NOT NULL,
+      "scanned_by" TEXT,
+      "scanned_by_name" TEXT,
+      "scanned_by_role" TEXT,
+      "result" TEXT NOT NULL,
+      "note" TEXT,
+      "ip" TEXT,
+      "user_agent" TEXT,
+      "scanned_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS "document_verifications_document_id_idx" ON "document_verifications"("document_id");
+    CREATE INDEX IF NOT EXISTS "document_verifications_token_idx" ON "document_verifications"("verification_token");
+    CREATE INDEX IF NOT EXISTS "document_verifications_doc_no_idx" ON "document_verifications"("document_number");
+    CREATE INDEX IF NOT EXISTS "document_scan_logs_verification_id_idx" ON "document_scan_logs"("verification_id");
+    CREATE INDEX IF NOT EXISTS "document_scan_logs_scanned_at_idx" ON "document_scan_logs"("scanned_at");
   `);
 
   console.log('✨ Schema applied to Supabase successfully!');

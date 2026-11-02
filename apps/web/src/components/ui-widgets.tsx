@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   DayAvailability,
+  DocumentVerification,
   EquipmentCategory,
   OfficialFormPurposeItem,
   Period,
@@ -896,11 +897,13 @@ export function OfficialGovFormDocument({
   blankMode = false,
   sampleDocMode = false,
   customFields,
+  verification,
 }: {
   req?: RequestWithTimeline | null;
   blankMode?: boolean;
   /** แสดงข้อมูลตัวอย่าง */
   sampleDocMode?: boolean;
+  verification?: DocumentVerification | null;
   customFields?: {
     formTitle?: string;
     subject?: string;
@@ -925,6 +928,24 @@ export function OfficialGovFormDocument({
     requesterRoleCaption?: string;
   };
 }) {
+  const [internalVer, setInternalVer] = useState<DocumentVerification | null>(null);
+
+  useEffect(() => {
+    if (verification !== undefined) return;
+    if (!req?.id) return;
+    api.getVerification(req.id)
+      .then((v) => {
+        if (v) {
+          setInternalVer(v);
+        } else if (req.status === 'approved' || req.status === 'borrowing' || req.status === 'returned') {
+          api.createVerification(req.id).then(setInternalVer).catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }, [req?.id, req?.status, verification]);
+
+  const activeVer = verification !== undefined ? verification : internalVer;
+
   const isBorrow = req?.type === 'borrow';
   const formTitle =
     customFields?.formTitle ||
@@ -1241,6 +1262,45 @@ export function OfficialGovFormDocument({
             <div className="text-[12.5px]">{l1RoleTitle}</div>
           </div>
         </div>
+
+        {/* QR Code Document Verification (ฝั่งประชาชน: มุมล่างขวาของเอกสาร) */}
+        {activeVer && activeVer.qrCodeDataUrl && (
+          <div className="mt-6 pt-3 border-t border-dashed border-[#8A8A8A] flex flex-wrap items-center justify-between gap-3 text-[11px] leading-relaxed text-[#2C3E50]">
+            <div className="flex items-center gap-3">
+              <div className="w-[74px] h-[74px] shrink-0 border border-[#CBD5E1] rounded-lg p-1 bg-white shadow-xs">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={activeVer.qrCodeDataUrl}
+                  alt={`QR Code ตรวจสอบเอกสาร ${activeVer.documentNumber}`}
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <div className="flex flex-col gap-0.5 text-left">
+                <span className="font-bold text-[12px] text-[#0B2545] flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full bg-[#10B981]"></span>
+                  เอกสารดิจิทัลผ่านการรับรองและลงนามอิเล็กทรอนิกส์
+                </span>
+                <div>
+                  <b>เลขที่เอกสาร:</b>{' '}
+                  <span className="font-mono text-[#0B2545]">{activeVer.documentNumber}</span>{' '}
+                  (ฉบับที่ {activeVer.version})
+                </div>
+                <div>
+                  <b>วันที่ออกเอกสาร:</b> {formatThaiDateTime(activeVer.issuedAt, true)}
+                </div>
+                <div>
+                  <b>หน่วยงานผู้ออกเอกสาร:</b> {activeVer.issuingOrg || 'องค์การบริหารส่วนตำบลน้ำชำ'}
+                </div>
+                <div className="text-[10px] text-[#64748B] font-mono break-all">
+                  รหัสยืนยัน: {activeVer.verificationToken}
+                </div>
+              </div>
+            </div>
+            <div className="text-right text-[11px] text-[#475569] flex flex-col items-end">
+              <span className="font-semibold text-[#0B2545]">สแกน QR Code เพื่อตรวจสอบความถูกต้อง</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

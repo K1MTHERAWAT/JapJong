@@ -4,6 +4,8 @@ import type {
   ConflictInfo,
   DayAvailability,
   DemoAccountSummary,
+  DocumentScanLog,
+  DocumentVerification,
   Equipment,
   HandoverRecord,
   ItemQty,
@@ -11,9 +13,11 @@ import type {
   Period,
   PermissionKey,
   PublicAccount,
+  PublicVerificationResult,
   RequestType,
   RequestWithTimeline,
   Role,
+  StaffVerificationResult,
   Venue,
 } from '@jongwen/shared';
 
@@ -265,6 +269,32 @@ export const api = {
   notifications: () => request<AppNotification[]>('/notifications'),
   readAllNotifications: () => request<{ ok: boolean }>('/notifications/read-all', { method: 'POST', body: '{}' }),
   resetDemo: () => request<{ ok: boolean }>('/dev/reset', { method: 'POST', body: '{}' }),
+
+  // Document Verification & QR Code
+  getVerification: (documentId: string) =>
+    request<DocumentVerification | null>(`/documents/${documentId}/verification`),
+  createVerification: (
+    documentId: string,
+    payload?: { documentType?: string; title?: string; forceNew?: boolean },
+  ) =>
+    request<DocumentVerification>(`/documents/${documentId}/verification`, {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    }),
+  revokeVerification: (documentId: string, reason: string) =>
+    request<DocumentVerification>(`/documents/${documentId}/revoke`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  publicVerify: (token: string) =>
+    request<PublicVerificationResult>(`/public/verify/${token}`),
+  staffVerify: (query: string) =>
+    request<StaffVerificationResult>('/staff/documents/verify', {
+      method: 'POST',
+      body: JSON.stringify({ query }),
+    }),
+  staffVerifyHistory: (limit = 50) =>
+    request<DocumentScanLog[]>(`/staff/documents/verify-history?limit=${limit}`),
 };
 
 // ===== Thai date formatting helpers =====

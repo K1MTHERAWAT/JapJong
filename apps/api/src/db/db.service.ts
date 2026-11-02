@@ -9,6 +9,8 @@ import {
   BookingRequest,
   BorrowRequest,
   DEFAULT_PERMISSIONS,
+  DocumentScanLog,
+  DocumentVerification,
   Equipment,
   HandoverRecord,
   OfficialFormPurposeItem,
@@ -47,6 +49,8 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   notifications: AppNotification[] = [];
   activities: ActivityLog[] = [];
   handovers: HandoverRecord[] = [];
+  verifications: DocumentVerification[] = [];
+  scanLogs: DocumentScanLog[] = [];
 
   private seq = { BK: 0, BR: 0, RP: 0, n: 0, l: 0, u: 100, v: 100, e: 100 };
   private resetCronTimer?: NodeJS.Timeout;
@@ -67,14 +71,54 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.prisma.$connect();
       this.dbAvailable = true;
-      await this.prisma.$executeRawUnsafe(`
-        ALTER TABLE "accounts"
-          ADD COLUMN IF NOT EXISTS "address_house_no" TEXT,
-          ADD COLUMN IF NOT EXISTS "address_moo" TEXT,
-          ADD COLUMN IF NOT EXISTS "address_subdistrict" TEXT,
-          ADD COLUMN IF NOT EXISTS "address_district" TEXT,
-          ADD COLUMN IF NOT EXISTS "address_province" TEXT;
-      `);
+      const initStatements = [
+        `ALTER TABLE "accounts"
+           ADD COLUMN IF NOT EXISTS "address_house_no" TEXT,
+           ADD COLUMN IF NOT EXISTS "address_moo" TEXT,
+           ADD COLUMN IF NOT EXISTS "address_subdistrict" TEXT,
+           ADD COLUMN IF NOT EXISTS "address_district" TEXT,
+           ADD COLUMN IF NOT EXISTS "address_province" TEXT`,
+        `CREATE TYPE "VerificationStatus" AS ENUM ('VALID', 'REVOKED', 'INVALID')`,
+        `CREATE TABLE IF NOT EXISTS "document_verifications" (
+           "id" TEXT PRIMARY KEY,
+           "document_id" TEXT NOT NULL,
+           "verification_token" TEXT NOT NULL UNIQUE,
+           "document_number" TEXT NOT NULL,
+           "document_hash" TEXT NOT NULL,
+           "version" INTEGER NOT NULL DEFAULT 1,
+           "status" "VerificationStatus" NOT NULL DEFAULT 'VALID',
+           "document_type" TEXT NOT NULL,
+           "title" TEXT NOT NULL DEFAULT '',
+           "issuing_org" TEXT NOT NULL DEFAULT 'องค์การบริหารส่วนตำบลน้ำชำ',
+           "metadata" JSONB,
+           "issued_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+           "revoked_at" TIMESTAMPTZ(3),
+           "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+           "updated_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+         )`,
+        `CREATE TABLE IF NOT EXISTS "document_scan_logs" (
+           "id" TEXT PRIMARY KEY,
+           "verification_id" TEXT NOT NULL,
+           "scanned_by" TEXT,
+           "scanned_by_name" TEXT,
+           "scanned_by_role" TEXT,
+           "result" TEXT NOT NULL,
+           "note" TEXT,
+           "ip" TEXT,
+           "user_agent" TEXT,
+           "scanned_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+         )`,
+        `CREATE INDEX IF NOT EXISTS "document_verifications_document_id_idx" ON "document_verifications"("document_id")`,
+        `CREATE INDEX IF NOT EXISTS "document_verifications_token_idx" ON "document_verifications"("verification_token")`,
+        `CREATE INDEX IF NOT EXISTS "document_verifications_doc_no_idx" ON "document_verifications"("document_number")`,
+        `CREATE INDEX IF NOT EXISTS "document_scan_logs_verification_id_idx" ON "document_scan_logs"("verification_id")`,
+        `CREATE INDEX IF NOT EXISTS "document_scan_logs_scanned_at_idx" ON "document_scan_logs"("scanned_at")`,
+      ];
+      for (const stmt of initStatements) {
+        await this.prisma.$executeRawUnsafe(stmt).catch((err) => {
+          this.logger.debug('Schema init notice: ' + (err?.message || err));
+        });
+      }
       const count = await this.prisma.account.count();
       if (count === 0) {
         if (process.env.DEMO_MODE === 'true' || process.env.SEED_DEMO === 'true') {
@@ -770,6 +814,70 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  async persistVerification(v: DocumentVerification) {
+    const existingIdx = this.verifications.findIndex((x) => x.id === v.id);
+    if (existingIdx >= 0) {
+      this.verifications[existingIdx] = v;
+    } else {
+      this.verifications.unshift(v);
+    }
+    if (!this.dbAvailable) return;
+    try {
+      await this.prisma.$executeRawUnsafe(
+        `INSERT INTO "document_verifications" ("id", "document_id", "verification_token", "document_number", "document_hash", "version", "status", "document_type", "title", "issuing_org", "metadata", "issued_at", "revoked_at", "created_at", "updated_at")
+         VALUES ($1, $2, $3, $4, $5, $6, $7::"VerificationStatus", $8, $9, $10, $11::jsonb, $12::timestamptz, $13::timestamptz, $14::timestamptz, $15::timestamptz)
+         ON CONFLICT ("id") DO UPDATE SET
+           "status" = EXCLUDED."status",
+           "version" = EXCLUDED."version",
+           "document_hash" = EXCLUDED."document_hash",
+           "revoked_at" = EXCLUDED."revoked_at",
+           "metadata" = EXCLUDED."metadata",
+           "updated_at" = EXCLUDED."updated_at"`,
+        v.id,
+        v.documentId,
+        v.verificationToken,
+        v.documentNumber,
+        v.documentHash,
+        v.version,
+        v.status,
+        v.documentType,
+        v.title,
+        v.issuingOrg,
+        v.metadata ? JSON.stringify(v.metadata) : null,
+        v.issuedAt,
+        v.revokedAt ?? null,
+        v.createdAt,
+        v.updatedAt,
+      );
+    } catch (err) {
+      this.logger.error('Failed to persist verification', err);
+    }
+  }
+
+  async persistScanLog(l: DocumentScanLog) {
+    this.scanLogs.unshift(l);
+    if (!this.dbAvailable) return;
+    try {
+      await this.prisma.$executeRawUnsafe(
+        `INSERT INTO "document_scan_logs" ("id", "verification_id", "scanned_by", "scanned_by_name", "scanned_by_role", "result", "note", "ip", "user_agent", "scanned_at")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::timestamptz)
+         ON CONFLICT ("id") DO NOTHING`,
+        l.id,
+        l.verificationId,
+        l.scannedBy ?? null,
+        l.scannedByName ?? null,
+        l.scannedByRole ?? null,
+        l.result,
+        l.note ?? null,
+        l.ip ?? null,
+        l.userAgent ?? null,
+        l.scannedAt,
+      );
+    } catch (err) {
+      this.logger.error('Failed to persist scan log', err);
+    }
+  }
+
   // ===================== Seed & Hydrate =====================
 
   async seedDatabase(forceClear = false) {
@@ -1067,6 +1175,51 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       citizenSignature: h.citizenSignature ?? undefined,
       staffSignature: h.staffSignature ?? undefined,
     }));
+
+    try {
+      const dbVers = await this.prisma.$queryRawUnsafe<any[]>(
+        `SELECT * FROM "document_verifications" ORDER BY "created_at" DESC`,
+      );
+      if (Array.isArray(dbVers)) {
+        this.verifications = dbVers.map((r) => ({
+          id: r.id,
+          documentId: r.document_id,
+          verificationToken: r.verification_token,
+          documentNumber: r.document_number,
+          documentHash: r.document_hash,
+          version: Number(r.version) || 1,
+          status: r.status,
+          documentType: r.document_type,
+          title: r.title || '',
+          issuingOrg: r.issuing_org || 'องค์การบริหารส่วนตำบลน้ำชำ',
+          metadata: r.metadata ? (typeof r.metadata === 'string' ? JSON.parse(r.metadata) : r.metadata) : undefined,
+          issuedAt: new Date(r.issued_at).toISOString(),
+          revokedAt: r.revoked_at ? new Date(r.revoked_at).toISOString() : undefined,
+          createdAt: new Date(r.created_at).toISOString(),
+          updatedAt: new Date(r.updated_at).toISOString(),
+        }));
+      }
+
+      const dbLogs = await this.prisma.$queryRawUnsafe<any[]>(
+        `SELECT * FROM "document_scan_logs" ORDER BY "scanned_at" DESC LIMIT 100`,
+      );
+      if (Array.isArray(dbLogs)) {
+        this.scanLogs = dbLogs.map((r) => ({
+          id: r.id,
+          verificationId: r.verification_id,
+          scannedBy: r.scanned_by ?? undefined,
+          scannedByName: r.scanned_by_name ?? undefined,
+          scannedByRole: r.scanned_by_role ?? undefined,
+          result: r.result,
+          note: r.note ?? undefined,
+          ip: r.ip ?? undefined,
+          userAgent: r.user_agent ?? undefined,
+          scannedAt: new Date(r.scanned_at).toISOString(),
+        }));
+      }
+    } catch (err) {
+      this.logger.warn('Could not load verifications from DB, using memory state:', err);
+    }
 
     await this.syncSequences();
     await this.cleanExpiredSessions();

@@ -243,11 +243,12 @@ model Request {
   requester      Account  @relation("RequestRequester", fields: [requesterId], references: [id])
   createdByStaff Account? @relation("RequestCreatedByStaff", fields: [createdByStaffId], references: [id])
 
-  venues     RequestVenue[]
-  periods    RequestPeriod[]
-  items      RequestItem[]
-  signatures SignatureRecord[]
-  handovers  HandoverRecord[]
+  venues        RequestVenue[]
+  periods       RequestPeriod[]
+  items         RequestItem[]
+  signatures    SignatureRecord[]
+  handovers     HandoverRecord[]
+  verifications DocumentVerification[]
 
   @@index([requesterId])
   @@index([type, status])
@@ -410,3 +411,57 @@ model OtpCode {
   @@index([phone])
   @@map("otp_codes")
 }
+
+// ===================== Document Verification & QR Code =====================
+
+enum VerificationStatus {
+  VALID
+  REVOKED
+  INVALID
+}
+
+model DocumentVerification {
+  id                String             @id @default(cuid())
+  documentId        String             @map("document_id")
+  verificationToken String             @unique @map("verification_token")
+  documentNumber    String             @map("document_number")
+  documentHash      String             @map("document_hash")
+  version           Int                @default(1)
+  status            VerificationStatus @default(VALID)
+  documentType      String             @map("document_type")
+  title             String             @default("")
+  issuingOrg        String             @default("องค์การบริหารส่วนตำบลน้ำชำ") @map("issuing_org")
+  metadata          Json?              @map("metadata")
+  issuedAt          DateTime           @default(now()) @map("issued_at") @db.Timestamptz(3)
+  revokedAt         DateTime?          @map("revoked_at") @db.Timestamptz(3)
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  request  Request           @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  scanLogs DocumentScanLog[]
+
+  @@index([documentId])
+  @@index([verificationToken])
+  @@index([documentNumber])
+  @@map("document_verifications")
+}
+
+model DocumentScanLog {
+  id             String   @id @default(cuid())
+  verificationId String   @map("verification_id")
+  scannedBy      String?  @map("scanned_by")
+  scannedByName  String?  @map("scanned_by_name")
+  scannedByRole  String?  @map("scanned_by_role")
+  result         String
+  note           String?
+  ip             String?
+  userAgent      String?  @map("user_agent")
+  scannedAt      DateTime @default(now()) @map("scanned_at") @db.Timestamptz(3)
+
+  verification DocumentVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+
+  @@index([verificationId])
+  @@index([scannedAt])
+  @@map("document_scan_logs")
+}
+

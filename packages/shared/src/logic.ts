@@ -350,6 +350,19 @@ export function canAccessRoute(
     };
   }
 
+  // 6.1 หน้าตรวจสอบเอกสาร QR Code (/staff/verify)
+  if (pathname.startsWith('/staff/verify')) {
+    const ok = account.role === 'STAFF' || account.role === 'ADMIN';
+    return {
+      allowed: ok,
+      title: 'ตรวจสอบเอกสาร QR Code',
+      requiredRoles: ['STAFF', 'ADMIN'],
+      reason: ok
+        ? undefined
+        : 'ต้องมีบทบาทเจ้าหน้าที่หรือผู้ดูแลระบบเท่านั้น',
+    };
+  }
+
   // 7. หน้าโฮมเจ้าหน้าที่ (/staff)
   if (pathname === '/staff') {
     const ok =

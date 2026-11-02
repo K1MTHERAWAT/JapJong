@@ -277,3 +277,78 @@ export interface LoginResponse {
   token: string;
   account: PublicAccount;
 }
+
+// ===== Document Verification & QR Code =====
+export type VerificationStatus = 'VALID' | 'REVOKED' | 'INVALID' | 'NOT_FOUND';
+
+export type VerificationDocumentType =
+  | 'booking_request'
+  | 'booking_permit'
+  | 'borrow_request'
+  | 'borrow_permit'
+  | 'handover';
+
+export interface DocumentVerification {
+  id: string;
+  documentId: string;
+  verificationToken: string;
+  documentNumber: string;
+  documentHash: string;
+  version: number;
+  status: 'VALID' | 'REVOKED' | 'INVALID';
+  documentType: VerificationDocumentType;
+  title: string;
+  issuingOrg: string;
+  metadata?: Record<string, unknown>;
+  qrCodeDataUrl?: string;
+  verificationUrl?: string;
+  issuedAt: string;
+  revokedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DocumentScanLog {
+  id: string;
+  verificationId: string;
+  scannedBy?: string;
+  scannedByName?: string;
+  scannedByRole?: string;
+  result: VerificationStatus;
+  note?: string;
+  ip?: string;
+  userAgent?: string;
+  scannedAt: string;
+  documentNumber?: string;
+  documentTitle?: string;
+}
+
+export interface PublicVerificationResult {
+  status: VerificationStatus;
+  documentNumber?: string;
+  documentType?: VerificationDocumentType;
+  title?: string;
+  issuingOrg?: string;
+  issuedAt?: string;
+  revokedAt?: string;
+  version?: number;
+  documentHash?: string;
+  message?: string;
+  requestStatus?: string;
+}
+
+export interface StaffVerificationResult extends PublicVerificationResult {
+  documentId?: string;
+  requesterName?: string;
+  organization?: string;
+  purpose?: string;
+  signatures?: {
+    level: string;
+    title: string;
+    signerName: string;
+    decision: string;
+    signedAt: string;
+  }[];
+  history?: DocumentScanLog[];
+}
+

@@ -5,11 +5,13 @@ import { AdminController } from './admin/admin.controller';
 import { AuthController } from './auth/auth.controller';
 import { AuthGuard } from './auth/auth.guard';
 import { DbService } from './db/db.service';
+import { DocumentsModule } from './documents/documents.module';
 import { RequestsController } from './requests/requests.controller';
 import { ResourcesController } from './resources/resources.controller';
 
 @Module({
   imports: [
+    DocumentsModule,
     ThrottlerModule.forRoot([
       {
         name: 'default',

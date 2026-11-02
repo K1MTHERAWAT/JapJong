@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { RequestWithTimeline } from '@jongwen/shared';
+import { DocumentVerification, RequestWithTimeline } from '@jongwen/shared';
 import { useAuth } from '@/components/auth-context';
 import { AppShell, roleHomePath } from '@/components/shell';
 import { OfficialGovFormDocument } from '@/components/ui';
@@ -13,6 +13,7 @@ export default function PermitPdfPage() {
   const params = useParams<{ id: string }>();
   const { account } = useAuth();
   const [req, setReq] = useState<RequestWithTimeline | null>(null);
+  const [verification, setVerification] = useState<DocumentVerification | null>(null);
   const homeHref = roleHomePath(account?.role);
 
   useEffect(() => {
@@ -20,6 +21,11 @@ export default function PermitPdfPage() {
     api
       .getRequest(params.id)
       .then(setReq)
+      .catch(() => {});
+
+    api
+      .createVerification(params.id)
+      .then(setVerification)
       .catch(() => {});
   }, [params.id]);
 
@@ -44,7 +50,7 @@ export default function PermitPdfPage() {
       }
     >
       <div className="print:block">
-        <OfficialGovFormDocument req={req} />
+        <OfficialGovFormDocument req={req} verification={verification} />
       </div>
     </AppShell>
   );

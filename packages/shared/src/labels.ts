@@ -1,4 +1,13 @@
-import type { EquipmentCategory, PermissionKey, RequestStatus, RequestType, Role, VenueType } from './types';
+import type {
+  EquipmentCategory,
+  PermissionKey,
+  RequestStatus,
+  RequestType,
+  Role,
+  VenueType,
+  VerificationDocumentType,
+  VerificationStatus,
+} from './types';
 
 export type Tone = 'green' | 'amber' | 'blue' | 'red' | 'gray' | 'orange' | 'purple' | 'teal' | 'cyan' | 'indigo' | 'pink';
 
@@ -270,3 +279,26 @@ export const SIGN_LEVEL_TITLE = {
 } as const;
 
 export const ACTIVE_BOOKING_STATUSES: RequestStatus[] = ['pending_staff', 'pending_l2', 'pending_l1', 'approved'];
+
+export const VERIFICATION_STATUS_LABEL: Record<VerificationStatus, string> = {
+  VALID: 'เอกสารถูกต้องและยังมีผล',
+  REVOKED: 'เอกสารถูกยกเลิก',
+  INVALID: 'ข้อมูลเอกสารไม่ถูกต้อง',
+  NOT_FOUND: 'ไม่พบข้อมูลเอกสาร',
+};
+
+export const VERIFICATION_STATUS_TONE: Record<VerificationStatus, Tone> = {
+  VALID: 'green',
+  REVOKED: 'amber',
+  INVALID: 'red',
+  NOT_FOUND: 'gray',
+};
+
+export const VERIFICATION_DOC_TYPE_LABEL: Record<VerificationDocumentType, string> = {
+  booking_request: 'แบบขอใช้สถานที่ราชการ',
+  booking_permit: 'หนังสืออนุมัติใช้สถานที่ราชการ',
+  borrow_request: 'แบบคำขอยืมอุปกรณ์',
+  borrow_permit: 'หนังสืออนุมัติยืมอุปกรณ์',
+  handover: 'เอกสารส่งมอบและคืนอุปกรณ์',
+};
+
