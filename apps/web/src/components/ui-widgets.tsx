@@ -466,7 +466,7 @@ export function SignatureBox({
   savedSignature,
   signerLabel,
   height = 180,
-  skipPinPrompt = false,
+  skipPinPrompt = true,
   pinAccountId,
 }: {
   value: string;

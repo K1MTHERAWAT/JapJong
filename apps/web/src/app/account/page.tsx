@@ -23,6 +23,7 @@ import {
   Input,
   PinKeypad,
   SignatureBox,
+  SignOtpVerifier,
   Tabs,
 } from '@/components/ui';
 import { api, formatThaiDate } from '@/lib/api';
@@ -38,6 +39,7 @@ export default function AccountPage() {
   const [nickname, setNickname] = useState('');
   const [department, setDepartment] = useState('');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [addressHouseNo, setAddressHouseNo] = useState('');
   const [addressMoo, setAddressMoo] = useState('');
   const [addressSubdistrict, setAddressSubdistrict] = useState('');
@@ -68,6 +70,7 @@ export default function AccountPage() {
       setNickname(account.nickname || '');
       setDepartment(account.department || '');
       setPhone(account.phone || '');
+      setEmail(account.email || '');
       setAddressHouseNo(account.addressHouseNo || '');
       setAddressMoo(account.addressMoo || '');
       setAddressSubdistrict(account.addressSubdistrict || '');
@@ -101,6 +104,7 @@ export default function AccountPage() {
         nickname: nickname.trim(),
         department: department.trim(),
         phone: phone.trim(),
+        email: email.trim(),
         addressHouseNo: addressHouseNo.trim(),
         addressMoo: addressMoo.trim(),
         addressSubdistrict: addressSubdistrict.trim(),
@@ -314,6 +318,13 @@ export default function AccountPage() {
                     placeholder="เช่น 081-234-5678"
                     required
                   />
+                  <Input
+                    label="อีเมล (สำหรับรับรหัส OTP ยืนยันการลงนาม)"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="เช่น user@namcham.go.th"
+                  />
                 </div>
 
                 {/* ที่อยู่สำหรับดึงไปกรอกคำขออัตโนมัติ */}
@@ -487,80 +498,112 @@ export default function AccountPage() {
 
           {/* TAB 3: Signature & PIN */}
           {activeTab === 'signature' && (
-            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-5">
-              {/* Signature Card */}
-              <Card className="flex min-w-0 flex-col gap-4 p-4 sm:p-6">
-                <div className="flex items-center gap-2.5 border-b border-line-soft pb-3">
-                  <PenTool className="size-5 text-brand" />
+            <div className="flex flex-col gap-4 sm:gap-5">
+              {/* Notice Banner */}
+              <div className="rounded-control border border-line bg-surface p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[13px]">
+                <div className="flex items-start gap-2.5">
+                  <KeyRound className="size-5 text-brand shrink-0 mt-0.5" />
                   <div>
-                    <h2 className="text-heading font-bold text-ink">
-                      ลายมือชื่อดิจิทัลประจำตัว
-                    </h2>
-                    <p className="text-caption text-muted">
-                      วาดลายเซ็นเก็บไว้เพื่อนำมาใช้ประกอบการยื่นคำขอหรือลงนามอนุมัติเอกสาร
-                    </p>
+                    <b className="text-ink font-semibold block text-[13.5px]">ระบบยืนยันตัวตน 2 ชั้นสำหรับการลงนาม (OTP + PIN)</b>
+                    <span className="text-muted leading-relaxed">
+                      1. ยืนยันเซสชันด้วย <b>Email OTP (Resend)</b> หนึ่งครั้งต่อการใช้งาน · 2. ยืนยันรหัส <b>PIN 6 หลัก</b> ส่วนบุคคลในแต่ละครั้งที่ลงนาม
+                    </span>
                   </div>
                 </div>
+                {account.signature && (
+                  <Chip tone="green">พร้อมลงนาม</Chip>
+                )}
+              </div>
 
-                <SignatureBox
-                  value={signature}
-                  onChange={setSignature}
-                  signerLabel={`${account.name} · ${account.position}`}
-                  height={240}
-                  skipPinPrompt
-                />
-
-                <Button
-                  type="button"
-                  variant="primary"
-                  disabled={!signature.trim() || savingSig}
-                  onClick={handleSaveSignature}
-                  className="w-full"
-                >
-                  {savingSig ? 'กำลังบันทึกลายเซ็น...' : 'บันทึกลายมือชื่อประจำตัว'}
-                </Button>
-              </Card>
-
-              {/* PIN Card */}
-              <Card className="flex min-w-0 flex-col items-center gap-4 p-4 sm:p-6">
-                <div className="w-full text-center border-b border-line-soft pb-3">
-                  <h2 className="text-heading font-bold text-ink">
-                    ตั้งค่า / เปลี่ยนรหัส PIN 6 หลัก
-                  </h2>
-                  <p className="text-caption text-muted mt-0.5">
-                    ใช้ยืนยันตัวตนทุกครั้งเมื่อดึงลายเซ็นที่บันทึกไว้มาลงนามในเอกสาร
-                  </p>
+              {sigMsg && (
+                <div className="rounded-2xl bg-brand-mint border border-brand/30 px-4 py-2.5 text-[13px] font-semibold text-brand text-center">
+                  {sigMsg}
                 </div>
+              )}
+              {sigErr && (
+                <div className="rounded-2xl bg-[#FDE8E8] border border-[#f9b4b4] px-4 py-2.5 text-[13px] text-[#7a1010] text-center">
+                  {sigErr}
+                </div>
+              )}
 
-                {!account.signature ? (
-                  <div className="rounded-control bg-warn-bg border border-warn-fg/30 p-4 text-center text-body text-warn-fg">
-                    กรุณาเขียนและบันทึกลายมือชื่อด้านซ้ายมือก่อน จึงจะสามารถตั้งรหัส PIN 6 หลักได้
+              <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-5">
+                {/* Signature Card */}
+                <Card className="flex min-w-0 flex-col gap-4 p-4 sm:p-6">
+                  <div className="flex items-center gap-2.5 border-b border-line-soft pb-3">
+                    <PenTool className="size-5 text-brand" />
+                    <div>
+                      <h2 className="text-heading font-bold text-ink">
+                        1. ลายมือชื่อดิจิทัลประจำตัว
+                      </h2>
+                      <p className="text-caption text-muted">
+                        วาดลายเซ็นเก็บไว้เพื่อนำมาใช้ประกอบการยื่นคำขอหรือลงนามอนุมัติเอกสาร
+                      </p>
+                    </div>
                   </div>
-                ) : (
-                  <PinKeypad
-                    pin={pin}
-                    onChange={setPin}
-                    subtitle={
-                      account.hasPin
-                        ? 'กดตัวเลข 6 หลักเพื่อเปลี่ยนรหัส PIN ใหม่'
-                        : 'กดตัวเลข 6 หลักเพื่อตั้งรหัส PIN ประจำตัว'
-                    }
-                    onComplete={handleSavePin}
+
+                  <SignatureBox
+                    value={signature}
+                    onChange={setSignature}
+                    signerLabel={`${account.name} · ${account.position}`}
+                    height={220}
+                    skipPinPrompt
                   />
-                )}
 
-                {sigErr && (
-                  <div className="w-full rounded-control bg-danger-bg border border-danger-fg/30 px-4 py-2.5 text-caption text-danger-fg text-center">
-                    {sigErr}
-                  </div>
-                )}
+                  <Button
+                    type="button"
+                    variant="primary"
+                    disabled={!signature.trim() || savingSig}
+                    onClick={handleSaveSignature}
+                    className="w-full"
+                  >
+                    {savingSig ? 'กำลังบันทึกลายเซ็น...' : 'บันทึกลายมือชื่อประจำตัว'}
+                  </Button>
+                </Card>
 
-                {sigMsg && (
-                  <div className="w-full rounded-control bg-brand-tint border border-brand px-4 py-2.5 text-caption text-brand-ink font-semibold text-center">
-                    {sigMsg}
-                  </div>
-                )}
-              </Card>
+                {/* PIN & Email OTP Column */}
+                <div className="flex flex-col gap-4">
+                  {/* PIN 6 หลัก Card */}
+                  <Card className="flex min-w-0 flex-col gap-4 p-4 sm:p-6">
+                    <div className="flex items-center justify-between border-b border-line-soft pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <KeyRound className="size-5 text-brand" />
+                        <div>
+                          <h2 className="text-heading font-bold text-ink">
+                            2. รหัส PIN 6 หลักสำหรับการลงนาม
+                          </h2>
+                          <p className="text-caption text-muted">
+                            ใช้ยืนยันการอนุมัติในแต่ละเอกสารร่วมกับลายเซ็นดิจิทัล
+                          </p>
+                        </div>
+                      </div>
+                      <Chip tone="green">กดเพื่อเปลี่ยน PIN</Chip>
+                    </div>
+
+                    <div className="flex flex-col items-center gap-3">
+                      <PinKeypad
+                        pin={pin}
+                        onChange={setPin}
+                        subtitle="กดตัวเลข 6 หลักเพื่อตั้งหรือเปลี่ยนรหัส PIN ประจำตัวของคุณ"
+                        onComplete={handleSavePin}
+                      />
+                    </div>
+                  </Card>
+
+                  {/* Email OTP Sign Session Card */}
+                  <Card className="flex min-w-0 flex-col gap-4 p-4 sm:p-6">
+                    <div className="border-b border-line-soft pb-3">
+                      <h2 className="text-heading font-bold text-ink">
+                        3. เซสชัน Email OTP (Resend)
+                      </h2>
+                      <p className="text-caption text-muted mt-0.5">
+                        ขอรหัส OTP ทางอีเมลเพื่อเปิดใช้งานเซสชันการลงนาม (มีผล 30 นาที)
+                      </p>
+                    </div>
+
+                    <SignOtpVerifier initialEmail={account.email} />
+                  </Card>
+                </div>
+              </div>
             </div>
           )}
         </div>

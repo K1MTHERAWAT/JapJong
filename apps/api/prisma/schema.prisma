@@ -108,6 +108,8 @@ model Account {
   phone       String
   lineName    String?  @map("line_name")
   lineUserId  String?  @map("line_user_id")
+  email       String?  @map("email")
+  emailVerified Boolean @default(false) @map("email_verified")
   addressHouseNo     String? @map("address_house_no")
   addressMoo         String? @map("address_moo")
   addressSubdistrict String? @map("address_subdistrict")
@@ -131,6 +133,8 @@ model Account {
   notifications    Notification[]
   sessions         Session[]
   activityLogs     ActivityLog[]
+  signOtpCodes     SignOtpCode[]
+  signVerifiedSessions SignVerifiedSession[]
 
   @@index([role])
   @@index([isDemo])
@@ -464,4 +468,40 @@ model DocumentScanLog {
   @@index([scannedAt])
   @@map("document_scan_logs")
 }
+
+// ===================== Email OTP for Signing (Resend) =====================
+
+model SignOtpCode {
+  id         String    @id @default(cuid())
+  accountId  String    @map("account_id")
+  email      String    @map("email")
+  codeHash   String    @map("code_hash")
+  attempts   Int       @default(0) @map("attempts")
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([expiresAt])
+  @@map("sign_otp_codes")
+}
+
+model SignVerifiedSession {
+  id           String    @id @default(cuid())
+  accountId    String    @map("account_id")
+  sessionToken String    @map("session_token")
+  verifiedAt   DateTime  @default(now()) @map("verified_at") @db.Timestamptz(3)
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt    DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, sessionToken])
+  @@index([expiresAt])
+  @@map("sign_verified_sessions")
+}
+
 

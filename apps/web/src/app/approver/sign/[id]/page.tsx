@@ -7,7 +7,7 @@ import { ROLE_LABEL, RequestWithTimeline, SIGN_LEVEL_TITLE, canSignRequest } fro
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
-import { Chip, OfficialGovFormDocument, PinKeypad, SignatureBox, SignaturePreviewCard } from '@/components/ui';
+import { Chip, OfficialGovFormDocument, PinKeypad, SignatureBox, SignaturePreviewCard, SignOtpVerifier } from '@/components/ui';
 import { api, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
 
 export default function ApproverSignDocumentPage() {
@@ -18,10 +18,13 @@ export default function ApproverSignDocumentPage() {
   const [showOfficialForm, setShowOfficialForm] = useState(true);
   const [signature, setSignature] = useState('');
   const [confirmed, setConfirmed] = useState(true);
-  const [pinStep, setPinStep] = useState(false);
+  const [otpStep, setOtpStep] = useState(false);
+  const [isSessionVerified, setIsSessionVerified] = useState(false);
   const [pendingDecision, setPendingDecision] = useState<'approve' | 'reject'>('approve');
-  const [completedL2, setCompletedL2] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
   const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [completedL2, setCompletedL2] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -37,21 +40,32 @@ export default function ApproverSignDocumentPage() {
       .catch(() => {});
   }, [params.id]);
 
-  const submitDecision = async (decision: 'approve' | 'reject', pinVal?: string) => {
+  // ตรวจสอบสถานะ Signing Session (OTP)
+  useEffect(() => {
+    api
+      .getSignSessionStatus()
+      .then((res) => {
+        setIsSessionVerified(res.isVerified);
+      })
+      .catch(() => {});
+  }, []);
+
+  const submitDecisionWithPin = async (enteredPin: string) => {
     if (!req) return;
     setError('');
+    setPinError('');
     setSubmitting(true);
     try {
       const updated = await api.signRequest(req.id, {
-        decision,
-        pin: pinVal,
+        decision: pendingDecision,
         signature,
+        pin: enteredPin,
       });
       setReq(updated);
-      setPinStep(false);
-      setPin('');
+      setOtpStep(false);
+      setShowPinModal(false);
 
-      if (decision === 'reject') {
+      if (pendingDecision === 'reject') {
         router.push('/approver');
       } else if (updated.status === 'approved' || updated.status === 'borrowing') {
         // ลงนามครบ 4 ฝ่าย → ไปหน้าใบอนุญาต (PDF)
@@ -60,11 +74,34 @@ export default function ApproverSignDocumentPage() {
         // ลงนามระดับ 2 เสร็จ → แสดงหน้าส่งต่อให้ระดับ 1 (นายก อบต.)
         setCompletedL2(true);
       }
-    } catch (err) {
-      setError((err as Error).message || 'รหัส PIN ไม่ถูกต้อง');
-      setPin('');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการลงนาม';
+      if (msg.includes('PIN')) {
+        setPinError(msg);
+        setPin('');
+      } else if (msg.includes('OTP') || msg.includes('เซสชัน')) {
+        setIsSessionVerified(false);
+        setShowPinModal(false);
+        setOtpStep(true);
+        setError(msg);
+      } else {
+        setError(msg);
+        setShowPinModal(false);
+      }
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleStartSign = (decision: 'approve' | 'reject') => {
+    setPendingDecision(decision);
+    setError('');
+    setPinError('');
+    if (!isSessionVerified) {
+      setOtpStep(true);
+    } else {
+      setPin('');
+      setShowPinModal(true);
     }
   };
 
@@ -96,41 +133,37 @@ export default function ApproverSignDocumentPage() {
   const sigL2 = req.type !== 'repair' ? req.signatures.find((s) => s.level === 'l2') : undefined;
   const sigL1 = req.type !== 'repair' ? req.signatures.find((s) => s.level === 'l1') : undefined;
 
+  const isFinalApprover = account?.role === 'APPROVER_L1';
+
   return (
     <AppShell
-      title={pinStep ? 'ยืนยัน PIN' : 'ลงนามเอกสาร'}
+      title={otpStep ? 'ยืนยัน OTP ก่อนลงนาม' : 'ลงนามเอกสาร'}
       backHref="/approver"
-      onBack={pinStep ? () => setPinStep(false) : undefined}
+      onBack={otpStep ? () => setOtpStep(false) : undefined}
       rightLabel={account?.position || 'ปลัด อบต.'}
       maxWidth="max-w-[960px]"
       footer={
-        !pinStep && !completedL2 && signCheck.allowed ? (
+        !otpStep && !completedL2 && signCheck.allowed ? (
           <div className="flex w-full sm:w-auto gap-2.5">
             <button
               type="button"
               disabled={submitting || !signature.trim()}
-              onClick={() => {
-                setError('');
-                setPin('');
-                setPendingDecision('reject');
-                setPinStep(true);
-              }}
+              onClick={() => handleStartSign('reject')}
               className="jw-btn-red flex-1 sm:w-40"
             >
-              ลงนามไม่เห็นชอบ
+              ลงนาม{isFinalApprover ? 'ไม่อนุมัติ' : 'ไม่เห็นชอบ'}
             </button>
             <button
               type="button"
               disabled={!confirmed || !signature.trim() || submitting}
-              onClick={() => {
-                setError('');
-                setPin('');
-                setPendingDecision('approve');
-                setPinStep(true);
-              }}
-              className="jw-btn flex-[1.5] sm:w-56"
+              onClick={() => handleStartSign('approve')}
+              className="jw-btn flex-[1.5] sm:w-64"
             >
-              ลงนามและยืนยัน PIN
+              {submitting
+                ? 'กำลังบันทึก...'
+                : isSessionVerified
+                ? `ลงนาม${isFinalApprover ? 'อนุมัติ' : 'เห็นชอบ'} (มีผลทันที)`
+                : `ลงนามและยืนยัน OTP`}
             </button>
           </div>
         ) : undefined
@@ -157,12 +190,20 @@ export default function ApproverSignDocumentPage() {
             </button>
           </div>
         </div>
-      ) : !pinStep ? (
+      ) : !otpStep ? (
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <b className="text-[16px]">{req.code}</b>
             <Chip tone="amber">รอคุณเขียนลายเซ็นลงนาม</Chip>
           </div>
+
+          {/* แถบสถานะเซสชัน OTP */}
+          <SignOtpVerifier
+            initialEmail={account?.email}
+            onVerified={() => {
+              setIsSessionVerified(true);
+            }}
+          />
 
           <div className="jw-card p-4 flex flex-col gap-2 text-[14px]">
             <div className="flex gap-2">
@@ -202,10 +243,10 @@ export default function ApproverSignDocumentPage() {
 
           {req.type !== 'repair' && showOfficialForm && <OfficialGovFormDocument req={req} />}
 
-          {/* ลายเซ็นของฝ่ายที่ลงนามมาแล้ว */}
+          {/* การ์ดแสดงลายเซ็น 4 ฝ่าย */}
           <div className="jw-card p-4 flex flex-col gap-2.5">
-            <b className="text-[14px] text-ink">สถานะลายมือชื่อทั้ง 4 ฝ่ายบนเอกสารนี้</b>
-            <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-4 gap-2">
+            <b className="text-[14px] text-ink">สถานะลายมือชื่อบนเอกสารนี้</b>
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5">
               <SignaturePreviewCard
                 roleLabel="1. ผู้ยื่นคำขอ"
                 signerName={req.requesterName}
@@ -214,25 +255,28 @@ export default function ApproverSignDocumentPage() {
                 status="signed"
               />
               <SignaturePreviewCard
-                roleLabel={`2. ${sigStaff?.title || SIGN_LEVEL_TITLE.staff}`}
+                roleLabel="2. เจ้าหน้าที่ (ระดับ 1)"
                 signerName={sigStaff?.signerName}
                 signature={sigStaff?.signature}
-                signedAt={sigStaff ? formatThaiDateTime(sigStaff.at) : undefined}
-                status={sigStaff ? (sigStaff.decision === 'approve' ? 'signed' : 'rejected') : 'pending'}
+                signedAt={sigStaff?.at ? formatThaiDateTime(sigStaff.at) : undefined}
+                decision={sigStaff?.decision}
+                status={sigStaff ? (sigStaff.decision === 'reject' ? 'rejected' : 'signed') : 'pending'}
               />
               <SignaturePreviewCard
-                roleLabel={`3. ${sigL2?.title || SIGN_LEVEL_TITLE.l2}`}
+                roleLabel="3. ปลัด อบต. (ระดับ 2)"
                 signerName={sigL2?.signerName}
                 signature={sigL2?.signature}
-                signedAt={sigL2 ? formatThaiDateTime(sigL2.at) : undefined}
-                status={sigL2 ? (sigL2.decision === 'approve' ? 'signed' : 'rejected') : 'pending'}
+                signedAt={sigL2?.at ? formatThaiDateTime(sigL2.at) : undefined}
+                decision={sigL2?.decision}
+                status={sigL2 ? (sigL2.decision === 'reject' ? 'rejected' : 'signed') : 'pending'}
               />
               <SignaturePreviewCard
-                roleLabel={`4. ${sigL1?.title || SIGN_LEVEL_TITLE.l1}`}
+                roleLabel="4. นายก อบต. (ระดับ 3)"
                 signerName={sigL1?.signerName}
                 signature={sigL1?.signature}
-                signedAt={sigL1 ? formatThaiDateTime(sigL1.at) : undefined}
-                status={sigL1 ? (sigL1.decision === 'approve' ? 'signed' : 'rejected') : 'pending'}
+                signedAt={sigL1?.at ? formatThaiDateTime(sigL1.at) : undefined}
+                decision={sigL1?.decision}
+                status={sigL1 ? (sigL1.decision === 'reject' ? 'rejected' : 'signed') : 'pending'}
               />
             </div>
           </div>
@@ -300,49 +344,89 @@ export default function ApproverSignDocumentPage() {
                   {confirmed && <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} />}
                 </div>
                 <span className="text-[13px] text-ink-mute leading-relaxed">
-                  ข้าพเจ้ายืนยันว่าได้ตรวจเอกสารแล้วและเขียนลายมือชื่อลงนามด้วยตนเอง
+                  ข้าพเจ้ายืนยันว่าได้ตรวจเอกสารแล้วและเขียนลายมือชื่อลงนามด้วยตนเอง (ระบบจะยืนยันตัวตนด้วย OTP ทางอีเมล)
                 </span>
               </div>
             </div>
           )}
+
+          {error && (
+            <div className="rounded-2xl bg-[#FDE8E8] border border-[#F9B4B4] px-3.5 py-2 text-[13px] text-[#7A1010]">
+              {error}
+            </div>
+          )}
         </div>
       ) : (
-        <div className="jw-card p-6 flex flex-col items-center gap-4">
-          <div>
-            <b className="text-[17px] text-ink block text-center">ใส่ PIN 6 หลัก</b>
-            <span className="text-[13px] text-ink-mute block text-center">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setOtpStep(false)}
+              className="text-[13px] text-brand font-semibold hover:underline flex items-center gap-1"
+            >
+              ← ย้อนกลับไปแก้ไขลายเซ็น
+            </button>
+            <span className="text-[12px] text-ink-mute">
               {stepDesc} · เอกสาร {req.code}
             </span>
           </div>
 
-          <PinKeypad
-            pin={pin}
-            onChange={setPin}
-            subtitle={
-              pendingDecision === 'approve'
-                ? 'กดรหัส PIN 6 หลักเพื่อยืนยันการลงนามเห็นชอบ/อนุมัติ'
-                : 'กดรหัส PIN 6 หลักเพื่อยืนยันการลงนามไม่เห็นชอบ'
-            }
-            onComplete={(full) => submitDecision(pendingDecision, full)}
+          <SignOtpVerifier
+            initialEmail={account?.email}
+            onVerified={() => {
+              setIsSessionVerified(true);
+              setOtpStep(false);
+              setPin('');
+              setPinError('');
+              setShowPinModal(true);
+            }}
           />
 
           {error && (
-            <div className="rounded-2xl bg-[#FDE8E8] border border-[#f9b4b4] px-3.5 py-2 text-[13px] text-[#7a1010]">
+            <div className="rounded-2xl bg-[#FDE8E8] border border-[#F9B4B4] px-3.5 py-2 text-[13px] text-[#7A1010]">
               {error}
             </div>
           )}
+        </div>
+      )}
 
-          <div className="flex items-center gap-4 text-[13px]">
-            <button
-              type="button"
-              onClick={() => setPinStep(false)}
-              className="text-ink-mute hover:underline"
-            >
-              ← ย้อนกลับไปแก้ไขลายเซ็น
-            </button>
-            <Link href="/approver/settings" className="text-brand font-semibold hover:underline">
-              ลืม PIN / ตั้งค่าใหม่?
-            </Link>
+      {showPinModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+          <div className="w-full max-w-[420px] bg-white rounded-hard p-6 flex flex-col items-center gap-4 shadow-md">
+            <div className="w-full flex items-center justify-between">
+              <div>
+                <b className="text-[16px] text-ink block">ยืนยันรหัส PIN 6 หลักเพื่อลงนาม</b>
+                <span className="text-[12px] text-ink-mute">
+                  คำขอ {req.code} · {pendingDecision === 'approve' ? 'ลงนามเห็นชอบ/อนุมัติ' : 'ลงนามไม่เห็นชอบ/ไม่อนุมัติ'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPinModal(false)}
+                className="text-ink-mute hover:text-ink"
+              >
+                <Icon name="x" className="w-5 h-5" />
+              </button>
+            </div>
+
+            <PinKeypad
+              pin={pin}
+              onChange={setPin}
+              subtitle={`กรอกรหัส PIN 6 หลักประจำตัวของ ${account?.name || 'ผู้อนุมัติ'} เพื่อยืนยันการลงนาม`}
+              onComplete={submitDecisionWithPin}
+            />
+
+            {pinError && (
+              <div className="w-full rounded-2xl bg-[#FDE8E8] border border-[#f9b4b4] px-3.5 py-2 text-[13px] text-[#7a1010] text-center">
+                {pinError}
+              </div>
+            )}
+
+            {submitting && (
+              <div className="text-[13px] text-brand font-medium animate-pulse">
+                กำลังตรวจสอบ PIN และบันทึกลายมือชื่อดิจิทัล...
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -121,6 +121,51 @@ async function main() {
     CREATE INDEX IF NOT EXISTS "document_scan_logs_scanned_at_idx" ON "document_scan_logs"("scanned_at");
   `);
 
+  console.log('📦 Applying migration 4 (accounts email & sign_otp_codes & sign_verified_sessions)...');
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "accounts"
+      ADD COLUMN IF NOT EXISTS "email" TEXT,
+      ADD COLUMN IF NOT EXISTS "email_verified" BOOLEAN DEFAULT false;
+  `);
+
+  // Set default demo emails
+  await runSqlStatements(`
+    UPDATE "accounts" SET "email" = 'suda@namcham.go.th', "email_verified" = true WHERE "id" = 's-suda' AND "email" IS NULL;
+    UPDATE "accounts" SET "email" = 'wichai@namcham.go.th', "email_verified" = true WHERE "id" = 'a-wichai' AND "email" IS NULL;
+    UPDATE "accounts" SET "email" = 'prasert@namcham.go.th', "email_verified" = true WHERE "id" = 'a-prasert' AND "email" IS NULL;
+    UPDATE "accounts" SET "email" = 'admin@namcham.go.th', "email_verified" = true WHERE "id" = 'ad-admin' AND "email" IS NULL;
+    UPDATE "accounts" SET "email" = 'somchai@namcham.go.th', "email_verified" = true WHERE "id" = 'u-somchai' AND "email" IS NULL;
+    UPDATE "accounts" SET "email" = 'manee@namcham.go.th', "email_verified" = true WHERE "id" = 'u-manee' AND "email" IS NULL;
+  `);
+
+  await runSqlStatements(`
+    CREATE TABLE IF NOT EXISTS "sign_otp_codes" (
+      "id" TEXT PRIMARY KEY,
+      "account_id" TEXT NOT NULL REFERENCES "accounts"("id") ON DELETE CASCADE,
+      "email" TEXT NOT NULL,
+      "code_hash" TEXT NOT NULL,
+      "attempts" INTEGER NOT NULL DEFAULT 0,
+      "expires_at" TIMESTAMPTZ(3) NOT NULL,
+      "consumed_at" TIMESTAMPTZ(3),
+      "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS "sign_verified_sessions" (
+      "id" TEXT PRIMARY KEY,
+      "account_id" TEXT NOT NULL REFERENCES "accounts"("id") ON DELETE CASCADE,
+      "session_token" TEXT NOT NULL,
+      "verified_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "expires_at" TIMESTAMPTZ(3) NOT NULL,
+      "revoked_at" TIMESTAMPTZ(3),
+      "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS "sign_otp_codes_account_id_idx" ON "sign_otp_codes"("account_id");
+    CREATE INDEX IF NOT EXISTS "sign_otp_codes_expires_at_idx" ON "sign_otp_codes"("expires_at");
+    CREATE INDEX IF NOT EXISTS "sign_verified_sessions_acc_token_idx" ON "sign_verified_sessions"("account_id", "session_token");
+    CREATE INDEX IF NOT EXISTS "sign_verified_sessions_expires_at_idx" ON "sign_verified_sessions"("expires_at");
+  `);
+
   console.log('✨ Schema applied to Supabase successfully!');
 }
 

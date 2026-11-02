@@ -9,6 +9,7 @@ import {
   Param,
   Post,
   Query,
+  Req,
   UnauthorizedException,
 } from '@nestjs/common';
 import {
@@ -553,6 +554,7 @@ export class RequestsController {
     @CurrentUser() user: Account,
     @Param('id') id: string,
     @Body() body: SignDto,
+    @Req() reqHttp: any,
   ) {
     const req = this.db.requests.find((r) => r.id === id || r.code === id);
     if (!req || req.type === 'repair') throw new NotFoundException('ไม่พบคำขอที่ต้องลงนาม');
@@ -575,8 +577,21 @@ export class RequestsController {
       throw new BadRequestException('ผลการพิจารณาไม่ถูกต้อง');
     }
 
-    // เจ้าหน้าที่ (ระดับ 1) / ผู้อนุมัติระดับ 2 / ผู้อนุมัติระดับ 1 ต้องยืนยัน PIN 6 หลักทุกครั้งที่ลงนาม
+    // ยืนยันตัวตน 2 ชั้น: 1) Verified Signing Session (Email OTP ผ่าน Resend) + 2) รหัส PIN 6 หลักประจำตัว
     if (check.expectedLevel === 'staff' || check.expectedLevel === 'l2' || check.expectedLevel === 'l1') {
+      // 1. ตรวจสอบเซสชัน Email OTP
+      const sessionToken = reqHttp.token;
+      const verifiedSession = sessionToken
+        ? await this.db.getSignVerifiedSession(user.id, sessionToken)
+        : null;
+
+      if (!verifiedSession || verifiedSession.expiresAt.getTime() < Date.now() || verifiedSession.revokedAt) {
+        throw new UnauthorizedException(
+          'กรุณายืนยันตัวตนด้วยรหัส OTP ทางอีเมลก่อนลงนามเอกสาร (เซสชันการลงนามยังไม่ได้รับการยืนยันหรือหมดอายุแล้ว)',
+        );
+      }
+
+      // 2. ตรวจสอบรหัส PIN 6 หลัก
       if (!user.pin) throw new BadRequestException('กรุณาตั้งค่า PIN 6 หลักก่อนลงนาม');
       const key = `pin:${user.id}`;
       assertNotLocked(key);

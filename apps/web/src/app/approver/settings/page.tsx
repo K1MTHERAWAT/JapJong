@@ -4,10 +4,10 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { roleHomePath, useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
-import { PinKeypad, SignatureBox } from '@/components/ui';
+import { PinKeypad, SignatureBox, SignOtpVerifier } from '@/components/ui';
 import { api } from '@/lib/api';
 
-type StepMode = 'signature' | 'pin';
+type StepMode = 'signature' | 'pin' | 'otp';
 
 export default function ApproverSignaturePinSettingsPage() {
   const router = useRouter();
@@ -15,6 +15,8 @@ export default function ApproverSignaturePinSettingsPage() {
   const [step, setStep] = useState<StepMode>('signature');
   const [signature, setSignature] = useState(account?.signature || '');
   const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [savingPin, setSavingPin] = useState(false);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -31,20 +33,45 @@ export default function ApproverSignaturePinSettingsPage() {
     setStep('pin');
   };
 
-  const handleSavePin = async (finalPin: string) => {
-    await api.savePin(finalPin);
-    await refreshMe();
-    setMessage('บันทึกลายเซ็นที่วาดและรหัส PIN 6 หลักเรียบร้อยแล้ว');
-    setTimeout(() => router.push(homeHref), 1000);
+  const handleSavePin = async (fullPin: string) => {
+    setPinError('');
+    setSavingPin(true);
+    try {
+      await api.savePin(fullPin);
+      await refreshMe();
+      setMessage('บันทึกรหัส PIN 6 หลักสำเร็จ');
+      setTimeout(() => {
+        setMessage('');
+        setStep('otp');
+      }, 700);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการบันทึก PIN';
+      setPinError(msg);
+      setPin('');
+    } finally {
+      setSavingPin(false);
+    }
   };
 
   return (
     <AppShell
-      title={step === 'signature' ? 'เขียนลายเซ็นและตั้ง PIN' : 'ตั้ง PIN'}
+      title={
+        step === 'signature'
+          ? 'ขั้นตอนที่ 1: ลายมือชื่อดิจิทัล'
+          : step === 'pin'
+          ? 'ขั้นตอนที่ 2: รหัส PIN 6 หลัก'
+          : 'ขั้นตอนที่ 3: ยืนยันเซสชัน Email OTP'
+      }
       backHref={homeHref}
-      onBack={step === 'pin' ? () => setStep('signature') : undefined}
+      onBack={
+        step === 'otp'
+          ? () => setStep('pin')
+          : step === 'pin'
+          ? () => setStep('signature')
+          : undefined
+      }
       rightLabel={account?.position || 'นายก'}
-      maxWidth="max-w-[540px]"
+      maxWidth="max-w-[600px]"
       footer={
         step === 'signature' ? (
           <button
@@ -53,11 +80,53 @@ export default function ApproverSignaturePinSettingsPage() {
             onClick={handleSaveSignature}
             className="jw-btn w-full"
           >
-            บันทึกลายเซ็นที่เขียน · ถัดไปตั้ง PIN
+            บันทึกลายเซ็นประจำตัว · ถัดไปตั้งรหัส PIN 6 หลัก
           </button>
         ) : undefined
       }
     >
+      {/* Stepper Header */}
+      <div className="flex items-center justify-between mb-4 px-1">
+        <div className="flex items-center gap-2">
+          <span
+            className={`w-7 h-7 rounded-full text-[12px] font-bold flex items-center justify-center ${
+              step === 'signature'
+                ? 'bg-brand text-white'
+                : 'bg-brand-mint text-brand'
+            }`}
+          >
+            1
+          </span>
+          <span className="text-[13px] font-medium text-ink">ลายเซ็น</span>
+        </div>
+        <div className="flex-1 h-[2px] bg-line mx-3" />
+        <div className="flex items-center gap-2">
+          <span
+            className={`w-7 h-7 rounded-full text-[12px] font-bold flex items-center justify-center ${
+              step === 'pin'
+                ? 'bg-brand text-white'
+                : step === 'otp'
+                ? 'bg-brand-mint text-brand'
+                : 'bg-soft text-ink-mute'
+            }`}
+          >
+            2
+          </span>
+          <span className="text-[13px] font-medium text-ink">รหัส PIN</span>
+        </div>
+        <div className="flex-1 h-[2px] bg-line mx-3" />
+        <div className="flex items-center gap-2">
+          <span
+            className={`w-7 h-7 rounded-full text-[12px] font-bold flex items-center justify-center ${
+              step === 'otp' ? 'bg-brand text-white' : 'bg-soft text-ink-mute'
+            }`}
+          >
+            3
+          </span>
+          <span className="text-[13px] font-medium text-ink">Email OTP</span>
+        </div>
+      </div>
+
       {step === 'signature' ? (
         <div className="jw-card p-5 flex flex-col gap-4">
           <div>
@@ -74,36 +143,68 @@ export default function ApproverSignaturePinSettingsPage() {
             height={220}
           />
         </div>
-      ) : (
+      ) : step === 'pin' ? (
         <div className="jw-card p-6 flex flex-col items-center gap-4">
-          <div className="text-center">
-            <b className="text-[17px] text-ink block">ตั้ง PIN 6 หลัก</b>
-            <span className="text-[13px] text-ink-mute">ใช้ยืนยันทุกครั้งที่ลงนาม</span>
-          </div>
-
           <PinKeypad
             pin={pin}
             onChange={setPin}
-            onComplete={(full) => handleSavePin(full)}
+            subtitle={`กำหนดรหัส PIN 6 หลักใหม่ของ ${account?.name || 'ผู้ใช้งาน'} เพื่อใช้ยืนยันการลงนามเอกสารแต่ละฉบับ`}
+            onComplete={handleSavePin}
           />
 
+          {pinError && (
+            <div className="w-full rounded-2xl bg-[#FDE8E8] border border-[#f9b4b4] px-3.5 py-2 text-[13px] text-[#7a1010] text-center">
+              {pinError}
+            </div>
+          )}
+
           {message && (
-            <div className="rounded-2xl bg-brand-mint text-brand px-4 py-2 text-[13px] font-semibold">
+            <div className="w-full rounded-2xl bg-brand-mint text-brand px-4 py-2.5 text-[13px] font-semibold text-center">
               {message}
             </div>
           )}
 
-          <p className="text-[12px] text-ink-mute text-center max-w-[300px]">
-            PIN เป็นความลับส่วนตัว ระบบเก็บแบบเข้ารหัส ผู้ดูแลระบบไม่เห็น PIN
-          </p>
+          {savingPin && (
+            <div className="text-[13px] text-brand font-medium animate-pulse">
+              กำลังบันทึกรหัส PIN 6 หลัก...
+            </div>
+          )}
 
-          <button
-            type="button"
-            onClick={() => setStep('signature')}
-            className="text-[12.5px] text-ink-mute underline"
-          >
-            ← ย้อนกลับไปแก้ไขลายเซ็น
-          </button>
+          <div className="text-center pt-2">
+            <button
+              type="button"
+              onClick={() => setStep('signature')}
+              className="text-[12.5px] text-ink-mute hover:underline"
+            >
+              ← ย้อนกลับไปแก้ไขลายเซ็น
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <SignOtpVerifier
+            initialEmail={account?.email}
+            onVerified={() => {
+              setMessage('ยืนยันตัวตนด้วยรหัส OTP ทางอีเมลสำเร็จ! การตั้งค่าครบถ้วน');
+              setTimeout(() => router.push(homeHref), 1200);
+            }}
+          />
+
+          {message && (
+            <div className="rounded-2xl bg-brand-mint text-brand px-4 py-2.5 text-[13px] font-semibold text-center">
+              {message}
+            </div>
+          )}
+
+          <div className="text-center pt-2">
+            <button
+              type="button"
+              onClick={() => setStep('pin')}
+              className="text-[12.5px] text-ink-mute hover:underline"
+            >
+              ← ย้อนกลับไปแก้ไขรหัส PIN
+            </button>
+          </div>
         </div>
       )}
     </AppShell>

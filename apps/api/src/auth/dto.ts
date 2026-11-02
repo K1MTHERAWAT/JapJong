@@ -122,6 +122,10 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   addressProvince?: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
 }
 
 export class ChangePasswordDto {
@@ -132,4 +136,16 @@ export class ChangePasswordDto {
   @IsString()
   @IsNotEmpty({ message: 'กรุณากรอกรหัสผ่านใหม่' })
   newPassword!: string;
+}
+
+export class RequestSignOtpDto {
+  @IsOptional()
+  @IsString()
+  email?: string;
+}
+
+export class VerifySignOtpDto {
+  @IsString()
+  @Length(6, 6, { message: 'รหัส OTP ต้องมี 6 หลัก' })
+  otp!: string;
 }

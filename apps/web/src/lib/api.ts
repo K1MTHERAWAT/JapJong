@@ -14,11 +14,14 @@ import type {
   PermissionKey,
   PublicAccount,
   PublicVerificationResult,
+  RequestSignOtpResponse,
   RequestType,
   RequestWithTimeline,
   Role,
+  SignSessionStatus,
   StaffVerificationResult,
   Venue,
+  VerifySignOtpResponse,
 } from '@jongwen/shared';
 
 const TOKEN_KEY = 'jongwen_token';
@@ -102,6 +105,7 @@ export const api = {
     position?: string;
     department?: string;
     phone?: string;
+    email?: string;
     lineName?: string;
     addressHouseNo?: string;
     addressMoo?: string;
@@ -119,6 +123,24 @@ export const api = {
     request<{ ok: boolean }>('/auth/verify-pin', {
       method: 'POST',
       body: JSON.stringify({ pin }),
+    }),
+
+  // Email OTP for Signing (Resend)
+  requestSignOtp: (email?: string) =>
+    request<RequestSignOtpResponse>('/auth/sign-otp/request', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+  verifySignOtp: (otp: string) =>
+    request<VerifySignOtpResponse>('/auth/sign-otp/verify', {
+      method: 'POST',
+      body: JSON.stringify({ otp }),
+    }),
+  getSignSessionStatus: () =>
+    request<SignSessionStatus>('/auth/sign-session/status'),
+  revokeSignSession: () =>
+    request<{ ok: boolean }>('/auth/sign-session/revoke', {
+      method: 'POST',
     }),
 
   // Resources

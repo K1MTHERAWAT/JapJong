@@ -21,6 +21,8 @@ export interface Account {
   department: string;
   phone: string;
   lineName?: string;
+  email?: string;
+  emailVerified?: boolean;
   addressHouseNo?: string;
   addressMoo?: string;
   addressSubdistrict?: string;
@@ -351,4 +353,30 @@ export interface StaffVerificationResult extends PublicVerificationResult {
   }[];
   history?: DocumentScanLog[];
 }
+
+// ===================== Email OTP for Signing =====================
+
+export interface SignSessionStatus {
+  isVerified: boolean;
+  expiresAt?: string;
+  email?: string;
+  maskedEmail?: string;
+}
+
+export interface RequestSignOtpResponse {
+  ok: boolean;
+  email: string;
+  maskedEmail: string;
+  expiresInSeconds: number;
+  resendCooldownSeconds: number;
+  demoOtp?: string;
+}
+
+export interface VerifySignOtpResponse {
+  ok: boolean;
+  verified: boolean;
+  expiresAt: string;
+  message?: string;
+}
+
 

@@ -22,3 +22,4 @@ export {
 } from '../ui-widgets';
 
 export { DatePickerField, TimePickerField } from '../date-time-picker';
+export { SignOtpVerifier } from '../sign-otp-verifier';

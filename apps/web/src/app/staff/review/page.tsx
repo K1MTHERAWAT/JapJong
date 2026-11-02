@@ -12,6 +12,7 @@ import {
   PinKeypad,
   SignatureBox,
   SignaturePreviewCard,
+  SignOtpVerifier,
   StatusChip,
 } from '@/components/ui';
 import { api, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
@@ -34,10 +35,13 @@ export default function StaffReviewPage() {
   const [afterPhotos, setAfterPhotos] = useState(2);
   const [staffSignature, setStaffSignature] = useState('');
   const [confirmed, setConfirmed] = useState(true);
-  const [pinStep, setPinStep] = useState(false);
+  const [otpStep, setOtpStep] = useState(false);
+  const [isSessionVerified, setIsSessionVerified] = useState(false);
   const [pendingDecision, setPendingDecision] = useState<'approve' | 'reject'>('approve');
+  const [showPinModal, setShowPinModal] = useState(false);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
   const [lastCompleted, setLastCompleted] = useState<RequestWithTimeline | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -61,18 +65,26 @@ export default function StaffReviewPage() {
     load(sp?.get('id'));
   }, [load]);
 
+  // ตรวจสอบสถานะ Signing Session (OTP)
+  useEffect(() => {
+    api
+      .getSignSessionStatus()
+      .then((res) => setIsSessionVerified(res.isVerified))
+      .catch(() => {});
+  }, []);
+
   const current = queue[index];
 
   useEffect(() => {
     setStaffSignature(account?.signature || '');
-    setPinStep(false);
-    setPin('');
-    setPinError('');
+    setOtpStep(false);
+    setErrorMsg('');
   }, [account?.id, account?.signature, current?.id]);
 
-  const handleDecision = async (decision: 'approve' | 'reject', pinVal?: string) => {
+  const handleDecision = async (decision: 'approve' | 'reject', enteredPin?: string) => {
     if (!current) return;
     if (current.type !== 'repair' && !staffSignature.trim()) return;
+    setErrorMsg('');
     setPinError('');
     setSubmitting(true);
     try {
@@ -82,14 +94,12 @@ export default function StaffReviewPage() {
           updated = await api.updateRepairStatus(current.id, {
             action: decision === 'approve' ? 'accept' : 'reopen',
             signature: staffSignature,
-            pin: pinVal,
           });
         } else {
           updated = await api.updateRepairStatus(current.id, {
             action: 'finish',
             resolution,
             signature: staffSignature,
-            pin: pinVal,
           });
         }
       } else {
@@ -97,31 +107,56 @@ export default function StaffReviewPage() {
           decision,
           note: note || undefined,
           signature: staffSignature,
-          pin: pinVal,
+          pin: enteredPin,
         });
       }
       setNote('');
-      setPinStep(false);
-      setPin('');
+      setOtpStep(false);
+      setShowPinModal(false);
       setLastCompleted(updated);
       load();
-    } catch (err) {
-      setPinError((err as Error).message || 'รหัส PIN ไม่ถูกต้อง');
-      setPin('');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการลงนาม';
+      if (msg.includes('PIN')) {
+        setPinError(msg);
+        setPin('');
+      } else if (msg.includes('OTP') || msg.includes('เซสชัน')) {
+        setIsSessionVerified(false);
+        setShowPinModal(false);
+        setOtpStep(true);
+        setErrorMsg(msg);
+      } else {
+        setErrorMsg(msg);
+        setShowPinModal(false);
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
+  const handleStartDecision = (decision: 'approve' | 'reject') => {
+    setPendingDecision(decision);
+    setErrorMsg('');
+    setPinError('');
+    if (current?.type === 'repair') {
+      handleDecision(decision);
+    } else if (!isSessionVerified) {
+      setOtpStep(true);
+    } else {
+      setPin('');
+      setShowPinModal(true);
+    }
+  };
+
   return (
     <AppShell
-      title={pinStep ? 'ยืนยัน PIN' : 'คำขอรอตรวจ'}
+      title={otpStep ? 'ยืนยัน OTP ก่อนลงนาม' : 'คำขอรอตรวจ'}
       backHref="/staff"
-      onBack={pinStep ? () => setPinStep(false) : undefined}
+      onBack={otpStep ? () => setOtpStep(false) : undefined}
       rightLabel={account?.nickname || 'สุดา'}
       maxWidth="max-w-[1440px]"
       footer={
-        current && !pinStep ? (
+        current && !otpStep ? (
           <div className="flex w-full sm:w-auto gap-2.5">
             {current.type === 'repair' ? (
               current.status === 'repair_in_progress' ? (
@@ -157,27 +192,17 @@ export default function StaffReviewPage() {
               <button
                 type="button"
                 disabled={submitting || !confirmed || !staffSignature.trim()}
-                onClick={() => {
-                  setPinError('');
-                  setPin('');
-                  setPendingDecision('approve');
-                  setPinStep(true);
-                }}
+                onClick={() => handleStartDecision('approve')}
                 className="jw-btn w-full sm:w-72"
               >
-                ลงนามซ่อมเสร็จและยืนยัน PIN
+                ลงนามซ่อมเสร็จ
               </button>
             ) : (
               <>
                 <button
                   type="button"
                   disabled={submitting || !staffSignature.trim()}
-                  onClick={() => {
-                    setPinError('');
-                    setPin('');
-                    setPendingDecision('reject');
-                    setPinStep(true);
-                  }}
+                  onClick={() => handleStartDecision('reject')}
                   className="jw-btn-red flex-1 sm:w-44"
                 >
                   ลงนามไม่ผ่าน
@@ -185,15 +210,14 @@ export default function StaffReviewPage() {
                 <button
                   type="button"
                   disabled={submitting || !confirmed || !staffSignature.trim()}
-                  onClick={() => {
-                    setPinError('');
-                    setPin('');
-                    setPendingDecision('approve');
-                    setPinStep(true);
-                  }}
+                  onClick={() => handleStartDecision('approve')}
                   className="jw-btn flex-[1.5] sm:w-64"
                 >
-                  ลงนามและยืนยัน PIN
+                  {submitting
+                    ? 'กำลังบันทึก...'
+                    : isSessionVerified
+                    ? 'ลงนามส่งต่อปลัด (มีผลทันที)'
+                    : 'ลงนามและยืนยัน OTP'}
                 </button>
               </>
             )}
@@ -234,44 +258,37 @@ export default function StaffReviewPage() {
             กลับหน้าหลักเจ้าหน้าที่
           </Link>
         </div>
-      ) : pinStep ? (
-        <div className="jw-card p-6 flex flex-col items-center gap-4">
-          <div>
-            <b className="text-[17px] text-ink block text-center">ใส่ PIN 6 หลัก</b>
-            <span className="text-[13px] text-ink-mute block text-center">
+      ) : otpStep ? (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setOtpStep(false)}
+              className="text-[13px] text-brand font-semibold hover:underline flex items-center gap-1"
+            >
+              ← ย้อนกลับไปแก้ไขลายเซ็น
+            </button>
+            <span className="text-[12px] text-ink-mute">
               ลงนามฝ่ายที่ 2 จาก 4 · เจ้าหน้าที่ตรวจสอบ (ระดับ 1) · เอกสาร {current.code}
             </span>
           </div>
 
-          <PinKeypad
-            pin={pin}
-            onChange={setPin}
-            subtitle={
-              pendingDecision === 'approve'
-                ? 'กดรหัส PIN 6 หลักเพื่อยืนยันการลงนามผ่าน (ระดับ 1)'
-                : 'กดรหัส PIN 6 หลักเพื่อยืนยันการลงนามไม่ผ่าน'
-            }
-            onComplete={(full) => handleDecision(pendingDecision, full)}
+          <SignOtpVerifier
+            initialEmail={account?.email}
+            onVerified={() => {
+              setIsSessionVerified(true);
+              setOtpStep(false);
+              setPin('');
+              setPinError('');
+              setShowPinModal(true);
+            }}
           />
 
-          {pinError && (
-            <div className="rounded-2xl bg-[#FDE8E8] border border-[#f9b4b4] px-3.5 py-2 text-[13px] text-[#7a1010]">
-              {pinError}
+          {errorMsg && (
+            <div className="rounded-2xl bg-[#FDE8E8] border border-[#F9B4B4] px-3.5 py-2 text-[13px] text-[#7A1010]">
+              {errorMsg}
             </div>
           )}
-
-          <div className="flex items-center gap-4 text-[13px]">
-            <button
-              type="button"
-              onClick={() => setPinStep(false)}
-              className="text-ink-mute hover:underline"
-            >
-              ← ย้อนกลับไปแก้ไขลายเซ็น
-            </button>
-            <Link href="/approver/settings" className="text-brand font-semibold hover:underline">
-              ลืม PIN / ตั้งค่าใหม่?
-            </Link>
-          </div>
         </div>
       ) : (
         <div className="flex flex-col gap-4 sm:gap-5">
@@ -303,6 +320,13 @@ export default function StaffReviewPage() {
             <h1 className="text-[22px] font-bold text-ink">{current.code}</h1>
             <StatusChip status={current.status} />
           </div>
+
+          {current.type !== 'repair' && (
+            <SignOtpVerifier
+              initialEmail={account?.email}
+              onVerified={() => setIsSessionVerified(true)}
+            />
+          )}
 
           <div className="jw-card p-4 sm:p-5 flex flex-col gap-3 text-[14px]">
             <div className="flex items-start gap-2">
@@ -585,6 +609,47 @@ export default function StaffReviewPage() {
             </div>
           )}
           </div>
+          </div>
+        </div>
+      )}
+
+      {showPinModal && current && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+          <div className="w-full max-w-[420px] bg-white rounded-hard p-6 flex flex-col items-center gap-4 shadow-md">
+            <div className="w-full flex items-center justify-between">
+              <div>
+                <b className="text-[16px] text-ink block">ยืนยันรหัส PIN 6 หลักเพื่อลงนาม</b>
+                <span className="text-[12px] text-ink-mute">
+                  คำขอ {current.code} · {pendingDecision === 'approve' ? 'ลงนามเห็นชอบ (ส่งต่อปลัด อบต.)' : 'ลงนามไม่เห็นชอบ/ไม่ผ่าน'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPinModal(false)}
+                className="text-ink-mute hover:text-ink"
+              >
+                <Icon name="x" className="w-5 h-5" />
+              </button>
+            </div>
+
+            <PinKeypad
+              pin={pin}
+              onChange={setPin}
+              subtitle={`กรอกรหัส PIN 6 หลักของ ${account?.name || 'เจ้าหน้าที่'} เพื่อยืนยันการลงนาม`}
+              onComplete={(enteredPin) => handleDecision(pendingDecision, enteredPin)}
+            />
+
+            {pinError && (
+              <div className="w-full rounded-2xl bg-[#FDE8E8] border border-[#f9b4b4] px-3.5 py-2 text-[13px] text-[#7a1010] text-center">
+                {pinError}
+              </div>
+            )}
+
+            {submitting && (
+              <div className="text-[13px] text-brand font-medium animate-pulse">
+                กำลังตรวจสอบ PIN และบันทึกลายมือชื่อดิจิทัล...
+              </div>
+            )}
           </div>
         </div>
       )}

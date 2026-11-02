@@ -1,7 +1,9 @@
 import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, NotFoundException, Patch, Post, Req, UnauthorizedException } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import * as crypto from 'crypto';
 import { DEFAULT_PERMISSIONS, Account, DemoAccountSummary } from '@jongwen/shared';
 import { DbService } from '../db/db.service';
+import { EmailService } from './email.service';
 import {
   CurrentUser,
   Public,
@@ -17,15 +19,29 @@ import {
   LoginDto,
   RegisterDto,
   RequestOtpDto,
+  RequestSignOtpDto,
   SetPinDto,
   SetSignatureDto,
   UpdateProfileDto,
   VerifyPinDto,
+  VerifySignOtpDto,
 } from './dto';
+
+function maskEmail(email?: string): string {
+  if (!email || !email.includes('@')) return email || '';
+  const [local, domain] = email.split('@');
+  if (local.length <= 2) {
+    return `${local}***@${domain}`;
+  }
+  return `${local.slice(0, 2)}***@${domain}`;
+}
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly db: DbService) {}
+  constructor(
+    private readonly db: DbService,
+    private readonly emailService: EmailService,
+  ) {}
 
   @Public()
   @Get('demo-accounts')
@@ -287,6 +303,14 @@ export class AuthController {
     if (body.addressProvince !== undefined) {
       user.addressProvince = String(body.addressProvince).trim().slice(0, 100) || undefined;
     }
+    if (body.email !== undefined) {
+      const emailStr = String(body.email).trim().toLowerCase();
+      if (emailStr && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr)) {
+        throw new BadRequestException('รูปแบบอีเมลไม่ถูกต้อง');
+      }
+      user.email = emailStr || undefined;
+      user.emailVerified = true;
+    }
 
     await this.db.persistAccount(user);
     await this.db.log('user', 'แก้ไขข้อมูลโปรไฟล์', user.name, {
@@ -361,6 +385,176 @@ export class AuthController {
       throw new UnauthorizedException('รหัส PIN ไม่ถูกต้อง');
     }
     clearFailures(key);
+    return { ok: true };
+  }
+
+  // ===================== Email OTP for Signing (Resend) =====================
+
+  @Throttle({ auth: { limit: 10, ttl: 60000 } })
+  @Post('sign-otp/request')
+  async requestSignOtp(
+    @CurrentUser() user: Account,
+    @Body() body: RequestSignOtpDto,
+    @Req() req: any,
+  ) {
+    const ip = req.ip || req.headers['x-forwarded-for'];
+    const targetEmail = body?.email?.trim().toLowerCase() || user.email;
+
+    if (!targetEmail) {
+      throw new BadRequestException('ไม่พบอีเมลของบัญชีนี้ กรุณาระบุหรือตั้งค่าอีเมลในหน้าจัดการบัญชีก่อน');
+    }
+
+    if (!user.email) {
+      user.email = targetEmail;
+      user.emailVerified = true;
+      await this.db.persistAccount(user);
+    }
+
+    // Rate limiting: ต้องเว้นระยะขอใหม่ 60 วินาที
+    const latest = await this.db.getLatestSignOtp(user.id);
+    if (latest && !latest.consumedAt) {
+      const msSince = Date.now() - latest.createdAt.getTime();
+      if (msSince < 60000) {
+        const secLeft = Math.ceil((60000 - msSince) / 1000);
+        throw new BadRequestException(`กรุณารออีก ${secLeft} วินาทีก่อนขอรหัส OTP ใหม่`);
+      }
+    }
+
+    // สร้าง OTP 6 หลักด้วย Node.js Crypto
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const salt = process.env.OTP_SECRET || 'jongwen_sign_otp_secret_salt';
+    const codeHash = crypto.createHmac('sha256', salt).update(otp).digest('hex');
+
+    // อายุ 5 นาที
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+    // บันทึกลงฐานข้อมูล
+    await this.db.createSignOtp(user.id, targetEmail, codeHash, expiresAt);
+
+    // ส่งผ่าน Resend
+    const sendResult = await this.emailService.sendSignOtpEmail(targetEmail, otp, user.name);
+    if (!sendResult.success) {
+      throw new BadRequestException(`ไม่สามารถส่งรหัส OTP ผ่าน Resend ได้: ${sendResult.error}`);
+    }
+
+    const masked = maskEmail(targetEmail);
+
+    // บันทึก Audit Log
+    await this.db.log('user', 'ขอรหัส OTP สำหรับยืนยันการลงนาม', `ส่งรหัส OTP 6 หลักไปยัง ${masked}`, {
+      id: user.id,
+      name: user.name,
+      role: user.role,
+      ip,
+    });
+
+    return {
+      ok: true,
+      email: targetEmail,
+      maskedEmail: masked,
+      expiresInSeconds: 300,
+      resendCooldownSeconds: 60,
+      ...(process.env.DEMO_MODE === 'true' || !process.env.RESEND_API_KEY ? { demoOtp: otp } : {}),
+    };
+  }
+
+  @Throttle({ auth: { limit: 15, ttl: 60000 } })
+  @Post('sign-otp/verify')
+  async verifySignOtp(
+    @CurrentUser() user: Account,
+    @Body() body: VerifySignOtpDto,
+    @Req() req: any,
+  ) {
+    const ip = req.ip || req.headers['x-forwarded-for'];
+    const submittedOtp = String(body.otp ?? '').trim();
+    if (!/^\d{6}$/.test(submittedOtp)) {
+      throw new BadRequestException('รหัส OTP ต้องเป็นตัวเลข 6 หลัก');
+    }
+
+    const latest = await this.db.getLatestSignOtp(user.id);
+    if (!latest || latest.consumedAt || latest.expiresAt.getTime() < Date.now()) {
+      throw new BadRequestException('ไม่พบรหัส OTP ที่ใช้งานได้ หรือรหัสหมดอายุแล้ว กรุณาขอรหัสใหม่');
+    }
+
+    if (latest.attempts >= 5) {
+      await this.db.consumeSignOtp(latest.id);
+      throw new BadRequestException('รหัส OTP ถูกระงับเนื่องจากกรอกผิดเกิน 5 ครั้ง กรุณาขอรหัสใหม่');
+    }
+
+    const salt = process.env.OTP_SECRET || 'jongwen_sign_otp_secret_salt';
+    const submittedHash = crypto.createHmac('sha256', salt).update(submittedOtp).digest('hex');
+
+    if (submittedHash !== latest.codeHash) {
+      const newAttempts = latest.attempts + 1;
+      await this.db.recordSignOtpAttempt(latest.id, newAttempts);
+
+      await this.db.log('user', 'ยืนยันรหัส OTP ลงนามไม่สำเร็จ', `กรอกรหัสผิดครั้งที่ ${newAttempts}/5`, {
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        ip,
+      });
+
+      if (newAttempts >= 5) {
+        await this.db.consumeSignOtp(latest.id);
+        throw new BadRequestException('รหัส OTP ไม่ถูกต้อง และถูกระงับเนื่องจากกรอกผิดครบ 5 ครั้ง กรุณาขอรหัสใหม่');
+      }
+
+      throw new UnauthorizedException(`รหัส OTP ไม่ถูกต้อง (เหลือโอกาสอีก ${5 - newAttempts} ครั้ง)`);
+    }
+
+    // รหัสถูกต้อง -> ใช้ได้ครั้งเดียว มาร์ก consumed ทันที ป้องกัน OTP reuse
+    await this.db.consumeSignOtp(latest.id);
+
+    // สร้าง Verified Session ผูกกับ User ID และ Session Token (มีผล 30 นาที)
+    const sessionToken = req.token;
+    if (!sessionToken) {
+      throw new UnauthorizedException('ไม่พบโทเคนเซสชันการเข้าสู่ระบบ');
+    }
+
+    const verifiedExpiresAt = new Date(Date.now() + 30 * 60 * 1000);
+    const verifiedSession = await this.db.createSignVerifiedSession(user.id, sessionToken, verifiedExpiresAt);
+
+    await this.db.log('user', 'ยืนยัน OTP สำหรับลงนามสำเร็จ', 'สร้าง Verified Signing Session ระยะเวลา 30 นาที', {
+      id: user.id,
+      name: user.name,
+      role: user.role,
+      ip,
+    });
+
+    return {
+      ok: true,
+      verified: true,
+      expiresAt: verifiedSession.expiresAt.toISOString(),
+      message: 'ยืนยันตัวตนสำเร็จ สามารถลงนามเอกสารได้ตลอดเซสชัน',
+    };
+  }
+
+  @Get('sign-session/status')
+  async getSignSessionStatus(@CurrentUser() user: Account, @Req() req: any) {
+    const sessionToken = req.token;
+    if (!sessionToken) {
+      return { isVerified: false, email: user.email, maskedEmail: maskEmail(user.email) };
+    }
+    const verified = await this.db.getSignVerifiedSession(user.id, sessionToken);
+    return {
+      isVerified: !!verified,
+      expiresAt: verified?.expiresAt?.toISOString(),
+      email: user.email,
+      maskedEmail: maskEmail(user.email),
+    };
+  }
+
+  @Post('sign-session/revoke')
+  async revokeSignSession(@CurrentUser() user: Account, @Req() req: any) {
+    const sessionToken = req.token;
+    if (sessionToken) {
+      await this.db.revokeSignVerifiedSession(sessionToken);
+      await this.db.log('user', 'เพิกถอนเซสชันยืนยันการลงนาม', 'ผู้ใช้ขอยกเลิกเซสชันการลงนามก่อนกำหนด', {
+        id: user.id,
+        name: user.name,
+        role: user.role,
+      });
+    }
     return { ok: true };
   }
 }

@@ -51,6 +51,25 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   handovers: HandoverRecord[] = [];
   verifications: DocumentVerification[] = [];
   scanLogs: DocumentScanLog[] = [];
+  signOtpCodes: {
+    id: string;
+    accountId: string;
+    email: string;
+    codeHash: string;
+    attempts: number;
+    expiresAt: Date;
+    consumedAt: Date | null;
+    createdAt: Date;
+  }[] = [];
+  signVerifiedSessions: {
+    id: string;
+    accountId: string;
+    sessionToken: string;
+    verifiedAt: Date;
+    expiresAt: Date;
+    revokedAt: Date | null;
+    createdAt: Date;
+  }[] = [];
 
   private seq = { BK: 0, BR: 0, RP: 0, n: 0, l: 0, u: 100, v: 100, e: 100 };
   private resetCronTimer?: NodeJS.Timeout;
@@ -299,6 +318,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
   async revokeSession(token: string): Promise<void> {
     this.memorySessions.delete(token);
+    await this.revokeSignVerifiedSession(token);
     if (this.dbAvailable) {
       await this.prisma.session.delete({ where: { token } }).catch(() => {});
     }
@@ -574,7 +594,9 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
           "address_moo" = ${a.addressMoo ?? null},
           "address_subdistrict" = ${a.addressSubdistrict ?? null},
           "address_district" = ${a.addressDistrict ?? null},
-          "address_province" = ${a.addressProvince ?? null}
+          "address_province" = ${a.addressProvince ?? null},
+          "email" = ${a.email ?? null},
+          "email_verified" = ${a.emailVerified ?? false}
       WHERE "id" = ${a.id}
     `;
   }
@@ -878,6 +900,231 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  // ===================== Email OTP for Signing (Resend) =====================
+
+  async createSignOtp(accountId: string, email: string, codeHash: string, expiresAt: Date) {
+    const id = `sotp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const record = {
+      id,
+      accountId,
+      email,
+      codeHash,
+      attempts: 0,
+      expiresAt,
+      consumedAt: null as Date | null,
+      createdAt: new Date(),
+    };
+    this.signOtpCodes.push(record);
+    if (this.dbAvailable) {
+      await this.prisma.$executeRawUnsafe(
+        `INSERT INTO "sign_otp_codes" ("id", "account_id", "email", "code_hash", "attempts", "expires_at", "consumed_at", "created_at")
+         VALUES ($1, $2, $3, $4, $5, $6::timestamptz, $7, $8::timestamptz)
+         ON CONFLICT ("id") DO NOTHING`,
+        record.id,
+        record.accountId,
+        record.email,
+        record.codeHash,
+        record.attempts,
+        record.expiresAt,
+        record.consumedAt,
+        record.createdAt,
+      ).catch((err) => this.logger.error('Failed to persist sign OTP code', err));
+    }
+    return record;
+  }
+
+  async getLatestSignOtp(accountId: string) {
+    const mem = [...this.signOtpCodes]
+      .filter((o) => o.accountId === accountId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+    if (!this.dbAvailable) return mem ?? null;
+
+    try {
+      const rows = await this.prisma.$queryRawUnsafe<
+        {
+          id: string;
+          account_id: string;
+          email: string;
+          code_hash: string;
+          attempts: number;
+          expires_at: Date;
+          consumed_at: Date | null;
+          created_at: Date;
+        }[]
+      >(
+        `SELECT "id", "account_id", "email", "code_hash", "attempts", "expires_at", "consumed_at", "created_at"
+         FROM "sign_otp_codes"
+         WHERE "account_id" = $1
+         ORDER BY "created_at" DESC
+         LIMIT 1`,
+        accountId,
+      );
+      if (rows && rows.length > 0) {
+        const r = rows[0];
+        return {
+          id: r.id,
+          accountId: r.account_id,
+          email: r.email,
+          codeHash: r.code_hash,
+          attempts: r.attempts,
+          expiresAt: new Date(r.expires_at),
+          consumedAt: r.consumed_at ? new Date(r.consumed_at) : null,
+          createdAt: new Date(r.created_at),
+        };
+      }
+    } catch (err) {
+      this.logger.error('Failed to query latest sign OTP', err);
+    }
+    return mem ?? null;
+  }
+
+  async recordSignOtpAttempt(id: string, attempts: number) {
+    const item = this.signOtpCodes.find((o) => o.id === id);
+    if (item) item.attempts = attempts;
+    if (this.dbAvailable) {
+      await this.prisma.$executeRawUnsafe(
+        `UPDATE "sign_otp_codes" SET "attempts" = $1 WHERE "id" = $2`,
+        attempts,
+        id,
+      ).catch((err) => this.logger.error('Failed to update sign OTP attempts', err));
+    }
+  }
+
+  async consumeSignOtp(id: string) {
+    const now = new Date();
+    const item = this.signOtpCodes.find((o) => o.id === id);
+    if (item) item.consumedAt = now;
+    if (this.dbAvailable) {
+      await this.prisma.$executeRawUnsafe(
+        `UPDATE "sign_otp_codes" SET "consumed_at" = $1::timestamptz WHERE "id" = $2`,
+        now,
+        id,
+      ).catch((err) => this.logger.error('Failed to consume sign OTP', err));
+    }
+  }
+
+  async createSignVerifiedSession(accountId: string, sessionToken: string, expiresAt: Date) {
+    const id = `svs-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const now = new Date();
+    await this.revokeSignVerifiedSession(sessionToken);
+
+    const record = {
+      id,
+      accountId,
+      sessionToken,
+      verifiedAt: now,
+      expiresAt,
+      revokedAt: null as Date | null,
+      createdAt: now,
+    };
+    this.signVerifiedSessions.push(record);
+    if (this.dbAvailable) {
+      await this.prisma.$executeRawUnsafe(
+        `INSERT INTO "sign_verified_sessions" ("id", "account_id", "session_token", "verified_at", "expires_at", "revoked_at", "created_at")
+         VALUES ($1, $2, $3, $4::timestamptz, $5::timestamptz, $6, $7::timestamptz)
+         ON CONFLICT ("id") DO NOTHING`,
+        record.id,
+        record.accountId,
+        record.sessionToken,
+        record.verifiedAt,
+        record.expiresAt,
+        record.revokedAt,
+        record.createdAt,
+      ).catch((err) => this.logger.error('Failed to persist sign verified session', err));
+    }
+    return record;
+  }
+
+  async getSignVerifiedSession(accountId: string, sessionToken: string) {
+    const now = new Date();
+    if (!this.dbAvailable) {
+      const active = this.signVerifiedSessions.find(
+        (s) =>
+          s.accountId === accountId &&
+          s.sessionToken === sessionToken &&
+          !s.revokedAt &&
+          s.expiresAt > now,
+      );
+      return active ?? null;
+    }
+    try {
+      const rows = await this.prisma.$queryRawUnsafe<
+        {
+          id: string;
+          account_id: string;
+          session_token: string;
+          verified_at: Date;
+          expires_at: Date;
+          revoked_at: Date | null;
+          created_at: Date;
+        }[]
+      >(
+        `SELECT "id", "account_id", "session_token", "verified_at", "expires_at", "revoked_at", "created_at"
+         FROM "sign_verified_sessions"
+         WHERE "account_id" = $1 AND "session_token" = $2 AND "revoked_at" IS NULL AND "expires_at" > $3::timestamptz
+         ORDER BY "created_at" DESC
+         LIMIT 1`,
+        accountId,
+        sessionToken,
+        now,
+      );
+      if (rows && rows.length > 0) {
+        const r = rows[0];
+        return {
+          id: r.id,
+          accountId: r.account_id,
+          sessionToken: r.session_token,
+          verifiedAt: new Date(r.verified_at),
+          expiresAt: new Date(r.expires_at),
+          revokedAt: r.revoked_at ? new Date(r.revoked_at) : null,
+          createdAt: new Date(r.created_at),
+        };
+      }
+    } catch (err) {
+      this.logger.error('Failed to query sign verified session', err);
+    }
+    const mem = this.signVerifiedSessions.find(
+      (s) =>
+        s.accountId === accountId &&
+        s.sessionToken === sessionToken &&
+        !s.revokedAt &&
+        s.expiresAt > now,
+    );
+    return mem ?? null;
+  }
+
+  async revokeSignVerifiedSession(sessionToken: string) {
+    const now = new Date();
+    for (const s of this.signVerifiedSessions) {
+      if (s.sessionToken === sessionToken && !s.revokedAt) {
+        s.revokedAt = now;
+      }
+    }
+    if (this.dbAvailable) {
+      await this.prisma.$executeRawUnsafe(
+        `UPDATE "sign_verified_sessions" SET "revoked_at" = $1::timestamptz WHERE "session_token" = $2 AND "revoked_at" IS NULL`,
+        now,
+        sessionToken,
+      ).catch(() => {});
+    }
+  }
+
+  async revokeSignVerifiedSessionByAccount(accountId: string) {
+    const now = new Date();
+    for (const s of this.signVerifiedSessions) {
+      if (s.accountId === accountId && !s.revokedAt) {
+        s.revokedAt = now;
+      }
+    }
+    if (this.dbAvailable) {
+      await this.prisma.$executeRawUnsafe(
+        `UPDATE "sign_verified_sessions" SET "revoked_at" = $1::timestamptz WHERE "account_id" = $2 AND "revoked_at" IS NULL`,
+        now,
+        accountId,
+      ).catch(() => {});
+    }
+  }
+
   // ===================== Seed & Hydrate =====================
 
   async seedDatabase(forceClear = false) {
@@ -962,8 +1209,10 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
             address_subdistrict: string | null;
             address_district: string | null;
             address_province: string | null;
+            email: string | null;
+            email_verified: boolean | null;
           }[]
-        >`SELECT "id", "address_house_no", "address_moo", "address_subdistrict", "address_district", "address_province" FROM "accounts"`,
+        >`SELECT "id", "address_house_no", "address_moo", "address_subdistrict", "address_district", "address_province", "email", "email_verified" FROM "accounts"`,
         this.prisma.venue.findMany({ orderBy: { createdAt: 'asc' } }),
         this.prisma.equipment.findMany({ orderBy: { createdAt: 'asc' } }),
         this.prisma.request.findMany({
@@ -996,6 +1245,8 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         department: a.department,
         phone: a.phone,
         lineName: a.lineName ?? undefined,
+        email: addr?.email ?? undefined,
+        emailVerified: addr?.email_verified ?? false,
         addressHouseNo: addr?.address_house_no ?? undefined,
         addressMoo: addr?.address_moo ?? undefined,
         addressSubdistrict: addr?.address_subdistrict ?? undefined,
