@@ -453,7 +453,7 @@ export class AuthController {
       maskedEmail: masked,
       expiresInSeconds: 300,
       resendCooldownSeconds: 60,
-      ...(process.env.DEMO_MODE === 'true' || !process.env.RESEND_API_KEY ? { demoOtp: otp } : {}),
+      demoOtp: otp, // Mock OTP mode สำหรับการทดสอบ
     };
   }
 

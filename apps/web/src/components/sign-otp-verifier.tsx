@@ -297,10 +297,15 @@ export function SignOtpVerifier({
             <span>จำกัดกรอกผิดไม่เกิน 5 ครั้ง</span>
           </div>
 
-          {/* Demo OTP Helper (ช่วยทดสอบในโหมดเดโม) */}
+          {/* Mock OTP Helper สำหรับทดสอบ */}
           {demoOtp && (
-            <div className="mt-1 flex items-center gap-2 bg-[#FEF3C7] border border-[#FDE68A] text-[#92400E] px-3 py-1.5 rounded-lg text-[12px]">
-              <span>💡 โหมดทดสอบ (Demo/Dev): รหัสคือ <b>{demoOtp}</b></span>
+            <div className="mt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-[#FEF3C7] border border-[#FDE68A] text-[#92400E] px-3.5 py-2.5 rounded-xl text-[12.5px]">
+              <div className="flex items-center gap-2">
+                <span>💡 Mock OTP สำหรับทดสอบ:</span>
+                <span className="font-mono font-bold text-[15px] tracking-wider text-[#78350F] bg-white px-2 py-0.5 rounded border border-[#FDE68A]">
+                  {demoOtp}
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -308,9 +313,9 @@ export function SignOtpVerifier({
                   setDigits(arr);
                   handleVerify(demoOtp);
                 }}
-                className="font-semibold underline ml-1 hover:text-ink"
+                className="font-semibold text-brand hover:underline bg-white px-2.5 py-1 rounded-md border border-[#FDE68A] shadow-xs text-[12px] self-start sm:self-auto"
               >
-                กดเพื่อกรอกทันที
+                กดเพื่อกรอกและยืนยันทันที →
               </button>
             </div>
           )}
