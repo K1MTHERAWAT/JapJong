@@ -13,6 +13,8 @@ import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
 import {
+  Chip,
+  DatePickerField,
   OfficialGovFormDocument,
   SignatureBox,
   Stepper,
@@ -58,6 +60,14 @@ export default function BorrowWizardPage() {
     d.setDate(d.getDate() + 4);
     return d.toISOString().slice(0, 10);
   });
+
+  const borrowDays = useMemo(() => {
+    if (!pickupDate || !returnDate) return 1;
+    const s = new Date(pickupDate).getTime();
+    const e = new Date(returnDate).getTime();
+    const diff = Math.round((e - s) / 86400000);
+    return Math.max(1, diff + 1);
+  }, [pickupDate, returnDate]);
   const [purpose, setPurpose] = useState('');
   const [purposeItems, setPurposeItems] = useState<OfficialFormPurposeItem[]>([
     { item: '', forWhat: '' },
@@ -404,34 +414,61 @@ export default function BorrowWizardPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="jw-lbl">หน่วยงาน / ชุมชน</label>
-              <input
-                type="text"
-                value={organization}
-                onChange={(e) => setOrganization(e.target.value)}
-                className="jw-in"
-                placeholder="ระบุหน่วยงานหรือกลุ่มชุมชน"
-              />
+          <div>
+            <label className="jw-lbl">หน่วยงาน / ชุมชน</label>
+            <input
+              type="text"
+              value={organization}
+              onChange={(e) => setOrganization(e.target.value)}
+              className="jw-in"
+              placeholder="ระบุหน่วยงานหรือกลุ่มชุมชน"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="jw-lbl mb-0">กำหนดวันรับและคืนอุปกรณ์</label>
+              <Chip tone="green">{borrowDays} วัน</Chip>
             </div>
-            <div>
-              <label className="jw-lbl">วันที่รับ</label>
-              <input
-                type="date"
-                value={pickupDate}
-                onChange={(e) => setPickupDate(e.target.value)}
-                className="jw-in"
-              />
-            </div>
-            <div>
-              <label className="jw-lbl">กำหนดคืน</label>
-              <input
-                type="date"
-                value={returnDate}
-                onChange={(e) => setReturnDate(e.target.value)}
-                className="jw-in"
-              />
+
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-center gap-2">
+              <div className="border border-line rounded-xl p-2.5 bg-white flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] text-ink-mute">เริ่มต้น</span>
+                  <span className="text-[12px] text-brand font-semibold">{formatThaiDate(pickupDate, false)}</span>
+                </div>
+                <DatePickerField
+                  value={pickupDate}
+                  label="วันที่รับ"
+                  onChange={(value) => {
+                    setPickupDate(value);
+                    if (value > returnDate) {
+                      setReturnDate(value);
+                    }
+                  }}
+                />
+              </div>
+
+              <span className="hidden sm:inline text-ink-mute">
+                <Icon name="arrow-right" className="w-4 h-4" />
+              </span>
+
+              <div className="border border-line rounded-xl p-2.5 bg-white flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] text-ink-mute">สิ้นสุด</span>
+                  <span className="text-[12px] text-brand font-semibold">{formatThaiDate(returnDate, false)}</span>
+                </div>
+                <DatePickerField
+                  value={returnDate}
+                  label="กำหนดคืน"
+                  onChange={(value) => {
+                    setReturnDate(value);
+                    if (value < pickupDate) {
+                      setPickupDate(value);
+                    }
+                  }}
+                />
+              </div>
             </div>
           </div>
 
