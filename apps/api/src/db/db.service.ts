@@ -96,8 +96,14 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
            ADD COLUMN IF NOT EXISTS "address_moo" TEXT,
            ADD COLUMN IF NOT EXISTS "address_subdistrict" TEXT,
            ADD COLUMN IF NOT EXISTS "address_district" TEXT,
-           ADD COLUMN IF NOT EXISTS "address_province" TEXT`,
-        `CREATE TYPE "VerificationStatus" AS ENUM ('VALID', 'REVOKED', 'INVALID')`,
+           ADD COLUMN IF NOT EXISTS "address_province" TEXT,
+           ADD COLUMN IF NOT EXISTS "email" TEXT,
+           ADD COLUMN IF NOT EXISTS "email_verified" BOOLEAN NOT NULL DEFAULT false`,
+        `DO $$ BEGIN
+           CREATE TYPE "VerificationStatus" AS ENUM ('VALID', 'REVOKED', 'INVALID');
+         EXCEPTION
+           WHEN duplicate_object THEN null;
+         END $$;`,
         `CREATE TABLE IF NOT EXISTS "document_verifications" (
            "id" TEXT PRIMARY KEY,
            "document_id" TEXT NOT NULL,
@@ -127,11 +133,31 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
            "user_agent" TEXT,
            "scanned_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
          )`,
+        `CREATE TABLE IF NOT EXISTS "sign_otp_codes" (
+           "id" TEXT PRIMARY KEY,
+           "account_id" TEXT NOT NULL,
+           "email" TEXT NOT NULL,
+           "otp_hash" TEXT NOT NULL,
+           "expires_at" TIMESTAMPTZ(3) NOT NULL,
+           "consumed_at" TIMESTAMPTZ(3),
+           "failed_attempts" INTEGER NOT NULL DEFAULT 0,
+           "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+         )`,
+        `CREATE TABLE IF NOT EXISTS "sign_verified_sessions" (
+           "id" TEXT PRIMARY KEY,
+           "account_id" TEXT NOT NULL,
+           "session_token" TEXT NOT NULL,
+           "expires_at" TIMESTAMPTZ(3) NOT NULL,
+           "revoked_at" TIMESTAMPTZ(3),
+           "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+         )`,
         `CREATE INDEX IF NOT EXISTS "document_verifications_document_id_idx" ON "document_verifications"("document_id")`,
         `CREATE INDEX IF NOT EXISTS "document_verifications_token_idx" ON "document_verifications"("verification_token")`,
         `CREATE INDEX IF NOT EXISTS "document_verifications_doc_no_idx" ON "document_verifications"("document_number")`,
         `CREATE INDEX IF NOT EXISTS "document_scan_logs_verification_id_idx" ON "document_scan_logs"("verification_id")`,
         `CREATE INDEX IF NOT EXISTS "document_scan_logs_scanned_at_idx" ON "document_scan_logs"("scanned_at")`,
+        `CREATE INDEX IF NOT EXISTS "sign_otp_codes_account_email_idx" ON "sign_otp_codes"("account_id", "email")`,
+        `CREATE INDEX IF NOT EXISTS "sign_verified_sessions_acc_token_idx" ON "sign_verified_sessions"("account_id", "session_token")`,
       ];
       for (const stmt of initStatements) {
         await this.prisma.$executeRawUnsafe(stmt).catch((err) => {

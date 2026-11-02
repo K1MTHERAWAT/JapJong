@@ -80,9 +80,15 @@ async function main() {
   `);
 
   console.log('📦 Applying migration 3 (document_verifications & document_scan_logs)...');
-  await runSqlStatements(`
-    CREATE TYPE "VerificationStatus" AS ENUM ('VALID', 'REVOKED', 'INVALID');
+  await prisma.$executeRawUnsafe(`
+    DO $$ BEGIN
+      CREATE TYPE "VerificationStatus" AS ENUM ('VALID', 'REVOKED', 'INVALID');
+    EXCEPTION
+      WHEN duplicate_object THEN null;
+    END $$;
+  `).catch(() => {});
 
+  await runSqlStatements(`
     CREATE TABLE IF NOT EXISTS "document_verifications" (
       "id" TEXT PRIMARY KEY,
       "document_id" TEXT NOT NULL,
