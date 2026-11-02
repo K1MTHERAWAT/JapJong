@@ -12,6 +12,7 @@
 * **Backend API**: NestJS 11 + Express + RESTful API + ValidationPipe (`class-validator`)
 * **Database**: รองรับทั้ง **Supabase PostgreSQL (Cloud)** และ **PostgreSQL 16 (Docker Compose)**
 * **ORM & Migrations**: Prisma ORM v6 + สคริปต์อัปเดตโครงสร้างฐานข้อมูลอัตโนมัติ (`migrate-supabase.ts`)
+* **Document Security**: ระบบตรวจสอบเอกสารดิจิทัล QR Code (`qrcode`, `html5-qrcode`), รหัสยืนยันสุ่ม 32-byte, SHA-256 Document Hashing และบันทึกประวัติการสแกน
 * **Shared Package**: `@jongwen/shared` (TypeScript Types, Labels, RBAC Logic, Date Helpers, Period Conflict Checks)
 * **Testing & CI/CD**: Vitest (Unit Tests) + GitHub Actions CI Pipeline + Multi-stage Dockerfile
 
@@ -40,7 +41,7 @@ BookingV1/
 ├── apps/
 │   ├── api/                    # @jongwen/api — NestJS REST API (:4000/api)
 │   │   ├── prisma/
-│   │   │   ├── schema.prisma       # Prisma Data Model (14 ตาราง รวม sessions, sequences, otp_codes)
+│   │   │   ├── schema.prisma       # Prisma Data Model (16 ตาราง รวม verifications, scan_logs, sessions)
 │   │   │   ├── migrations/         # SQL Migration Files
 │   │   │   ├── migrate-supabase.ts # สคริปต์สร้างและอัปเดตตารางบน Supabase PostgreSQL
 │   │   │   └── seed.ts             # Standalone Seed Script (รองรับ argon2id hash)
@@ -48,6 +49,7 @@ BookingV1/
 │   │       ├── auth/             # Login, Register, OTP, Profile & Address, Password, Signature, PIN
 │   │       ├── resources/        # Venues, Equipment, Monthly Availability, Conflict & Stock Check
 │   │       ├── requests/         # Booking, Borrow, Repair, 3-Level Sign, Handover, Reschedule
+│   │       ├── documents/        # QR Code Verification, Document Hashing, Public & Staff Verify API
 │   │       ├── admin/            # Users & Permissions, Account Management, Overview, Activity Logs
 │   │       └── db/               # Prisma Database Service (Persistent DB Sessions & Sequences)
 │   └── web/                    # @jongwen/web — Next.js 15 (App Router) + Tailwind CSS (:3000)
@@ -62,10 +64,11 @@ BookingV1/
 │           │   ├── repair/       # แจ้งซ่อมบำรุงและติดตามสถานะ (Fast-ticket ไม่บังคับลงนาม)
 │           │   ├── requests/     # รายละเอียดคำขอ เอกสารราชการ A4 และขอเลื่อนวัน/ยกเลิก
 │           │   ├── history/      # ประวัติคำขอและการดำเนินการ (แยกตามบทบาทและฟิลเตอร์ครบชุด)
-│           │   ├── staff/        # เจ้าหน้าที่ (แดชบอร์ด, ตรวจคำขอ, รับมอบ–รับคืน, กรอกแทน Walk-in)
+│           │   ├── staff/        # เจ้าหน้าที่ (ตรวจคำขอ, รับมอบ–รับคืน, กรอกแทน, ตรวจสอบ QR Code /staff/verify)
+│           │   ├── verify/       # ตรวจสอบเอกสารดิจิทัลสาธารณะสำหรับประชาชน (/verify/[token])
 │           │   ├── approver/     # ปลัด อบต. / นายก อบต. (คิวลงนามอนุมัติด้วย PIN 6 หลัก, ใบอนุญาต PDF)
 │           │   └── admin/        # แอดมิน (ภาพรวมระบบ, จัดการทรัพยากร/แบบฟอร์ม, บัญชีผู้ใช้ & สิทธิ์)
-│           ├── components/       # AppShell, Sidebar (แยกหมวดหมู่), UI Primitives & OfficialGovFormDocument
+│           ├── components/       # AppShell, Sidebar (แยกหมวดหมู่), UI Primitives, DatePicker & OfficialGovFormDocument
 │           └── lib/api.ts        # Client API SDK
 ├── package.json
 └── pnpm-workspace.yaml
@@ -167,6 +170,11 @@ pnpm dev
 4. **Sidebar แยกหมวดหมู่ & Sticky Action Bar:**
    - แถบเมนูด้านซ้ายจัดหมวดหมู่ตามบทบาทชัดเจน (*บริการหลัก, รายการและประวัติ, งานเจ้าหน้าที่, งานผู้บริหาร, ระบบและผู้ดูแล, บัญชีผู้ใช้งาน*) ย่อ/ขยายได้ และรองรับ Mobile Drawer
    - มีแถบหัวข้อหน้า (Top Page Header) พร้อมปุ่มย้อนกลับ และแถบปุ่มดำเนินการด้านล่างแบบลอยตัว (Sticky Footer Action Bar) ในหน้าฟอร์มหลายขั้นตอน
+5. **ระบบตรวจสอบเอกสารราชการด้วย QR Code (Document Verification & Anti-Tampering):**
+   - เอกสารราชการที่ผ่านการอนุมัติแล้วจะได้รับการสร้างรหัสยืนยันดิจิทัล (Verification Token สุ่ม 32-byte) และคำนวณ **SHA-256 Hash** ประจำเอกสาร
+   - ฝัง QR Code ลงในเอกสารราชการทางการ (`OfficialGovFormDocument`) ที่มุมล่างขวา เชื่อมโยงตรงไปยัง URL ตรวจสอบสาธารณะ
+   - **ประชาชนทั่วไป (`/verify/[token]`):** ตรวจสอบสถานะเอกสารได้ทันทีจากสมาร์ตโฟน โดยไม่เปิดเผยข้อมูลส่วนบุคคล (PII Safe) แสดงเฉพาะสถานะความถูกต้อง วันที่ออกเอกสาร และหน่วยงานผู้ออก (อบต.น้ำชำ)
+   - **เจ้าหน้าที่ (`/staff/verify`):** สแกนผ่านกล้องมือถือสด (ตรวจจับกล้องหลังอัตโนมัติ), อัปโหลดรูปภาพ QR Code หรือค้นหาด้วยเลขที่เอกสาร แสดงข้อมูลระดับลึก เช่น ชื่อผู้ยื่น ลายมือชื่อการอนุมัติ พร้อมบันทึกประวัติการสแกนลงฐานข้อมูลอัตโนมัติ
 
 ---
 
@@ -180,6 +188,10 @@ pnpm dev
    - ปลัด อบต. (`APPROVER_L2`) และ นายก อบต. (`APPROVER_L1`) ต้องเป็นคนละบัญชีในการลงนามคำขอเดียวกัน
    - เจ้าหน้าที่ไม่สามารถตรวจรับมอบ–รับคืนอุปกรณ์ให้คำขอของตนเองได้
 5. **การเข้ารหัสด้วย Argon2id:** รหัสผ่านบัญชี, รหัส PIN 6 หลัก และรหัส OTP ได้รับการแฮชด้วย `argon2id`
+6. **การป้องกันการปลอมแปลงเอกสาร (Document Integrity & Anti-Tampering):**
+   - ตรวจสอบสถานะเอกสารแบบเรียลไทม์ผ่าน Backend (`VALID`, `REVOKED`, `INVALID`, `NOT_FOUND`)
+   - รองรับการเพิกถอนสิทธิ์เอกสาร (`POST /documents/:id/revoke`) และการออกเอกสารฉบับใหม่ (Versioning) โดยฉบับเดิมจะสิ้นผลทันที
+   - บันทึกประวัติการสแกนของเจ้าหน้าที่ (`DocumentScanLog`) พร้อม IP Address, User Agent และ Timestamp
 
 ---
 
@@ -194,12 +206,15 @@ erDiagram
     accounts ||--o{ notifications : "user_id"
     accounts ||--o{ sessions : "account_id"
     accounts ||--o{ activity_logs : "actor_id"
+    accounts ||--o{ document_scan_logs : "scanned_by"
 
     requests ||--o{ request_venues : "request_id"
     requests ||--o{ request_periods : "request_id"
     requests ||--o{ request_items : "request_id"
     requests ||--o{ signature_records : "request_id"
     requests ||--o{ handover_records : "request_id"
+    requests ||--o{ document_verifications : "document_id"
+    document_verifications ||--o{ document_scan_logs : "verification_id"
 
     venues ||--o{ request_venues : "venue_id"
     equipments ||--o{ request_items : "equipment_id"
@@ -377,5 +392,34 @@ erDiagram
         timestamptz expires_at
         timestamptz consumed_at
         timestamptz created_at
+    }
+
+    document_verifications {
+        string id PK
+        string document_id FK
+        string verification_token UK
+        string document_number
+        string document_hash "sha256"
+        int version
+        string status "VALID, REVOKED, INVALID"
+        string issuing_org
+        string document_type
+        text qr_code_data_url
+        timestamptz issued_at
+        timestamptz revoked_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    document_scan_logs {
+        serial id PK
+        string verification_id FK
+        string document_number
+        string scanned_by FK
+        string scanned_role
+        string result_status "VALID, REVOKED, NOT_FOUND, INVALID"
+        string ip_address
+        string user_agent
+        timestamptz scanned_at
     }
 ```
