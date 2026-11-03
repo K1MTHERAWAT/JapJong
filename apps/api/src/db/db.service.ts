@@ -2264,10 +2264,10 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         this.prisma.handoverRecord.findMany({ orderBy: { createdAt: 'asc' } }),
       ]);
 
-    const addrMap = new Map(accountAddresses.map((r) => [r.id, r]));
+    const addrMap = new Map((accountAddresses as any[]).map((r: any) => [r.id, r]));
 
-    this.accounts = dbAccounts.map((a) => {
-      const addr = addrMap.get(a.id);
+    this.accounts = (dbAccounts || []).map((a: any) => {
+      const addr = addrMap.get(a.id) as any;
       return {
         id: a.id,
         username: a.username,
@@ -2291,7 +2291,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         permissions:
           a.permissions && typeof a.permissions === 'object'
             ? (a.permissions as Record<PermissionKey, boolean>)
-            : { ...DEFAULT_PERMISSIONS[a.role] },
+            : { ...DEFAULT_PERMISSIONS[(a.role as Role) || 'USER'] },
         signature: a.signature,
         pin: a.pin,
         isDemo: a.isDemo,
@@ -2300,7 +2300,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       };
     });
 
-    this.venues = dbVenues.map((v) => ({
+    this.venues = (dbVenues || []).map((v: any) => ({
       id: v.id,
       name: v.name,
       type: v.type,
@@ -2318,7 +2318,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       approvalLevels: v.approvalLevels,
     }));
 
-    this.equipment = dbEquipment.map((e) => ({
+    this.equipment = (dbEquipment || []).map((e: any) => ({
       id: e.id,
       name: e.name,
       category: e.category,
@@ -2326,7 +2326,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       enabled: e.enabled,
     }));
 
-    this.requests = dbRequests.map((r): AnyRequest => {
+    this.requests = (dbRequests || []).map((r: any): AnyRequest => {
       const base = {
         id: r.id,
         code: r.code,
@@ -2354,9 +2354,9 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       };
 
       const currentRound = r.approvalRound ?? 1;
-      const signatures = r.signatures
-        .filter((s) => s.round === currentRound)
-        .map((s) => ({
+      const signatures = (r.signatures || [])
+        .filter((s: any) => s.round === currentRound)
+        .map((s: any) => ({
           level: s.level,
           round: s.round,
           signerId: s.signerId,
