@@ -37,11 +37,11 @@ export class EmailService {
     otpCode: string,
     recipientName?: string,
   ): Promise<SendOtpResult> {
-    const subject = `รหัส OTP สำหรับยืนยันการลงนามเอกสาร: ${otpCode} (อบต.น้ำชำ)`;
+    const subject = `รหัส OTP สำหรับยืนยันการลงนามเอกสาร: ${otpCode} (อบต.)`;
 
     /* ปิดการยิง API Resend จริงชั่วคราว
     const fromAddress =
-      process.env.RESEND_FROM?.trim() || 'Jongwen อบต.น้ำชำ <onboarding@resend.dev>';
+      process.env.RESEND_FROM?.trim() || 'JapJong อบต. <onboarding@resend.dev>';
 
     if (this.resend) {
       try {

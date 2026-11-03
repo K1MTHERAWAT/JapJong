@@ -6,11 +6,14 @@ import {
   Post,
   Req,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Account, VerificationDocumentType } from '@jongwen/shared';
 import { CurrentUser, Public, Roles } from '../auth/auth.guard';
 import { DocumentsService } from './documents.service';
 
+@ApiTags('Documents')
+@ApiBearerAuth('bearer')
 @Controller('documents')
 export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}

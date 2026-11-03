@@ -53,7 +53,7 @@ export default function PublicVerifyPage() {
             ระบบตรวจสอบความถูกต้องเอกสาร (QR Code Verification)
           </h2>
           <p className="text-[13.5px] text-ink-mute mt-1">
-            องค์การบริหารส่วนตำบลน้ำชำ อำเภอสูงเม่น จังหวัดแพร่
+            องค์การบริหารส่วนตำบล (อบต.)
           </p>
         </div>
 
@@ -133,7 +133,7 @@ export default function PublicVerifyPage() {
 
                   <div className="bg-soft/70 p-3.5 rounded-xl flex flex-col gap-1">
                     <span className="text-[12px] text-ink-mute font-medium">หน่วยงานผู้ออกเอกสาร</span>
-                    <b className="text-[15px] text-ink">{result.issuingOrg || 'องค์การบริหารส่วนตำบลน้ำชำ'}</b>
+                    <b className="text-[15px] text-ink">{result.issuingOrg || 'องค์การบริหารส่วนตำบล (อบต.)'}</b>
                   </div>
 
                   <div className="bg-soft/70 p-3.5 rounded-xl flex flex-col gap-1">
@@ -164,7 +164,7 @@ export default function PublicVerifyPage() {
             <div className="p-4 rounded-xl bg-soft text-[12.5px] text-ink-mute leading-relaxed border border-line flex items-start gap-2.5">
               <Icon name="shield-check" className="w-4 h-4 text-brand shrink-0 mt-0.5" />
               <span>
-                ข้อมูลนี้ดึงสดจากระบบฐานข้อมูลกลาง อบต.น้ำชำ เพื่อคุ้มครองข้อมูลส่วนบุคคล (PDPA)
+                ข้อมูลนี้ดึงสดจากระบบฐานข้อมูลกลาง อบต. เพื่อคุ้มครองข้อมูลส่วนบุคคล (PDPA)
                 ระบบจะไม่แสดงเลขประจำตัวประชาชนหรือเบอร์โทรศัพท์ผ่านหน้าตรวจสอบสาธารณะนี้
               </span>
             </div>

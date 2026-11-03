@@ -7,6 +7,7 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Response, Request } from 'express';
 import { Account } from '@jongwen/shared';
@@ -19,6 +20,7 @@ import {
   LineRegistrationStatusQueryDto,
 } from './line-auth.dto';
 
+@ApiTags('Authentication')
 @Controller('auth/line')
 export class LineAuthController {
   constructor(

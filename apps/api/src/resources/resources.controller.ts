@@ -1,4 +1,5 @@
 import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import {
   ACTIVE_BOOKING_STATUSES,
   Account,
@@ -18,6 +19,7 @@ import { DbService } from '../db/db.service';
 const VALID_VENUE_TYPES: VenueType[] = ['meeting', 'pavilion', 'field', 'yard', 'training'];
 const VALID_EQUIPMENT_CATEGORIES: EquipmentCategory[] = ['audio', 'tent', 'it'];
 
+@ApiTags('Resources')
 @Controller('resources')
 export class ResourcesController {
   constructor(private readonly db: DbService) {}

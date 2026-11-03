@@ -80,10 +80,10 @@ export default function AdminHomePage() {
           </div>
         </div>
 
-        {/* จัดการระบบ 3 ปุ่ม */}
+        {/* จัดการระบบ */}
         <div>
           <h2 className="text-[16px] sm:text-[18px] font-bold text-ink mb-3">จัดการระบบ</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             <Link
               href="/admin/resources"
               className="jw-card p-4 flex items-center gap-3 hover:ring-1 hover:ring-brand transition"
@@ -91,7 +91,10 @@ export default function AdminHomePage() {
               <div className="w-11 h-11 rounded-2xl bg-brand-mint text-brand flex items-center justify-center shrink-0">
                 <Icon name="building-community" className="w-6 h-6" />
               </div>
-              <b className="text-[15px]">ทรัพยากร</b>
+              <div>
+                <b className="text-[15px] block text-ink">ทรัพยากร</b>
+                <span className="text-[12px] text-ink-mute">สถานที่ & อุปกรณ์</span>
+              </div>
             </Link>
 
             <Link
@@ -101,18 +104,39 @@ export default function AdminHomePage() {
               <div className="w-11 h-11 rounded-2xl bg-brand-mint text-brand flex items-center justify-center shrink-0">
                 <Icon name="shield-check" className="w-6 h-6" />
               </div>
-              <b className="text-[15px]">จัดการสิทธิ์</b>
+              <div>
+                <b className="text-[15px] block text-ink">จัดการสิทธิ์</b>
+                <span className="text-[12px] text-ink-mute">บัญชีผู้ใช้ & บทบาท</span>
+              </div>
             </Link>
 
             <Link
-              href="/admin/resources"
+              href="/admin/notifications"
               className="jw-card p-4 flex items-center gap-3 hover:ring-1 hover:ring-brand transition"
             >
               <div className="w-11 h-11 rounded-2xl bg-brand-mint text-brand flex items-center justify-center shrink-0">
+                <Icon name="bell" className="w-6 h-6" />
+              </div>
+              <div>
+                <b className="text-[15px] block text-ink">ประวัติแจ้งเตือน</b>
+                <span className="text-[12px] text-ink-mute">LINE OA & Outbox</span>
+              </div>
+            </Link>
+
+            <a
+              href="/api/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="jw-card p-4 flex items-center gap-3 hover:ring-1 hover:ring-emerald-500 transition group"
+            >
+              <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition">
                 <Icon name="file-text" className="w-6 h-6" />
               </div>
-              <b className="text-[15px]">แบบฟอร์ม</b>
-            </Link>
+              <div>
+                <b className="text-[15px] block text-ink group-hover:text-emerald-700">OpenAPI Docs ↗</b>
+                <span className="text-[12px] text-ink-mute">Interactive Swagger UI</span>
+              </div>
+            </a>
           </div>
         </div>
 

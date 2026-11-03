@@ -10,6 +10,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
   Account,
@@ -25,6 +26,8 @@ import { DbService } from '../db/db.service';
 
 const VALID_ROLES: Role[] = ['USER', 'STAFF', 'APPROVER_L2', 'APPROVER_L1', 'ADMIN'];
 
+@ApiTags('Admin')
+@ApiBearerAuth('bearer')
 @Controller()
 export class AdminController {
   constructor(private readonly db: DbService) {}

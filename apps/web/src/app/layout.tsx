@@ -12,8 +12,8 @@ const noto = Noto_Sans_Thai({
 });
 
 export const metadata: Metadata = {
-  title: 'Jongwen · ระบบจองสถานที่และครุภัณฑ์',
-  description: 'ระบบจองสถานที่ ยืม–คืนครุภัณฑ์ และแจ้งซ่อม (Jongwen)',
+  title: 'จับจอง · ระบบขอใช้สถานที่ ขอใช้อุปกรณ์ และแจ้งซ่อม',
+  description: 'ระบบขอใช้สถานที่ราชการ ขอยืม–คืนครุภัณฑ์ และแจ้งซ่อมบำรุง (จับจอง)',
   icons: {
     icon: '/icon.png',
     shortcut: '/favicon.ico',

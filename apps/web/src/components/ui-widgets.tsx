@@ -1289,7 +1289,7 @@ export function OfficialGovFormDocument({
                   <b>วันที่ออกเอกสาร:</b> {formatThaiDateTime(activeVer.issuedAt, true)}
                 </div>
                 <div>
-                  <b>หน่วยงานผู้ออกเอกสาร:</b> {activeVer.issuingOrg || 'องค์การบริหารส่วนตำบลน้ำชำ'}
+                  <b>หน่วยงานผู้ออกเอกสาร:</b> {activeVer.issuingOrg || 'องค์การบริหารส่วนตำบล (อบต.)'}
                 </div>
                 <div className="text-[10px] text-[#64748B] font-mono break-all">
                   รหัสยืนยัน: {activeVer.verificationToken}

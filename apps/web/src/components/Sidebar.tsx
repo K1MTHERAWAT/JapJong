@@ -74,17 +74,17 @@ export function Sidebar({ items }: { items: NavItem[] }) {
         <div className="relative flex flex-col gap-1 overflow-visible flex-1">
           {/* Header */}
           <div className={`relative flex items-center mb-2 ${open ? 'h-11 justify-between pl-2' : 'h-11 justify-center'}`}>
-            <Link href="/" className={`flex items-center gap-2.5 min-w-0 ${open ? '' : 'justify-center'}`} title="Jongwen">
+            <Link href="/" className={`flex items-center gap-2.5 min-w-0 ${open ? '' : 'justify-center'}`} title="จับจอง">
               <div className={`size-8 rounded-control overflow-hidden shrink-0 flex items-center justify-center bg-surface-muted border border-line-soft ${open ? '' : 'lg:mx-auto'}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/logo.png"
-                  alt="Jongwen Logo"
+                  alt="โลโก้จับจอง"
                   className="size-full object-contain"
                 />
               </div>
               <span className={['text-heading text-ink font-bold tracking-tight', open ? '' : 'lg:sr-only'].join(' ')}>
-                Jongwen
+                จับจอง
               </span>
             </Link>
             <button

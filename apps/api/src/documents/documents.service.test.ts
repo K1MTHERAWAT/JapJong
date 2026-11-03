@@ -77,7 +77,7 @@ describe('DocumentsService & QR Code Verification', () => {
 
     expect(pubRes.status).toBe('VALID');
     expect(pubRes.documentNumber).toBe('BK-2569-9999');
-    expect(pubRes.issuingOrg).toBe('องค์การบริหารส่วนตำบลน้ำชำ');
+    expect(pubRes.issuingOrg).toBe('องค์การบริหารส่วนตำบล (อบต.)');
     expect(pubRes.documentHash).toBe(ver.documentHash);
     // ไม่เปิดเผยชื่อผู้ขอในผลลัพธ์สาธารณะ เพื่อคุ้มครองข้อมูลส่วนบุคคล (PDPA)
     expect((pubRes as any).requesterName).toBeUndefined();

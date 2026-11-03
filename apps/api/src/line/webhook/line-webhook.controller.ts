@@ -1,8 +1,10 @@
 import { Body, Controller, Headers, HttpCode, Post, Req } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { Public } from '../../auth/auth.guard';
 import { LineWebhookService } from './line-webhook.service';
 import { LineWebhookRequestBody } from './line-webhook.types';
 
+@ApiTags('Notifications')
 @Controller('line')
 export class LineWebhookController {
   constructor(private readonly webhookService: LineWebhookService) {}

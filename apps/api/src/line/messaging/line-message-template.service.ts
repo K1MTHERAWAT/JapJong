@@ -50,13 +50,13 @@ export class LineMessageTemplateService {
 
     let category: NotificationCategory = 'SYSTEM';
     let referenceType: NotificationReferenceType = 'system';
-    let inAppTitle = 'Jongwen แจ้งเตือน';
+    let inAppTitle = 'จับจอง แจ้งเตือน';
     let inAppMessage = '';
     let defaultLink = '/';
-    let headerLabel = 'Jongwen แจ้งเตือน';
+    let headerLabel = 'จับจอง';
     let headline = '';
     let details: { label: string; value: string }[] = [];
-    let footerNote = 'สามารถเข้าสู่ระบบ Jongwen เพื่อตรวจสอบรายละเอียดเพิ่มเติม';
+    let footerNote = 'สามารถเข้าสู่ระบบจับจอง เพื่อตรวจสอบรายละเอียดเพิ่มเติม';
 
     switch (input.event) {
       // ===================== 5.1 ระบบจองสถานที่ราชการ =====================
@@ -150,7 +150,7 @@ export class LineMessageTemplateService {
       case 'STAFF_NEW_BOOKING':
         category = 'BOOKING_STATUS';
         referenceType = 'booking';
-        headerLabel = 'Jongwen แจ้งเตือนเจ้าหน้าที่';
+        headerLabel = 'จับจอง เจ้าหน้าที่';
         inAppTitle = 'มีคำขอจองสถานที่ใหม่';
         inAppMessage = `${code} · ${requester}`;
         defaultLink = refId ? `/staff/review?id=${refId}` : '/staff/review';
@@ -166,7 +166,7 @@ export class LineMessageTemplateService {
       case 'STAFF_BOOKING_RESCHEDULED':
         category = 'BOOKING_STATUS';
         referenceType = 'booking';
-        headerLabel = 'Jongwen แจ้งเตือนเจ้าหน้าที่';
+        headerLabel = 'จับจอง เจ้าหน้าที่';
         inAppTitle = `คำขอจอง ${code} ขอเลื่อนวันใช้งาน`;
         inAppMessage = `${code} · ${requester} ส่งคำขอพิจารณาใหม่`;
         defaultLink = refId ? `/staff/review?id=${refId}` : '/staff/review';
@@ -297,7 +297,7 @@ export class LineMessageTemplateService {
       case 'STAFF_NEW_BORROW':
         category = 'BORROW_STATUS';
         referenceType = 'borrow';
-        headerLabel = 'Jongwen แจ้งเตือนเจ้าหน้าที่';
+        headerLabel = 'จับจอง เจ้าหน้าที่';
         inAppTitle = 'มีคำขอยืมครุภัณฑ์ใหม่';
         inAppMessage = `${code} · ${requester}`;
         defaultLink = refId ? `/staff/review?id=${refId}` : '/staff/review';
@@ -313,7 +313,7 @@ export class LineMessageTemplateService {
       case 'STAFF_BORROW_RETURN_REQUESTED':
         category = 'BORROW_RETURN';
         referenceType = 'borrow';
-        headerLabel = 'Jongwen แจ้งเตือนเจ้าหน้าที่';
+        headerLabel = 'จับจอง เจ้าหน้าที่';
         inAppTitle = `แจ้งคืนอุปกรณ์ ${code}`;
         inAppMessage = requester;
         defaultLink = refId ? `/staff/handover?id=${refId}` : '/staff/handover';
@@ -329,7 +329,7 @@ export class LineMessageTemplateService {
       case 'STAFF_BORROW_OVERDUE':
         category = 'BORROW_RETURN';
         referenceType = 'borrow';
-        headerLabel = 'Jongwen แจ้งเตือนเจ้าหน้าที่';
+        headerLabel = 'จับจอง เจ้าหน้าที่';
         inAppTitle = `รายการยืม ${code} เลยกำหนดส่งคืน`;
         inAppMessage = `${requester} · กำหนดคืน ${dateText}`;
         defaultLink = refId ? `/staff/handover?id=${refId}` : '/staff/handover';
@@ -445,7 +445,7 @@ export class LineMessageTemplateService {
       case 'STAFF_NEW_REPAIR':
         category = 'REPAIR_STATUS';
         referenceType = 'repair';
-        headerLabel = 'Jongwen แจ้งเตือนเจ้าหน้าที่';
+        headerLabel = 'จับจอง เจ้าหน้าที่';
         inAppTitle = 'แจ้งซ่อมใหม่';
         inAppMessage = `${code} · ${loc}`;
         defaultLink = refId ? `/staff/review?id=${refId}` : '/staff/review';
@@ -461,7 +461,7 @@ export class LineMessageTemplateService {
       case 'STAFF_REPAIR_REOPENED':
         category = 'REPAIR_STATUS';
         referenceType = 'repair';
-        headerLabel = 'Jongwen แจ้งเตือนเจ้าหน้าที่';
+        headerLabel = 'จับจอง เจ้าหน้าที่';
         inAppTitle = `งานซ่อม ${code} ขอให้ตรวจสอบซ้ำ`;
         inAppMessage = `${loc} · ผู้แจ้งขอให้แก้ไขเพิ่มเติม`;
         defaultLink = refId ? `/staff/review?id=${refId}` : '/staff/review';
@@ -477,7 +477,7 @@ export class LineMessageTemplateService {
       case 'STAFF_REPAIR_CONFIRMED':
         category = 'REPAIR_STATUS';
         referenceType = 'repair';
-        headerLabel = 'Jongwen แจ้งเตือนเจ้าหน้าที่';
+        headerLabel = 'จับจอง เจ้าหน้าที่';
         inAppTitle = `ผู้แจ้งตรวจรับงานซ่อม ${code} แล้ว`;
         inAppMessage = `${loc} · ปิดงานซ่อมเรียบร้อย`;
         defaultLink = refId ? `/staff/review?id=${refId}` : '/staff/review';
@@ -533,7 +533,7 @@ export class LineMessageTemplateService {
       case 'STAFF_SIGNING_REQUIRED':
         category = 'DOCUMENT_SIGNING';
         referenceType = 'signing';
-        headerLabel = 'Jongwen แจ้งเตือนผู้มีอำนาจลงนาม';
+        headerLabel = 'จับจอง ผู้มีอำนาจลงนาม';
         inAppTitle = input.statusLabel ? `${input.statusLabel} ${code}` : `รอลงนามเอกสาร ${code}`;
         inAppMessage = requester;
         defaultLink = refId ? `/approver/sign/${refId}` : '/approver';
@@ -549,7 +549,7 @@ export class LineMessageTemplateService {
       case 'STAFF_SIGNING_RETURNED':
         category = 'DOCUMENT_SIGNING';
         referenceType = 'signing';
-        headerLabel = 'Jongwen แจ้งเตือนเจ้าหน้าที่';
+        headerLabel = 'จับจอง เจ้าหน้าที่';
         inAppTitle = `เอกสาร ${code} ถูกส่งกลับมาแก้ไข`;
         inAppMessage = reason;
         defaultLink = refId ? `/staff/review?id=${refId}` : '/staff/review';
@@ -565,12 +565,12 @@ export class LineMessageTemplateService {
       default:
         category = 'SYSTEM';
         referenceType = 'system';
-        inAppTitle = 'ทดสอบระบบแจ้งเตือน Jongwen';
+        inAppTitle = 'ทดสอบระบบแจ้งเตือน จับจอง';
         inAppMessage = 'ระบบเชื่อมต่อการแจ้งเตือนผ่านเว็บไซต์และ LINE Official Account พร้อมใช้งาน';
         defaultLink = '/account';
         headline = 'ทดสอบการแจ้งเตือนสำเร็จ';
         details = [
-          { label: 'บริการ', value: 'ระบบแจ้งเตือนอัตโนมัติ Jongwen' },
+          { label: 'บริการ', value: 'ระบบแจ้งเตือนอัตโนมัติ จับจอง' },
           { label: 'สถานะ', value: 'เชื่อมต่อพร้อมใช้งาน' },
         ];
         break;
@@ -709,7 +709,7 @@ export class LineMessageTemplateService {
               height: 'sm',
               action: {
                 type: 'uri',
-                label: 'เข้าสู่ระบบ Jongwen',
+                label: 'เข้าสู่ระบบจับจอง',
                 uri: safeUrl,
               },
             },

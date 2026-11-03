@@ -2,7 +2,7 @@
   "name": "jongwen-booking",
   "private": true,
   "version": "0.1.0",
-  "description": "Jongwen · ระบบจองสถานที่ ยืม–คืนครุภัณฑ์ และแจ้งซ่อม (monorepo: Next.js + NestJS + Tailwind)",
+  "description": "JapJong (จับจอง) · ระบบขอใช้สถานที่ ขอใช้อุปกรณ์ และแจ้งซ่อม (monorepo: Next.js + NestJS + Tailwind)",
   "scripts": {
     "build:shared": "pnpm --filter @jongwen/shared build",
     "dev": "pnpm build:shared && pnpm --parallel --filter @jongwen/api --filter @jongwen/web dev",

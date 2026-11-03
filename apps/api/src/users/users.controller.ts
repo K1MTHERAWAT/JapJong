@@ -6,6 +6,7 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Account } from '@jongwen/shared';
 import { CurrentUser } from '../auth/auth.guard';
 import { DbService } from '../db/db.service';
@@ -45,6 +46,8 @@ export class WithdrawConsentDto {
   consentType!: string;
 }
 
+@ApiTags('Authentication')
+@ApiBearerAuth('bearer')
 @Controller('users')
 export class UsersController {
   constructor(private readonly db: DbService) {}

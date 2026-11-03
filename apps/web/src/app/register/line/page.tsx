@@ -167,7 +167,7 @@ function LineRegisterContent() {
                 ยินดีต้อนรับ, {lineProfile?.displayName || 'ผู้ใช้งาน LINE'}
               </h1>
               <p className="text-[13px] text-ink-mute">
-                กรุณาระบุข้อมูลเพิ่มเติมและให้ความยินยอมเพื่อเริ่มใช้งานระบบ Jongwen
+                กรุณาระบุข้อมูลเพิ่มเติมและให้ความยินยอมเพื่อเริ่มใช้งานระบบจับจอง
               </p>
             </div>
           </div>
@@ -227,7 +227,7 @@ function LineRegisterContent() {
                 <div className="text-[12.5px] text-ink-mute leading-relaxed bg-white p-3.5 rounded-xl border border-line flex flex-col gap-2 max-h-[160px] overflow-y-auto">
                   <b className="text-ink">วัตถุประสงค์การเก็บรวบรวมและใช้ข้อมูลส่วนบุคคล:</b>
                   <p>
-                    1. องค์การบริหารส่วนตำบลน้ำชำ จัดเก็บข้อมูล ชื่อ-นามสกุล เบอร์โทรศัพท์ และข้อมูลโปรไฟล์ LINE ของท่านเพื่อวัตถุประสงค์ในการยืนยันตัวบุคคลในการขอใช้สถานที่ การยืม-คืนอุปกรณ์ และการแจ้งซ่อมแซม
+                    1. องค์การบริหารส่วนตำบล จัดเก็บข้อมูล ชื่อ-นามสกุล เบอร์โทรศัพท์ และข้อมูลโปรไฟล์ LINE ของท่านเพื่อวัตถุประสงค์ในการยืนยันตัวบุคคลในการขอใช้สถานที่ การยืม-คืนอุปกรณ์ และการแจ้งซ่อมแซม
                   </p>
                   <p>
                     2. การประมวลผลข้อมูลดำเนินการภายใต้ฐานความยินยอมและฐานการปฏิบัติหน้าที่ตามภารกิจของหน่วยงานรัฐ (Public Task)
@@ -248,7 +248,7 @@ function LineRegisterContent() {
                 />
                 <span className="leading-snug">
                   <span className="text-status-crit font-bold">[จำเป็น]</span> ข้าพเจ้ายอมรับ{' '}
-                  <span className="font-semibold underline">ข้อกำหนดและเงื่อนไขการให้บริการ</span> ของระบบ Jongwen
+                  <span className="font-semibold underline">ข้อกำหนดและเงื่อนไขการให้บริการ</span> ของระบบจับจอง
                 </span>
               </label>
 

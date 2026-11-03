@@ -6,6 +6,7 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import * as express from 'express';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 // โหลดค่าจากไฟล์ .env ในโฟลเดอร์ apps/api (กรณีรันผ่าน nest start ที่ไม่ได้โหลด .env อัตโนมัติ)
 (() => {
@@ -57,8 +58,13 @@ async function bootstrap() {
   // รองรับ Reverse Proxy / PaaS (เช่น Cloud Run, Nginx, Railway) ให้ throttler จับ IP จริงผ่าน X-Forwarded-For
   app.set('trust proxy', 1);
 
-  // Security headers ด้วย helmet
-  app.use(helmet());
+  // Security headers ด้วย helmet (ปิด CSP เฉพาะในระดับ global เพื่อให้ Swagger UI render CSS/JS ได้สมบูรณ์)
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+    }),
+  );
 
   // ตั้ง body limit ให้ตรงกับขนาดข้อมูลรวมภาพลายเซ็น และเก็บ rawBody สำหรับตรวจสอบ X-Line-Signature
   app.use(
@@ -97,11 +103,53 @@ async function bootstrap() {
     next();
   });
 
+  // ตั้งค่า OpenAPI Interactive (Swagger UI)
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('JapJong API Documentation')
+    .setDescription(
+      'ระบบบริหารจัดการขอใช้สถานที่ราชการ ขอยืม–คืนครุภัณฑ์ แจ้งซ่อมบำรุง และระบบแจ้งเตือน LINE Official Account — ระบบจับจอง (JapJong)',
+    )
+    .setVersion('1.0.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'Token',
+        name: 'Authorization',
+        description: 'กรอก Session Token (เช่น ได้จาก POST /api/auth/login)',
+        in: 'header',
+      },
+      'bearer',
+    )
+    .addTag('Authentication', 'เข้าสู่ระบบ, ลงทะเบียน, LINE Login, และจัดการโปรไฟล์')
+    .addTag('Requests', 'คำขอจองสถานที่, ยืม-คืนครุภัณฑ์, แจ้งซ่อมบำรุง และการลงนาม')
+    .addTag('Notifications', 'ศูนย์การแจ้งเตือน, การตั้งค่าช่องทางรับแจ้งเตือน, และ LINE OA Push Message')
+    .addTag('Resources', 'ข้อมูลสถานที่และครุภัณฑ์ ตรวจสอบคิวว่างและสต็อก')
+    .addTag('Documents', 'การตรวจสอบเอกสารราชการอิเล็กทรอนิกส์ด้วย QR Code')
+    .addTag('Admin', 'ภาพรวมระบบ จัดการบัญชีผู้ใช้งาน สิทธิ์ และ Logs')
+    .build();
+
+  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, swaggerDocument, {
+    customSiteTitle: 'JapJong API · OpenAPI Interactive',
+    customCss: `
+      .swagger-ui .topbar { background-color: #047857; }
+      .swagger-ui .topbar .topbar-wrapper a span { display: inline-block; font-weight: bold; }
+    `,
+    swaggerOptions: {
+      persistAuthorization: true,
+      filter: true,
+      tagsSorter: 'alpha',
+    },
+  });
+
   const port = Number(process.env.PORT ?? 4000);
   await app.listen(port);
   // eslint-disable-next-line no-console
   console.log(
-    `🚀 Jongwen API running at http://localhost:${port}/api (DEMO_MODE: ${process.env.DEMO_MODE === 'true'})`,
+    `🚀 JapJong API running at http://localhost:${port}/api (DEMO_MODE: ${process.env.DEMO_MODE === 'true'})`,
   );
+  // eslint-disable-next-line no-console
+  console.log(`📚 OpenAPI Interactive Docs at http://localhost:${port}/api/docs`);
 }
 bootstrap();

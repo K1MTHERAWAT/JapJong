@@ -262,7 +262,7 @@ export default function NotificationSettingsPage() {
               </div>
 
               <div className="text-[12px] text-muted leading-relaxed border-t border-line-soft pt-2.5">
-                💡 <b>คำแนะนำ:</b> เพื่อให้ได้รับข้อความแจ้งเตือน กรุณาเพิ่มเพื่อน LINE OA ของ Jongwen และหลีกเลี่ยงการบล็อกบัญชี
+                💡 <b>คำแนะนำ:</b> เพื่อให้ได้รับข้อความแจ้งเตือน กรุณาเพิ่มเพื่อน LINE OA ของระบบจับจอง และหลีกเลี่ยงการบล็อกบัญชี
               </div>
             </div>
 

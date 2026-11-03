@@ -178,7 +178,7 @@ export class DocumentsService {
       status: req.status === 'cancelled' ? 'REVOKED' : 'VALID',
       documentType: docType,
       title,
-      issuingOrg: 'องค์การบริหารส่วนตำบลน้ำชำ',
+      issuingOrg: 'องค์การบริหารส่วนตำบล (อบต.)',
       metadata: {
         requestId: req.id,
         requestCode: req.code,
@@ -304,7 +304,7 @@ export class DocumentsService {
       version: ver.version,
       documentHash: ver.documentHash,
       requestStatus: req?.status,
-      message: 'เอกสารถูกต้องและยังมีผลสมบูรณ์ตามฐานข้อมูลขององค์การบริหารส่วนตำบลน้ำชำ',
+      message: 'เอกสารถูกต้องและยังมีผลสมบูรณ์ตามฐานข้อมูลขององค์การบริหารส่วนตำบล (อบต.)',
     };
   }
 

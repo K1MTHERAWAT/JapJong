@@ -1,4 +1,5 @@
 import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, NotFoundException, Patch, Post, Req, UnauthorizedException } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import * as crypto from 'crypto';
 import { DEFAULT_PERMISSIONS, Account, DemoAccountSummary } from '@jongwen/shared';
@@ -36,6 +37,7 @@ function maskEmail(email?: string): string {
   return `${local.slice(0, 2)}***@${domain}`;
 }
 
+@ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
   constructor(

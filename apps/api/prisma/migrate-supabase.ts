@@ -99,7 +99,7 @@ async function main() {
       "status" "VerificationStatus" NOT NULL DEFAULT 'VALID',
       "document_type" TEXT NOT NULL,
       "title" TEXT NOT NULL DEFAULT '',
-      "issuing_org" TEXT NOT NULL DEFAULT 'องค์การบริหารส่วนตำบลน้ำชำ',
+      "issuing_org" TEXT NOT NULL DEFAULT 'องค์การบริหารส่วนตำบล (อบต.)',
       "metadata" JSONB,
       "issued_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "revoked_at" TIMESTAMPTZ(3),

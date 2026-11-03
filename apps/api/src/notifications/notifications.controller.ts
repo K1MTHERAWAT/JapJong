@@ -8,6 +8,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Account, LineDeliveryStatus, hasPermission } from '@jongwen/shared';
 import { CurrentUser, Permissions } from '../auth/auth.guard';
 import {
@@ -18,6 +19,8 @@ import { NotificationPreferencesService } from './notification-preferences.servi
 import { NotificationQueueService } from './notification-queue.service';
 import { NotificationsService } from './notifications.service';
 
+@ApiTags('Notifications')
+@ApiBearerAuth('bearer')
 @Controller()
 export class NotificationsController {
   constructor(

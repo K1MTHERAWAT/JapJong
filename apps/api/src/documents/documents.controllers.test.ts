@@ -55,7 +55,7 @@ describe('Documents & Verification Controllers Unit Tests', () => {
       verifyPublic: vi.fn().mockResolvedValue({
         status: 'VALID',
         documentNumber: 'BK-2569-0001',
-        issuingOrg: 'องค์การบริหารส่วนตำบลน้ำชำ',
+        issuingOrg: 'องค์การบริหารส่วนตำบล (อบต.)',
       }),
       getVerifyHistory: vi.fn().mockResolvedValue([
         { id: 'log-01', result: 'VALID', scannedByName: 'สุดา มีสุข' },

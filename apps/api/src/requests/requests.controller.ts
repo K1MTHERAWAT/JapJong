@@ -13,6 +13,7 @@ import {
   Req,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   Account,
   AnyRequest,
@@ -61,6 +62,8 @@ class AsyncMutex {
   }
 }
 
+@ApiTags('Requests')
+@ApiBearerAuth('bearer')
 @Controller('requests')
 export class RequestsController {
   private readonly bookingMutex = new AsyncMutex();

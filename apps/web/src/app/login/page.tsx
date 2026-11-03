@@ -149,14 +149,14 @@ export default function LoginPage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logo.png"
-              alt="Jongwen Logo"
+              alt="โลโก้จับจอง"
               className="w-20 h-20 rounded-[20px] bg-white p-1.5 object-contain shadow-low border border-line"
             />
-            <h1 className="text-[28px] font-bold text-ink">Jongwen</h1>
+            <h1 className="text-[28px] font-bold text-ink">จับจอง</h1>
             <p className="text-[13px] text-ink-mute leading-relaxed">
-              ระบบบริหารจัดการสถานที่และทรัพยากร
+              ระบบขอใช้สถานที่ ขอใช้อุปกรณ์ และแจ้งซ่อม
               <br />
-              ของหน่วยงานราชการ
+              องค์การบริหารส่วนตำบล (อบต.)
             </p>
           </div>
 
@@ -165,10 +165,10 @@ export default function LoginPage() {
             <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 text-[13px] text-amber-900 flex flex-col gap-2">
               <div className="flex items-center gap-2 font-bold text-amber-950">
                 <Icon name="alert-triangle" className="w-5 h-5 text-amber-600 shrink-0" />
-                <span>ยังไม่พบบัญชี Jongwen ที่เชื่อมต่อกับ LINE</span>
+                <span>ยังไม่พบบัญชีจับจองที่เชื่อมต่อกับ LINE</span>
               </div>
               <p className="leading-relaxed">
-                บัญชี LINE <b>{unlinkedNotice.displayName || 'ของคุณ'}</b> ยังไม่ได้เชื่อมโยงกับระบบ Jongwen
+                บัญชี LINE <b>{unlinkedNotice.displayName || 'ของคุณ'}</b> ยังไม่ได้เชื่อมโยงกับระบบจับจอง
                 <br />
                 กรุณาเข้าสู่ระบบด้วย <b>ชื่อผู้ใช้และรหัสผ่านเดิม</b> ของท่าน เพื่อเข้าใช้งานระบบ
               </p>

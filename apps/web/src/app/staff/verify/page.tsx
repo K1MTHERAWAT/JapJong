@@ -170,7 +170,7 @@ export default function StaffVerifyPage() {
               <div>
                 <b className="text-[16px] text-ink block">สแกนตรวจสอบเอกสารทางราชการ</b>
                 <span className="text-[12.5px] text-ink-mute">
-                  ตรวจความถูกต้อง ลายมือชื่อ และสถานะการอนุญาตของเอกสาร อบต.น้ำชำ
+                  ตรวจความถูกต้อง ลายมือชื่อ และสถานะการอนุญาตของเอกสาร อบต.
                 </span>
               </div>
               <Chip tone="blue">เจ้าหน้าที่: {account?.name}</Chip>
@@ -318,7 +318,7 @@ export default function StaffVerifyPage() {
         {verifying && (
           <div className="jw-card p-10 flex flex-col items-center justify-center gap-3 text-center">
             <div className="w-8 h-8 border-3 border-brand border-t-transparent rounded-full animate-spin"></div>
-            <span className="text-[14px] text-ink-mute">กำลังส่งรหัสไปตรวจสอบกับฐานข้อมูล อบต.น้ำชำ...</span>
+            <span className="text-[14px] text-ink-mute">กำลังส่งรหัสไปตรวจสอบกับฐานข้อมูล อบต....</span>
           </div>
         )}
 
@@ -408,7 +408,7 @@ export default function StaffVerifyPage() {
                     )}
                     <div className="flex justify-between py-1 border-b border-soft">
                       <span className="text-ink-mute">ผู้ออกเอกสาร:</span>
-                      <span className="font-semibold text-ink">{result.issuingOrg || 'อบต.น้ำชำ'}</span>
+                      <span className="font-semibold text-ink">{result.issuingOrg || 'องค์การบริหารส่วนตำบล (อบต.)'}</span>
                     </div>
                   </div>
                 </div>

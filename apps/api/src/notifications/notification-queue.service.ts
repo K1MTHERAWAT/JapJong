@@ -135,7 +135,7 @@ export class NotificationQueueService {
 
     const messages: LineMessageObject[] = Array.isArray(job.messagePayload)
       ? job.messagePayload
-      : [{ type: 'text', text: 'Jongwen แจ้งเตือนระบบ' }];
+      : [{ type: 'text', text: 'จับจอง แจ้งเตือนระบบ' }];
 
     const nextAttempt = (job.attemptCount || 0) + 1;
 
