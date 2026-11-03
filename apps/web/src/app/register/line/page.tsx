@@ -103,7 +103,8 @@ function LineRegisterContent() {
 
       setStoredAuth(res.token, res.account.id);
       await refreshMe();
-      router.push(roleHomePath(res.account.role));
+      const target = searchParams.get('target');
+      router.push(target || roleHomePath(res.account.role));
     } catch (err) {
       setError((err as Error).message || 'การลงทะเบียนไม่สำเร็จ');
       setSubmitting(false);

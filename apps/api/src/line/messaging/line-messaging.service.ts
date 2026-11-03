@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 import { LineMessageObject, LinePushResult } from './line-messaging.types';
 
 const LINE_PUSH_ENDPOINT = 'https://api.line.me/v2/bot/message/push';
+const LINE_REPLY_ENDPOINT = 'https://api.line.me/v2/bot/message/reply';
 
 @Injectable()
 export class LineMessagingService {
@@ -128,6 +129,96 @@ export class LineMessagingService {
         errorCode: 'NETWORK_ERROR',
         errorMessage: safeMsg,
         retryable: true,
+      };
+    }
+  }
+
+  /**
+   * ส่ง Reply Message กลับไปยังผู้ใช้ผ่าน replyToken
+   */
+  async sendReplyMessage(
+    replyToken: string,
+    messages: LineMessageObject[],
+  ): Promise<LinePushResult> {
+    const token = String(replyToken || '').trim();
+    if (!token) {
+      return {
+        ok: false,
+        statusCode: 400,
+        errorCode: 'MISSING_REPLY_TOKEN',
+        errorMessage: 'ไม่พบ replyToken ของคำขอ',
+        retryable: false,
+      };
+    }
+
+    if (!Array.isArray(messages) || messages.length === 0 || messages.length > 5) {
+      return {
+        ok: false,
+        statusCode: 400,
+        errorCode: 'INVALID_MESSAGE_PAYLOAD',
+        errorMessage: 'จำนวนข้อความต้องอยู่ระหว่าง 1 ถึง 5 ข้อความตามข้อกำหนดของ LINE Messaging API',
+        retryable: false,
+      };
+    }
+
+    if (!this.isEnabled || !this.channelAccessToken) {
+      const mockId = `mock_reply_${crypto.randomBytes(8).toString('hex')}`;
+      this.logger.log(
+        `[MOCK LINE REPLY] Token=${token.slice(0, 6)}... Messages=${messages.length} Id=${mockId}`,
+      );
+      return {
+        ok: true,
+        providerMessageId: mockId,
+        statusCode: 200,
+        retryable: false,
+        mock: true,
+      };
+    }
+
+    try {
+      const response = await fetch(LINE_REPLY_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.channelAccessToken}`,
+        },
+        body: JSON.stringify({
+          replyToken: token,
+          messages,
+        }),
+      });
+
+      const requestId = response.headers.get('x-line-request-id') || undefined;
+
+      if (response.ok) {
+        return {
+          ok: true,
+          providerMessageId: requestId || `reply_${Date.now()}`,
+          statusCode: response.status,
+          retryable: false,
+        };
+      }
+
+      let errDetail = '';
+      try {
+        const errJson = (await response.json()) as { message?: string };
+        errDetail = this.sanitizeErrorMessage(errJson?.message || '');
+      } catch {
+        errDetail = `HTTP ${response.status}`;
+      }
+
+      return this.classifyHttpError(response.status, errDetail);
+    } catch (err) {
+      const safeMsg = this.sanitizeErrorMessage(
+        err instanceof Error ? err.message : 'Network error connecting to LINE Reply API',
+      );
+      this.logger.error(`LINE Reply API network failure: ${safeMsg}`);
+      return {
+        ok: false,
+        statusCode: 503,
+        errorCode: 'NETWORK_ERROR',
+        errorMessage: safeMsg,
+        retryable: false,
       };
     }
   }

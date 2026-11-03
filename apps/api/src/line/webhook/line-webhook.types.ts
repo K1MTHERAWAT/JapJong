@@ -6,7 +6,7 @@ export interface LineWebhookSource {
 }
 
 export interface LineWebhookEventPayload {
-  type: 'follow' | 'unfollow' | 'message' | 'accountLink' | string;
+  type: 'follow' | 'unfollow' | 'message' | 'postback' | 'accountLink' | string;
   webhookEventId?: string;
   timestamp?: number;
   source?: LineWebhookSource;
@@ -19,6 +19,10 @@ export interface LineWebhookEventPayload {
     id: string;
     type: string;
     text?: string;
+  };
+  postback?: {
+    data: string;
+    params?: Record<string, any>;
   };
 }
 

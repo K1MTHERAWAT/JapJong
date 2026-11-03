@@ -207,8 +207,10 @@ export class LineAuthService {
       throw new UnauthorizedException('ID Token Issuer ไม่ถูกต้อง');
     }
 
-    if (this.channelId && payload.aud !== this.channelId) {
-      throw new UnauthorizedException('ID Token Audience ไม่ตรงกับ Channel ID');
+    const liffId = (process.env.NEXT_PUBLIC_LIFF_ID || process.env.LINE_LIFF_ID || '').trim();
+    const allowedAudiences = [this.channelId, liffId].filter(Boolean);
+    if (allowedAudiences.length > 0 && !allowedAudiences.includes(payload.aud)) {
+      throw new UnauthorizedException('ID Token Audience ไม่ตรงกับ Channel ID หรือ LIFF ID');
     }
 
     const nowSeconds = Math.floor(Date.now() / 1000);
@@ -417,6 +419,60 @@ export class LineAuthService {
             linkedAt: account.linkedAt.toISOString(),
           }
         : null,
+    };
+  }
+
+  /**
+   * Authenticates a user from LIFF using LINE ID Token
+   * Returns session token for existing user, or registration ticket for new user
+   */
+  async authenticateLiffUser(idToken: string) {
+    if (!idToken) {
+      throw new BadRequestException('idToken is required');
+    }
+
+    const payload = await this.verifyIdToken(idToken);
+    const lineUserId = payload.sub;
+    const displayName = payload.name || 'LINE User';
+    const pictureUrl = payload.picture || null;
+
+    // 1. Search for existing account linked to this LINE User ID
+    const user = await this.db.findUserByLineUserId(lineUserId);
+
+    if (user) {
+      // 2. Validate account status
+      if (user.active === false || user.accountStatus === 'SUSPENDED') {
+        throw new ForbiddenException('บัญชีผู้ใช้งานนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ');
+      }
+
+      // 3. Create Session Token
+      const token = await this.db.createSession(user.id);
+      return {
+        status: 'AUTHENTICATED' as const,
+        token,
+        account: this.db.toPublic(user),
+      };
+    } else {
+      // 4. Issue Registration Ticket for first-time registration (Phase 2 flow)
+      const ticket = this.issueRegistrationTicket(lineUserId, displayName, pictureUrl);
+      return {
+        status: 'NEW_USER' as const,
+        ticket,
+        lineProfile: {
+          displayName,
+          pictureUrl,
+        },
+      };
+    }
+  }
+
+  /**
+   * Returns safe LIFF public configuration
+   */
+  getLiffConfig() {
+    return {
+      liffId: (process.env.NEXT_PUBLIC_LIFF_ID || process.env.LINE_LIFF_ID || '').trim() || null,
+      channelId: this.channelId || null,
     };
   }
 

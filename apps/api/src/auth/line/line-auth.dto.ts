@@ -68,3 +68,9 @@ export class LineRegisterDto {
   @Type(() => ConsentItemDto)
   consents!: ConsentItemDto[];
 }
+
+export class LineLiffAuthDto {
+  @IsNotEmpty({ message: 'กรุณาระบุ idToken' })
+  @IsString()
+  idToken!: string;
+}

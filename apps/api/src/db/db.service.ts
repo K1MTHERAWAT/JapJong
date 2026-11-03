@@ -1660,16 +1660,24 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     'DOCUMENT_SIGNING',
   ];
 
-  async updateLineFriendshipStatus(lineUserId: string, status: LineFriendshipStatus): Promise<boolean> {
+  async updateLineFriendshipStatus(
+    lineUserId: string,
+    status: LineFriendshipStatus,
+    eventTimestamp?: Date,
+  ): Promise<boolean> {
     const trimmed = String(lineUserId || '').trim();
     if (!trimmed) return false;
-    const now = new Date();
+    const now = eventTimestamp || new Date();
     let updated = false;
     for (const acc of this.userLineAccounts) {
       if (acc.lineUserId === trimmed) {
+        // Event ordering: Do not let older events overwrite newer status
+        if (acc.statusUpdatedAt && eventTimestamp && acc.statusUpdatedAt > eventTimestamp) {
+          return false;
+        }
         acc.friendshipStatus = status;
         acc.statusUpdatedAt = now;
-        acc.updatedAt = now;
+        acc.updatedAt = new Date();
         updated = true;
       }
     }
@@ -1677,7 +1685,12 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     if (this.dbAvailable) {
       try {
         await this.prisma.$executeRawUnsafe(
-          `UPDATE "user_line_accounts" SET "friendship_status" = $1, "status_updated_at" = $2::timestamptz, "updated_at" = $2::timestamptz WHERE "line_user_id" = $3`,
+          `UPDATE "user_line_accounts" 
+           SET "friendship_status" = $1, 
+               "status_updated_at" = $2::timestamptz, 
+               "updated_at" = NOW() 
+           WHERE "line_user_id" = $3 
+             AND ("status_updated_at" IS NULL OR "status_updated_at" <= $2::timestamptz)`,
           status,
           now,
           trimmed,

@@ -16,6 +16,7 @@ import { DbService } from '../../db/db.service';
 import { LineAuthService } from './line-auth.service';
 import {
   LineCallbackQueryDto,
+  LineLiffAuthDto,
   LineRegisterDto,
   LineRegistrationStatusQueryDto,
 } from './line-auth.dto';
@@ -88,6 +89,40 @@ export class LineAuthController {
   @Post('register')
   async register(@Body() body: LineRegisterDto) {
     return this.lineAuthService.registerFirstTimeUser(body);
+  }
+
+  /**
+   * LIFF Authentication & Token Verification
+   * POST /auth/line/liff
+   */
+  @Throttle({ auth: { limit: 20, ttl: 60000 } })
+  @Public()
+  @Post('liff')
+  async authenticateLiff(@Body() body: LineLiffAuthDto) {
+    return this.lineAuthService.authenticateLiffUser(body.idToken);
+  }
+
+  /**
+   * Get safe public LIFF configuration
+   * GET /auth/line/liff/config
+   */
+  @Public()
+  @Get('liff/config')
+  getLiffConfig() {
+    return this.lineAuthService.getLiffConfig();
+  }
+
+  /**
+   * Get authenticated user profile via LIFF session
+   * GET /auth/line/liff/profile
+   */
+  @Get('liff/profile')
+  async getLiffProfile(@CurrentUser() user: Account) {
+    const status = await this.lineAuthService.getStatus(user.id);
+    return {
+      account: this.db.toPublic(user),
+      lineAccount: status.lineAccount,
+    };
   }
 
   /**

@@ -12,8 +12,6 @@ services:
         value: 22
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 4000
       - key: DEMO_MODE
         value: "false"
       - key: LINE_NOTIFICATION_ENABLED

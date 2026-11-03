@@ -28,10 +28,18 @@ export class LineMessageTemplateService {
 
   /**
    * ตรวจสอบและสร้าง URL ที่ปลอดภัยสำหรับแนบในข้อความแจ้งเตือน
+   * หากมีการกำหนด LIFF ID ในระบบ จะสร้างเป็น LIFF URL เพื่อเปิดผ่าน LINE In-App Browser ทันที
    */
   buildSafeUrl(linkPath?: string): string {
-    if (!linkPath) return this.frontendUrl;
+    const liffId = (process.env.NEXT_PUBLIC_LIFF_ID || process.env.LINE_LIFF_ID || '').trim();
+    if (!linkPath) {
+      if (liffId) return `https://liff.line.me/${liffId}`;
+      return this.frontendUrl;
+    }
     const cleanPath = linkPath.startsWith('/') ? linkPath : `/${linkPath}`;
+    if (liffId) {
+      return `https://liff.line.me/${liffId}?target=${encodeURIComponent(cleanPath)}`;
+    }
     return `${this.frontendUrl}${cleanPath}`;
   }
 

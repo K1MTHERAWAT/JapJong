@@ -108,6 +108,19 @@ export const api = {
   logout: () => request<{ ok: boolean }>('/auth/logout', { method: 'POST', body: JSON.stringify({}) }),
   getLineAuthUrl: () => request<LineAuthUrlResponse>('/auth/line?redirect=false'),
   getLineStatus: () => request<LineAuthStatusResponse>('/auth/line/status'),
+  authLiff: (idToken: string) =>
+    request<{
+      status: 'AUTHENTICATED' | 'NEW_USER';
+      token?: string;
+      account?: PublicAccount;
+      ticket?: string;
+      lineProfile?: { displayName: string; pictureUrl: string | null };
+    }>('/auth/line/liff', {
+      method: 'POST',
+      body: JSON.stringify({ idToken }),
+    }),
+  getLiffConfig: () =>
+    request<{ liffId: string | null; channelId: string | null }>('/auth/line/liff/config'),
   getLineRegistrationStatus: (ticket: string) =>
     request<LineRegistrationTicketInfo>(`/auth/line/registration-status?ticket=${encodeURIComponent(ticket)}`),
   registerWithLine: (payload: LineRegisterPayload) =>
