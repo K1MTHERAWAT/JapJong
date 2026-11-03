@@ -37,6 +37,14 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.setGlobalPrefix('api');
 
+  // รองรับทั้ง /auth/line (ตาม LINE Developer Callback URL) และ /api/auth/line
+  app.use((req: express.Request, _res: express.Response, next: express.NextFunction) => {
+    if (req.url.startsWith('/auth/line')) {
+      req.url = '/api' + req.url;
+    }
+    next();
+  });
+
   // ตรวจสอบและแปลง Type ข้อมูลที่ส่งเข้ามาด้วย ValidationPipe
   app.useGlobalPipes(
     new ValidationPipe({

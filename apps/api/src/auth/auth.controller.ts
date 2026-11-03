@@ -98,7 +98,10 @@ export class AuthController {
 
     const digits = username.replace(/\D/g, '');
     const user = this.db.accounts.find(
-      (a) => a.username.toLowerCase() === username || (digits.length >= 9 && a.phone.replace(/\D/g, '') === digits),
+      (a) =>
+        a.username.toLowerCase() === username ||
+        (a.email && a.email.toLowerCase() === username) ||
+        (digits.length >= 9 && a.phone.replace(/\D/g, '') === digits),
     );
     if (!user || !(await verifySecret(user.password, password))) {
       recordFailure(lockKey);
@@ -167,59 +170,81 @@ export class AuthController {
     }
 
     const name = String(body.name ?? '').trim().slice(0, 100);
+    const email = String(body.email ?? '').trim().toLowerCase();
     const phone = String(body.phone ?? '').trim();
     const password = String(body.password ?? '');
     const digits = phone.replace(/\D/g, '');
-    if (!name || !digits || !password) throw new BadRequestException('กรุณากรอกข้อมูลให้ครบถ้วน');
-    if (!/^0\d{8,9}$/.test(digits)) throw new BadRequestException('เบอร์โทรศัพท์ไม่ถูกต้อง');
+
+    if (!name) throw new BadRequestException('กรุณากรอกชื่อ-นามสกุล');
+    if (!password) throw new BadRequestException('กรุณากรอกรหัสผ่าน');
+
+    // ตรวจสอบอีเมล (ถ้ามีการกรอก)
+    if (email) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        throw new BadRequestException('รูปแบบอีเมลไม่ถูกต้อง');
+      }
+      if (this.db.accounts.some((a) => (a.email && a.email.toLowerCase() === email) || a.username.toLowerCase() === email)) {
+        throw new ConflictException('อีเมลนี้ถูกใช้งานในระบบแล้ว');
+      }
+    }
+
+    // ตรวจสอบเบอร์โทรศัพท์ (ถ้ามีการกรอก)
+    if (digits) {
+      if (!/^0\d{8,9}$/.test(digits)) throw new BadRequestException('เบอร์โทรศัพท์ไม่ถูกต้อง');
+      if (this.db.accounts.some((a) => a.phone.replace(/\D/g, '') === digits || a.username === digits)) {
+        throw new ConflictException('เบอร์โทรศัพท์นี้ลงทะเบียนแล้ว');
+      }
+    }
+
     if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
       throw new BadRequestException('รหัสผ่านต้องยาวอย่างน้อย 8 ตัว และมีทั้งตัวอักษรและตัวเลข');
     }
 
+    // ตรวจสอบ OTP เฉพาะกรณีที่มีการส่ง OTP มา (เพื่อ Backward Compatibility กับการลงทะเบียนแบบ OTP)
     const rawOtp = String(body.otp ?? '').trim();
-    if (process.env.DEMO_MODE === 'true') {
-      if (rawOtp !== '000000') {
-        throw new BadRequestException('รหัส OTP ในโหมดเดโมคือ 000000');
+    if (rawOtp && digits) {
+      if (process.env.DEMO_MODE === 'true') {
+        if (rawOtp !== '000000') {
+          throw new BadRequestException('รหัส OTP ในโหมดเดโมคือ 000000');
+        }
+      } else {
+        if (!/^\d{6}$/.test(rawOtp)) {
+          throw new BadRequestException('รหัส OTP ไม่ถูกต้อง (ต้องเป็นตัวเลข 6 หลัก)');
+        }
+        const otpRecord = await this.db.prisma.otpCode.findFirst({
+          where: {
+            phone: digits,
+            consumedAt: null,
+            expiresAt: { gt: new Date() },
+            attempts: { lt: 5 },
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (!otpRecord) {
+          throw new BadRequestException('ไม่พบรหัส OTP หรือรหัสหมดอายุแล้ว (กรุณาขอรหัสใหม่)');
+        }
+        await this.db.prisma.otpCode.update({
+          where: { id: otpRecord.id },
+          data: { attempts: { increment: 1 } },
+        });
+        const valid = await verifySecret(otpRecord.codeHash, rawOtp);
+        if (!valid) {
+          throw new BadRequestException('รหัส OTP ไม่ถูกต้อง');
+        }
+        await this.db.prisma.otpCode.update({
+          where: { id: otpRecord.id },
+          data: { consumedAt: new Date() },
+        });
       }
-    } else {
-      if (!/^\d{6}$/.test(rawOtp)) {
-        throw new BadRequestException('รหัส OTP ไม่ถูกต้อง (ต้องเป็นตัวเลข 6 หลัก)');
-      }
-      const otpRecord = await this.db.prisma.otpCode.findFirst({
-        where: {
-          phone: digits,
-          consumedAt: null,
-          expiresAt: { gt: new Date() },
-          attempts: { lt: 5 },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-      if (!otpRecord) {
-        throw new BadRequestException('ไม่พบรหัส OTP หรือรหัสหมดอายุแล้ว (กรุณาขอรหัสใหม่)');
-      }
-      await this.db.prisma.otpCode.update({
-        where: { id: otpRecord.id },
-        data: { attempts: { increment: 1 } },
-      });
-      const valid = await verifySecret(otpRecord.codeHash, rawOtp);
-      if (!valid) {
-        throw new BadRequestException('รหัส OTP ไม่ถูกต้อง');
-      }
-      await this.db.prisma.otpCode.update({
-        where: { id: otpRecord.id },
-        data: { consumedAt: new Date() },
-      });
-    }
-
-    if (this.db.accounts.some((a) => a.phone.replace(/\D/g, '') === digits || a.username === digits)) {
-      throw new ConflictException('เบอร์โทรศัพท์นี้ลงทะเบียนแล้ว');
     }
 
     const hashedPassword = await hashSecret(password);
     const id = await this.db.nextId('u');
+    const username = email || (digits ? digits : (body.username ? body.username.trim().toLowerCase() : `user_${id}`));
+
     const account: Account = {
       id,
-      username: digits,
+      username,
       password: hashedPassword,
       name,
       nickname: name.split(' ')[0] || name,
@@ -227,11 +252,15 @@ export class AuthController {
       role: 'USER',
       position: 'ประชาชน',
       department: String(body.department ?? '').trim().slice(0, 100) || 'ประชาชนทั่วไป',
-      phone,
+      phone: digits ? phone : '',
+      email: email || undefined,
       lineName: String(body.lineName ?? '').slice(0, 50) || name.split(' ')[0],
       permissions: { ...DEFAULT_PERMISSIONS.USER },
       signature: null,
       pin: null,
+      active: true,
+      accountStatus: 'ACTIVE',
+      registrationCompletedAt: new Date().toISOString(),
       createdAt: new Date().toISOString(),
     };
     this.db.accounts.unshift(account);

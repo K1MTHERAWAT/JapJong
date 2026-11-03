@@ -23,21 +23,25 @@ export class RequestOtpDto {
 }
 
 export class RegisterDto {
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  username!: string;
+  username?: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'กรุณากรอกรหัสผ่าน' })
   password!: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'กรุณากรอกชื่อ-นามสกุล' })
   name!: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  phone!: string;
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
 
   @IsOptional()
   @IsString()

@@ -9,6 +9,10 @@ import type {
   Equipment,
   HandoverRecord,
   ItemQty,
+  LineAuthStatusResponse,
+  LineAuthUrlResponse,
+  LineRegisterPayload,
+  LineRegistrationTicketInfo,
   LoginResponse,
   Period,
   PermissionKey,
@@ -91,13 +95,41 @@ export const api = {
   login: (payload: { username: string; password: string }) =>
     request<LoginResponse>('/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
   logout: () => request<{ ok: boolean }>('/auth/logout', { method: 'POST', body: JSON.stringify({}) }),
+  getLineAuthUrl: () => request<LineAuthUrlResponse>('/auth/line?redirect=false'),
+  getLineStatus: () => request<LineAuthStatusResponse>('/auth/line/status'),
+  getLineRegistrationStatus: (ticket: string) =>
+    request<LineRegistrationTicketInfo>(`/auth/line/registration-status?ticket=${encodeURIComponent(ticket)}`),
+  registerWithLine: (payload: LineRegisterPayload) =>
+    request<LoginResponse>('/auth/line/register', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  lineLogout: () => request<{ ok: boolean }>('/auth/line/logout', { method: 'POST', body: JSON.stringify({}) }),
+  getUsersMe: () => request<{ account: PublicAccount; lineAccount: any; consents: any[] }>('/users/me'),
+  updateUsersMe: (payload: any) =>
+    request<PublicAccount>('/users/me', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  withdrawConsent: (consentType: string) =>
+    request<{ ok: boolean; withdrawn: boolean }>('/users/me/consents/withdraw', {
+      method: 'POST',
+      body: JSON.stringify({ consentType }),
+    }),
   requestOtp: (phone: string) =>
     request<{ ok: boolean; message: string }>('/auth/request-otp', {
       method: 'POST',
       body: JSON.stringify({ phone }),
     }),
-  register: (payload: { name: string; phone: string; password: string; otp?: string; lineName?: string; department?: string }) =>
-    request<LoginResponse>('/auth/register', { method: 'POST', body: JSON.stringify(payload) }),
+  register: (payload: {
+    name: string;
+    password: string;
+    email?: string;
+    phone?: string;
+    otp?: string;
+    lineName?: string;
+    department?: string;
+  }) => request<LoginResponse>('/auth/register', { method: 'POST', body: JSON.stringify(payload) }),
   me: () => request<PublicAccount>('/auth/me'),
   updateProfile: (payload: {
     name?: string;

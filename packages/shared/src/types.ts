@@ -21,6 +21,7 @@ export interface Account {
   department: string;
   phone: string;
   lineName?: string;
+  lineUserId?: string;
   email?: string;
   emailVerified?: boolean;
   addressHouseNo?: string;
@@ -36,6 +37,8 @@ export interface Account {
   isDemo?: boolean;
   /** สถานะเปิด/ปิดการใช้งานบัญชี (ค่าเริ่มต้น = true) */
   active?: boolean;
+  registrationCompletedAt?: string;
+  accountStatus?: 'ACTIVE' | 'SUSPENDED';
   createdAt: string;
 }
 
@@ -377,6 +380,70 @@ export interface VerifySignOtpResponse {
   verified: boolean;
   expiresAt: string;
   message?: string;
+}
+
+// ===================== LINE Authentication =====================
+
+export interface UserLineAccount {
+  id: string;
+  userId: string;
+  lineUserId: string;
+  displayName: string;
+  pictureUrl?: string | null;
+  linkedAt: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LineAuthStatusResponse {
+  isLinked: boolean;
+  lineAccount?: {
+    lineUserId: string;
+    displayName: string;
+    pictureUrl?: string | null;
+    linkedAt: string;
+  } | null;
+}
+
+export interface LineAuthUrlResponse {
+  url: string;
+  state: string;
+}
+
+// ===================== PDPA Consent & LINE Registration =====================
+
+export interface UserConsent {
+  id: string;
+  userId: string;
+  consentType: string;
+  consentVersion: string;
+  consentStatus: 'GRANTED' | 'WITHDRAWN';
+  consentedAt: string;
+  withdrawnAt?: string | null;
+  createdAt: string;
+}
+
+export interface ConsentItemInput {
+  consentType: string;
+  consentVersion: string;
+  agreed: boolean;
+}
+
+export interface LineRegistrationTicketInfo {
+  valid: boolean;
+  lineProfile?: {
+    displayName: string;
+    pictureUrl?: string | null;
+  };
+  error?: string;
+}
+
+export interface LineRegisterPayload {
+  ticket: string;
+  name: string;
+  phone: string;
+  consents: ConsentItemInput[];
 }
 
 

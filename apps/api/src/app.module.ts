@@ -5,14 +5,19 @@ import { AdminController } from './admin/admin.controller';
 import { AuthController } from './auth/auth.controller';
 import { AuthGuard } from './auth/auth.guard';
 import { EmailService } from './auth/email.service';
-import { DbService } from './db/db.service';
+import { DbModule } from './db/db.module';
 import { DocumentsModule } from './documents/documents.module';
+import { LineAuthModule } from './auth/line/line-auth.module';
+import { UsersModule } from './users/users.module';
 import { RequestsController } from './requests/requests.controller';
 import { ResourcesController } from './resources/resources.controller';
 
 @Module({
   imports: [
+    DbModule,
     DocumentsModule,
+    LineAuthModule,
+    UsersModule,
     ThrottlerModule.forRoot([
       {
         name: 'default',
@@ -28,7 +33,6 @@ import { ResourcesController } from './resources/resources.controller';
   ],
   controllers: [AuthController, ResourcesController, RequestsController, AdminController],
   providers: [
-    DbService,
     EmailService,
     {
       provide: APP_GUARD,

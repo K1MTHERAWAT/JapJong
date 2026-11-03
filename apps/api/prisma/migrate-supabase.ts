@@ -172,6 +172,47 @@ async function main() {
     CREATE INDEX IF NOT EXISTS "sign_verified_sessions_expires_at_idx" ON "sign_verified_sessions"("expires_at");
   `);
 
+  console.log('📦 Applying migration 5 (user_line_accounts)...');
+  await runSqlStatements(`
+    CREATE TABLE IF NOT EXISTS "user_line_accounts" (
+      "id" TEXT PRIMARY KEY,
+      "user_id" TEXT NOT NULL UNIQUE REFERENCES "accounts"("id") ON DELETE CASCADE,
+      "line_user_id" TEXT NOT NULL UNIQUE,
+      "display_name" TEXT NOT NULL,
+      "picture_url" TEXT,
+      "linked_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "is_active" BOOLEAN NOT NULL DEFAULT true,
+      "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updated_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS "user_line_accounts_user_id_idx" ON "user_line_accounts"("user_id");
+    CREATE INDEX IF NOT EXISTS "user_line_accounts_line_user_id_idx" ON "user_line_accounts"("line_user_id");
+  `);
+
+  console.log('📦 Applying migration 6 (account registration/status & user_consents)...');
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "accounts"
+      ADD COLUMN IF NOT EXISTS "registration_completed_at" TIMESTAMPTZ(3),
+      ADD COLUMN IF NOT EXISTS "account_status" TEXT NOT NULL DEFAULT 'ACTIVE';
+  `);
+
+  await runSqlStatements(`
+    CREATE TABLE IF NOT EXISTS "user_consents" (
+      "id" TEXT PRIMARY KEY,
+      "user_id" TEXT NOT NULL REFERENCES "accounts"("id") ON DELETE CASCADE,
+      "consent_type" TEXT NOT NULL,
+      "consent_version" TEXT NOT NULL,
+      "consent_status" TEXT NOT NULL,
+      "consented_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "withdrawn_at" TIMESTAMPTZ(3),
+      "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS "user_consents_user_id_idx" ON "user_consents"("user_id");
+    CREATE INDEX IF NOT EXISTS "user_consents_type_ver_idx" ON "user_consents"("consent_type", "consent_version");
+  `);
+
   console.log('✨ Schema applied to Supabase successfully!');
 }
 

@@ -14,8 +14,9 @@ interface AuthContextValue {
   loginWithDemo: (accountId: string) => Promise<PublicAccount>;
   registerAccount: (payload: {
     name: string;
-    phone: string;
     password: string;
+    email?: string;
+    phone?: string;
     otp?: string;
     lineName?: string;
     department?: string;
@@ -128,8 +129,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const registerAccount = useCallback(
     async (payload: {
       name: string;
-      phone: string;
       password: string;
+      email?: string;
+      phone?: string;
       otp?: string;
       lineName?: string;
       department?: string;

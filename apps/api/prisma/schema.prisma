@@ -135,6 +135,10 @@ model Account {
   activityLogs     ActivityLog[]
   signOtpCodes     SignOtpCode[]
   signVerifiedSessions SignVerifiedSession[]
+  lineAccount      UserLineAccount?
+  consents         UserConsent[]
+  registrationCompletedAt DateTime? @map("registration_completed_at") @db.Timestamptz(3)
+  accountStatus    String    @default("ACTIVE") @map("account_status")
 
   @@index([role])
   @@index([isDemo])
@@ -502,6 +506,45 @@ model SignVerifiedSession {
   @@index([accountId, sessionToken])
   @@index([expiresAt])
   @@map("sign_verified_sessions")
+}
+
+// ===================== LINE Authentication =====================
+
+model UserLineAccount {
+  id          String   @id @default(cuid())
+  userId      String   @unique @map("user_id")
+  lineUserId  String   @unique @map("line_user_id")
+  displayName String   @map("display_name")
+  pictureUrl  String?  @map("picture_url")
+  linkedAt    DateTime @default(now()) @map("linked_at") @db.Timestamptz(3)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  account Account @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([lineUserId])
+  @@index([userId])
+  @@map("user_line_accounts")
+}
+
+// ===================== PDPA Consent Management =====================
+
+model UserConsent {
+  id             String    @id @default(cuid())
+  userId         String    @map("user_id")
+  consentType    String    @map("consent_type") // e.g. "TERMS_OF_SERVICE", "PRIVACY_POLICY", "DATA_PROCESSING", "MARKETING"
+  consentVersion String    @map("consent_version") // e.g. "1.0.0"
+  consentStatus  String    @map("consent_status") // "GRANTED" | "WITHDRAWN"
+  consentedAt    DateTime  @default(now()) @map("consented_at") @db.Timestamptz(3)
+  withdrawnAt    DateTime? @map("withdrawn_at") @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  account Account @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([consentType, consentVersion])
+  @@map("user_consents")
 }
 
 

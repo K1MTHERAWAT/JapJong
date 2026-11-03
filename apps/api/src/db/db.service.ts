@@ -70,6 +70,27 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     revokedAt: Date | null;
     createdAt: Date;
   }[] = [];
+  userLineAccounts: {
+    id: string;
+    userId: string;
+    lineUserId: string;
+    displayName: string;
+    pictureUrl: string | null;
+    linkedAt: Date;
+    isActive: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+  }[] = [];
+  userConsents: {
+    id: string;
+    userId: string;
+    consentType: string;
+    consentVersion: string;
+    consentStatus: 'GRANTED' | 'WITHDRAWN';
+    consentedAt: Date;
+    withdrawnAt: Date | null;
+    createdAt: Date;
+  }[] = [];
 
   private seq = { BK: 0, BR: 0, RP: 0, n: 0, l: 0, u: 100, v: 100, e: 100 };
   private resetCronTimer?: NodeJS.Timeout;
@@ -1151,6 +1172,384 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  // ===================== LINE Account Management =====================
+
+  async findUserByLineUserId(lineUserId: string): Promise<Account | null> {
+    const trimmed = String(lineUserId || '').trim();
+    if (!trimmed) return null;
+
+    if (this.dbAvailable) {
+      try {
+        const rows = await this.prisma.$queryRawUnsafe<any[]>(
+          `SELECT "user_id" FROM "user_line_accounts" WHERE "line_user_id" = $1 AND "is_active" = true LIMIT 1`,
+          trimmed,
+        );
+        if (rows && rows.length > 0) {
+          const user = this.accounts.find((a) => a.id === rows[0].user_id && a.active !== false);
+          if (user) return user;
+        }
+      } catch {
+        // Fallback to in-memory check
+      }
+    }
+
+    const inMem = this.userLineAccounts.find((l) => l.lineUserId === trimmed && l.isActive);
+    if (inMem) {
+      const user = this.accounts.find((a) => a.id === inMem.userId && a.active !== false);
+      if (user) return user;
+    }
+
+    // Legacy check: Account.lineUserId
+    const legacy = this.accounts.find((a) => a.lineUserId === trimmed && a.active !== false);
+    return legacy ?? null;
+  }
+
+  async getLineAccount(userId: string): Promise<{
+    id: string;
+    userId: string;
+    lineUserId: string;
+    displayName: string;
+    pictureUrl: string | null;
+    linkedAt: Date;
+    isActive: boolean;
+  } | null> {
+    if (this.dbAvailable) {
+      try {
+        const rows = await this.prisma.$queryRawUnsafe<any[]>(
+          `SELECT "id", "user_id", "line_user_id", "display_name", "picture_url", "linked_at", "is_active"
+           FROM "user_line_accounts" WHERE "user_id" = $1 AND "is_active" = true LIMIT 1`,
+          userId,
+        );
+        if (rows && rows.length > 0) {
+          const r = rows[0];
+          return {
+            id: r.id,
+            userId: r.user_id,
+            lineUserId: r.line_user_id,
+            displayName: r.display_name,
+            pictureUrl: r.picture_url,
+            linkedAt: new Date(r.linked_at),
+            isActive: Boolean(r.is_active),
+          };
+        }
+      } catch {
+        // Fallback
+      }
+    }
+
+    const inMem = this.userLineAccounts.find((l) => l.userId === userId && l.isActive);
+    if (inMem) return inMem;
+
+    // Check account lineUserId
+    const acc = this.accounts.find((a) => a.id === userId);
+    if (acc?.lineUserId) {
+      return {
+        id: `legacy-${acc.id}`,
+        userId: acc.id,
+        lineUserId: acc.lineUserId,
+        displayName: acc.lineName || acc.name,
+        pictureUrl: null,
+        linkedAt: new Date(),
+        isActive: true,
+      };
+    }
+
+    return null;
+  }
+
+  async linkLineAccount(
+    userId: string,
+    data: { lineUserId: string; displayName: string; pictureUrl?: string | null },
+  ): Promise<{
+    id: string;
+    userId: string;
+    lineUserId: string;
+    displayName: string;
+    pictureUrl: string | null;
+    linkedAt: Date;
+    isActive: boolean;
+  }> {
+    const now = new Date();
+    const id = `line-${randomBytes(8).toString('hex')}`;
+    const record = {
+      id,
+      userId,
+      lineUserId: data.lineUserId,
+      displayName: data.displayName,
+      pictureUrl: data.pictureUrl ?? null,
+      linkedAt: now,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    this.userLineAccounts = this.userLineAccounts.filter(
+      (l) => l.userId !== userId && l.lineUserId !== data.lineUserId,
+    );
+    this.userLineAccounts.push(record);
+
+    const user = this.accounts.find((a) => a.id === userId);
+    if (user) {
+      user.lineUserId = data.lineUserId;
+      user.lineName = data.displayName;
+    }
+
+    if (this.dbAvailable) {
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `INSERT INTO "user_line_accounts" ("id", "user_id", "line_user_id", "display_name", "picture_url", "linked_at", "is_active", "created_at", "updated_at")
+           VALUES ($1, $2, $3, $4, $5, $6::timestamptz, true, $7::timestamptz, $8::timestamptz)
+           ON CONFLICT ("user_id") DO UPDATE
+           SET "line_user_id" = EXCLUDED."line_user_id",
+               "display_name" = EXCLUDED."display_name",
+               "picture_url" = EXCLUDED."picture_url",
+               "linked_at" = EXCLUDED."linked_at",
+               "is_active" = true,
+               "updated_at" = EXCLUDED."updated_at"`,
+          id,
+          userId,
+          data.lineUserId,
+          data.displayName,
+          data.pictureUrl ?? null,
+          now,
+          now,
+          now,
+        );
+        await this.prisma.$executeRawUnsafe(
+          `UPDATE "accounts" SET "line_user_id" = $1, "line_name" = $2 WHERE "id" = $3`,
+          data.lineUserId,
+          data.displayName,
+          userId,
+        ).catch(() => {});
+      } catch (err) {
+        this.logger.error('Failed to persist LINE account link', err);
+      }
+    }
+
+    return record;
+  }
+
+  async unlinkLineAccount(userId: string): Promise<void> {
+    this.userLineAccounts = this.userLineAccounts.filter((l) => l.userId !== userId);
+    const user = this.accounts.find((a) => a.id === userId);
+    if (user) {
+      user.lineUserId = undefined;
+      user.lineName = undefined;
+    }
+    if (this.dbAvailable) {
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `DELETE FROM "user_line_accounts" WHERE "user_id" = $1`,
+          userId,
+        );
+        await this.prisma.$executeRawUnsafe(
+          `UPDATE "accounts" SET "line_user_id" = NULL, "line_name" = NULL WHERE "id" = $1`,
+          userId,
+        ).catch(() => {});
+      } catch {
+        // Ignored
+      }
+    }
+  }
+
+  // ===================== PDPA Consent Management =====================
+
+  async saveUserConsents(
+    userId: string,
+    consents: { consentType: string; consentVersion: string; agreed: boolean }[],
+  ): Promise<void> {
+    const now = new Date();
+    for (const c of consents) {
+      const status = c.agreed ? 'GRANTED' : 'WITHDRAWN';
+      const id = `cst-${randomBytes(8).toString('hex')}`;
+      const record = {
+        id,
+        userId,
+        consentType: c.consentType,
+        consentVersion: c.consentVersion,
+        consentStatus: status as 'GRANTED' | 'WITHDRAWN',
+        consentedAt: now,
+        withdrawnAt: c.agreed ? null : now,
+        createdAt: now,
+      };
+      this.userConsents.push(record);
+
+      if (this.dbAvailable) {
+        try {
+          await this.prisma.$executeRawUnsafe(
+            `INSERT INTO "user_consents" ("id", "user_id", "consent_type", "consent_version", "consent_status", "consented_at", "withdrawn_at", "created_at")
+             VALUES ($1, $2, $3, $4, $5, $6::timestamptz, $7::timestamptz, $8::timestamptz)`,
+            id,
+            userId,
+            c.consentType,
+            c.consentVersion,
+            status,
+            now,
+            c.agreed ? null : now,
+            now,
+          );
+        } catch {
+          // Handled
+        }
+      }
+    }
+  }
+
+  async getUserConsents(userId: string) {
+    if (this.dbAvailable) {
+      try {
+        const rows = await this.prisma.$queryRawUnsafe<any[]>(
+          `SELECT "id", "user_id", "consent_type", "consent_version", "consent_status", "consented_at", "withdrawn_at", "created_at"
+           FROM "user_consents" WHERE "user_id" = $1 ORDER BY "consented_at" DESC`,
+          userId,
+        );
+        if (rows && rows.length > 0) {
+          return rows.map((r) => ({
+            id: r.id,
+            userId: r.user_id,
+            consentType: r.consent_type,
+            consentVersion: r.consent_version,
+            consentStatus: r.consent_status,
+            consentedAt: new Date(r.consented_at).toISOString(),
+            withdrawnAt: r.withdrawn_at ? new Date(r.withdrawn_at).toISOString() : null,
+            createdAt: new Date(r.created_at).toISOString(),
+          }));
+        }
+      } catch {
+        // Fallback
+      }
+    }
+
+    return this.userConsents
+      .filter((c) => c.userId === userId)
+      .map((c) => ({
+        id: c.id,
+        userId: c.userId,
+        consentType: c.consentType,
+        consentVersion: c.consentVersion,
+        consentStatus: c.consentStatus,
+        consentedAt: c.consentedAt.toISOString(),
+        withdrawnAt: c.withdrawnAt ? c.withdrawnAt.toISOString() : null,
+        createdAt: c.createdAt.toISOString(),
+      }));
+  }
+
+  async withdrawConsent(userId: string, consentType: string): Promise<boolean> {
+    const now = new Date();
+    let updated = false;
+    for (const c of this.userConsents) {
+      if (c.userId === userId && c.consentType === consentType && c.consentStatus === 'GRANTED') {
+        c.consentStatus = 'WITHDRAWN';
+        c.withdrawnAt = now;
+        updated = true;
+      }
+    }
+
+    if (this.dbAvailable) {
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `UPDATE "user_consents" SET "consent_status" = 'WITHDRAWN', "withdrawn_at" = $1::timestamptz
+           WHERE "user_id" = $2 AND "consent_type" = $3 AND "consent_status" = 'GRANTED'`,
+          now,
+          userId,
+          consentType,
+        );
+        updated = true;
+      } catch {
+        // Fallback
+      }
+    }
+    return updated;
+  }
+
+  async createLineCitizenAccount(data: {
+    name: string;
+    phone: string;
+    lineUserId: string;
+    displayName: string;
+    pictureUrl?: string | null;
+    consents: { consentType: string; consentVersion: string; agreed: boolean }[];
+  }): Promise<Account> {
+    const now = new Date();
+    const id = await this.nextId('u');
+    const cleanPhone = data.phone.trim();
+    const username = `line_${data.lineUserId.slice(-8)}_${cleanPhone.slice(-4)}`;
+    const nickname = data.displayName.slice(0, 8);
+    const initial = data.name.trim().charAt(0) || 'ป';
+    const pwdHash = await hashSecret(randomBytes(16).toString('hex'));
+
+    const newAccount: Account = {
+      id,
+      username,
+      password: pwdHash,
+      name: data.name.trim(),
+      nickname,
+      initial,
+      role: 'USER',
+      position: 'ประชาชน',
+      department: 'ประชาชนทั่วไป',
+      phone: cleanPhone,
+      lineName: data.displayName,
+      lineUserId: data.lineUserId,
+      permissions: { ...DEFAULT_PERMISSIONS['USER'] },
+      signature: null,
+      pin: null,
+      isDemo: false,
+      active: true,
+      accountStatus: 'ACTIVE',
+      registrationCompletedAt: now.toISOString(),
+      createdAt: now.toISOString(),
+    };
+
+    this.accounts.push(newAccount);
+
+    if (this.dbAvailable) {
+      try {
+        await this.prisma.account.create({
+          data: {
+            id,
+            username,
+            password: pwdHash,
+            name: newAccount.name,
+            nickname,
+            initial,
+            role: 'USER',
+            position: 'ประชาชน',
+            department: 'ประชาชนทั่วไป',
+            phone: cleanPhone,
+            lineName: data.displayName,
+            lineUserId: data.lineUserId,
+            permissions: newAccount.permissions as any,
+            signature: null,
+            pin: null,
+            isDemo: false,
+            active: true,
+            createdAt: now,
+          },
+        });
+
+        await this.prisma.$executeRawUnsafe(
+          `UPDATE "accounts" SET "registration_completed_at" = $1::timestamptz, "account_status" = 'ACTIVE' WHERE "id" = $2`,
+          now,
+          id,
+        ).catch(() => {});
+      } catch (err) {
+        this.logger.error('Failed to create account in database:', err);
+      }
+    }
+
+    // ต้องเชื่อม LINE และบันทึก Consent หลังสร้างแถว accounts แล้ว (Foreign Key)
+    await this.linkLineAccount(id, {
+      lineUserId: data.lineUserId,
+      displayName: data.displayName,
+      pictureUrl: data.pictureUrl,
+    });
+
+    await this.saveUserConsents(id, data.consents);
+
+    return newAccount;
+  }
+
   // ===================== Seed & Hydrate =====================
 
   async seedDatabase(forceClear = false) {
@@ -1271,6 +1670,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         department: a.department,
         phone: a.phone,
         lineName: a.lineName ?? undefined,
+        lineUserId: a.lineUserId ?? undefined,
         email: addr?.email ?? undefined,
         emailVerified: addr?.email_verified ?? false,
         addressHouseNo: addr?.address_house_no ?? undefined,
