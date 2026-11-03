@@ -13,9 +13,11 @@
 * **Database**: รองรับทั้ง **Supabase PostgreSQL (Cloud)** และ **PostgreSQL 16 (Docker Compose)**
 * **ORM & Migrations**: Prisma ORM v6 + สคริปต์อัปเดตโครงสร้างฐานข้อมูลอัตโนมัติ (`migrate-supabase.ts`)
 * **Two-Factor Signing Verification**: ระบบยืนยันการลงนามเอกสาร 2 ชั้นด้วย **Email OTP (Resend SDK / Mock Mode)** + **รหัส PIN 6 หลักส่วนบุคคล** + **ลายมือชื่อดิจิทัลที่วาดจริง**
+* **LINE Official Account & Notification System (Phase 3)**: ระบบแจ้งเตือนประชาชนและเจ้าหน้าที่ผ่าน **LINE Messaging API (Push Text & Flex Messages)** พร้อม **Outbox Queue (Idempotency, Exponential Backoff Retry)**, **LINE Webhook (HMAC-SHA256, Friendship Status Tracking)** และ **Mock Provider** สำหรับโหมดทดสอบ
+* **LINE Login & Onboarding (Phase 2)**: เข้าสู่ระบบและเชื่อมต่อบัญชีด้วย LINE พร้อมระบบลงทะเบียนผู้ใช้ใหม่และบันทึกความยินยอม **PDPA Consent**
 * **Document Security**: ระบบตรวจสอบเอกสารดิจิทัล QR Code (`qrcode`, `html5-qrcode`), รหัสยืนยันสุ่ม 32-byte, SHA-256 Document Hashing และบันทึกประวัติการสแกน
 * **Shared Package**: `@jongwen/shared` (TypeScript Types, Labels, RBAC Logic, Date Helpers, Period Conflict Checks)
-* **Testing & CI/CD**: Vitest (Unit Tests) + GitHub Actions CI Pipeline + Multi-stage Dockerfile
+* **Testing & CI/CD**: Vitest (Unit Tests 308 ข้อ ครอบคลุม 26 Scenarios) + GitHub Actions CI Pipeline + Multi-stage Dockerfile
 
 ---
 
@@ -42,12 +44,14 @@ BookingV1/
 ├── apps/
 │   ├── api/                    # @jongwen/api — NestJS REST API (:4000/api)
 │   │   ├── prisma/
-│   │   │   ├── schema.prisma       # Prisma Data Model (18 ตาราง รวม sign_otp_codes, sign_verified_sessions)
+│   │   │   ├── schema.prisma       # Prisma Data Model (22 ตาราง รวม LINE accounts, notifications, logs, webhooks)
 │   │   │   ├── migrations/         # SQL Migration Files
-│   │   │   ├── migrate-supabase.ts # สคริปต์สร้างและอัปเดตตารางบน Supabase PostgreSQL
+│   │   │   ├── migrate-supabase.ts # สคริปต์สร้างและอัปเดตตารางบน Supabase PostgreSQL (Migration 1-7)
 │   │   │   └── seed.ts             # Standalone Seed Script (รองรับ argon2id hash)
 │   │   └── src/
-│   │       ├── auth/             # Login, Register, Email OTP, Profile & Address, Password, Signature, PIN
+│   │       ├── auth/             # Login, Register, LINE Login, Email OTP, Profile, Signature, PIN
+│   │       ├── line/             # LINE Messaging API Client, Flex Template Service, Webhook Handler
+│   │       ├── notifications/    # In-App Notifications, Outbox Queue, Preferences, Business Events, Admin Retry
 │   │       ├── resources/        # Venues, Equipment, Monthly Availability, Conflict & Stock Check
 │   │       ├── requests/         # Booking, Borrow, Repair, 3-Level Sign, Handover, Reschedule
 │   │       ├── documents/        # QR Code Verification, Document Hashing, Public & Staff Verify API
@@ -57,9 +61,10 @@ BookingV1/
 │       ├── public/               # Static Assets (โลโก้, ไอคอน)
 │       └── src/
 │           ├── app/              # หน้าจอทั้งหมดตามบทบาท (Responsive Phone/Tablet/Desktop)
-│           │   ├── login/        # เข้าสู่ระบบ + โหมดคลิกเดียว (One-Click Demo)
-│           │   ├── register/     # ลงทะเบียนผู้ใช้งานใหม่พร้อมยืนยัน OTP
+│           │   ├── login/        # เข้าสู่ระบบ + LINE Login + โหมดคลิกเดียว (One-Click Demo)
+│           │   ├── register/     # ลงทะเบียนผู้ใช้ทั่วไป และ /register/line (ลงทะเบียนครั้งแรกผ่าน LINE + PDPA)
 │           │   ├── account/      # จัดการบัญชีผู้ใช้งาน (โปรไฟล์, ที่อยู่, เปลี่ยนรหัสผ่าน, ลายเซ็น & PIN)
+│           │   ├── notifications/# ศูนย์การแจ้งเตือน (/notifications) และตั้งค่าช่องทางรับแจ้งเตือน (/settings)
 │           │   ├── booking/      # ขอใช้สถานที่ราชการ (5 ขั้นตอน + ล็อกรายการตามที่เลือกจริง)
 │           │   ├── borrow/       # ขอยืม–คืนอุปกรณ์ราชการ (3 ขั้นตอน + แบบคำขอราชการ) และ /borrow/my
 │           │   ├── repair/       # แจ้งซ่อมบำรุงและติดตามสถานะ (Fast-ticket ไม่บังคับลงนาม)
@@ -68,9 +73,9 @@ BookingV1/
 │           │   ├── staff/        # เจ้าหน้าที่ (ตรวจคำขอ, รับมอบ–รับคืน, กรอกแทน, ตรวจสอบ QR Code /staff/verify)
 │           │   ├── verify/       # ตรวจสอบเอกสารดิจิทัลสาธารณะสำหรับประชาชน (/verify/[token])
 │           │   ├── approver/     # ปลัด อบต. / นายก อบต. (คิวลงนามอนุมัติด้วย PIN 6 หลัก, ใบอนุญาต PDF)
-│           │   └── admin/        # แอดมิน (ภาพรวมระบบ, จัดการทรัพยากร/แบบฟอร์ม, บัญชีผู้ใช้ & สิทธิ์)
-│           ├── components/       # AppShell, Sidebar (แยกหมวดหมู่), UI Primitives, DatePicker & OfficialGovFormDocument
-│           └── lib/api.ts        # Client API SDK
+│           │   └── admin/        # แอดมิน (ภาพรวม, จัดการทรัพยากร/แบบฟอร์ม, ผู้ใช้ & สิทธิ์, แดชบอร์ดแจ้งเตือน)
+│           ├── components/       # AppShell, Sidebar (Badge แจ้งเตือน), UI Primitives, DatePicker & OfficialGovFormDocument
+│           └── lib/api.ts        # Client API SDK (Notifications, Preferences, LINE Status, Admin Retry)
 ├── package.json
 └── pnpm-workspace.yaml
 ```
@@ -129,12 +134,34 @@ pnpm --filter @jongwen/api exec tsx prisma/migrate-supabase.ts
 pnpm db:seed
 ```
 
-### 3. รันระบบทั้งหมด
+### 3. ตั้งค่าสภาพแวดล้อม (Environment Variables)
+
+สร้างไฟล์ `apps/api/.env` (คัดลอกจาก `.env.example`):
+```env
+# Database
+DATABASE_URL="postgresql://postgres:<PASSWORD>@db.<PROJECT_REF>.supabase.co:5432/postgres?schema=public"
+
+# LINE Official Account / Messaging API (Phase 3)
+LINE_CHANNEL_ID="<Messaging_API_Channel_ID>"
+LINE_CHANNEL_SECRET="<Messaging_API_Channel_Secret>"
+LINE_CHANNEL_ACCESS_TOKEN="<Long_Lived_Channel_Access_Token>"
+LINE_OA_BASIC_ID="@<your_oa_basic_id>"
+LINE_WEBHOOK_URL="https://<your-domain>/api/line/webhook"
+LINE_NOTIFICATION_ENABLED=false # เปลี่ยนเป็น true เมื่อพร้อมส่งจริง (หาก false จะใช้ Mock Provider อัตโนมัติ)
+
+# LINE Login (Phase 2)
+LINE_LOGIN_CALLBACK_URL="http://localhost:4000/auth/line/callback"
+FRONTEND_URL="http://localhost:3000"
+BACKEND_URL="http://localhost:4000"
+```
+
+### 4. รันระบบทั้งหมด
 ```powershell
 pnpm dev
 ```
 - **Web App (Next.js)**: http://localhost:3000
 - **API Server (NestJS)**: http://localhost:4000/api
+- **LINE Webhook Endpoint**: http://localhost:4000/api/line/webhook
 
 ---
 
@@ -182,6 +209,19 @@ pnpm dev
      - **ชั้นที่ 2 (PIN Authorization):** เมื่อคลิกลงนามในแต่ละเอกสาร ผู้ลงนามต้องกดรหัส PIN 6 หลักส่วนบุคคลผ่านแป้นตัวเลขจำลอง (`PinKeypad`) เพื่อยืนยันเจตนาการลงนาม
      - **ลายมือชื่อดิจิทัลจริง:** ต้องวาดลายเซ็นสดบนหน้าจอสัมผัสหรือเมาส์ (ระบบไม่ถือว่า OTP หรือ PIN เป็นลายเซ็นดิจิทัลโดยอัตโนมัติ)
      - รองรับครบวงจรในหน้าลงนามผู้อนุมัติ (`/approver/sign/[id]`), หน้าตรวจคำขอเจ้าหน้าที่ (`/staff/review`), หน้าตั้งค่า 3 ขั้นตอน (`/approver/settings`) และหน้าจัดการบัญชีส่วนตัว (`/account`)
+7. **ระบบแจ้งเตือนผ่าน LINE Official Account & ศูนย์การแจ้งเตือน (Phase 3 — LINE Notification System):**
+   - แจ้งเตือนประชาชนและเจ้าหน้าที่ผ่าน **LINE Official Account (LINE Messaging API)** เมื่อมีเหตุการณ์สำคัญเกิดขึ้นในระบบ:
+     - **ระบบจองสถานที่:** แจ้งเตือนเมื่อส่งคำขอสำเร็จ, เจ้าหน้าที่รับเรื่อง, อยู่ระหว่างตรวจสอบ, ขอเอกสารเพิ่ม, ได้รับอนุมัติ/ปฏิเสธ, และเอกสารรอการลงนาม
+     - **ระบบยืม-คืนอุปกรณ์:** แจ้งเตือนผลการอนุมัติ, ใกล้ถึงกำหนดคืน, และแจ้งเตือนเมื่อเลยกำหนดคืน
+     - **ระบบแจ้งซ่อมบำรุง:** แจ้งเตือนรับเรื่อง, เจ้าหน้าที่เริ่มดำเนินการซ่อม, ซ่อมเสร็จสิ้น, และปิดงาน
+     - **การลงนามเอกสาร 3 ลำดับขั้น:** แจ้งเตือนคิวรอลงนามไปยังเจ้าหน้าที่ผู้ตรวจสอบ, ปลัด อบต., และนายก อบต.
+   - **ข้อความรูปแบบ Flex Message (Bubble Card):** แสดงข้อมูลสวยงาม มีสีสันบอกสถานะชัดเจน พร้อมปุ่มกดดูรายละเอียดคำขอและลิงก์ความปลอดภัย (Safe URL Whitelist)
+   - **ศูนย์การแจ้งเตือนภายในเว็บ (`/notifications`):** ดูประวัติการแจ้งเตือนทั้งหมด, กรองตามหมวดหมู่, ตัวนับจำนวนที่ยังไม่อ่านแบบเรียลไทม์ และปุ่มทำเครื่องหมายอ่านแล้วทั้งหมด
+   - **ตั้งค่าการรับแจ้งเตือนรายบุคคล (`/notifications/settings`):** ผู้ใช้สามารถเปิด-ปิดการแจ้งเตือน In-App และ LINE แยกตามหมวดหมู่ได้อย่างอิสระ โดยช่องทาง LINE เป็นแบบ **Opt-in** ตามหลักความเป็นส่วนตัว (PDPA)
+   - **แดชบอร์ดตรวจสอบการแจ้งเตือนสำหรับผู้ดูแลระบบ (`/admin/notifications`):** ตรวจสอบประวัติการส่ง (Sent, Failed, Skipped), ดู Error Code, และกดปุ่ม Retry ส่งข้อความใหม่ได้ทันที
+8. **ระบบ LINE Login & ลงทะเบียนครั้งแรกพร้อม PDPA Consent (Phase 2):**
+   - เข้าสู่ระบบด้วย LINE Account ผ่าน LINE Login v2.1
+   - กรณีเข้าสู่ระบบครั้งแรก จะได้รับ Secure Ticket นำทางไปยังหน้าลงทะเบียนเฉพาะ (`/register/line`) เพื่อกรอกข้อมูลพื้นฐานและบันทึกความยินยอมตามนโยบายคุ้มครองข้อมูลส่วนบุคคล (PDPA)
 
 ---
 
@@ -205,6 +245,12 @@ pnpm dev
    - ป้องกัน Brute-force: จำกัดการกรอกผิดไม่เกิน 5 ครั้ง หากเกินระบบจะระงับรหัสทันที
    - ป้องกัน Rate Abuse: หน่วงเวลาการขอรหัสใหม่ (Cooldown) ขั้นต่ำ 60 วินาที
    - เซสชันการลงนาม (`sign_verified_sessions`) จะถูกเพิกถอนทันทีเมื่อออกจากระบบ (Logout), เซสชันหมดอายุ (30 นาที) หรือผู้ใช้กดเพิกถอนด้วยตนเอง
+8. **ความมั่นคงปลอดภัยของ LINE Messaging API & Outbox Queue (Phase 3):**
+   - **ความปลอดภัยของ Credentials:** Channel Access Token และ Channel Secret ถูกจัดเก็บใน Backend เท่านั้น ไม่ถูกเปิดเผยไปยัง Frontend หรือบันทึกลงใน Error Log
+   - **การป้องกันข้อความซ้ำ (Idempotency):** ใช้ `eventKey` และ `X-Line-Retry-Key` ในการส่งข้อความ ป้องกันการส่งแจ้งเตือนซ้ำในเหตุการณ์เดียวกัน
+   - **ระบบคิว Outbox และ Retry:** มีกลไก Retry แบบ Exponential Backoff สำหรับข้อขัดข้องชั่วคราวทางเครือข่าย พร้อมแยกแยะข้อผิดพลาดถาวร (401, 403, 429, User Blocked)
+   - **การตรวจสอบ Webhook Signature:** ยืนยันความถูกต้องของ `X-Line-Signature` ด้วย HMAC-SHA256 กับ Raw Request Body ป้องกันการปลอมแปลง Request และจัดเก็บ Webhook Event ID เพื่อป้องกัน Replay Attack
+   - **Resilience & Fallback:** หาก LINE API มีปัญหา ระบบจะไม่ทำให้กระบวนการหลักทางธุรกิจ (Business Transaction) ล้มเหลว โดย In-App Notification ยังคงทำงานได้ตามปกติ
 
 ---
 
@@ -217,11 +263,16 @@ erDiagram
     accounts ||--o{ signature_records : "signer_id"
     accounts ||--o{ handover_records : "staff_id"
     accounts ||--o{ notifications : "user_id"
+    accounts ||--o{ user_line_accounts : "user_id"
+    accounts ||--o{ user_notification_preferences : "user_id"
+    accounts ||--o{ line_notification_logs : "user_id"
     accounts ||--o{ sessions : "account_id"
     accounts ||--o{ activity_logs : "actor_id"
     accounts ||--o{ document_scan_logs : "scanned_by"
     accounts ||--o{ sign_otp_codes : "account_id"
     accounts ||--o{ sign_verified_sessions : "account_id"
+
+    notifications ||--o{ line_notification_logs : "notification_id"
 
     requests ||--o{ request_venues : "request_id"
     requests ||--o{ request_periods : "request_id"
@@ -384,8 +435,65 @@ erDiagram
         string user_id FK
         string title
         string body
+        string notification_type "BOOKING_STATUS, BORROW_STATUS, etc"
+        string reference_type "booking, borrow, repair, document"
+        string reference_id
         boolean read
         string link
+        timestamptz read_at
+        timestamptz created_at
+    }
+
+    user_line_accounts {
+        string id PK
+        string user_id FK
+        string line_user_id UK
+        string display_name
+        string picture_url
+        string friendship_status "FRIEND, BLOCKED, UNFRIEND, UNKNOWN"
+        boolean is_active
+        timestamptz linked_at
+        timestamptz status_updated_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    user_notification_preferences {
+        string id PK
+        string user_id FK
+        string channel "IN_APP, LINE"
+        string notification_type "BOOKING_STATUS, BORROW_STATUS, etc"
+        boolean is_enabled
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    line_notification_logs {
+        string id PK
+        string user_id FK
+        string notification_id FK
+        string line_user_id
+        string notification_type
+        string event_key UK
+        string reference_type
+        string reference_id
+        string status "PENDING, PROCESSING, SENT, FAILED, SKIPPED"
+        string provider_message_id
+        string error_code
+        string error_message
+        int attempt_count
+        timestamptz sent_at
+        timestamptz created_at
+    }
+
+    line_webhook_events {
+        string id PK
+        string webhook_event_id UK
+        string event_type "follow, unfollow, message, accountLink"
+        string line_user_id
+        timestamptz event_timestamp
+        string processing_status "PROCESSED, DUPLICATE, IGNORED, FAILED"
+        timestamptz processed_at
         timestamptz created_at
     }
 
