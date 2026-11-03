@@ -1075,25 +1075,23 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     if (!this.dbAvailable) return mem ?? null;
 
     try {
-      const rows = await this.prisma.$queryRawUnsafe<
-        {
-          id: string;
-          account_id: string;
-          email: string;
-          code_hash: string;
-          attempts: number;
-          expires_at: Date;
-          consumed_at: Date | null;
-          created_at: Date;
-        }[]
-      >(
+      const rows = (await this.prisma.$queryRawUnsafe(
         `SELECT "id", "account_id", "email", "code_hash", "attempts", "expires_at", "consumed_at", "created_at"
          FROM "sign_otp_codes"
          WHERE "account_id" = $1
          ORDER BY "created_at" DESC
          LIMIT 1`,
         accountId,
-      );
+      )) as {
+        id: string;
+        account_id: string;
+        email: string;
+        code_hash: string;
+        attempts: number;
+        expires_at: Date;
+        consumed_at: Date | null;
+        created_at: Date;
+      }[];
       if (rows && rows.length > 0) {
         const r = rows[0];
         return {
@@ -1183,17 +1181,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       return active ?? null;
     }
     try {
-      const rows = await this.prisma.$queryRawUnsafe<
-        {
-          id: string;
-          account_id: string;
-          session_token: string;
-          verified_at: Date;
-          expires_at: Date;
-          revoked_at: Date | null;
-          created_at: Date;
-        }[]
-      >(
+      const rows = (await this.prisma.$queryRawUnsafe(
         `SELECT "id", "account_id", "session_token", "verified_at", "expires_at", "revoked_at", "created_at"
          FROM "sign_verified_sessions"
          WHERE "account_id" = $1 AND "session_token" = $2 AND "revoked_at" IS NULL AND "expires_at" > $3::timestamptz
@@ -1202,7 +1190,15 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         accountId,
         sessionToken,
         now,
-      );
+      )) as {
+        id: string;
+        account_id: string;
+        session_token: string;
+        verified_at: Date;
+        expires_at: Date;
+        revoked_at: Date | null;
+        created_at: Date;
+      }[];
       if (rows && rows.length > 0) {
         const r = rows[0];
         return {
@@ -1268,10 +1264,10 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
     if (this.dbAvailable) {
       try {
-        const rows = await this.prisma.$queryRawUnsafe<any[]>(
+        const rows = (await this.prisma.$queryRawUnsafe(
           `SELECT "user_id" FROM "user_line_accounts" WHERE "line_user_id" = $1 AND "is_active" = true LIMIT 1`,
           trimmed,
-        );
+        )) as any[];
         if (rows && rows.length > 0) {
           const user = this.accounts.find((a) => a.id === rows[0].user_id && a.active !== false);
           if (user) return user;
@@ -1305,11 +1301,11 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   } | null> {
     if (this.dbAvailable) {
       try {
-        const rows = await this.prisma.$queryRawUnsafe<any[]>(
+        const rows = (await this.prisma.$queryRawUnsafe(
           `SELECT "id", "user_id", "line_user_id", "display_name", "picture_url", "friendship_status", "status_updated_at", "linked_at", "is_active"
            FROM "user_line_accounts" WHERE "user_id" = $1 AND "is_active" = true LIMIT 1`,
           userId,
-        );
+        )) as any[];
         if (rows && rows.length > 0) {
           const r = rows[0];
           return {
@@ -1504,11 +1500,11 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   async getUserConsents(userId: string) {
     if (this.dbAvailable) {
       try {
-        const rows = await this.prisma.$queryRawUnsafe<any[]>(
+        const rows = (await this.prisma.$queryRawUnsafe(
           `SELECT "id", "user_id", "consent_type", "consent_version", "consent_status", "consented_at", "withdrawn_at", "created_at"
            FROM "user_consents" WHERE "user_id" = $1 ORDER BY "consented_at" DESC`,
           userId,
-        );
+        )) as any[];
         if (rows && rows.length > 0) {
           return rows.map((r) => ({
             id: r.id,
@@ -1703,10 +1699,10 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
     if (this.dbAvailable) {
       try {
-        const rows = await this.prisma.$queryRawUnsafe<any[]>(
+        const rows = (await this.prisma.$queryRawUnsafe(
           `SELECT * FROM "user_notification_preferences" WHERE "user_id" = $1`,
           userId,
-        );
+        )) as any[];
         if (Array.isArray(rows)) {
           saved = rows.map((r) => ({
             id: r.id,
@@ -1779,12 +1775,12 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
     if (this.dbAvailable) {
       try {
-        const rows = await this.prisma.$queryRawUnsafe<any[]>(
+        const rows = (await this.prisma.$queryRawUnsafe(
           `SELECT "is_enabled" FROM "user_notification_preferences" WHERE "user_id" = $1 AND "channel" = $2 AND "notification_type" = $3 LIMIT 1`,
           userId,
           channel,
           category,
-        );
+        )) as any[];
         if (rows && rows.length > 0) {
           return Boolean(rows[0].is_enabled);
         }
@@ -1862,10 +1858,10 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
     if (this.dbAvailable) {
       try {
-        const rows = await this.prisma.$queryRawUnsafe<any[]>(
+        const rows = (await this.prisma.$queryRawUnsafe(
           `SELECT * FROM "line_notification_logs" WHERE "event_key" = $1 LIMIT 1`,
           eventKey,
-        );
+        )) as any[];
         if (rows && rows.length > 0) {
           return this.mapLineLogRow(rows[0]);
         }
@@ -1884,10 +1880,10 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
     if (this.dbAvailable) {
       try {
-        const rows = await this.prisma.$queryRawUnsafe<any[]>(
+        const rows = (await this.prisma.$queryRawUnsafe(
           `SELECT * FROM "line_notification_logs" WHERE "id" = $1 LIMIT 1`,
           id,
-        );
+        )) as any[];
         if (rows && rows.length > 0) {
           const mapped = this.mapLineLogRow(rows[0]);
           this.lineNotificationLogs.unshift(mapped);
@@ -2031,10 +2027,10 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     const limit = Math.min(Math.max(filter?.limit ?? 100, 1), 500);
     if (this.dbAvailable && this.lineNotificationLogs.length === 0) {
       try {
-        const rows = await this.prisma.$queryRawUnsafe<any[]>(
+        const rows = (await this.prisma.$queryRawUnsafe(
           `SELECT * FROM "line_notification_logs" ORDER BY "created_at" DESC LIMIT $1`,
           limit,
-        );
+        )) as any[];
         if (Array.isArray(rows) && rows.length > 0) {
           this.lineNotificationLogs = rows.map((r) => this.mapLineLogRow(r));
         }
@@ -2091,10 +2087,10 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
     if (this.dbAvailable) {
       try {
-        const rows = await this.prisma.$queryRawUnsafe<any[]>(
+        const rows = (await this.prisma.$queryRawUnsafe(
           `SELECT * FROM "line_webhook_events" WHERE "webhook_event_id" = $1 LIMIT 1`,
           webhookEventId,
-        );
+        )) as any[];
         if (rows && rows.length > 0) {
           const r = rows[0];
           return {
@@ -2236,7 +2232,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     const [dbAccounts, accountAddresses, dbVenues, dbEquipment, dbRequests, dbNotifications, dbActivities, dbHandovers] =
       await Promise.all([
         this.prisma.account.findMany({ orderBy: { createdAt: 'asc' } }),
-        this.prisma.$queryRaw<
+        (this.prisma.$queryRaw`SELECT "id", "address_house_no", "address_moo", "address_subdistrict", "address_district", "address_province", "email", "email_verified" FROM "accounts"` as Promise<
           {
             id: string;
             address_house_no: string | null;
@@ -2247,7 +2243,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
             email: string | null;
             email_verified: boolean | null;
           }[]
-        >`SELECT "id", "address_house_no", "address_moo", "address_subdistrict", "address_district", "address_province", "email", "email_verified" FROM "accounts"`,
+        >),
         this.prisma.venue.findMany({ orderBy: { createdAt: 'asc' } }),
         this.prisma.equipment.findMany({ orderBy: { createdAt: 'asc' } }),
         this.prisma.request.findMany({
