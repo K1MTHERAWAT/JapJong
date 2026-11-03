@@ -85,6 +85,7 @@ describe('Navigation Menu Access Control (getVisibleNav)', () => {
   it('renders citizen personal menus but hides officer menus for citizen user', () => {
     const visible = getVisibleNav(baseCitizen);
     expect(visible.some((i) => i.href === '/history')).toBe(true);
+    expect(visible.some((i) => i.href === '/notifications')).toBe(true);
     expect(visible.some((i) => i.href === '/account')).toBe(true);
 
     // Citizens cannot see staff or approver menus
@@ -118,6 +119,7 @@ describe('Navigation Menu Access Control (getVisibleNav)', () => {
   it('renders admin and governance menus for Admin role', () => {
     const visible = getVisibleNav(baseAdmin);
     expect(visible.some((i) => i.href === '/admin')).toBe(true);
+    expect(visible.some((i) => i.href === '/admin/notifications')).toBe(true);
     expect(visible.some((i) => i.href === '/admin/resources')).toBe(true);
     expect(visible.some((i) => i.href === '/admin/permissions')).toBe(true);
   });

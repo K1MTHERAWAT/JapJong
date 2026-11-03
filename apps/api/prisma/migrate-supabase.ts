@@ -213,6 +213,72 @@ async function main() {
     CREATE INDEX IF NOT EXISTS "user_consents_type_ver_idx" ON "user_consents"("consent_type", "consent_version");
   `);
 
+  console.log('📦 Applying migration 7 (Phase 3 — LINE Notification System)...');
+  await runSqlStatements(`
+    ALTER TABLE "notifications"
+      ADD COLUMN IF NOT EXISTS "notification_type" TEXT NOT NULL DEFAULT 'SYSTEM',
+      ADD COLUMN IF NOT EXISTS "reference_type" TEXT,
+      ADD COLUMN IF NOT EXISTS "reference_id" TEXT,
+      ADD COLUMN IF NOT EXISTS "read_at" TIMESTAMPTZ(3);
+
+    CREATE INDEX IF NOT EXISTS "notifications_ref_idx" ON "notifications"("reference_type", "reference_id");
+
+    ALTER TABLE "user_line_accounts"
+      ADD COLUMN IF NOT EXISTS "friendship_status" TEXT NOT NULL DEFAULT 'UNKNOWN',
+      ADD COLUMN IF NOT EXISTS "status_updated_at" TIMESTAMPTZ(3);
+
+    CREATE TABLE IF NOT EXISTS "user_notification_preferences" (
+      "id" TEXT PRIMARY KEY,
+      "user_id" TEXT NOT NULL REFERENCES "accounts"("id") ON DELETE CASCADE,
+      "channel" TEXT NOT NULL,
+      "notification_type" TEXT NOT NULL,
+      "is_enabled" BOOLEAN NOT NULL DEFAULT true,
+      "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updated_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE ("user_id", "channel", "notification_type")
+    );
+
+    CREATE INDEX IF NOT EXISTS "user_notification_preferences_user_id_idx" ON "user_notification_preferences"("user_id");
+
+    CREATE TABLE IF NOT EXISTS "line_notification_logs" (
+      "id" TEXT PRIMARY KEY,
+      "user_id" TEXT NOT NULL REFERENCES "accounts"("id") ON DELETE CASCADE,
+      "notification_id" TEXT REFERENCES "notifications"("id") ON DELETE SET NULL,
+      "line_user_id" TEXT NOT NULL,
+      "notification_type" TEXT NOT NULL,
+      "event_key" TEXT UNIQUE,
+      "reference_type" TEXT,
+      "reference_id" TEXT,
+      "message_payload" JSONB,
+      "status" TEXT NOT NULL DEFAULT 'PENDING',
+      "provider_message_id" TEXT,
+      "error_code" TEXT,
+      "error_message" TEXT,
+      "attempt_count" INTEGER NOT NULL DEFAULT 0,
+      "next_retry_at" TIMESTAMPTZ(3),
+      "sent_at" TIMESTAMPTZ(3),
+      "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS "line_notification_logs_user_id_idx" ON "line_notification_logs"("user_id");
+    CREATE INDEX IF NOT EXISTS "line_notification_logs_status_idx" ON "line_notification_logs"("status");
+    CREATE INDEX IF NOT EXISTS "line_notification_logs_created_at_idx" ON "line_notification_logs"("created_at");
+
+    CREATE TABLE IF NOT EXISTS "line_webhook_events" (
+      "id" TEXT PRIMARY KEY,
+      "webhook_event_id" TEXT NOT NULL UNIQUE,
+      "event_type" TEXT NOT NULL,
+      "line_user_id" TEXT,
+      "event_timestamp" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "processed_at" TIMESTAMPTZ(3),
+      "processing_status" TEXT NOT NULL DEFAULT 'PROCESSED',
+      "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS "line_webhook_events_line_user_id_idx" ON "line_webhook_events"("line_user_id");
+    CREATE INDEX IF NOT EXISTS "line_webhook_events_created_at_idx" ON "line_webhook_events"("created_at");
+  `);
+
   console.log('✨ Schema applied to Supabase successfully!');
 }
 

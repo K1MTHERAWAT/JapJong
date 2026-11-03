@@ -204,12 +204,10 @@ export class AdminController {
     };
   }
 
-  @Get('notifications')
   notifications(@CurrentUser() user: Account) {
     return this.db.notifications.filter((n) => n.userId === user.id);
   }
 
-  @Post('notifications/read-all')
   readAll(@CurrentUser() user: Account) {
     this.db.markAllNotificationsRead(user.id);
     return { ok: true };

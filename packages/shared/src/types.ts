@@ -227,14 +227,99 @@ export type RequestWithTimeline = AnyRequest & {
 };
 
 // ===== Others =====
+export type NotificationChannel = 'IN_APP' | 'LINE';
+
+export type NotificationCategory =
+  | 'BOOKING_STATUS'
+  | 'BORROW_STATUS'
+  | 'BORROW_RETURN'
+  | 'REPAIR_STATUS'
+  | 'DOCUMENT_SIGNING'
+  | 'SYSTEM';
+
+export type NotificationReferenceType = 'booking' | 'borrow' | 'repair' | 'signing' | 'system';
+
+export type LineDeliveryStatus = 'PENDING' | 'PROCESSING' | 'SENT' | 'FAILED' | 'SKIPPED';
+
+export type LineFriendshipStatus = 'FRIEND' | 'UNFRIEND' | 'BLOCKED' | 'UNKNOWN';
+
 export interface AppNotification {
   id: string;
   userId: string;
   title: string;
   body: string;
+  message?: string;
+  notificationType?: NotificationCategory | string;
+  referenceType?: NotificationReferenceType | string | null;
+  referenceId?: string | null;
   at: string;
+  createdAt?: string;
   read: boolean;
+  isRead?: boolean;
+  readAt?: string | null;
   link?: string;
+}
+
+export interface UserNotificationPreference {
+  id: string;
+  userId: string;
+  channel: NotificationChannel;
+  notificationType: NotificationCategory;
+  isEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LineNotificationLog {
+  id: string;
+  userId: string;
+  userName?: string;
+  notificationId?: string | null;
+  lineUserId: string;
+  notificationType: string;
+  eventKey?: string | null;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  status: LineDeliveryStatus;
+  providerMessageId?: string | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  attemptCount: number;
+  sentAt?: string | null;
+  createdAt: string;
+}
+
+export interface LineWebhookEventRecord {
+  id: string;
+  webhookEventId: string;
+  eventType: string;
+  lineUserId?: string | null;
+  eventTimestamp: string;
+  processedAt?: string | null;
+  processingStatus: 'PROCESSED' | 'IGNORED' | 'FAILED';
+  createdAt: string;
+}
+
+export interface LineNotificationStatusResponse {
+  lineNotificationEnabled: boolean;
+  isLinked: boolean;
+  lineAccount?: {
+    displayName: string;
+    pictureUrl?: string | null;
+    linkedAt: string;
+    friendshipStatus: LineFriendshipStatus;
+  } | null;
+  oaBasicId?: string | null;
+  addFriendUrl?: string | null;
+}
+
+export interface AdminNotificationDashboardSummary {
+  total: number;
+  sent: number;
+  failed: number;
+  pending: number;
+  skipped: number;
+  logs: LineNotificationLog[];
 }
 
 export interface ActivityLog {
@@ -390,6 +475,8 @@ export interface UserLineAccount {
   lineUserId: string;
   displayName: string;
   pictureUrl?: string | null;
+  friendshipStatus?: LineFriendshipStatus;
+  statusUpdatedAt?: string | null;
   linkedAt: string;
   isActive: boolean;
   createdAt: string;

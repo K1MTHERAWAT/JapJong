@@ -6,6 +6,8 @@ import {
   Wrench,
   FileText,
   Clock,
+  Bell,
+  BellRing,
   ClipboardList,
   CheckSquare,
   PenTool,
@@ -48,6 +50,13 @@ export const NAV: NavItem[] = [
     section: 'รายการและประวัติ',
     roles: ['USER', 'STAFF', 'APPROVER_L2', 'APPROVER_L1', 'ADMIN'],
   },
+  {
+    href: '/notifications',
+    label: 'ศูนย์แจ้งเตือน',
+    icon: Bell,
+    section: 'รายการและประวัติ',
+    roles: ['USER', 'STAFF', 'APPROVER_L2', 'APPROVER_L1', 'ADMIN'],
+  },
 
   // เจ้าหน้าที่
   { href: '/staff/review', label: 'ตรวจคำขอ & งานซ่อม', icon: ClipboardList, section: 'งานเจ้าหน้าที่', roles: ['STAFF', 'ADMIN'] },
@@ -60,6 +69,7 @@ export const NAV: NavItem[] = [
 
   // แอดมินและทรัพยากร
   { href: '/admin', label: 'ภาพรวมผู้ดูแลระบบ', icon: LayoutDashboard, section: 'ระบบและผู้ดูแล', roles: ['ADMIN'], exact: true },
+  { href: '/admin/notifications', label: 'บันทึกแจ้งเตือน & LINE', icon: BellRing, section: 'ระบบและผู้ดูแล', roles: ['ADMIN'] },
   { href: '/admin/resources', label: 'จัดการสถานที่/อุปกรณ์', icon: Shield, section: 'ระบบและผู้ดูแล', roles: ['ADMIN', 'STAFF'] },
   { href: '/admin/permissions', label: 'บัญชีผู้ใช้ & สิทธิ์', icon: Users, section: 'ระบบและผู้ดูแล', roles: ['ADMIN'] },
 

@@ -137,6 +137,8 @@ model Account {
   signVerifiedSessions SignVerifiedSession[]
   lineAccount      UserLineAccount?
   consents         UserConsent[]
+  notificationPreferences UserNotificationPreference[]
+  lineNotificationLogs    LineNotificationLog[]
   registrationCompletedAt DateTime? @map("registration_completed_at") @db.Timestamptz(3)
   accountStatus    String    @default("ACTIVE") @map("account_status")
 
@@ -354,17 +356,23 @@ model HandoverRecord {
 // ===================== Others =====================
 
 model Notification {
-  id        String   @id
-  userId    String   @map("user_id")
-  title     String
-  body      String
-  read      Boolean  @default(false)
-  link      String?
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  id               String    @id
+  userId           String    @map("user_id")
+  title            String
+  body             String
+  notificationType String    @default("SYSTEM") @map("notification_type")
+  referenceType    String?   @map("reference_type")
+  referenceId      String?   @map("reference_id")
+  read             Boolean   @default(false)
+  readAt           DateTime? @map("read_at") @db.Timestamptz(3)
+  link             String?
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  user Account @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                 Account               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lineNotificationLogs LineNotificationLog[]
 
   @@index([userId, read])
+  @@index([referenceType, referenceId])
   @@map("notifications")
 }
 
@@ -511,15 +519,17 @@ model SignVerifiedSession {
 // ===================== LINE Authentication =====================
 
 model UserLineAccount {
-  id          String   @id @default(cuid())
-  userId      String   @unique @map("user_id")
-  lineUserId  String   @unique @map("line_user_id")
-  displayName String   @map("display_name")
-  pictureUrl  String?  @map("picture_url")
-  linkedAt    DateTime @default(now()) @map("linked_at") @db.Timestamptz(3)
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id               String    @id @default(cuid())
+  userId           String    @unique @map("user_id")
+  lineUserId       String    @unique @map("line_user_id")
+  displayName      String    @map("display_name")
+  pictureUrl       String?   @map("picture_url")
+  friendshipStatus String    @default("UNKNOWN") @map("friendship_status")
+  statusUpdatedAt  DateTime? @map("status_updated_at") @db.Timestamptz(3)
+  linkedAt         DateTime  @default(now()) @map("linked_at") @db.Timestamptz(3)
+  isActive         Boolean   @default(true) @map("is_active")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   account Account @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -545,6 +555,67 @@ model UserConsent {
   @@index([userId])
   @@index([consentType, consentVersion])
   @@map("user_consents")
+}
+
+// ===================== Phase 3: LINE Notification System =====================
+
+model UserNotificationPreference {
+  id               String   @id @default(cuid())
+  userId           String   @map("user_id")
+  channel          String   @map("channel") // "IN_APP" | "LINE"
+  notificationType String   @map("notification_type") // "BOOKING_STATUS" | "BORROW_STATUS" | "BORROW_RETURN" | "REPAIR_STATUS" | "DOCUMENT_SIGNING"
+  isEnabled        Boolean  @default(true) @map("is_enabled")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  account Account @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channel, notificationType])
+  @@index([userId])
+  @@map("user_notification_preferences")
+}
+
+model LineNotificationLog {
+  id                String    @id @default(cuid())
+  userId            String    @map("user_id")
+  notificationId    String?   @map("notification_id")
+  lineUserId        String    @map("line_user_id")
+  notificationType  String    @map("notification_type")
+  eventKey          String?   @unique @map("event_key")
+  referenceType     String?   @map("reference_type")
+  referenceId       String?   @map("reference_id")
+  messagePayload    Json?     @map("message_payload")
+  status            String    @default("PENDING") @map("status") // "PENDING" | "PROCESSING" | "SENT" | "FAILED" | "SKIPPED"
+  providerMessageId String?   @map("provider_message_id")
+  errorCode         String?   @map("error_code")
+  errorMessage      String?   @map("error_message")
+  attemptCount      Int       @default(0) @map("attempt_count")
+  nextRetryAt       DateTime? @map("next_retry_at") @db.Timestamptz(3)
+  sentAt            DateTime? @map("sent_at") @db.Timestamptz(3)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  account      Account       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notification Notification? @relation(fields: [notificationId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("line_notification_logs")
+}
+
+model LineWebhookEvent {
+  id               String    @id @default(cuid())
+  webhookEventId   String    @unique @map("webhook_event_id")
+  eventType        String    @map("event_type")
+  lineUserId       String?   @map("line_user_id")
+  eventTimestamp   DateTime  @map("event_timestamp") @db.Timestamptz(3)
+  processedAt      DateTime? @map("processed_at") @db.Timestamptz(3)
+  processingStatus String    @default("PROCESSED") @map("processing_status")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([lineUserId])
+  @@index([createdAt])
+  @@map("line_webhook_events")
 }
 
 

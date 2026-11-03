@@ -61,3 +61,29 @@ export function ErrorState({
     </div>
   );
 }
+
+export function Feedback({
+  tone = 'neutral',
+  className = '',
+  children,
+}: {
+  tone?: 'brand' | 'crit' | 'neutral' | 'warn';
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const toneClasses = {
+    brand: 'bg-[#F2F7F4] border-brand/30 text-brand-ink',
+    crit: 'bg-danger-bg border-danger-fg/30 text-danger-fg',
+    warn: 'bg-warn-bg border-warn-fg/30 text-warn-fg',
+    neutral: 'bg-surface-muted border-line text-ink-soft',
+  };
+  return (
+    <div
+      className={`rounded-control border p-3.5 text-caption font-medium flex items-center justify-between gap-2 ${
+        toneClasses[tone] || toneClasses.neutral
+      } ${className}`}
+    >
+      <div>{children}</div>
+    </div>
+  );
+}

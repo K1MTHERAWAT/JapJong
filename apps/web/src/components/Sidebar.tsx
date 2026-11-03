@@ -10,7 +10,7 @@ import { ROLE_META } from '@jongwen/shared';
 
 export function Sidebar({ items }: { items: NavItem[] }) {
   const path = usePathname();
-  const { account, logout } = useAuth();
+  const { account, logout, unreadCount } = useAuth();
   const [hovered, setHovered] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const open = hovered || drawer;
@@ -33,10 +33,10 @@ export function Sidebar({ items }: { items: NavItem[] }) {
   }, [drawer, closeDrawer]);
 
   const navGroups = [
-    items.filter((item) => ['/', '/booking', '/borrow', '/repair', '/borrow/my', '/history', '/account'].includes(item.href)),
+    items.filter((item) => ['/', '/booking', '/borrow', '/repair', '/borrow/my', '/history', '/notifications', '/account'].includes(item.href)),
     items.filter((item) => ['/staff/review', '/staff/handover', '/staff/walk-in', '/staff/verify'].includes(item.href)),
     items.filter((item) => ['/approver'].includes(item.href)),
-    items.filter((item) => ['/admin/resources', '/admin/permissions'].includes(item.href)),
+    items.filter((item) => ['/admin', '/admin/notifications', '/admin/resources', '/admin/permissions'].includes(item.href)),
   ].filter((group) => group.length > 0);
 
   return (
@@ -110,9 +110,19 @@ export function Sidebar({ items }: { items: NavItem[] }) {
                       aria-current={active ? 'page' : undefined}
                       className={`flex h-11 items-center gap-3 rounded-control text-ink-soft hover:bg-hover transition-colors aria-[current=page]:bg-brand-tint aria-[current=page]:font-semibold aria-[current=page]:text-brand-ink aria-[current=page]:shadow-sm ${open ? 'px-3' : 'justify-center px-0 lg:mx-auto lg:size-11'}`}
                     >
-                      <i.icon className={`size-5 shrink-0 ${open ? '' : 'lg:size-[21px]'}`} />
-                      <span className={['text-body truncate', open ? '' : 'lg:sr-only'].join(' ')}>
-                        {i.label}
+                      <div className="relative shrink-0">
+                        <i.icon className={`size-5 ${open ? '' : 'lg:size-[21px]'}`} />
+                        {i.href === '/notifications' && unreadCount > 0 && !open && (
+                          <span className="absolute -top-1 -right-1 size-2 rounded-full bg-status-crit" />
+                        )}
+                      </div>
+                      <span className={['text-body truncate flex-1 flex items-center justify-between', open ? '' : 'lg:sr-only'].join(' ')}>
+                        <span>{i.label}</span>
+                        {i.href === '/notifications' && unreadCount > 0 && open && (
+                          <span className="ml-2 px-1.5 py-0.2 rounded-full bg-status-crit text-white text-[11px] font-bold">
+                            {unreadCount > 99 ? '99+' : unreadCount}
+                          </span>
+                        )}
                       </span>
                     </Link>
                   );

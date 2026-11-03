@@ -1,5 +1,6 @@
 import type {
   ActivityLog,
+  AdminNotificationDashboardSummary,
   AppNotification,
   ConflictInfo,
   DayAvailability,
@@ -11,9 +12,14 @@ import type {
   ItemQty,
   LineAuthStatusResponse,
   LineAuthUrlResponse,
+  LineDeliveryStatus,
+  LineNotificationLog,
+  LineNotificationStatusResponse,
   LineRegisterPayload,
   LineRegistrationTicketInfo,
   LoginResponse,
+  NotificationCategory,
+  NotificationChannel,
   Period,
   PermissionKey,
   PublicAccount,
@@ -24,6 +30,7 @@ import type {
   Role,
   SignSessionStatus,
   StaffVerificationResult,
+  UserNotificationPreference,
   Venue,
   VerifySignOtpResponse,
 } from '@jongwen/shared';
@@ -321,7 +328,41 @@ export const api = {
       activities: ActivityLog[];
     }>('/admin/overview'),
   notifications: () => request<AppNotification[]>('/notifications'),
+  getUnreadCount: () => request<{ unreadCount: number }>('/notifications/unread-count'),
+  markNotificationRead: (id: string) =>
+    request<AppNotification>(`/notifications/${id}/read`, { method: 'PATCH' }),
   readAllNotifications: () => request<{ ok: boolean }>('/notifications/read-all', { method: 'POST', body: '{}' }),
+  getNotificationPreferences: () =>
+    request<{ preferences: UserNotificationPreference[] }>('/notifications/preferences'),
+  updateNotificationPreferences: (
+    preferences: { channel: NotificationChannel; notificationType: NotificationCategory; isEnabled: boolean }[],
+  ) =>
+    request<{ ok: boolean; preferences: UserNotificationPreference[] }>('/notifications/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify({ preferences }),
+    }),
+  getLineNotificationStatus: () =>
+    request<LineNotificationStatusResponse>('/line/notification/status'),
+  testLineNotification: (payload?: { userId?: string; useFlex?: boolean }) =>
+    request<{ ok: boolean; inAppNotification?: AppNotification; lineLog?: LineNotificationLog }>(
+      '/line/notification/test',
+      { method: 'POST', body: JSON.stringify(payload || {}) },
+    ),
+  getAdminNotificationLogs: (status?: LineDeliveryStatus, limit?: number) => {
+    const q = new URLSearchParams();
+    if (status) q.set('status', status);
+    if (limit) q.set('limit', String(limit));
+    const qs = q.toString();
+    return request<AdminNotificationDashboardSummary>(`/admin/notifications/logs${qs ? `?${qs}` : ''}`);
+  },
+  getAdminFailedNotifications: (limit?: number) =>
+    request<{ failedCount: number; logs: LineNotificationLog[] }>(
+      `/admin/notifications/failed${limit ? `?limit=${limit}` : ''}`,
+    ),
+  retryNotification: (id: string) =>
+    request<{ ok: boolean; log: LineNotificationLog }>(`/admin/notifications/${id}/retry`, {
+      method: 'POST',
+    }),
   resetDemo: () => request<{ ok: boolean }>('/dev/reset', { method: 'POST', body: '{}' }),
 
   // Document Verification & QR Code

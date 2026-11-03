@@ -13,11 +13,18 @@ import {
   DocumentVerification,
   Equipment,
   HandoverRecord,
+  LineDeliveryStatus,
+  LineFriendshipStatus,
+  LineNotificationLog,
+  LineWebhookEventRecord,
+  NotificationCategory,
+  NotificationChannel,
   OfficialFormPurposeItem,
   PermissionKey,
   PublicAccount,
   RepairRequest,
   Role,
+  UserNotificationPreference,
   Venue,
 } from '@jongwen/shared';
 import {
@@ -76,6 +83,8 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     lineUserId: string;
     displayName: string;
     pictureUrl: string | null;
+    friendshipStatus: LineFriendshipStatus;
+    statusUpdatedAt: Date | null;
     linkedAt: Date;
     isActive: boolean;
     createdAt: Date;
@@ -91,6 +100,9 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     withdrawnAt: Date | null;
     createdAt: Date;
   }[] = [];
+  userNotificationPreferences: UserNotificationPreference[] = [];
+  lineNotificationLogs: (LineNotificationLog & { messagePayload?: any; nextRetryAt?: string | null })[] = [];
+  lineWebhookEvents: LineWebhookEventRecord[] = [];
 
   private seq = { BK: 0, BR: 0, RP: 0, n: 0, l: 0, u: 100, v: 100, e: 100 };
   private resetCronTimer?: NodeJS.Timeout;
@@ -512,19 +524,43 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     return { ...rest, hasPin: !!pin };
   }
 
-  async notify(userId: string, title: string, body: string, link?: string) {
+  async notify(
+    userId: string,
+    title: string,
+    body: string,
+    link?: string,
+    options?: {
+      notificationType?: NotificationCategory | string;
+      referenceType?: string | null;
+      referenceId?: string | null;
+    },
+  ): Promise<AppNotification | null> {
+    const notificationType = (options?.notificationType || 'SYSTEM') as NotificationCategory;
+    const isEnabled = await this.isChannelEnabled(userId, 'IN_APP', notificationType);
+    if (!isEnabled) {
+      return null;
+    }
+
     const id = await this.nextId('n');
+    const nowIso = new Date().toISOString();
     const item: AppNotification = {
       id,
       userId,
       title,
       body,
+      message: body,
+      notificationType,
+      referenceType: options?.referenceType ?? null,
+      referenceId: options?.referenceId ?? null,
       link,
-      at: new Date().toISOString(),
+      at: nowIso,
+      createdAt: nowIso,
       read: false,
+      isRead: false,
+      readAt: null,
     };
     this.notifications.unshift(item);
-    if (!this.dbAvailable) return;
+    if (!this.dbAvailable) return item;
     void this.prisma.notification
       .create({
         data: {
@@ -537,21 +573,73 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
           createdAt: new Date(item.at),
         },
       })
+      .then(() =>
+        this.prisma.$executeRawUnsafe(
+          `UPDATE "notifications" SET "notification_type" = $1, "reference_type" = $2, "reference_id" = $3 WHERE "id" = $4`,
+          notificationType,
+          item.referenceType ?? null,
+          item.referenceId ?? null,
+          item.id,
+        ),
+      )
       .catch((err) => this.logger.error('Failed to persist notification', err));
+    return item;
   }
 
-  notifyRole(role: Account['role'], title: string, body: string, link?: string) {
-    this.accounts.filter((a) => a.role === role).forEach((a) => void this.notify(a.id, title, body, link));
+  notifyRole(
+    role: Account['role'],
+    title: string,
+    body: string,
+    link?: string,
+    options?: {
+      notificationType?: NotificationCategory | string;
+      referenceType?: string | null;
+      referenceId?: string | null;
+    },
+  ) {
+    this.accounts
+      .filter((a) => a.role === role && a.active !== false)
+      .forEach((a) => void this.notify(a.id, title, body, link, options));
+  }
+
+  async markNotificationRead(userId: string, notificationId: string): Promise<AppNotification | null> {
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const target = this.notifications.find((n) => n.id === notificationId && n.userId === userId);
+    if (!target) return null;
+    target.read = true;
+    target.isRead = true;
+    target.readAt = nowIso;
+    if (this.dbAvailable) {
+      await this.prisma
+        .$executeRawUnsafe(
+          `UPDATE "notifications" SET "read" = true, "read_at" = $1::timestamptz WHERE "id" = $2 AND "user_id" = $3`,
+          now,
+          notificationId,
+          userId,
+        )
+        .catch((err) => this.logger.error('Failed to mark notification read', err));
+    }
+    return target;
   }
 
   markAllNotificationsRead(userId: string) {
-    this.notifications.filter((n) => n.userId === userId).forEach((n) => (n.read = true));
+    const now = new Date();
+    const nowIso = now.toISOString();
+    this.notifications
+      .filter((n) => n.userId === userId)
+      .forEach((n) => {
+        n.read = true;
+        n.isRead = true;
+        if (!n.readAt) n.readAt = nowIso;
+      });
     if (!this.dbAvailable) return;
-    void this.prisma.notification
-      .updateMany({
-        where: { userId, read: false },
-        data: { read: true },
-      })
+    void this.prisma
+      .$executeRawUnsafe(
+        `UPDATE "notifications" SET "read" = true, "read_at" = COALESCE("read_at", $1::timestamptz) WHERE "user_id" = $2 AND "read" = false`,
+        now,
+        userId,
+      )
       .catch((err) => this.logger.error('Failed to mark notifications read', err));
   }
 
@@ -1210,13 +1298,15 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     lineUserId: string;
     displayName: string;
     pictureUrl: string | null;
+    friendshipStatus: LineFriendshipStatus;
+    statusUpdatedAt: Date | null;
     linkedAt: Date;
     isActive: boolean;
   } | null> {
     if (this.dbAvailable) {
       try {
         const rows = await this.prisma.$queryRawUnsafe<any[]>(
-          `SELECT "id", "user_id", "line_user_id", "display_name", "picture_url", "linked_at", "is_active"
+          `SELECT "id", "user_id", "line_user_id", "display_name", "picture_url", "friendship_status", "status_updated_at", "linked_at", "is_active"
            FROM "user_line_accounts" WHERE "user_id" = $1 AND "is_active" = true LIMIT 1`,
           userId,
         );
@@ -1228,6 +1318,8 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
             lineUserId: r.line_user_id,
             displayName: r.display_name,
             pictureUrl: r.picture_url,
+            friendshipStatus: (r.friendship_status || 'UNKNOWN') as LineFriendshipStatus,
+            statusUpdatedAt: r.status_updated_at ? new Date(r.status_updated_at) : null,
             linkedAt: new Date(r.linked_at),
             isActive: Boolean(r.is_active),
           };
@@ -1249,6 +1341,8 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         lineUserId: acc.lineUserId,
         displayName: acc.lineName || acc.name,
         pictureUrl: null,
+        friendshipStatus: 'UNKNOWN',
+        statusUpdatedAt: null,
         linkedAt: new Date(),
         isActive: true,
       };
@@ -1259,27 +1353,39 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
   async linkLineAccount(
     userId: string,
-    data: { lineUserId: string; displayName: string; pictureUrl?: string | null },
+    data: {
+      lineUserId: string;
+      displayName: string;
+      pictureUrl?: string | null;
+      friendshipStatus?: LineFriendshipStatus;
+    },
   ): Promise<{
     id: string;
     userId: string;
     lineUserId: string;
     displayName: string;
     pictureUrl: string | null;
+    friendshipStatus: LineFriendshipStatus;
+    statusUpdatedAt: Date | null;
     linkedAt: Date;
     isActive: boolean;
   }> {
     const now = new Date();
-    const id = `line-${randomBytes(8).toString('hex')}`;
+    const existing = this.userLineAccounts.find((l) => l.userId === userId || l.lineUserId === data.lineUserId);
+    const id = existing?.id || `line-${randomBytes(8).toString('hex')}`;
+    const friendshipStatus: LineFriendshipStatus =
+      data.friendshipStatus || existing?.friendshipStatus || 'UNKNOWN';
     const record = {
       id,
       userId,
       lineUserId: data.lineUserId,
       displayName: data.displayName,
       pictureUrl: data.pictureUrl ?? null,
+      friendshipStatus,
+      statusUpdatedAt: existing?.statusUpdatedAt ?? null,
       linkedAt: now,
       isActive: true,
-      createdAt: now,
+      createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
 
@@ -1548,6 +1654,510 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     await this.saveUserConsents(id, data.consents);
 
     return newAccount;
+  }
+
+  // ===================== Phase 3: LINE Notification Helpers =====================
+
+  static readonly NOTIFICATION_CATEGORIES: NotificationCategory[] = [
+    'BOOKING_STATUS',
+    'BORROW_STATUS',
+    'BORROW_RETURN',
+    'REPAIR_STATUS',
+    'DOCUMENT_SIGNING',
+  ];
+
+  async updateLineFriendshipStatus(lineUserId: string, status: LineFriendshipStatus): Promise<boolean> {
+    const trimmed = String(lineUserId || '').trim();
+    if (!trimmed) return false;
+    const now = new Date();
+    let updated = false;
+    for (const acc of this.userLineAccounts) {
+      if (acc.lineUserId === trimmed) {
+        acc.friendshipStatus = status;
+        acc.statusUpdatedAt = now;
+        acc.updatedAt = now;
+        updated = true;
+      }
+    }
+
+    if (this.dbAvailable) {
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `UPDATE "user_line_accounts" SET "friendship_status" = $1, "status_updated_at" = $2::timestamptz, "updated_at" = $2::timestamptz WHERE "line_user_id" = $3`,
+          status,
+          now,
+          trimmed,
+        );
+        updated = true;
+      } catch (err) {
+        this.logger.warn('Failed to update LINE friendship status in DB', err);
+      }
+    }
+
+    return updated;
+  }
+
+  async getUserNotificationPreferences(userId: string): Promise<UserNotificationPreference[]> {
+    const nowIso = new Date().toISOString();
+    let saved: UserNotificationPreference[] = [];
+
+    if (this.dbAvailable) {
+      try {
+        const rows = await this.prisma.$queryRawUnsafe<any[]>(
+          `SELECT * FROM "user_notification_preferences" WHERE "user_id" = $1`,
+          userId,
+        );
+        if (Array.isArray(rows)) {
+          saved = rows.map((r) => ({
+            id: r.id,
+            userId: r.user_id,
+            channel: r.channel as NotificationChannel,
+            notificationType: r.notification_type as NotificationCategory,
+            isEnabled: Boolean(r.is_enabled),
+            createdAt: new Date(r.created_at).toISOString(),
+            updatedAt: new Date(r.updated_at).toISOString(),
+          }));
+        }
+      } catch {
+        // Fallback to in-memory
+      }
+    }
+
+    if (saved.length === 0) {
+      saved = this.userNotificationPreferences.filter((p) => p.userId === userId);
+    }
+
+    const result: UserNotificationPreference[] = [];
+    const channels: NotificationChannel[] = ['IN_APP', 'LINE'];
+
+    for (const category of DbService.NOTIFICATION_CATEGORIES) {
+      for (const channel of channels) {
+        const match = saved.find((p) => p.channel === channel && p.notificationType === category);
+        if (match) {
+          result.push(match);
+        } else {
+          // Policy (Section 6): IN_APP defaults to true, LINE defaults to false (must opt-in explicitly)
+          result.push({
+            id: `pref-default-${userId}-${channel}-${category}`,
+            userId,
+            channel,
+            notificationType: category,
+            isEnabled: channel === 'IN_APP',
+            createdAt: nowIso,
+            updatedAt: nowIso,
+          });
+        }
+      }
+    }
+
+    return result;
+  }
+
+  async isChannelEnabled(
+    userId: string,
+    channel: NotificationChannel,
+    notificationType: NotificationCategory | string,
+  ): Promise<boolean> {
+    const category = DbService.NOTIFICATION_CATEGORIES.includes(notificationType as NotificationCategory)
+      ? (notificationType as NotificationCategory)
+      : null;
+
+    if (!category) {
+      // SYSTEM notifications default to enabled for IN_APP
+      const memMatch = this.userNotificationPreferences.find(
+        (p) => p.userId === userId && p.channel === channel && p.notificationType === notificationType,
+      );
+      if (memMatch) return memMatch.isEnabled;
+      return channel === 'IN_APP';
+    }
+
+    // Check in-memory first
+    const mem = this.userNotificationPreferences.find(
+      (p) => p.userId === userId && p.channel === channel && p.notificationType === category,
+    );
+    if (mem) return mem.isEnabled;
+
+    if (this.dbAvailable) {
+      try {
+        const rows = await this.prisma.$queryRawUnsafe<any[]>(
+          `SELECT "is_enabled" FROM "user_notification_preferences" WHERE "user_id" = $1 AND "channel" = $2 AND "notification_type" = $3 LIMIT 1`,
+          userId,
+          channel,
+          category,
+        );
+        if (rows && rows.length > 0) {
+          return Boolean(rows[0].is_enabled);
+        }
+      } catch {
+        // Fallback
+      }
+    }
+
+    return channel === 'IN_APP';
+  }
+
+  async upsertUserNotificationPreferences(
+    userId: string,
+    items: { channel: NotificationChannel; notificationType: NotificationCategory; isEnabled: boolean }[],
+  ): Promise<UserNotificationPreference[]> {
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    for (const item of items) {
+      if (item.channel !== 'IN_APP' && item.channel !== 'LINE') continue;
+      const existingIdx = this.userNotificationPreferences.findIndex(
+        (p) =>
+          p.userId === userId &&
+          p.channel === item.channel &&
+          p.notificationType === item.notificationType,
+      );
+      const id =
+        existingIdx >= 0
+          ? this.userNotificationPreferences[existingIdx].id
+          : `pref-${randomBytes(8).toString('hex')}`;
+      const record: UserNotificationPreference = {
+        id,
+        userId,
+        channel: item.channel,
+        notificationType: item.notificationType,
+        isEnabled: Boolean(item.isEnabled),
+        createdAt: existingIdx >= 0 ? this.userNotificationPreferences[existingIdx].createdAt : nowIso,
+        updatedAt: nowIso,
+      };
+      if (existingIdx >= 0) {
+        this.userNotificationPreferences[existingIdx] = record;
+      } else {
+        this.userNotificationPreferences.push(record);
+      }
+
+      if (this.dbAvailable) {
+        try {
+          await this.prisma.$executeRawUnsafe(
+            `INSERT INTO "user_notification_preferences" ("id", "user_id", "channel", "notification_type", "is_enabled", "created_at", "updated_at")
+             VALUES ($1, $2, $3, $4, $5, $6::timestamptz, $6::timestamptz)
+             ON CONFLICT ("user_id", "channel", "notification_type") DO UPDATE
+             SET "is_enabled" = EXCLUDED."is_enabled", "updated_at" = EXCLUDED."updated_at"`,
+            id,
+            userId,
+            item.channel,
+            item.notificationType,
+            Boolean(item.isEnabled),
+            now,
+          );
+        } catch (err) {
+          this.logger.warn('Failed to upsert notification preference in DB', err);
+        }
+      }
+    }
+
+    return this.getUserNotificationPreferences(userId);
+  }
+
+  async getLineNotificationLogByEventKey(
+    eventKey: string,
+  ): Promise<(LineNotificationLog & { messagePayload?: any; nextRetryAt?: string | null }) | null> {
+    if (!eventKey) return null;
+    const inMem = this.lineNotificationLogs.find((l) => l.eventKey === eventKey);
+    if (inMem) return inMem;
+
+    if (this.dbAvailable) {
+      try {
+        const rows = await this.prisma.$queryRawUnsafe<any[]>(
+          `SELECT * FROM "line_notification_logs" WHERE "event_key" = $1 LIMIT 1`,
+          eventKey,
+        );
+        if (rows && rows.length > 0) {
+          return this.mapLineLogRow(rows[0]);
+        }
+      } catch {
+        // Fallback
+      }
+    }
+    return null;
+  }
+
+  async getLineNotificationLogById(
+    id: string,
+  ): Promise<(LineNotificationLog & { messagePayload?: any; nextRetryAt?: string | null }) | null> {
+    const inMem = this.lineNotificationLogs.find((l) => l.id === id);
+    if (inMem) return inMem;
+
+    if (this.dbAvailable) {
+      try {
+        const rows = await this.prisma.$queryRawUnsafe<any[]>(
+          `SELECT * FROM "line_notification_logs" WHERE "id" = $1 LIMIT 1`,
+          id,
+        );
+        if (rows && rows.length > 0) {
+          const mapped = this.mapLineLogRow(rows[0]);
+          this.lineNotificationLogs.unshift(mapped);
+          return mapped;
+        }
+      } catch {
+        // Fallback
+      }
+    }
+    return null;
+  }
+
+  async createLineNotificationLog(data: {
+    userId: string;
+    notificationId?: string | null;
+    lineUserId: string;
+    notificationType: string;
+    eventKey?: string | null;
+    referenceType?: string | null;
+    referenceId?: string | null;
+    messagePayload?: any;
+    status: LineDeliveryStatus;
+    errorCode?: string | null;
+    errorMessage?: string | null;
+  }): Promise<LineNotificationLog & { messagePayload?: any; nextRetryAt?: string | null }> {
+    const now = new Date();
+    const id = `lnl-${randomBytes(8).toString('hex')}`;
+    const user = this.accounts.find((a) => a.id === data.userId);
+    const record: LineNotificationLog & { messagePayload?: any; nextRetryAt?: string | null } = {
+      id,
+      userId: data.userId,
+      userName: user?.name,
+      notificationId: data.notificationId ?? null,
+      lineUserId: data.lineUserId,
+      notificationType: data.notificationType,
+      eventKey: data.eventKey ?? null,
+      referenceType: data.referenceType ?? null,
+      referenceId: data.referenceId ?? null,
+      messagePayload: data.messagePayload ?? null,
+      status: data.status,
+      providerMessageId: null,
+      errorCode: data.errorCode ?? null,
+      errorMessage: data.errorMessage ?? null,
+      attemptCount: 0,
+      nextRetryAt: null,
+      sentAt: null,
+      createdAt: now.toISOString(),
+    };
+
+    this.lineNotificationLogs.unshift(record);
+
+    if (this.dbAvailable) {
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `INSERT INTO "line_notification_logs"
+           ("id", "user_id", "notification_id", "line_user_id", "notification_type", "event_key", "reference_type", "reference_id", "message_payload", "status", "error_code", "error_message", "attempt_count", "created_at")
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, 0, $13::timestamptz)`,
+          id,
+          record.userId,
+          record.notificationId,
+          record.lineUserId,
+          record.notificationType,
+          record.eventKey,
+          record.referenceType,
+          record.referenceId,
+          record.messagePayload ? JSON.stringify(record.messagePayload) : null,
+          record.status,
+          record.errorCode,
+          record.errorMessage,
+          now,
+        );
+      } catch (err) {
+        this.logger.warn('Failed to persist line_notification_log in DB', err);
+      }
+    }
+
+    return record;
+  }
+
+  async updateLineNotificationLog(
+    id: string,
+    patch: {
+      status?: LineDeliveryStatus;
+      providerMessageId?: string | null;
+      errorCode?: string | null;
+      errorMessage?: string | null;
+      attemptCount?: number;
+      nextRetryAt?: Date | null;
+      sentAt?: Date | null;
+    },
+  ): Promise<(LineNotificationLog & { messagePayload?: any; nextRetryAt?: string | null }) | null> {
+    const target = await this.getLineNotificationLogById(id);
+    if (!target) return null;
+
+    if (patch.status !== undefined) target.status = patch.status;
+    if (patch.providerMessageId !== undefined) target.providerMessageId = patch.providerMessageId;
+    if (patch.errorCode !== undefined) target.errorCode = patch.errorCode;
+    if (patch.errorMessage !== undefined) target.errorMessage = patch.errorMessage;
+    if (patch.attemptCount !== undefined) target.attemptCount = patch.attemptCount;
+    if (patch.nextRetryAt !== undefined) {
+      target.nextRetryAt = patch.nextRetryAt ? patch.nextRetryAt.toISOString() : null;
+    }
+    if (patch.sentAt !== undefined) {
+      target.sentAt = patch.sentAt ? patch.sentAt.toISOString() : null;
+    }
+
+    if (this.dbAvailable) {
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `UPDATE "line_notification_logs"
+           SET "status" = $1,
+               "provider_message_id" = $2,
+               "error_code" = $3,
+               "error_message" = $4,
+               "attempt_count" = $5,
+               "next_retry_at" = $6::timestamptz,
+               "sent_at" = $7::timestamptz
+           WHERE "id" = $8`,
+          target.status,
+          target.providerMessageId ?? null,
+          target.errorCode ?? null,
+          target.errorMessage ?? null,
+          target.attemptCount,
+          target.nextRetryAt ? new Date(target.nextRetryAt) : null,
+          target.sentAt ? new Date(target.sentAt) : null,
+          id,
+        );
+      } catch (err) {
+        this.logger.warn('Failed to update line_notification_log in DB', err);
+      }
+    }
+
+    return target;
+  }
+
+  async getLineNotificationLogs(filter?: {
+    status?: LineDeliveryStatus;
+    userId?: string;
+    limit?: number;
+  }): Promise<LineNotificationLog[]> {
+    const limit = Math.min(Math.max(filter?.limit ?? 100, 1), 500);
+    if (this.dbAvailable && this.lineNotificationLogs.length === 0) {
+      try {
+        const rows = await this.prisma.$queryRawUnsafe<any[]>(
+          `SELECT * FROM "line_notification_logs" ORDER BY "created_at" DESC LIMIT $1`,
+          limit,
+        );
+        if (Array.isArray(rows) && rows.length > 0) {
+          this.lineNotificationLogs = rows.map((r) => this.mapLineLogRow(r));
+        }
+      } catch {
+        // Fallback
+      }
+    }
+
+    return this.lineNotificationLogs
+      .filter((l) => {
+        if (filter?.status && l.status !== filter.status) return false;
+        if (filter?.userId && l.userId !== filter.userId) return false;
+        return true;
+      })
+      .slice(0, limit)
+      .map(({ messagePayload: _mp, nextRetryAt: _nr, ...publicLog }) => ({
+        ...publicLog,
+        userName: publicLog.userName || this.accounts.find((a) => a.id === publicLog.userId)?.name,
+      }));
+  }
+
+  private mapLineLogRow(r: any): LineNotificationLog & { messagePayload?: any; nextRetryAt?: string | null } {
+    const user = this.accounts.find((a) => a.id === r.user_id);
+    return {
+      id: r.id,
+      userId: r.user_id,
+      userName: user?.name,
+      notificationId: r.notification_id ?? null,
+      lineUserId: r.line_user_id,
+      notificationType: r.notification_type,
+      eventKey: r.event_key ?? null,
+      referenceType: r.reference_type ?? null,
+      referenceId: r.reference_id ?? null,
+      messagePayload: r.message_payload
+        ? typeof r.message_payload === 'string'
+          ? JSON.parse(r.message_payload)
+          : r.message_payload
+        : null,
+      status: r.status as LineDeliveryStatus,
+      providerMessageId: r.provider_message_id ?? null,
+      errorCode: r.error_code ?? null,
+      errorMessage: r.error_message ?? null,
+      attemptCount: Number(r.attempt_count) || 0,
+      nextRetryAt: r.next_retry_at ? new Date(r.next_retry_at).toISOString() : null,
+      sentAt: r.sent_at ? new Date(r.sent_at).toISOString() : null,
+      createdAt: new Date(r.created_at).toISOString(),
+    };
+  }
+
+  async findWebhookEvent(webhookEventId: string): Promise<LineWebhookEventRecord | null> {
+    if (!webhookEventId) return null;
+    const inMem = this.lineWebhookEvents.find((e) => e.webhookEventId === webhookEventId);
+    if (inMem) return inMem;
+
+    if (this.dbAvailable) {
+      try {
+        const rows = await this.prisma.$queryRawUnsafe<any[]>(
+          `SELECT * FROM "line_webhook_events" WHERE "webhook_event_id" = $1 LIMIT 1`,
+          webhookEventId,
+        );
+        if (rows && rows.length > 0) {
+          const r = rows[0];
+          return {
+            id: r.id,
+            webhookEventId: r.webhook_event_id,
+            eventType: r.event_type,
+            lineUserId: r.line_user_id ?? null,
+            eventTimestamp: new Date(r.event_timestamp).toISOString(),
+            processedAt: r.processed_at ? new Date(r.processed_at).toISOString() : null,
+            processingStatus: r.processing_status,
+            createdAt: new Date(r.created_at).toISOString(),
+          };
+        }
+      } catch {
+        // Fallback
+      }
+    }
+    return null;
+  }
+
+  async recordWebhookEvent(data: {
+    webhookEventId: string;
+    eventType: string;
+    lineUserId?: string | null;
+    eventTimestamp: Date;
+    processingStatus: 'PROCESSED' | 'IGNORED' | 'FAILED';
+  }): Promise<LineWebhookEventRecord> {
+    const now = new Date();
+    const id = `lwe-${randomBytes(8).toString('hex')}`;
+    const record: LineWebhookEventRecord = {
+      id,
+      webhookEventId: data.webhookEventId,
+      eventType: data.eventType,
+      lineUserId: data.lineUserId ?? null,
+      eventTimestamp: data.eventTimestamp.toISOString(),
+      processedAt: now.toISOString(),
+      processingStatus: data.processingStatus,
+      createdAt: now.toISOString(),
+    };
+
+    this.lineWebhookEvents.unshift(record);
+
+    if (this.dbAvailable) {
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `INSERT INTO "line_webhook_events" ("id", "webhook_event_id", "event_type", "line_user_id", "event_timestamp", "processed_at", "processing_status", "created_at")
+           VALUES ($1, $2, $3, $4, $5::timestamptz, $6::timestamptz, $7, $8::timestamptz)
+           ON CONFLICT ("webhook_event_id") DO NOTHING`,
+          id,
+          record.webhookEventId,
+          record.eventType,
+          record.lineUserId,
+          data.eventTimestamp,
+          now,
+          record.processingStatus,
+          now,
+        );
+      } catch (err) {
+        this.logger.warn('Failed to persist line_webhook_event in DB', err);
+      }
+    }
+
+    return record;
   }
 
   // ===================== Seed & Hydrate =====================
@@ -1819,13 +2429,20 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       return repair;
     });
 
-    this.notifications = dbNotifications.map((n) => ({
+    this.notifications = dbNotifications.map((n: any) => ({
       id: n.id,
       userId: n.userId,
       title: n.title,
       body: n.body,
+      message: n.body,
+      notificationType: n.notificationType || n.notification_type || 'SYSTEM',
+      referenceType: n.referenceType || n.reference_type || null,
+      referenceId: n.referenceId || n.reference_id || null,
       at: n.createdAt.toISOString(),
+      createdAt: n.createdAt.toISOString(),
       read: n.read,
+      isRead: n.read,
+      readAt: n.readAt ? new Date(n.readAt).toISOString() : null,
       link: n.link ?? undefined,
     }));
 

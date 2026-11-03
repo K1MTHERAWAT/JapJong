@@ -37,9 +37,9 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.setGlobalPrefix('api');
 
-  // รองรับทั้ง /auth/line (ตาม LINE Developer Callback URL) และ /api/auth/line
+  // รองรับทั้ง /auth/line, /line/webhook (ตาม LINE Developer Console) และ /api/*
   app.use((req: express.Request, _res: express.Response, next: express.NextFunction) => {
-    if (req.url.startsWith('/auth/line')) {
+    if (req.url.startsWith('/auth/line') || req.url.startsWith('/line/webhook')) {
       req.url = '/api' + req.url;
     }
     next();
@@ -60,8 +60,15 @@ async function bootstrap() {
   // Security headers ด้วย helmet
   app.use(helmet());
 
-  // ตั้ง body limit ให้ตรงกับขนาดข้อมูลรวมภาพลายเซ็น
-  app.use(express.json({ limit: '2mb' }));
+  // ตั้ง body limit ให้ตรงกับขนาดข้อมูลรวมภาพลายเซ็น และเก็บ rawBody สำหรับตรวจสอบ X-Line-Signature
+  app.use(
+    express.json({
+      limit: '2mb',
+      verify: (req: any, _res, buf) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
   app.use(express.urlencoded({ limit: '2mb', extended: true }));
 
   const allowedOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:3000,http://127.0.0.1:3000')

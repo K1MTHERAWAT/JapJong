@@ -6,6 +6,7 @@ import {
   ForbiddenException,
   Get,
   NotFoundException,
+  Optional,
   Param,
   Post,
   Query,
@@ -39,6 +40,7 @@ import {
 } from '../auth/auth.guard';
 import { verifySecret } from '../auth/secret';
 import { DbService } from '../db/db.service';
+import { NotificationEventsService } from '../notifications/notification-events.service';
 import {
   CreateBookingDto,
   CreateBorrowDto,
@@ -63,7 +65,10 @@ class AsyncMutex {
 export class RequestsController {
   private readonly bookingMutex = new AsyncMutex();
 
-  constructor(private readonly db: DbService) {}
+  constructor(
+    private readonly db: DbService,
+    @Optional() private readonly notificationEvents?: NotificationEventsService,
+  ) {}
 
   private sanitizeItems(items: unknown): ItemQty[] {
     if (!Array.isArray(items)) return [];
@@ -408,7 +413,11 @@ export class RequestsController {
       };
       this.db.requests.unshift(req);
       await this.db.persistRequest(req);
-      this.db.notifyRole('STAFF', 'มีคำขอจองสถานที่ใหม่', `${req.code} · ${req.requesterName}`, `/staff/review?id=${req.id}`);
+      if (this.notificationEvents) {
+        await this.notificationEvents.onBookingCreated(req);
+      } else {
+        this.db.notifyRole('STAFF', 'มีคำขอจองสถานที่ใหม่', `${req.code} · ${req.requesterName}`, `/staff/review?id=${req.id}`);
+      }
       await this.db.log('request', `ส่งคำขอจอง ${req.code}`, req.requesterName, {
         id: user.id,
         name: user.name,
@@ -483,7 +492,11 @@ export class RequestsController {
       };
       this.db.requests.unshift(req);
       await this.db.persistRequest(req);
-      this.db.notifyRole('STAFF', 'มีคำขอยืมครุภัณฑ์ใหม่', `${req.code} · ${req.requesterName}`, `/staff/review?id=${req.id}`);
+      if (this.notificationEvents) {
+        await this.notificationEvents.onBorrowCreated(req);
+      } else {
+        this.db.notifyRole('STAFF', 'มีคำขอยืมครุภัณฑ์ใหม่', `${req.code} · ${req.requesterName}`, `/staff/review?id=${req.id}`);
+      }
       await this.db.log('request', `ส่งคำขอยืม ${req.code}`, req.requesterName, {
         id: user.id,
         name: user.name,
@@ -538,7 +551,11 @@ export class RequestsController {
     };
     this.db.requests.unshift(req);
     await this.db.persistRequest(req);
-    this.db.notifyRole('STAFF', 'แจ้งซ่อมใหม่', `${req.code} · ${req.location}`, `/staff/review?id=${req.id}`);
+    if (this.notificationEvents) {
+      await this.notificationEvents.onRepairCreated(req);
+    } else {
+      this.db.notifyRole('STAFF', 'แจ้งซ่อมใหม่', `${req.code} · ${req.location}`, `/staff/review?id=${req.id}`);
+    }
     await this.db.log('request', `แจ้งซ่อม ${req.code}`, req.location, {
       id: user.id,
       name: user.name,
@@ -624,24 +641,35 @@ export class RequestsController {
     if (body.decision === 'reject') {
       req.status = 'rejected';
       req.rejectReason = note || 'ไม่ผ่านการพิจารณา';
-      this.db.notify(req.requesterId, `คำขอ ${req.code} ไม่ผ่าน`, req.rejectReason, `/requests/${req.id}`);
+      if (!this.notificationEvents) {
+        this.db.notify(req.requesterId, `คำขอ ${req.code} ไม่ผ่าน`, req.rejectReason, `/requests/${req.id}`);
+      }
     } else if (level === 'staff') {
       req.status = 'pending_l2';
-      this.db.notifyRole('APPROVER_L2', `รอเห็นชอบ ${req.code}`, req.requesterName, `/approver/sign/${req.id}`);
+      if (!this.notificationEvents) {
+        this.db.notifyRole('APPROVER_L2', `รอเห็นชอบ ${req.code}`, req.requesterName, `/approver/sign/${req.id}`);
+      }
     } else if (level === 'l2') {
       req.status = 'pending_l1';
-      this.db.notifyRole('APPROVER_L1', `รออนุมัติ ${req.code}`, req.requesterName, `/approver/sign/${req.id}`);
+      if (!this.notificationEvents) {
+        this.db.notifyRole('APPROVER_L1', `รออนุมัติ ${req.code}`, req.requesterName, `/approver/sign/${req.id}`);
+      }
     } else {
       req.status = req.type === 'borrow' ? 'borrowing' : 'approved';
-      this.db.notify(
-        req.requesterId,
-        `คำขอ ${req.code} อนุมัติแล้ว`,
-        'ดาวน์โหลดเอกสารใบอนุญาต (PDF) ได้แล้ว',
-        `/approver/permit/${req.id}`,
-      );
+      if (!this.notificationEvents) {
+        this.db.notify(
+          req.requesterId,
+          `คำขอ ${req.code} อนุมัติแล้ว`,
+          'ดาวน์โหลดเอกสารใบอนุญาต (PDF) ได้แล้ว',
+          `/approver/permit/${req.id}`,
+        );
+      }
     }
 
     await this.db.persistRequest(req);
+    if (this.notificationEvents) {
+      await this.notificationEvents.onRequestSigned(req, level, body.decision, req.rejectReason);
+    }
     await this.db.log('request', `${body.decision === 'approve' ? 'ลงนาม' : 'ไม่ผ่าน'} ${req.code}`, `${user.name} (${SIGN_LEVEL_TITLE[level]})`, {
       id: user.id,
       name: user.name,
@@ -678,6 +706,9 @@ export class RequestsController {
       req.signatures = [];
       req.updatedAt = new Date().toISOString();
       await this.db.persistRequest(req);
+      if (this.notificationEvents) {
+        await this.notificationEvents.onBookingRescheduled(req);
+      }
       await this.db.log('request', `ขอเลื่อนวัน ${req.code} (รอบที่ ${req.approvalRound})`, user.name, {
         id: user.id,
         name: user.name,
@@ -723,7 +754,11 @@ export class RequestsController {
     req.returnRequestedAt = now;
     req.updatedAt = now;
     await this.db.persistRequest(req);
-    this.db.notifyRole('STAFF', `แจ้งคืนอุปกรณ์ ${req.code}`, req.requesterName, `/staff/handover?id=${req.id}`);
+    if (this.notificationEvents) {
+      await this.notificationEvents.onBorrowReturnRequested(req);
+    } else {
+      this.db.notifyRole('STAFF', `แจ้งคืนอุปกรณ์ ${req.code}`, req.requesterName, `/staff/handover?id=${req.id}`);
+    }
     return this.enrich(req);
   }
 
@@ -773,6 +808,9 @@ export class RequestsController {
     req.updatedAt = now;
     await this.db.persistHandover(handoverRecord);
     await this.db.persistRequest(req);
+    if (req.type === 'borrow' && body.phase === 'after' && this.notificationEvents) {
+      await this.notificationEvents.onBorrowReturned(req);
+    }
     await this.db.log('request', `${body.phase === 'before' ? 'ยืนยันรับมอบ' : 'ยืนยันรับคืน'} ${req.code}`, user.name, {
       id: user.id,
       name: user.name,
@@ -840,7 +878,9 @@ export class RequestsController {
       req.resolution = String(body.resolution ?? '').slice(0, 1000) || 'ดำเนินการซ่อมเรียบร้อย';
       req.staffSignature = sig;
       req.staffSignerName = user.name;
-      this.db.notify(req.requesterId, `${req.location} ซ่อมเสร็จแล้ว`, 'รอคุณตรวจรับงาน', `/repair?mode=track&id=${req.id}`);
+      if (!this.notificationEvents) {
+        this.db.notify(req.requesterId, `${req.location} ซ่อมเสร็จแล้ว`, 'รอคุณตรวจรับงาน', `/repair?mode=track&id=${req.id}`);
+      }
     } else if (body.action === 'confirm') {
       const sig = body.signature ? requireDrawnSignature(body.signature, 'ผู้แจ้งซ่อม') : undefined;
       req.status = 'repair_done';
@@ -851,6 +891,9 @@ export class RequestsController {
     }
     req.updatedAt = now;
     await this.db.persistRequest(req);
+    if (this.notificationEvents) {
+      await this.notificationEvents.onRepairStatusUpdated(req, body.action);
+    }
     await this.db.log('request', `อัปเดตงานซ่อม ${req.code}`, user.name, {
       id: user.id,
       name: user.name,

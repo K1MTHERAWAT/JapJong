@@ -24,6 +24,7 @@ interface AuthContextValue {
   logout: () => void;
   refreshMe: () => Promise<void>;
   refreshNotifications: () => Promise<void>;
+  markNotificationRead: (id: string) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
 }
 
@@ -152,6 +153,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setNotifications([]);
   }, []);
 
+  const markNotificationRead = useCallback(async (id: string) => {
+    try {
+      await api.markNotificationRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true, isRead: true, readAt: new Date().toISOString() } : n)),
+      );
+    } catch {
+      await refreshNotifications();
+    }
+  }, [refreshNotifications]);
+
   const markAllNotificationsRead = useCallback(async () => {
     await api.readAllNotifications();
     await refreshNotifications();
@@ -173,6 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         refreshMe,
         refreshNotifications,
+        markNotificationRead,
         markAllNotificationsRead,
       }}
     >

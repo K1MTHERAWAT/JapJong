@@ -252,7 +252,7 @@ export function canAccessRoute(
   pathname: string,
 ): RouteAccessResult {
   // หน้าสาธารณะ
-  if (pathname === '/login' || pathname === '/register') {
+  if (pathname === '/login' || pathname === '/register' || pathname.startsWith('/register/line')) {
     return { allowed: true, title: 'เข้าสู่ระบบ / ลงทะเบียน', requiredRoles: [] };
   }
 
@@ -294,8 +294,8 @@ export function canAccessRoute(
     };
   }
 
-  // 3. หน้าโฮมแอดมิน (/admin)
-  if (pathname === '/admin') {
+  // 3. หน้าโฮมแอดมิน (/admin) และระบบจัดการแจ้งเตือน (/admin/notifications)
+  if (pathname === '/admin' || pathname.startsWith('/admin/notifications')) {
     const ok = account.role === 'ADMIN' || hasPermission(account, 'manageUsers');
     return {
       allowed: ok,

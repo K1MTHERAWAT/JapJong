@@ -8,6 +8,7 @@ import { EmailService } from './auth/email.service';
 import { DbModule } from './db/db.module';
 import { DocumentsModule } from './documents/documents.module';
 import { LineAuthModule } from './auth/line/line-auth.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { UsersModule } from './users/users.module';
 import { RequestsController } from './requests/requests.controller';
 import { ResourcesController } from './resources/resources.controller';
@@ -15,6 +16,7 @@ import { ResourcesController } from './resources/resources.controller';
 @Module({
   imports: [
     DbModule,
+    NotificationsModule,
     DocumentsModule,
     LineAuthModule,
     UsersModule,

@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   Building2,
   CheckCircle2,
+  ExternalLink,
   KeyRound,
   PenTool,
   Phone,
@@ -256,6 +258,13 @@ export default function AccountPage() {
                   {account.hasPin ? 'ตั้ง PIN 6 หลักแล้ว' : 'ยังไม่ตั้ง PIN'}
                 </Chip>
               </div>
+              <Link
+                href="/notifications/settings"
+                className="text-[12px] text-brand font-medium hover:underline inline-flex items-center gap-1 mt-1"
+              >
+                <span>ตั้งค่าการแจ้งเตือน (LINE & In-App)</span>
+                <ExternalLink className="size-3" />
+              </Link>
             </div>
           </Card>
 
