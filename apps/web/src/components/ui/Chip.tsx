@@ -1,5 +1,5 @@
 import React from 'react';
-import { REQUEST_TYPE_LABEL, RequestStatus, RequestType, STATUS_META, Tone } from '@jongwen/shared';
+import { REQUEST_TYPE_LABEL, RequestStatus, RequestType, STATUS_META, Tone } from '@japjong/shared';
 
 export type ChipTone = 'warn' | 'ok' | 'info' | 'danger' | 'typeBorrow' | 'typeBooking' | 'typeRepair' | Tone;
 

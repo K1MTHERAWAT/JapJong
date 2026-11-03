@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { DocumentVerification, RequestWithTimeline } from '@jongwen/shared';
+import { DocumentVerification, RequestWithTimeline } from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
 import { AppShell, roleHomePath } from '@/components/shell';
 import { OfficialGovFormDocument } from '@/components/ui';

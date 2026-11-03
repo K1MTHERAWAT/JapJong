@@ -10,7 +10,7 @@ import {
   requireDrawnSignature,
   safeEqual,
 } from './auth.guard';
-import { Account } from '@jongwen/shared';
+import { Account } from '@japjong/shared';
 
 describe('AuthGuard & Helper Functions Unit Tests', () => {
   describe('extractToken()', () => {

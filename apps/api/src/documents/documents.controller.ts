@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
-import { Account, VerificationDocumentType } from '@jongwen/shared';
+import { Account, VerificationDocumentType } from '@japjong/shared';
 import { CurrentUser, Public, Roles } from '../auth/auth.guard';
 import { DocumentsService } from './documents.service';
 

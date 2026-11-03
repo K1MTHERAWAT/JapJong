@@ -12,6 +12,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { UsersModule } from './users/users.module';
 import { RequestsController } from './requests/requests.controller';
 import { ResourcesController } from './resources/resources.controller';
+import { HealthController } from './health/health.controller';
 
 @Module({
   imports: [
@@ -33,7 +34,7 @@ import { ResourcesController } from './resources/resources.controller';
       },
     ]),
   ],
-  controllers: [AuthController, ResourcesController, RequestsController, AdminController],
+  controllers: [AuthController, ResourcesController, RequestsController, AdminController, HealthController],
   providers: [
     EmailService,
     {

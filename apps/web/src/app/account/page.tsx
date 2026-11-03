@@ -15,7 +15,7 @@ import {
 import {
   ROLE_LABEL,
   ROLE_TONE,
-} from '@jongwen/shared';
+} from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import {

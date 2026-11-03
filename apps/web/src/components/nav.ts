@@ -17,7 +17,7 @@ import {
   UserCircle,
   LayoutDashboard,
 } from 'lucide-react';
-import { canAccessRoute, PublicAccount, Role } from '@jongwen/shared';
+import { canAccessRoute, PublicAccount, Role } from '@japjong/shared';
 
 export type NavItem = {
   href: string;

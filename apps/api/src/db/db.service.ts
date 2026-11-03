@@ -26,7 +26,7 @@ import {
   Role,
   UserNotificationPreference,
   Venue,
-} from '@jongwen/shared';
+} from '@japjong/shared';
 import {
   mockAccounts,
   mockActivities,

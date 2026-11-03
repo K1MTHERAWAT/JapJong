@@ -22,7 +22,7 @@ describe('LineAuthService', () => {
     mockDb = {
       findUserByLineUserId: vi.fn(),
       getLineAccount: vi.fn(),
-      createSession: vi.fn().mockResolvedValue('test-jongwen-session-token'),
+      createSession: vi.fn().mockResolvedValue('test-japjong-session-token'),
       toPublic: vi.fn((acc) => ({ id: acc.id, name: acc.name })),
     };
 
@@ -210,7 +210,7 @@ describe('LineAuthService', () => {
       expect(result.redirectUrl).toContain(encodeURIComponent('ความปลอดภัยไม่ถูกต้อง'));
     });
 
-    it('authenticates and redirects with token when LINE user is linked to Jongwen account', async () => {
+    it('authenticates and redirects with token when LINE user is linked to JapJong account', async () => {
       const { state } = service.generateAuthUrl();
       const nonce = (service as any).stateStore.get(state).nonce;
 
@@ -240,7 +240,7 @@ describe('LineAuthService', () => {
       });
 
       const result = await service.handleCallback('valid-code', state);
-      expect(result.redirectUrl).toContain('line_token=test-jongwen-session-token');
+      expect(result.redirectUrl).toContain('line_token=test-japjong-session-token');
       expect(result.redirectUrl).toContain('account_id=u-somchai');
       expect(mockDb.createSession).toHaveBeenCalledWith('u-somchai');
     });

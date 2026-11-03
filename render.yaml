@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: japjong-api
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: pnpm install && pnpm build:shared && pnpm --filter @japjong/api build
+    startCommand: pnpm --filter @japjong/api start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: DEMO_MODE
+        value: "false"
+      - key: LINE_NOTIFICATION_ENABLED
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: BACKEND_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: LINE_CHANNEL_ID
+        sync: false
+      - key: LINE_CHANNEL_SECRET
+        sync: false
+      - key: LINE_CHANNEL_ACCESS_TOKEN
+        sync: false
+      - key: LINE_OA_BASIC_ID
+        sync: false
+      - key: LINE_WEBHOOK_URL
+        sync: false
+      - key: LINE_LOGIN_CALLBACK_URL
+        sync: false
+

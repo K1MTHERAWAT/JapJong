@@ -20,7 +20,7 @@ importers:
 
   apps/api:
     dependencies:
-      '@jongwen/shared':
+      '@japjong/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@nestjs/common':
@@ -108,7 +108,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@jongwen/shared':
+      '@japjong/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       html5-qrcode:

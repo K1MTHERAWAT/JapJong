@@ -12,7 +12,7 @@ import {
   ROLE_LABEL,
   Role,
   canAccessRoute,
-} from '@jongwen/shared';
+} from '@japjong/shared';
 import { useAuth } from './auth-context';
 import { Sidebar } from './Sidebar';
 import { getVisibleNav } from './nav';

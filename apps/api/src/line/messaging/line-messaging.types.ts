@@ -1,4 +1,4 @@
-import { NotificationCategory, NotificationReferenceType } from '@jongwen/shared';
+import { NotificationCategory, NotificationReferenceType } from '@japjong/shared';
 
 export interface LineTextMessage {
   type: 'text';

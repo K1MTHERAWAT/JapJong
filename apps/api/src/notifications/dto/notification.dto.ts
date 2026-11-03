@@ -7,7 +7,7 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
-import { NotificationCategory, NotificationChannel } from '@jongwen/shared';
+import { NotificationCategory, NotificationChannel } from '@japjong/shared';
 
 export class NotificationPreferenceItemDto {
   @IsIn(['IN_APP', 'LINE'], { message: 'ช่องทางการแจ้งเตือนต้องเป็น IN_APP หรือ LINE' })

@@ -6,7 +6,7 @@ import {
   BorrowRequest,
   DEFAULT_PERMISSIONS,
   RepairRequest,
-} from '@jongwen/shared';
+} from '@japjong/shared';
 import { LineMessageTemplateService } from '../line/messaging/line-message-template.service';
 import { LineMessagingService } from '../line/messaging/line-messaging.service';
 import { LineWebhookService } from '../line/webhook/line-webhook.service';

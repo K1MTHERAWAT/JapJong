@@ -21,7 +21,7 @@ import {
   NotificationCategory,
   NotificationChannel,
   UserNotificationPreference,
-} from '@jongwen/shared';
+} from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Button, Card, Chip, Feedback } from '@/components/ui';

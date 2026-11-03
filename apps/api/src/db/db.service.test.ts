@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { DbService } from './db.service';
-import { Account, BookingRequest, HandoverRecord } from '@jongwen/shared';
+import { Account, BookingRequest, HandoverRecord } from '@japjong/shared';
 
 describe('DbService (Unit & In-Memory Storage Engine)', () => {
   let db: DbService;

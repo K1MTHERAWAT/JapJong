@@ -1,8 +1,9 @@
 {
-  "name": "@jongwen/api",
+  "name": "@japjong/api",
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prebuild": "pnpm --filter @japjong/shared build",
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "node dist/main.js",
@@ -17,7 +18,7 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@jongwen/shared": "workspace:*",
+    "@japjong/shared": "workspace:*",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",

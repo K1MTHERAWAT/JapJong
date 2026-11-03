@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { EquipmentCategory, FACILITIES, VENUE_TYPE_LABEL, VenueType } from '@jongwen/shared';
+import { EquipmentCategory, FACILITIES, VENUE_TYPE_LABEL, VenueType } from '@japjong/shared';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
 import { Chip, Stepper, Tabs, Toggle } from '@/components/ui';

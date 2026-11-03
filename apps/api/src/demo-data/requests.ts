@@ -1,4 +1,4 @@
-import type { ActivityLog, AnyRequest, AppNotification } from '@jongwen/shared';
+import type { ActivityLog, AnyRequest, AppNotification } from '@japjong/shared';
 import { MOCK_SIGNATURES } from './accounts';
 
 const t = (date: string, time = '00:00') => `${date}T${time}:00+07:00`;

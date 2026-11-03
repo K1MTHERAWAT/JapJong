@@ -7,7 +7,7 @@ import {
   Post,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { Account } from '@jongwen/shared';
+import { Account } from '@japjong/shared';
 import { CurrentUser } from '../auth/auth.guard';
 import { DbService } from '../db/db.service';
 import { IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';

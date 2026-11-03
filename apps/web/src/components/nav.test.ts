@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getVisibleNav, NAV } from './nav';
-import { PublicAccount } from '@jongwen/shared';
+import { PublicAccount } from '@japjong/shared';
 
 describe('Navigation Menu Access Control (getVisibleNav)', () => {
   const mockSig = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';

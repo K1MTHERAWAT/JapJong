@@ -19,7 +19,7 @@ import {
   ROLE_LABEL,
   Role,
   hasPermission,
-} from '@jongwen/shared';
+} from '@japjong/shared';
 import { DbService } from '../db/db.service';
 
 export const IS_PUBLIC = 'isPublic';

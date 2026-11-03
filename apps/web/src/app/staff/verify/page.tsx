@@ -8,7 +8,7 @@ import {
   VERIFICATION_DOC_TYPE_LABEL,
   VERIFICATION_STATUS_LABEL,
   VERIFICATION_STATUS_TONE,
-} from '@jongwen/shared';
+} from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';

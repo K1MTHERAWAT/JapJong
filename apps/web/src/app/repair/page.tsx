@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { REPAIR_CATEGORIES, RepairRequest, RequestWithTimeline } from '@jongwen/shared';
+import { REPAIR_CATEGORIES, RepairRequest, RequestWithTimeline } from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';

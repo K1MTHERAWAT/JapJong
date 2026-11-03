@@ -16,7 +16,7 @@ import {
   Settings,
   Wrench,
 } from 'lucide-react';
-import { AppNotification } from '@jongwen/shared';
+import { AppNotification } from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Button, Card, Chip } from '@/components/ui';

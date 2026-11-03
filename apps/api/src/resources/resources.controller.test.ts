@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ResourcesController } from './resources.controller';
-import { Account, BookingRequest, Equipment, Venue } from '@jongwen/shared';
+import { Account, BookingRequest, Equipment, Venue } from '@japjong/shared';
 
 describe('ResourcesController Unit Tests', () => {
   let controller: ResourcesController;

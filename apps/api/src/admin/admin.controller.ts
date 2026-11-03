@@ -19,7 +19,7 @@ import {
   PermissionKey,
   ROLE_LABEL,
   Role,
-} from '@jongwen/shared';
+} from '@japjong/shared';
 import { CurrentUser, Permissions } from '../auth/auth.guard';
 import { hashSecret } from '../auth/secret';
 import { DbService } from '../db/db.service';

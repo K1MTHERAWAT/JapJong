@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { LineAuthService } from './line-auth.service';
-import { DEFAULT_PERMISSIONS } from '@jongwen/shared';
+import { DEFAULT_PERMISSIONS } from '@japjong/shared';
 
 function createJwt(payload: any): string {
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64');

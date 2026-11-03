@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ['@jongwen/shared'],
+  transpilePackages: ['@japjong/shared'],
   async rewrites() {
     const apiOrigin = process.env.API_ORIGIN || 'http://localhost:4000';
     return [

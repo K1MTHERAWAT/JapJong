@@ -8,7 +8,7 @@ import {
   IsString,
   Min,
 } from 'class-validator';
-import { ItemQty, Period } from '@jongwen/shared';
+import { ItemQty, Period } from '@japjong/shared';
 
 export class CreateBookingDto {
   @IsArray()

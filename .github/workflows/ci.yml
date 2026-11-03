@@ -15,9 +15,9 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: jongwen
-          POSTGRES_PASSWORD: jongwen_dev_secret_change_in_production
-          POSTGRES_DB: jongwen
+          POSTGRES_USER: japjong
+          POSTGRES_PASSWORD: japjong_dev_secret_change_in_production
+          POSTGRES_DB: japjong
         ports:
           - 5433:5432
         options: >-
@@ -27,8 +27,8 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql://jongwen:jongwen_dev_secret_change_in_production@localhost:5433/jongwen?schema=public
-      JWT_SECRET: jongwen_ci_test_secret_key_at_least_32_chars
+      DATABASE_URL: postgresql://japjong:japjong_dev_secret_change_in_production@localhost:5433/japjong?schema=public
+      JWT_SECRET: japjong_ci_test_secret_key_at_least_32_chars
       DEMO_MODE: "false"
 
     steps:
@@ -62,10 +62,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma Client
-        run: pnpm --filter @jongwen/api prisma:generate
+        run: pnpm --filter @japjong/api prisma:generate
 
       - name: Deploy Prisma Migrations (Verify DB Schema)
-        run: pnpm --filter @jongwen/api prisma:deploy
+        run: pnpm --filter @japjong/api prisma:deploy
 
       - name: Build Shared Package
         run: pnpm build:shared

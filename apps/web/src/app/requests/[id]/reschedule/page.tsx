@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { CalendarDays, ChevronDown, Clock3 } from 'lucide-react';
-import { BookingRequest, DayAvailability, Period, RequestWithTimeline, periodDurationText } from '@jongwen/shared';
+import { BookingRequest, DayAvailability, Period, RequestWithTimeline, periodDurationText } from '@japjong/shared';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
 import { CalendarC4, Chip, StatusChip, Tabs } from '@/components/ui';

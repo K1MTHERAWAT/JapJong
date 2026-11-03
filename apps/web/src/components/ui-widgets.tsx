@@ -14,7 +14,7 @@ import {
   TimelineStep,
   Tone,
   VenueType,
-} from '@jongwen/shared';
+} from '@japjong/shared';
 import { Icon, IconName } from './icons';
 import { api, formatMonthTitle, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
 

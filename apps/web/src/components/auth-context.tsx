@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { AppNotification, PublicAccount } from '@jongwen/shared';
+import { AppNotification, PublicAccount } from '@japjong/shared';
 import { MockAccountHint, api, clearStoredAuth, getStoredToken, setStoredAuth } from '@/lib/api';
 
 interface AuthContextValue {

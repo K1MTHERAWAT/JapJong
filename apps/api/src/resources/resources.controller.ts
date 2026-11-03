@@ -12,7 +12,7 @@ import {
   Venue,
   VenueType,
   overlaps,
-} from '@jongwen/shared';
+} from '@japjong/shared';
 import { CurrentUser, Permissions, Public } from '../auth/auth.guard';
 import { DbService } from '../db/db.service';
 

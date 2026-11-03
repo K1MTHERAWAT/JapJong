@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
 import { UsersController } from './users.controller';
-import { Account, DEFAULT_PERMISSIONS } from '@jongwen/shared';
+import { Account, DEFAULT_PERMISSIONS } from '@japjong/shared';
 
 describe('UsersController', () => {
   let controller: UsersController;

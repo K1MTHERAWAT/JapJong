@@ -6,7 +6,7 @@ import { AppModule } from '../src/app.module';
 import { DbService } from '../src/db/db.service';
 import { RequestsController } from '../src/requests/requests.controller';
 import { hashSecret } from '../src/auth/secret';
-import { BookingRequest } from '@jongwen/shared';
+import { BookingRequest } from '@japjong/shared';
 
 describe('Security & Penetration Testing Suite (PHASE 7)', () => {
   let app: INestApplication;

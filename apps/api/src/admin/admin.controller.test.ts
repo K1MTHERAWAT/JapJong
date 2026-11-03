@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { AdminController } from './admin.controller';
-import { Account, DEFAULT_PERMISSIONS } from '@jongwen/shared';
+import { Account, DEFAULT_PERMISSIONS } from '@japjong/shared';
 
 describe('AdminController Unit Tests', () => {
   let controller: AdminController;

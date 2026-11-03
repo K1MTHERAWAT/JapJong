@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ActivityLog } from '@jongwen/shared';
+import { ActivityLog } from '@japjong/shared';
 import { AppShell } from '@/components/shell';
 import { Icon, IconName } from '@/components/icons';
 import { api, formatThaiDateTime } from '@/lib/api';

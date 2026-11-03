@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { DocumentsController } from './documents.controller';
 import { PublicVerifyController } from './public-verify.controller';
 import { StaffVerifyController } from './staff-verify.controller';
-import { Account } from '@jongwen/shared';
+import { Account } from '@japjong/shared';
 
 describe('Documents & Verification Controllers Unit Tests', () => {
   let mockDocumentsService: any;

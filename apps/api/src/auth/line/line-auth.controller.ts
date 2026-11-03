@@ -10,7 +10,7 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Response, Request } from 'express';
-import { Account } from '@jongwen/shared';
+import { Account } from '@japjong/shared';
 import { CurrentUser, Public } from '../auth.guard';
 import { DbService } from '../../db/db.service';
 import { LineAuthService } from './line-auth.service';

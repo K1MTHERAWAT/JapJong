@@ -2,7 +2,7 @@ import { BadRequestException, Body, ConflictException, Controller, ForbiddenExce
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import * as crypto from 'crypto';
-import { DEFAULT_PERMISSIONS, Account, DemoAccountSummary } from '@jongwen/shared';
+import { DEFAULT_PERMISSIONS, Account, DemoAccountSummary } from '@japjong/shared';
 import { DbService } from '../db/db.service';
 import { EmailService } from './email.service';
 import {
@@ -453,7 +453,7 @@ export class AuthController {
 
     // สร้าง OTP 6 หลักด้วย Node.js Crypto
     const otp = crypto.randomInt(100000, 1000000).toString();
-    const salt = process.env.OTP_SECRET || 'jongwen_sign_otp_secret_salt';
+    const salt = process.env.OTP_SECRET || 'japjong_sign_otp_secret_salt';
     const codeHash = crypto.createHmac('sha256', salt).update(otp).digest('hex');
 
     // อายุ 5 นาที
@@ -511,7 +511,7 @@ export class AuthController {
       throw new BadRequestException('รหัส OTP ถูกระงับเนื่องจากกรอกผิดเกิน 5 ครั้ง กรุณาขอรหัสใหม่');
     }
 
-    const salt = process.env.OTP_SECRET || 'jongwen_sign_otp_secret_salt';
+    const salt = process.env.OTP_SECRET || 'japjong_sign_otp_secret_salt';
     const submittedHash = crypto.createHmac('sha256', salt).update(submittedOtp).digest('hex');
 
     if (submittedHash !== latest.codeHash) {

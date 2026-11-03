@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
 import crypto from 'crypto';
 import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { AuthController } from './auth.controller';
-import { Account, DEFAULT_PERMISSIONS } from '@jongwen/shared';
+import { Account, DEFAULT_PERMISSIONS } from '@japjong/shared';
 import { hashSecret } from './secret';
 
 describe('AuthController Unit Tests', () => {
@@ -255,7 +255,7 @@ describe('AuthController Unit Tests', () => {
     });
 
     it('increments attempts and throws UnauthorizedException on incorrect OTP', async () => {
-      const salt = process.env.OTP_SECRET || 'jongwen_sign_otp_secret_salt';
+      const salt = process.env.OTP_SECRET || 'japjong_sign_otp_secret_salt';
       const actualHash = crypto.createHmac('sha256', salt).update('654321').digest('hex');
       mockDb.getLatestSignOtp.mockResolvedValueOnce({
         id: 'otp-01',
@@ -271,7 +271,7 @@ describe('AuthController Unit Tests', () => {
     });
 
     it('verifies matching OTP, consumes it, and creates verified session', async () => {
-      const salt = process.env.OTP_SECRET || 'jongwen_sign_otp_secret_salt';
+      const salt = process.env.OTP_SECRET || 'japjong_sign_otp_secret_salt';
       const code = '123456';
       const codeHash = crypto.createHmac('sha256', salt).update(code).digest('hex');
       mockDb.getLatestSignOtp.mockResolvedValueOnce({

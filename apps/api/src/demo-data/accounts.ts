@@ -1,4 +1,4 @@
-import { Account, DEFAULT_PERMISSIONS } from '@jongwen/shared';
+import { Account, DEFAULT_PERMISSIONS } from '@japjong/shared';
 
 /**
  * Demo data accounts — ใช้สำหรับทดสอบทุกบทบาทในโหมดเดโม

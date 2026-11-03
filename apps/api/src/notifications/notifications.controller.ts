@@ -9,7 +9,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { Account, LineDeliveryStatus, hasPermission } from '@jongwen/shared';
+import { Account, LineDeliveryStatus, hasPermission } from '@japjong/shared';
 import { CurrentUser, Permissions } from '../auth/auth.guard';
 import {
   TestLineNotificationDto,

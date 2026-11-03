@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LineAuthController } from './line-auth.controller';
-import { Account, DEFAULT_PERMISSIONS } from '@jongwen/shared';
+import { Account, DEFAULT_PERMISSIONS } from '@japjong/shared';
 
 describe('LineAuthController', () => {
   let controller: LineAuthController;

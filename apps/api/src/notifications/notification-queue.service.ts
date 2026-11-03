@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { LineNotificationLog } from '@jongwen/shared';
+import { LineNotificationLog } from '@japjong/shared';
 import { DbService } from '../db/db.service';
 import { LineMessagingService } from '../line/messaging/line-messaging.service';
 import { LineMessageObject } from '../line/messaging/line-messaging.types';

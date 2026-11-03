@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { DemoAccountSummary, ROLE_LABEL, ROLE_TONE } from '@jongwen/shared';
+import { DemoAccountSummary, ROLE_LABEL, ROLE_TONE } from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
 import { roleHomePath } from '@/components/shell';
 import { Icon } from '@/components/icons';

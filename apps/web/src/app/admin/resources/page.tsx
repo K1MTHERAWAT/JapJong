@@ -7,7 +7,7 @@ import {
   Equipment,
   VENUE_TYPE_LABEL,
   Venue,
-} from '@jongwen/shared';
+} from '@japjong/shared';
 import { roleHomePath, useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { OfficialGovFormDocument, Tabs, Toggle } from '@/components/ui';

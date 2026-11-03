@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { RequestsController } from './requests.controller';
-import { Account, BookingRequest, BorrowRequest, RepairRequest, Venue, Equipment } from '@jongwen/shared';
+import { Account, BookingRequest, BorrowRequest, RepairRequest, Venue, Equipment } from '@japjong/shared';
 import { hashSecret } from '../auth/secret';
 
 describe('RequestsController Unit Tests', () => {

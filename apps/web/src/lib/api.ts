@@ -33,14 +33,16 @@ import type {
   UserNotificationPreference,
   Venue,
   VerifySignOtpResponse,
-} from '@jongwen/shared';
+} from '@japjong/shared';
 
-const TOKEN_KEY = 'jongwen_token';
-const ACCOUNT_KEY = 'jongwen_account_id';
+const TOKEN_KEY = 'japjong_token';
+const ACCOUNT_KEY = 'japjong_account_id';
+const LEGACY_TOKEN_KEY = 'jongwen_token';
+const LEGACY_ACCOUNT_KEY = 'jongwen_account_id';
 
 export function getStoredToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem(TOKEN_KEY);
+  return localStorage.getItem(TOKEN_KEY) ?? localStorage.getItem(LEGACY_TOKEN_KEY);
 }
 
 export function setStoredAuth(token: string, accountId: string) {
@@ -53,6 +55,8 @@ export function clearStoredAuth() {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(ACCOUNT_KEY);
+  localStorage.removeItem(LEGACY_TOKEN_KEY);
+  localStorage.removeItem(LEGACY_ACCOUNT_KEY);
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {

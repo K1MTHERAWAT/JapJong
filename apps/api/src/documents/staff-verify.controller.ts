@@ -7,7 +7,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { Account } from '@jongwen/shared';
+import { Account } from '@japjong/shared';
 import { CurrentUser, Roles } from '../auth/auth.guard';
 import { DocumentsService } from './documents.service';
 

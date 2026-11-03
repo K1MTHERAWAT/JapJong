@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { Equipment, RequestWithTimeline, SIGN_LEVEL_TITLE } from '@jongwen/shared';
+import { Equipment, RequestWithTimeline, SIGN_LEVEL_TITLE } from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
 import { AppShell, roleHomePath } from '@/components/shell';
 import { OfficialGovFormDocument, RequestTypeChip, SignaturePreviewCard, StatusChip, Timeline } from '@/components/ui';

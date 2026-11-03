@@ -3,7 +3,7 @@ import {
   NotificationCategory,
   NotificationChannel,
   UserNotificationPreference,
-} from '@jongwen/shared';
+} from '@japjong/shared';
 import { DbService } from '../db/db.service';
 
 @Injectable()

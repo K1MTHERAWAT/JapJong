@@ -12,7 +12,7 @@
     "outDir": "./dist",
     "baseUrl": "./",
     "paths": {
-      "@jongwen/shared": ["../../packages/shared/src/index.ts"]
+      "@japjong/shared": ["../../packages/shared/src/index.ts"]
     },
     "incremental": true,
     "skipLibCheck": true,

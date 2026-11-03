@@ -20,7 +20,7 @@ import {
   AdminNotificationDashboardSummary,
   LineDeliveryStatus,
   LineNotificationLog,
-} from '@jongwen/shared';
+} from '@japjong/shared';
 import { AppShell } from '@/components/shell';
 import { Button, Card, Chip, Feedback } from '@/components/ui';
 import { api, formatThaiDateTime } from '@/lib/api';

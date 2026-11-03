@@ -1,4 +1,4 @@
-import type { Equipment, Venue } from '@jongwen/shared';
+import type { Equipment, Venue } from '@japjong/shared';
 
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];

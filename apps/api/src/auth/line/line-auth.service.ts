@@ -322,7 +322,7 @@ export class LineAuthService {
     // 5. Consume ticket (one-time use)
     this.ticketStore.delete(dto.ticket);
 
-    // 6. Create Jongwen session token
+    // 6. Create JapJong session token
     const token = await this.db.createSession(newAccount.id);
 
     return {
@@ -371,7 +371,7 @@ export class LineAuthService {
       const displayName = profile.name || 'LINE User';
       const pictureUrl = profile.picture || null;
 
-      // 4. Find linked Jongwen account
+      // 4. Find linked JapJong account
       const user = await this.db.findUserByLineUserId(lineUserId);
 
       if (user) {

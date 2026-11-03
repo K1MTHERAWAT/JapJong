@@ -16,7 +16,7 @@ import {
   ROLE_LABEL,
   RequestType,
   RequestWithTimeline,
-} from '@jongwen/shared';
+} from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
 import { AppShell, roleHomePath } from '@/components/shell';
 import {

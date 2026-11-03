@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { LogIn, LogOut, Menu, X } from 'lucide-react';
 import { useAuth } from './auth-context';
 import type { NavItem } from './nav';
-import { ROLE_META } from '@jongwen/shared';
+import { ROLE_META } from '@japjong/shared';
 
 export function Sidebar({ items }: { items: NavItem[] }) {
   const path = usePathname();

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { BookingRequest, BorrowRequest, RepairRequest, SignLevel } from '@jongwen/shared';
+import { BookingRequest, BorrowRequest, RepairRequest, SignLevel } from '@japjong/shared';
 import { DbService } from '../db/db.service';
 import { NotificationsService } from './notifications.service';
 

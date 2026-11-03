@@ -15,7 +15,7 @@ import {
   VERIFICATION_DOC_TYPE_LABEL,
   VerificationDocumentType,
   VerificationStatus,
-} from '@jongwen/shared';
+} from '@japjong/shared';
 import { DbService } from '../db/db.service';
 
 @Injectable()

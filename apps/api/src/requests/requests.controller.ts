@@ -30,7 +30,7 @@ import {
   hasPermission,
   overlaps,
   withTimeline,
-} from '@jongwen/shared';
+} from '@japjong/shared';
 import {
   CurrentUser,
   Permissions,

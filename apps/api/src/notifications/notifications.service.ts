@@ -7,7 +7,7 @@ import {
   LineNotificationLog,
   LineNotificationStatusResponse,
   Role,
-} from '@jongwen/shared';
+} from '@japjong/shared';
 import { DbService } from '../db/db.service';
 import { LineMessageTemplateService } from '../line/messaging/line-message-template.service';
 import { LineMessagingService } from '../line/messaging/line-messaging.service';

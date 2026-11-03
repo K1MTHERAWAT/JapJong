@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { DocumentsService } from './documents.service';
 import { DbService } from '../db/db.service';
-import { BookingRequest } from '@jongwen/shared';
+import { BookingRequest } from '@japjong/shared';
 
 describe('DocumentsService & QR Code Verification', () => {
   let db: DbService;
@@ -54,7 +54,7 @@ describe('DocumentsService & QR Code Verification', () => {
     expect(hash).toHaveLength(64);
     expect(hash).toMatch(/^[a-f0-9]{64}$/);
 
-    const qrDataUrl = await service.generateQrCodeDataUrl('https://jongwen.local/verify/test-token');
+    const qrDataUrl = await service.generateQrCodeDataUrl('https://japjong.local/verify/test-token');
     expect(qrDataUrl).toMatch(/^data:image\/png;base64,/);
   });
 

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { NotificationCategory, NotificationReferenceType } from '@jongwen/shared';
+import { NotificationCategory, NotificationReferenceType } from '@japjong/shared';
 import {
   BuiltNotificationContent,
   LineFlexMessage,

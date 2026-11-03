@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Equipment, PublicAccount, REPAIR_CATEGORIES, RequestType, Venue } from '@jongwen/shared';
+import { Equipment, PublicAccount, REPAIR_CATEGORIES, RequestType, Venue } from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';

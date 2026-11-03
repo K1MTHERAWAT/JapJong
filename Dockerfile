@@ -1,5 +1,5 @@
 # ==============================================================
-# Multi-stage Dockerfile for Jongwen Booking System
+# Multi-stage Dockerfile for JapJong Booking System
 # Targets:
 #   - api (NestJS Backend Service)
 #   - web (Next.js Frontend Service)
@@ -27,8 +27,8 @@ FROM dependencies AS builder
 WORKDIR /app
 COPY . .
 RUN pnpm build:shared
-RUN pnpm --filter @jongwen/api build
-RUN pnpm --filter @jongwen/web build
+RUN pnpm --filter @japjong/api build
+RUN pnpm --filter @japjong/web build
 
 # ----------------- API Runner -----------------
 FROM base AS api

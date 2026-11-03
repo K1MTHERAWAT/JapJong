@@ -16,7 +16,7 @@
 * **LINE Official Account & Notification System (Phase 3)**: ระบบแจ้งเตือนประชาชนและเจ้าหน้าที่ผ่าน **LINE Messaging API (Push Text & Flex Messages)** พร้อม **Outbox Queue (Idempotency, Exponential Backoff Retry)**, **LINE Webhook (HMAC-SHA256, Friendship Status Tracking)** และ **Mock Provider** สำหรับโหมดทดสอบ
 * **LINE Login & Onboarding (Phase 2)**: เข้าสู่ระบบและเชื่อมต่อบัญชีด้วย LINE พร้อมระบบลงทะเบียนผู้ใช้ใหม่และบันทึกความยินยอม **PDPA Consent**
 * **Document Security**: ระบบตรวจสอบเอกสารดิจิทัล QR Code (`qrcode`, `html5-qrcode`), รหัสยืนยันสุ่ม 32-byte, SHA-256 Document Hashing และบันทึกประวัติการสแกน
-* **Shared Package**: `@jongwen/shared` (TypeScript Types, Labels, RBAC Logic, Date Helpers, Period Conflict Checks)
+* **Shared Package**: `@japjong/shared` (TypeScript Types, Labels, RBAC Logic, Date Helpers, Period Conflict Checks)
 * **Testing & CI/CD**: Vitest (Unit Tests 308 ข้อ ครอบคลุม 26 Scenarios) + GitHub Actions CI Pipeline + Multi-stage Dockerfile
 
 ---
@@ -34,7 +34,7 @@ BookingV1/
 ├── LICENSE                     # MIT License
 ├── vitest.config.mts           # กำหนดค่า Unit Testing สำหรับ Monorepo
 ├── packages/
-│   └── shared/                 # @jongwen/shared — Types, Labels, RBAC Logic, Business Logic
+│   └── shared/                 # @japjong/shared — Types, Labels, RBAC Logic, Business Logic
 │       └── src/
 │           ├── types.ts          # Shared Models, Account (รวมที่อยู่), PublicAccount, Request Types
 │           ├── labels.ts         # ป้ายกำกับภาษาไทยสำหรับบทบาท สถานะ และประเภทคำขอ
@@ -42,7 +42,7 @@ BookingV1/
 │           ├── logic.test.ts     # Unit Tests ทดสอบเงื่อนไขทางธุรกิจ
 │           └── index.ts
 ├── apps/
-│   ├── api/                    # @jongwen/api — NestJS REST API (:4000/api)
+│   ├── api/                    # @japjong/api — NestJS REST API (:4000/api)
 │   │   ├── prisma/
 │   │   │   ├── schema.prisma       # Prisma Data Model (22 ตาราง รวม LINE accounts, notifications, logs, webhooks)
 │   │   │   ├── migrations/         # SQL Migration Files
@@ -57,7 +57,7 @@ BookingV1/
 │   │       ├── documents/        # QR Code Verification, Document Hashing, Public & Staff Verify API
 │   │       ├── admin/            # Users & Permissions, Account Management, Overview, Activity Logs
 │   │       └── db/               # Prisma Database Service (Persistent DB Sessions & Sequences)
-│   └── web/                    # @jongwen/web — Next.js 15 (App Router) + Tailwind CSS (:3000)
+│   └── web/                    # @japjong/web — Next.js 15 (App Router) + Tailwind CSS (:3000)
 │       ├── public/               # Static Assets (โลโก้, ไอคอน)
 │       └── src/
 │           ├── app/              # หน้าจอทั้งหมดตามบทบาท (Responsive Phone/Tablet/Desktop)
@@ -92,7 +92,7 @@ BookingV1/
    *(หมายเหตุ: หากรหัสผ่านมีอักขระพิเศษ เช่น `+` หรือ `/` ให้เข้ารหัสเป็น `%2B` และ `%2F`)*
 2. รันสคริปต์สร้างตารางและนำเข้าข้อมูลเริ่มต้นขึ้น Supabase:
    ```powershell
-   pnpm --filter @jongwen/api exec tsx prisma/migrate-supabase.ts
+   pnpm --filter @japjong/api exec tsx prisma/migrate-supabase.ts
    pnpm db:seed
    ```
 
@@ -100,8 +100,8 @@ BookingV1/
 | รายการ | ค่าการเชื่อมต่อ |
 | :--- | :--- |
 | **Host / Port** | `localhost:5433` |
-| **Database / User / Password** | `jongwen` / `jongwen` / `jongwen_dev` |
-| **DATABASE_URL** | `postgresql://jongwen:jongwen_dev@localhost:5433/jongwen?schema=public` |
+| **Database / User / Password** | `japjong` / `japjong` / `japjong_dev` |
+| **DATABASE_URL** | `postgresql://japjong:japjong_dev@localhost:5433/japjong?schema=public` |
 
 ---
 
@@ -130,7 +130,7 @@ pnpm install
 ### 2. เตรียมฐานข้อมูล (Supabase หรือ Docker)
 ```powershell
 # กรณีใช้ Supabase (ตั้งค่า DATABASE_URL ใน apps/api/.env แล้ว):
-pnpm --filter @jongwen/api exec tsx prisma/migrate-supabase.ts
+pnpm --filter @japjong/api exec tsx prisma/migrate-supabase.ts
 pnpm db:seed
 ```
 
