@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     region: singapore
-    buildCommand: pnpm install && pnpm build:shared && pnpm --filter @japjong/api build
+    buildCommand: pnpm install --ignore-scripts && pnpm build:shared && pnpm --filter @japjong/api prisma:generate && pnpm --filter @japjong/api build
     startCommand: pnpm --filter @japjong/api start
     healthCheckPath: /api/health
     envVars:

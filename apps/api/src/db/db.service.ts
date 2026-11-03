@@ -2369,24 +2369,24 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         }));
 
       if (r.type === 'booking') {
-        const currentPeriods = r.periods
-          .filter((p) => p.kind === 'current')
-          .map((p) => ({ start: p.startTime.toISOString(), end: p.endTime.toISOString() }));
-        const reschedulePeriods = r.periods
-          .filter((p) => p.kind === 'reschedule')
-          .map((p) => ({ start: p.startTime.toISOString(), end: p.endTime.toISOString() }));
+        const currentPeriods = (r.periods || [])
+          .filter((p: any) => p.kind === 'current')
+          .map((p: any) => ({ start: p.startTime.toISOString(), end: p.endTime.toISOString() }));
+        const reschedulePeriods = (r.periods || [])
+          .filter((p: any) => p.kind === 'reschedule')
+          .map((p: any) => ({ start: p.startTime.toISOString(), end: p.endTime.toISOString() }));
 
         const booking: BookingRequest = {
           ...base,
           type: 'booking',
-          venueIds: r.venues.map((v) => v.venueId),
+          venueIds: (r.venues || []).map((v: any) => v.venueId),
           periods: currentPeriods,
           rescheduleTo: reschedulePeriods.length > 0 ? reschedulePeriods : undefined,
           attendees: r.attendees ?? 30,
           activity: r.activity ?? '',
           purpose: r.purpose ?? '',
           attachments: r.attachments,
-          extraItems: r.items.map((i) => ({ equipmentId: i.equipmentId, qty: i.qty })),
+          extraItems: (r.items || []).map((i: any) => ({ equipmentId: i.equipmentId, qty: i.qty })),
           signatures,
         };
         return booking;
@@ -2396,7 +2396,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         const borrow: BorrowRequest = {
           ...base,
           type: 'borrow',
-          items: r.items.map((i) => ({ equipmentId: i.equipmentId, qty: i.qty })),
+          items: (r.items || []).map((i: any) => ({ equipmentId: i.equipmentId, qty: i.qty })),
           pickupDate: r.pickupDate ? r.pickupDate.toISOString().slice(0, 10) : '2026-10-22',
           returnDate: r.returnDate ? r.returnDate.toISOString().slice(0, 10) : '2026-10-25',
           purpose: r.purpose ?? '',
@@ -2446,7 +2446,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       link: n.link ?? undefined,
     }));
 
-    this.activities = dbActivities.map((a) => ({
+    this.activities = (dbActivities || []).map((a: any) => ({
       id: a.id,
       kind: a.kind,
       title: a.title,
@@ -2458,7 +2458,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       at: a.createdAt.toISOString(),
     }));
 
-    this.handovers = dbHandovers.map((h) => ({
+    this.handovers = (dbHandovers || []).map((h: any) => ({
       requestId: h.requestId,
       phase: h.phase,
       items: Array.isArray(h.checklist) ? (h.checklist as { label: string; ok: boolean }[]) : [],
@@ -2471,11 +2471,11 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     }));
 
     try {
-      const dbVers = await this.prisma.$queryRawUnsafe<any[]>(
+      const dbVers = (await this.prisma.$queryRawUnsafe(
         `SELECT * FROM "document_verifications" ORDER BY "created_at" DESC`,
-      );
+      )) as any[];
       if (Array.isArray(dbVers)) {
-        this.verifications = dbVers.map((r) => ({
+        this.verifications = dbVers.map((r: any) => ({
           id: r.id,
           documentId: r.document_id,
           verificationToken: r.verification_token,
@@ -2494,11 +2494,11 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         }));
       }
 
-      const dbLogs = await this.prisma.$queryRawUnsafe<any[]>(
+      const dbLogs = (await this.prisma.$queryRawUnsafe(
         `SELECT * FROM "document_scan_logs" ORDER BY "scanned_at" DESC LIMIT 100`,
-      );
+      )) as any[];
       if (Array.isArray(dbLogs)) {
-        this.scanLogs = dbLogs.map((r) => ({
+        this.scanLogs = dbLogs.map((r: any) => ({
           id: r.id,
           verificationId: r.verification_id,
           scannedBy: r.scanned_by ?? undefined,
