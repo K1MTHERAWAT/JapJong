@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import {
   ActivityLog,
@@ -193,7 +193,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         `CREATE INDEX IF NOT EXISTS "sign_verified_sessions_acc_token_idx" ON "sign_verified_sessions"("account_id", "session_token")`,
       ];
       for (const stmt of initStatements) {
-        await this.prisma.$executeRawUnsafe(stmt).catch((err) => {
+        await this.prisma.$executeRawUnsafe(stmt).catch((err: any) => {
           this.logger.debug('Schema init notice: ' + (err?.message || err));
         });
       }
@@ -582,7 +582,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
           item.id,
         ),
       )
-      .catch((err) => this.logger.error('Failed to persist notification', err));
+      .catch((err: any) => this.logger.error('Failed to persist notification', err));
     return item;
   }
 
@@ -618,7 +618,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
           notificationId,
           userId,
         )
-        .catch((err) => this.logger.error('Failed to mark notification read', err));
+        .catch((err: any) => this.logger.error('Failed to mark notification read', err));
     }
     return target;
   }
@@ -640,7 +640,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         now,
         userId,
       )
-      .catch((err) => this.logger.error('Failed to mark notifications read', err));
+      .catch((err: any) => this.logger.error('Failed to mark notifications read', err));
   }
 
   async log(
@@ -677,7 +677,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
           createdAt: new Date(entry.at),
         },
       })
-      .catch((err) => this.logger.error('Failed to persist activity log', err));
+      .catch((err: any) => this.logger.error('Failed to persist activity log', err));
   }
 
   // ===================== Persistence Helpers =====================
@@ -698,7 +698,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         department: a.department,
         phone: a.phone,
         lineName: a.lineName ?? null,
-        permissions: a.permissions as unknown as Prisma.InputJsonValue,
+        permissions: a.permissions as any,
         signature: a.signature ?? null,
         pin: a.pin ?? null,
         isDemo: a.isDemo ?? false,
@@ -716,7 +716,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         department: a.department,
         phone: a.phone,
         lineName: a.lineName ?? null,
-        permissions: a.permissions as unknown as Prisma.InputJsonValue,
+        permissions: a.permissions as any,
         signature: a.signature ?? null,
         pin: a.pin ?? null,
         isDemo: a.isDemo ?? false,
@@ -813,7 +813,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       addressSubdistrict: r.addressSubdistrict ?? null,
       addressDistrict: r.addressDistrict ?? null,
       addressProvince: r.addressProvince ?? null,
-      purposeItems: r.purposeItems ? (r.purposeItems as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
+      purposeItems: r.purposeItems ? (r.purposeItems as any) : null,
       purpose: r.type === 'booking' || r.type === 'borrow' ? r.purpose : null,
       activity: r.type === 'booking' ? r.activity : null,
       attendees: r.type === 'booking' ? r.attendees : null,
@@ -845,7 +845,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       updatedAt: new Date(r.updatedAt),
     };
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx: any) => {
       await tx.request.upsert({
         where: { id: r.id },
         create: { id: r.id, ...commonData },
@@ -856,13 +856,13 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         await tx.requestVenue.deleteMany({ where: { requestId: r.id } });
         if (r.venueIds.length > 0) {
           await tx.requestVenue.createMany({
-            data: r.venueIds.map((venueId) => ({ requestId: r.id, venueId })),
+            data: r.venueIds.map((venueId: any) => ({ requestId: r.id, venueId })),
             skipDuplicates: true,
           });
         }
 
         await tx.requestPeriod.deleteMany({ where: { requestId: r.id } });
-        const periodRows: Prisma.RequestPeriodCreateManyInput[] = r.periods.map((p, idx) => ({
+        const periodRows: any[] = r.periods.map((p: any, idx: number) => ({
           requestId: r.id,
           kind: 'current',
           sortOrder: idx,
@@ -951,7 +951,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       create: {
         requestId: h.requestId,
         phase: h.phase,
-        checklist: h.items as unknown as Prisma.InputJsonValue,
+        checklist: h.items as any,
         note: h.note,
         staffId: h.staffId,
         staffName: h.staffName ?? null,
@@ -960,7 +960,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         createdAt: new Date(h.at),
       },
       update: {
-        checklist: h.items as unknown as Prisma.InputJsonValue,
+        checklist: h.items as any,
         note: h.note,
         staffId: h.staffId,
         staffName: h.staffName ?? null,
@@ -1063,7 +1063,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         record.expiresAt,
         record.consumedAt,
         record.createdAt,
-      ).catch((err) => this.logger.error('Failed to persist sign OTP code', err));
+      ).catch((err: any) => this.logger.error('Failed to persist sign OTP code', err));
     }
     return record;
   }
@@ -1119,7 +1119,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         `UPDATE "sign_otp_codes" SET "attempts" = $1 WHERE "id" = $2`,
         attempts,
         id,
-      ).catch((err) => this.logger.error('Failed to update sign OTP attempts', err));
+      ).catch((err: any) => this.logger.error('Failed to update sign OTP attempts', err));
     }
   }
 
@@ -1132,7 +1132,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         `UPDATE "sign_otp_codes" SET "consumed_at" = $1::timestamptz WHERE "id" = $2`,
         now,
         id,
-      ).catch((err) => this.logger.error('Failed to consume sign OTP', err));
+      ).catch((err: any) => this.logger.error('Failed to consume sign OTP', err));
     }
   }
 
@@ -1163,7 +1163,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         record.expiresAt,
         record.revokedAt,
         record.createdAt,
-      ).catch((err) => this.logger.error('Failed to persist sign verified session', err));
+      ).catch((err: any) => this.logger.error('Failed to persist sign verified session', err));
     }
     return record;
   }
