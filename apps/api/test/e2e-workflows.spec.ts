@@ -454,14 +454,14 @@ describe('End-to-End System Workflows (E2E)', () => {
       await establishSigningOtpSession(staffToken, staffId);
 
       const venue = db.venues[0];
-      const dateStr = getWeekdayDateStr(12);
+      const dateStr = getWeekdayDateStr(14);
 
       const bookingRes = await request(app.getHttpServer())
         .post('/requests/booking')
         .set('Authorization', `Bearer ${citizenToken}`)
         .send({
           venueIds: [venue.id],
-          periods: [{ start: `${dateStr}T09:00:00+07:00`, end: `${dateStr}T12:00:00+07:00` }],
+          periods: [{ start: `${dateStr}T13:00:00+07:00`, end: `${dateStr}T16:00:00+07:00` }],
           activity: 'สัมมนา',
           purpose: 'สัมมนา',
           requesterSignature: validSignature,
