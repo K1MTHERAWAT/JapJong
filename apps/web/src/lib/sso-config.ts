@@ -1,13 +1,21 @@
 import type { GovSsoConfig } from 'gov-sso-login';
 
-function resolveFrontendUrl(): string {
-  if (typeof window !== 'undefined' && window.location.origin) {
-    return window.location.origin;
+function resolveCallbackUrl(): string {
+  if (process.env.NEXT_PUBLIC_CALLBACK_URL) {
+    return process.env.NEXT_PUBLIC_CALLBACK_URL;
   }
-  return (
-    process.env.NEXT_PUBLIC_FRONTEND_URL ||
-    'https://japjong.vercel.app'
-  );
+  const customFrontend = process.env.NEXT_PUBLIC_FRONTEND_URL;
+  if (customFrontend && customFrontend.includes('/auth/callback')) {
+    return customFrontend;
+  }
+  let base = 'https://japjong.vercel.app';
+  if (typeof window !== 'undefined' && window.location.origin) {
+    base = window.location.origin;
+  } else if (customFrontend) {
+    base = customFrontend;
+  }
+  base = base.replace(/\/+$/, '');
+  return `${base}/auth/callback`;
 }
 
 function resolveApiBaseUrl(): string {
@@ -30,7 +38,7 @@ export const ssoConfig: GovSsoConfig = {
     return resolveApiBaseUrl();
   },
   get callbackUrl() {
-    return `${resolveFrontendUrl()}/auth/callback`;
+    return resolveCallbackUrl();
   },
   ssoCallbackPath: '/api/auth/sso-callback',
 };
