@@ -71,8 +71,21 @@ describe('Phase 5 — LINE Rich Menu & Flex Message Integration', () => {
       expect(actionUris).toContain('/booking');
       expect(actionUris).toContain('/borrow');
       expect(actionUris).toContain('/repair');
-      expect(actionUris).toContain('/requests');
-      expect(actionUris).toContain('/documents');
+      expect(actionUris).toContain('/borrow/my');
+      expect(actionUris).toContain('/history');
+    });
+
+    it('verifies staff menu routes point to staff operations and review targets', async () => {
+      const menus = await richMenuService.listRichMenus();
+      const staff = menus.find((m) => m.menuType === 'STAFF');
+      const actionUris = staff?.actions.map((a) => a.actionData) || [];
+
+      expect(actionUris).toContain('/booking');
+      expect(actionUris).toContain('/borrow');
+      expect(actionUris).toContain('/repair');
+      expect(actionUris).toContain('/staff/review');
+      expect(actionUris).toContain('/history');
+      expect(actionUris).toContain('/staff/walk-in');
     });
   });
 
