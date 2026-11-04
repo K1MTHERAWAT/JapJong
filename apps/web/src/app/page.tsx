@@ -29,7 +29,8 @@ import {
   RequestTypeChip,
   Tabs,
 } from '@/components/ui';
-import { api, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
+import { api, formatPeriodRange, formatThaiDate, formatThaiDateTime, getStoredToken } from '@/lib/api';
+import { resolveLiffTarget } from '@/lib/liff';
 
 type TabFilter = 'all' | RequestType;
 
@@ -39,6 +40,27 @@ export default function HomePage() {
   const [requests, setRequests] = useState<RequestWithTimeline[]>([]);
   const [tab, setTab] = useState<TabFilter>('all');
   const [search, setSearch] = useState('');
+
+  // ดักจับกรณีผู้ใช้เปิดมาจาก LINE LIFF (เช่น Endpoint URL ใน LINE Developers Console ชี้มาที่ '/')
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const query = window.location.search;
+    if (!query) return;
+
+    if (query.includes('liff.state') || query.includes('target=') || query.includes('redirect=')) {
+      const target = resolveLiffTarget(null, query, '');
+      const token = getStoredToken();
+      if (target && target !== '/') {
+        if (token) {
+          router.replace(target);
+        } else {
+          router.replace(`/liff${query}`);
+        }
+      } else if (query.includes('liff.state') && !token) {
+        router.replace(`/liff${query}`);
+      }
+    }
+  }, [router]);
 
   useEffect(() => {
     api

@@ -3,13 +3,15 @@
 import React, { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api, getStoredToken, setStoredAuth } from '../../lib/api';
-import { getLiffIdToken, initLiff, loginWithLiff } from '../../lib/liff';
+import { getLiffIdToken, initLiff, loginWithLiff, resolveLiffTarget } from '../../lib/liff';
 import { AlertCircle, ArrowRight, CheckCircle2, Loader2, LogIn } from 'lucide-react';
 
 function LiffAuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const target = searchParams?.get('target') || searchParams?.get('redirect') || '/';
+  const [target, setTarget] = useState(() =>
+    resolveLiffTarget(searchParams, typeof window !== 'undefined' ? window.location.href : null),
+  );
 
   const [loading, setLoading] = useState(true);
   const [statusMessage, setStatusMessage] = useState('กำลังเชื่อมต่อระบบจับจอง (JapJong)...');
@@ -22,14 +24,23 @@ function LiffAuthContent() {
 
     async function handleLiffAuth() {
       try {
+        // ดึงค่า target ที่ถูกต้องที่สุดเสมอ (รองรับทั้ง target, redirect, และ liff.state)
+        let effectiveTarget = resolveLiffTarget(
+          searchParams,
+          typeof window !== 'undefined' ? window.location.href : null,
+        );
+        if (effectiveTarget !== '/' && isMounted) {
+          setTarget(effectiveTarget);
+        }
+
         // 1. ถ้ามี Session ในเครื่องอยู่แล้ว ให้เดินทางไปยังหน้าเป้าหมายได้ทันที
         const existingToken = getStoredToken();
         if (existingToken) {
           if (isMounted) {
             setStatusMessage('พบเซสชันการใช้งานเดิม กำลังนำท่านเข้าสู่ระบบ...');
             setTimeout(() => {
-              router.replace(target);
-            }, 400);
+              router.replace(effectiveTarget);
+            }, 300);
           }
           return;
         }
@@ -49,6 +60,16 @@ function LiffAuthContent() {
 
         setStatusMessage('กำลังเริ่มต้นการเชื่อมต่อ LINE Front-end Framework (LIFF)...');
         const liffRes = await initLiff(liffId || undefined);
+
+        // ตรวจสอบ target อีกครั้งหลัง initLiff (เผื่อ LIFF SDK ได้ unpack liff.state ลงใน window.location แล้ว)
+        const postInitTarget = resolveLiffTarget(
+          null,
+          typeof window !== 'undefined' ? window.location.href : null,
+        );
+        if (postInitTarget !== '/') {
+          effectiveTarget = postInitTarget;
+          if (isMounted) setTarget(postInitTarget);
+        }
 
         if (!liffRes.ok) {
           if (isMounted) {
@@ -90,8 +111,8 @@ function LiffAuthContent() {
           if (isMounted) {
             setStatusMessage(`ยินดีต้อนรับคุณ ${authRes.account.name || 'ผู้ใช้งาน'}`);
             setTimeout(() => {
-              router.replace(target);
-            }, 500);
+              router.replace(effectiveTarget);
+            }, 400);
           }
         } else if (authRes.status === 'NEW_USER' && authRes.ticket) {
           if (isMounted) {
@@ -99,8 +120,10 @@ function LiffAuthContent() {
             setTicket(authRes.ticket);
             setStatusMessage('พบว่าท่านเข้าใช้งานครั้งแรก กำลังนำท่านไปยังหน้าลงทะเบียน...');
             setTimeout(() => {
-              router.replace(`/register/line?ticket=${encodeURIComponent(authRes.ticket!)}&target=${encodeURIComponent(target)}`);
-            }, 800);
+              router.replace(
+                `/register/line?ticket=${encodeURIComponent(authRes.ticket!)}&target=${encodeURIComponent(effectiveTarget)}`,
+              );
+            }, 600);
           }
         } else {
           if (isMounted) {
@@ -125,7 +148,7 @@ function LiffAuthContent() {
     return () => {
       isMounted = false;
     };
-  }, [router, target]);
+  }, [router, searchParams]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center px-4 py-8">

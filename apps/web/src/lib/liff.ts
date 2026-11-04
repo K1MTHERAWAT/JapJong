@@ -101,3 +101,113 @@ export async function closeLiffWindow(): Promise<void> {
   }
 }
 
+/**
+ * ตรวจสอบความถูกต้องของ Local Target Path ป้องกัน Open Redirect
+ * ต้องเริ่มต้นด้วย '/' และไม่ตามด้วย '/' อีกตัว (เช่น '//malicious.com')
+ */
+export function isValidLocalTarget(path?: string | null): boolean {
+  if (!path || typeof path !== 'string') return false;
+  const trimmed = path.trim();
+  return trimmed.startsWith('/') && !trimmed.startsWith('//');
+}
+
+/**
+ * สกัด target URL จาก searchParams หรือ query string หรือ liff.state
+ * รองรับทั้งกรณี:
+ * 1) ?target=/borrow หรือ ?redirect=/borrow
+ * 2) ?liff.state=%3Ftarget%3D%2Fborrow (หรือ URL-encoded ซ้อนกันหลายชั้น)
+ * 3) ?liff.state=%2Fborrow หรือ /borrow
+ * 4) ?liff.state=%3Fredirect%3D%2Fborrow
+ * 5) URL เต็ม https://.../borrow (ดึงเฉพาะ pathname + search)
+ */
+export function resolveLiffTarget(
+  searchParams?: { get: (name: string) => string | null } | null,
+  rawUrlOrSearch?: string | null,
+  fallback = '/',
+): string {
+  let search = '';
+  if (typeof rawUrlOrSearch === 'string') {
+    const qIdx = rawUrlOrSearch.indexOf('?');
+    search = qIdx >= 0 ? rawUrlOrSearch.slice(qIdx) : rawUrlOrSearch;
+  } else if (typeof window !== 'undefined' && window.location) {
+    search = window.location.search;
+  }
+
+  let urlParams: URLSearchParams | null = null;
+  if (search) {
+    try {
+      urlParams = new URLSearchParams(search);
+    } catch {}
+  }
+
+  const readKey = (key: string): string | null => {
+    if (searchParams) {
+      const val = searchParams.get(key);
+      if (val !== null && val !== undefined) return val;
+    }
+    if (urlParams) {
+      return urlParams.get(key);
+    }
+    return null;
+  };
+
+  // 1. ตรวจสอบ direct params: target หรือ redirect
+  const direct = readKey('target') || readKey('redirect');
+  if (isValidLocalTarget(direct)) {
+    return direct!;
+  }
+
+  // 2. ตรวจสอบ liff.state
+  const liffState = readKey('liff.state');
+  if (liffState) {
+    let decoded = liffState.trim();
+    // Decode ซ้ำเผื่อมีการ encode หลายชั้น (สูงสุด 3 ครั้ง)
+    for (let i = 0; i < 3; i++) {
+      if (decoded.includes('%')) {
+        try {
+          decoded = decodeURIComponent(decoded);
+        } catch {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+
+    // กรณีเป็น local path ตรงๆ เช่น "/borrow"
+    if (isValidLocalTarget(decoded)) {
+      return decoded;
+    }
+
+    // กรณีเป็น query string เช่น "?target=/borrow" หรือ "target=/borrow"
+    const cleanQuery = decoded.startsWith('?') ? decoded.slice(1) : decoded;
+    try {
+      const innerParams = new URLSearchParams(cleanQuery);
+      const innerTarget = innerParams.get('target') || innerParams.get('redirect');
+      if (innerTarget) {
+        let cleanSub = innerTarget.trim();
+        try {
+          if (cleanSub.includes('%')) cleanSub = decodeURIComponent(cleanSub);
+        } catch {}
+        if (isValidLocalTarget(cleanSub)) {
+          return cleanSub;
+        }
+      }
+    } catch {}
+
+    // กรณีเป็น full URL เช่น "https://japjong.vercel.app/borrow"
+    if (decoded.startsWith('http://') || decoded.startsWith('https://')) {
+      try {
+        const parsed = new URL(decoded);
+        const fullLocal = `${parsed.pathname}${parsed.search}`;
+        if (isValidLocalTarget(fullLocal) && fullLocal !== '/') {
+          return fullLocal;
+        }
+      } catch {}
+    }
+  }
+
+  return fallback;
+}
+
+
