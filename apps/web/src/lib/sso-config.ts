@@ -4,32 +4,37 @@ const GOVCENTER_ALLOWED_DOMAINS = ['govcenter.co', 'gov.co'];
 const GOVCENTER_LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 
 function resolveCallbackUrlWithSource(): { url: string; source: string } {
-  if (process.env.NEXT_PUBLIC_CALLBACK_URL) {
+  if (
+    typeof window !== 'undefined' &&
+    window.location.origin &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ) {
     return {
-      url: process.env.NEXT_PUBLIC_CALLBACK_URL,
-      source: 'env:NEXT_PUBLIC_CALLBACK_URL',
+      url: `${window.location.origin}/auth/callback`,
+      source: 'window.location.origin (localhost)',
     };
   }
-  const customFrontend = process.env.NEXT_PUBLIC_FRONTEND_URL;
-  if (customFrontend && customFrontend.includes('/auth/callback')) {
+
+  const frontendUrl = process.env.NEXT_PUBLIC_FRONTEND_URL;
+  if (frontendUrl) {
+    const cleanBase = frontendUrl.replace(/\/+$/, '');
+    const url = cleanBase.endsWith('/auth/callback') ? cleanBase : `${cleanBase}/auth/callback`;
     return {
-      url: customFrontend,
-      source: 'env:NEXT_PUBLIC_FRONTEND_URL (with /auth/callback)',
+      url,
+      source: 'env:NEXT_PUBLIC_FRONTEND_URL',
     };
   }
-  let base = 'https://japjong.vercel.app';
-  let source = 'fallback:https://japjong.vercel.app';
+
   if (typeof window !== 'undefined' && window.location.origin) {
-    base = window.location.origin;
-    source = 'window.location.origin';
-  } else if (customFrontend) {
-    base = customFrontend;
-    source = 'env:NEXT_PUBLIC_FRONTEND_URL';
+    return {
+      url: `${window.location.origin.replace(/\/+$/, '')}/auth/callback`,
+      source: 'window.location.origin',
+    };
   }
-  base = base.replace(/\/+$/, '');
+
   return {
-    url: `${base}/auth/callback`,
-    source,
+    url: 'https://japjong.vercel.app/auth/callback',
+    source: 'fallback:https://japjong.vercel.app',
   };
 }
 
