@@ -17,7 +17,9 @@
 * **LINE Login & Onboarding (Phase 2)**: เข้าสู่ระบบและเชื่อมต่อบัญชีด้วย LINE พร้อมระบบลงทะเบียนผู้ใช้ใหม่และบันทึกความยินยอม **PDPA Consent**
 * **Document Security**: ระบบตรวจสอบเอกสารดิจิทัล QR Code (`qrcode`, `html5-qrcode`), รหัสยืนยันสุ่ม 32-byte, SHA-256 Document Hashing และบันทึกประวัติการสแกน
 * **Shared Package**: `@japjong/shared` (TypeScript Types, Labels, RBAC Logic, Date Helpers, Period Conflict Checks)
-* **Testing & CI/CD**: Vitest (Unit Tests 308 ข้อ ครอบคลุม 26 Scenarios) + GitHub Actions CI Pipeline + Multi-stage Dockerfile
+* **Testing & CI/CD**: Vitest (Unit Tests 361 ข้อ ครอบคลุม 26 Test Files ใน Monorepo) + GitHub Actions CI Pipeline + Multi-stage Dockerfile
+* **LINE Webhook & LIFF Integration (Phase 4)**: รองรับการเข้าสู่ระบบอัตโนมัติผ่าน **LINE Front-end Framework (LIFF SDK)**, Direct Routing ถอดรหัส `liff.state`, ป้องกัน Open Redirect และระบบตรวจสอบ Webhook Signature (HMAC-SHA256) ป้องกัน Replay Attack
+* **LINE Rich Menu & Flex Message Engine (Phase 5)**: ระบบ Rich Menu อัจฉริยะแบบแยกบทบาท (Citizen, Staff, Admin, Guest) สลับเมนูอัตโนมัติตาม Role ของผู้ใช้งาน พร้อมระบบสร้างภาพกราฟิกด้วย Pure Node.js (2500x1686, RGB PNG, zlib deflate) และหน้าจอแอดมินบริหารจัดการครบวงจร (`/admin/line`)
 
 ---
 
@@ -44,18 +46,18 @@ BookingV1/
 ├── apps/
 │   ├── api/                    # @japjong/api — NestJS REST API (:4000/api)
 │   │   ├── prisma/
-│   │   │   ├── schema.prisma       # Prisma Data Model (22 ตาราง รวม LINE accounts, notifications, logs, webhooks)
+│   │   │   ├── schema.prisma       # Prisma Data Model (25 ตาราง รวม LINE accounts, notifications, webhooks, rich_menus, flex_templates)
 │   │   │   ├── migrations/         # SQL Migration Files
-│   │   │   ├── migrate-supabase.ts # สคริปต์สร้างและอัปเดตตารางบน Supabase PostgreSQL (Migration 1-7)
+│   │   │   ├── migrate-supabase.ts # สคริปต์สร้างและอัปเดตตารางบน Supabase PostgreSQL (Migration 1-8)
 │   │   │   └── seed.ts             # Standalone Seed Script (รองรับ argon2id hash)
 │   │   └── src/
 │   │       ├── auth/             # Login, Register, LINE Login, Email OTP, Profile, Signature, PIN
-│   │       ├── line/             # LINE Messaging API Client, Flex Template Service, Webhook Handler
+│   │       ├── line/             # LINE Messaging API Client, Flex Template Service, Webhook Handler, Rich Menu Service
 │   │       ├── notifications/    # In-App Notifications, Outbox Queue, Preferences, Business Events, Admin Retry
 │   │       ├── resources/        # Venues, Equipment, Monthly Availability, Conflict & Stock Check
 │   │       ├── requests/         # Booking, Borrow, Repair, 3-Level Sign, Handover, Reschedule
 │   │       ├── documents/        # QR Code Verification, Document Hashing, Public & Staff Verify API
-│   │       ├── admin/            # Users & Permissions, Account Management, Overview, Activity Logs
+│   │       ├── admin/            # Users & Permissions, LINE & Rich Menu Manager, Overview, Activity Logs
 │   │       └── db/               # Prisma Database Service (Persistent DB Sessions & Sequences)
 │   └── web/                    # @japjong/web — Next.js 15 (App Router) + Tailwind CSS (:3000)
 │       ├── public/               # Static Assets (โลโก้, ไอคอน)
@@ -63,6 +65,7 @@ BookingV1/
 │           ├── app/              # หน้าจอทั้งหมดตามบทบาท (Responsive Phone/Tablet/Desktop)
 │           │   ├── login/        # เข้าสู่ระบบ + LINE Login + โหมดคลิกเดียว (One-Click Demo)
 │           │   ├── register/     # ลงทะเบียนผู้ใช้ทั่วไป และ /register/line (ลงทะเบียนครั้งแรกผ่าน LINE + PDPA)
+│           │   ├── liff/         # LINE Front-end Framework (LIFF SSO Login & Dynamic Route Resolver)
 │           │   ├── account/      # จัดการบัญชีผู้ใช้งาน (โปรไฟล์, ที่อยู่, เปลี่ยนรหัสผ่าน, ลายเซ็น & PIN)
 │           │   ├── notifications/# ศูนย์การแจ้งเตือน (/notifications) และตั้งค่าช่องทางรับแจ้งเตือน (/settings)
 │           │   ├── booking/      # ขอใช้สถานที่ราชการ (5 ขั้นตอน + ล็อกรายการตามที่เลือกจริง)
@@ -73,7 +76,7 @@ BookingV1/
 │           │   ├── staff/        # เจ้าหน้าที่ (ตรวจคำขอ, รับมอบ–รับคืน, กรอกแทน, ตรวจสอบ QR Code /staff/verify)
 │           │   ├── verify/       # ตรวจสอบเอกสารดิจิทัลสาธารณะสำหรับประชาชน (/verify/[token])
 │           │   ├── approver/     # ปลัด อบต. / นายก อบต. (คิวลงนามอนุมัติด้วย PIN 6 หลัก, ใบอนุญาต PDF)
-│           │   └── admin/        # แอดมิน (ภาพรวม, จัดการทรัพยากร/แบบฟอร์ม, ผู้ใช้ & สิทธิ์, แดชบอร์ดแจ้งเตือน)
+│           │   └── admin/        # แอดมิน (ภาพรวม, จัดการทรัพยากร/แบบฟอร์ม, ผู้ใช้ & สิทธิ์, จัดการ LINE & Rich Menu /admin/line)
 │           ├── components/       # AppShell, Sidebar (Badge แจ้งเตือน), UI Primitives, DatePicker & OfficialGovFormDocument
 │           └── lib/api.ts        # Client API SDK (Notifications, Preferences, LINE Status, Admin Retry)
 ├── package.json
@@ -222,6 +225,21 @@ pnpm dev
 8. **ระบบ LINE Login & ลงทะเบียนครั้งแรกพร้อม PDPA Consent (Phase 2):**
    - เข้าสู่ระบบด้วย LINE Account ผ่าน LINE Login v2.1
    - กรณีเข้าสู่ระบบครั้งแรก จะได้รับ Secure Ticket นำทางไปยังหน้าลงทะเบียนเฉพาะ (`/register/line`) เพื่อกรอกข้อมูลพื้นฐานและบันทึกความยินยอมตามนโยบายคุ้มครองข้อมูลส่วนบุคคล (PDPA)
+9. **ระบบ LINE Webhook & LIFF Front-end Framework (Phase 4):**
+   - **LINE Front-end Framework (LIFF SDK):** รองรับการเปิดใช้งานระบบจับจองบนแอปพลิเคชัน LINE ทั้งบน iOS/Android โดยตรง ผ่านหน้า `/liff`
+   - **Seamless Single Sign-On (SSO):** ดึง LINE ID Token ส่งยืนยันกับ Backend เพื่อสร้างเซสชันการใช้งานทันทีโดยผู้ใช้ไม่ต้องกรอกรหัสผ่านซ้ำ
+   - **Dynamic LIFF Target Routing:** ระบบถอดรหัสพารามิเตอร์ `liff.state` และ Query Parameter แบบหลายชั้น พร้อมระบบป้องกัน **Open Redirect Vulnerability** ป้องกันการส่งต่อลิงก์ไปยังภายนอก
+   - **LINE Webhook Processing:** ตรวจสอบความถูกต้องของ Signature (`X-Line-Signature`) ด้วย HMAC-SHA256 จัดการสถานะการเพิ่มเพื่อน (`follow`) และการบล็อก (`unfollow`) อัตโนมัติ พร้อมระบบป้องกัน Replay Attack ด้วยตาราง `line_webhook_events`
+10. **ระบบบริหารจัดการ LINE Rich Menu & Flex Message Engine (Phase 5):**
+    - **Multi-Role Rich Menus (4 ประเภท):** ออกแบบเมนูแยกตามบทบาทของผู้ใช้งานอย่างชัดเจน:
+      - **CITIZEN (บริการประชาชน):** 6 ช่อง — 1. จองสถานที่ (`/booking`), 2. ยืมอุปกรณ์ (`/borrow`), 3. แจ้งปัญหา (`/repair`), 4. รายการยืมของฉัน (`/borrow/my`), 5. ประวัติคำขอทั้งหมด (`/history`), 6. ติดต่อเจ้าหน้าที่ (ข้อความติดต่อ อบต.)
+      - **STAFF (งานเจ้าหน้าที่):** 6 ช่อง — 1. จองสถานที่ (`/booking`), 2. ยืมอุปกรณ์ (`/borrow`), 3. แจ้งปัญหา (`/repair`), 4. เอกสารรอลงนาม (`/staff/review`), 5. ประวัติคำขอทั้งหมด (`/history`), 6. กรอกคำขอแทน Walk-in (`/staff/walk-in`)
+      - **ADMIN (จัดการระบบ):** 6 ช่อง — 1. Dashboard สรุปภาพรวม (`/admin`), 2. จัดการผู้ใช้งาน (`/admin/users`), 3. จัดการทรัพยากร (`/admin/resources`), 4. จัดการ Rich Menu (`/admin/line`), 5. บันทึกแจ้งเตือน (`/admin/notifications`), 6. บัญชีผู้ใช้และสิทธิ์ (`/admin/permissions`)
+      - **DEFAULT (ผู้ใช้ทั่วไป/แขก):** เมนูสำหรับผู้ที่ยังไม่ได้เชื่อมต่อบัญชี
+    - **Dynamic Role Switching:** เมื่อเจ้าหน้าที่หรือผู้ใช้เข้าสู่ระบบ ระบบจะสลับ Rich Menu บน LINE ให้ตรงตามบทบาทของตนเองอัตโนมัติแบบเรียลไทม์
+    - **Pure Node.js Canvas & PNG Generator:** สถาปัตยกรรมการสร้างภาพเมนูขนาดมาตรฐาน LINE (2500 x 1686 พิกเซล, RGB PNG, zlib deflate, CRC-32) ด้วย Node.js ในตัว ไม่ต้องติดตั้ง Library ภายนอกหรือ C++ native dependencies
+    - **Custom Flex Message Template Overrides:** ผู้ดูแลระบบสามารถปรับแต่ง Headline, สีหัวการ์ด (Header Color), ปุ่ม Action, และ Footer Note ของข้อความ Flex Message แจ้งเตือนได้ผ่านหน้า `/admin/line`
+
 
 ---
 
@@ -273,6 +291,8 @@ erDiagram
     accounts ||--o{ sign_verified_sessions : "account_id"
 
     notifications ||--o{ line_notification_logs : "notification_id"
+
+    rich_menus ||--o{ rich_menu_actions : "rich_menu_id"
 
     requests ||--o{ request_venues : "request_id"
     requests ||--o{ request_periods : "request_id"
@@ -566,5 +586,54 @@ erDiagram
         timestamptz expires_at
         timestamptz revoked_at
         timestamptz created_at
+    }
+
+    line_webhook_events {
+        string id PK
+        string webhook_event_id UK
+        string event_type
+        string line_user_id
+        timestamptz event_timestamp
+        timestamptz processed_at
+        string processing_status
+        timestamptz created_at
+    }
+
+    rich_menus {
+        string id PK
+        string name
+        string menu_type "DEFAULT, CITIZEN, STAFF, ADMIN"
+        string line_rich_menu_id UK
+        string chat_bar_text
+        int width
+        int height
+        string status "DRAFT, PUBLISHED, ARCHIVED"
+        boolean is_default
+        timestamptz published_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    rich_menu_actions {
+        string id PK
+        string rich_menu_id FK
+        int sort_order
+        string label
+        json area
+        string action_type "URI, MESSAGE, POSTBACK"
+        string action_data
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    flex_message_templates {
+        string id PK
+        string name
+        string event_type UK
+        string template_type "FLEX, TEXT"
+        json content
+        string status "ACTIVE, DISABLED"
+        timestamptz created_at
+        timestamptz updated_at
     }
 ```
