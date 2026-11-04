@@ -279,6 +279,12 @@ async function main() {
     CREATE INDEX IF NOT EXISTS "line_webhook_events_created_at_idx" ON "line_webhook_events"("created_at");
   `);
 
+  console.log('📦 Applying migration 8 (Phase 5 — LINE Rich Menu & Flex Message)...');
+  const mig8 = path.resolve(__dirname, 'migrations/20261104060000_phase5_rich_menu_flex/migration.sql');
+  if (fs.existsSync(mig8)) {
+    await runSqlFile(mig8);
+  }
+
   console.log('✨ Schema applied to Supabase successfully!');
 }
 

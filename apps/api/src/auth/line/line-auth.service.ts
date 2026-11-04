@@ -4,10 +4,12 @@ import {
   ForbiddenException,
   Injectable,
   Logger,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { DbService } from '../../db/db.service';
+import { LineRichMenuService } from '../../line/rich-menu/line-rich-menu.service';
 import { LineRegisterDto } from './line-auth.dto';
 
 export interface LineTokenResponse {
@@ -53,7 +55,10 @@ export class LineAuthService {
   // In-memory registration ticket store (TTL: 15 minutes)
   private ticketStore = new Map<string, StoredTicket>();
 
-  constructor(private readonly db: DbService) {}
+  constructor(
+    private readonly db: DbService,
+    @Optional() private readonly richMenuService?: LineRichMenuService,
+  ) {}
 
   get channelId(): string {
     return process.env.LINE_CHANNEL_ID || '';
@@ -322,7 +327,13 @@ export class LineAuthService {
     });
 
     // 5. Consume ticket (one-time use)
+    const lineUserId = stored.lineUserId;
     this.ticketStore.delete(dto.ticket);
+
+    // Sync role-based Rich Menu
+    if (this.richMenuService) {
+      await this.richMenuService.switchUserRichMenuByRole(lineUserId, newAccount.role).catch(() => {});
+    }
 
     // 6. Create JapJong session token
     const token = await this.db.createSession(newAccount.id);
@@ -385,6 +396,9 @@ export class LineAuthService {
         }
 
         // Existing User -> Create Session & Redirect directly to service
+        if (this.richMenuService) {
+          await this.richMenuService.switchUserRichMenuByRole(lineUserId, user.role).catch(() => {});
+        }
         const sessionToken = await this.db.createSession(user.id);
         return {
           redirectUrl: `${this.frontendUrl}/login?line_token=${sessionToken}&account_id=${user.id}`,
@@ -446,6 +460,9 @@ export class LineAuthService {
       }
 
       // 3. Create Session Token
+      if (this.richMenuService) {
+        await this.richMenuService.switchUserRichMenuByRole(lineUserId, user.role).catch(() => {});
+      }
       const token = await this.db.createSession(user.id);
       return {
         status: 'AUTHENTICATED' as const,

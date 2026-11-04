@@ -8,11 +8,26 @@ import {
   NotificationTemplateInput,
 } from './line-messaging.types';
 
+export interface TemplateOverride {
+  status?: 'ACTIVE' | 'DISABLED';
+  templateType?: 'FLEX' | 'TEXT';
+  headline?: string;
+  footerNote?: string;
+  headerColor?: string;
+  buttonLabel?: string;
+}
+
 const MAX_LINE_TEXT_LENGTH = 5000;
 const MAX_FLEX_ALT_TEXT_LENGTH = 400;
 
 @Injectable()
 export class LineMessageTemplateService {
+  private overrideResolver?: (event: string) => TemplateOverride | null;
+
+  setOverrideResolver(resolver?: (event: string) => TemplateOverride | null) {
+    this.overrideResolver = resolver;
+  }
+
   private get frontendUrl(): string {
     const raw = (process.env.FRONTEND_URL || 'http://localhost:3000').trim().replace(/\/+$/, '');
     try {
@@ -584,6 +599,14 @@ export class LineMessageTemplateService {
         break;
     }
 
+    const override = this.overrideResolver ? this.overrideResolver(input.event) : null;
+    if (override) {
+      if (override.headline) headline = override.headline;
+      if (override.footerNote) footerNote = override.footerNote;
+    }
+    // Template ถูกปิดหรือกำหนดเป็น TEXT -> ส่ง Text Message แทน Flex (In-App ไม่ได้รับผลกระทบ)
+    const useFlex = !!input.useFlex && !(override && (override.status === 'DISABLED' || override.templateType === 'TEXT'));
+
     const finalLink = input.linkPath || defaultLink;
     const detailLines = details.map((d) => `${d.label}: ${d.value}`).join('\n');
     const rawText = `${headerLabel}\n\n${headline}\n\n${detailLines}\n\n${footerNote}`;
@@ -597,8 +620,13 @@ export class LineMessageTemplateService {
       text: safeText,
     };
 
-    const lineMessages: LineMessageObject[] = input.useFlex
-      ? [this.buildFlexCard(headerLabel, headline, details, footerNote, finalLink)]
+    const lineMessages: LineMessageObject[] = useFlex
+      ? [
+          this.buildFlexCard(headerLabel, headline, details, footerNote, finalLink, {
+            headerColor: override?.headerColor,
+            buttonLabel: override?.buttonLabel,
+          }),
+        ]
       : [textMessage];
 
     return {
@@ -621,7 +649,10 @@ export class LineMessageTemplateService {
     details: { label: string; value: string }[],
     footerNote: string,
     linkPath?: string,
+    options?: { headerColor?: string; buttonLabel?: string },
   ): LineFlexMessage {
+    const brandColor = options?.headerColor && /^#[0-9A-Fa-f]{6}$/.test(options.headerColor) ? options.headerColor : '#1B5E3C';
+    const buttonLabel = (options?.buttonLabel || 'ดูรายละเอียด').slice(0, 20);
     const rawAlt = `${headerLabel}: ${headline}`;
     const altText =
       rawAlt.length > MAX_FLEX_ALT_TEXT_LENGTH

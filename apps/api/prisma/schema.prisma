@@ -619,3 +619,70 @@ model LineWebhookEvent {
 }
 
 
+
+// ===================== Phase 5: LINE Rich Menu & Flex Message =====================
+// แยก Configuration ของ LINE ออกจากข้อมูลผู้ใช้ (ไม่มี FK ไปยัง accounts)
+
+model RichMenu {
+  id             String    @id @default(cuid())
+  name           String    @map("name")
+  /// "DEFAULT" | "CITIZEN" | "STAFF" | "ADMIN"
+  menuType       String    @map("menu_type")
+  /// Rich Menu ID ที่ได้จาก LINE Messaging API หลัง Publish
+  lineRichMenuId String?   @unique @map("line_rich_menu_id")
+  chatBarText    String    @default("เมนูจับจอง") @map("chat_bar_text")
+  width          Int       @default(2500)
+  height         Int       @default(1686)
+  /// ภาพเมนู (data URL base64) — เก็บเฉพาะที่ผ่านการตรวจสอบตาม LINE Spec
+  imageData      String?   @map("image_data")
+  imageMimeType  String?   @map("image_mime_type")
+  /// "DRAFT" | "PUBLISHED" | "ARCHIVED"
+  status         String    @default("DRAFT")
+  isDefault      Boolean   @default(false) @map("is_default")
+  publishedAt    DateTime? @map("published_at") @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  actions RichMenuAction[]
+
+  @@index([menuType, status])
+  @@map("rich_menus")
+}
+
+model RichMenuAction {
+  id         String   @id @default(cuid())
+  richMenuId String   @map("rich_menu_id")
+  sortOrder  Int      @default(0) @map("sort_order")
+  label      String
+  /// พื้นที่กด { x, y, width, height }
+  area       Json
+  /// "uri" | "message" | "postback"
+  actionType String   @map("action_type")
+  /// uri: path ภายใน Japjong หรือ URL ที่อยู่ใน Allowlist / message: ข้อความ / postback: action=<allowlisted>
+  actionData String   @map("action_data")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  richMenu RichMenu @relation(fields: [richMenuId], references: [id], onDelete: Cascade)
+
+  @@index([richMenuId])
+  @@map("rich_menu_actions")
+}
+
+model FlexMessageTemplate {
+  id           String   @id @default(cuid())
+  name         String
+  /// NotificationEventKey เช่น BOOKING_APPROVED (1 template ต่อ 1 event)
+  eventType    String   @unique @map("event_type")
+  /// "FLEX" | "TEXT"
+  templateType String   @default("FLEX") @map("template_type")
+  /// การปรับแต่ง { headline?, headerColor?, buttonLabel?, footerNote? }
+  content      Json
+  /// "ACTIVE" | "DISABLED"
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([status])
+  @@map("flex_message_templates")
+}

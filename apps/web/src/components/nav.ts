@@ -16,6 +16,7 @@ import {
   Users,
   UserCircle,
   LayoutDashboard,
+  Smartphone,
 } from 'lucide-react';
 import { canAccessRoute, PublicAccount, Role } from '@japjong/shared';
 
@@ -69,6 +70,7 @@ export const NAV: NavItem[] = [
 
   // แอดมินและทรัพยากร
   { href: '/admin', label: 'ภาพรวมผู้ดูแลระบบ', icon: LayoutDashboard, section: 'ระบบและผู้ดูแล', roles: ['ADMIN'], exact: true },
+  { href: '/admin/line', label: 'จัดการ LINE & Rich Menu', icon: Smartphone, section: 'ระบบและผู้ดูแล', roles: ['ADMIN'] },
   { href: '/admin/notifications', label: 'บันทึกแจ้งเตือน & LINE', icon: BellRing, section: 'ระบบและผู้ดูแล', roles: ['ADMIN'] },
   { href: '/admin/resources', label: 'จัดการสถานที่/อุปกรณ์', icon: Shield, section: 'ระบบและผู้ดูแล', roles: ['ADMIN', 'STAFF'] },
   { href: '/admin/permissions', label: 'บัญชีผู้ใช้ & สิทธิ์', icon: Users, section: 'ระบบและผู้ดูแล', roles: ['ADMIN'] },

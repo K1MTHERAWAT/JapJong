@@ -407,6 +407,76 @@ export const api = {
     }),
   staffVerifyHistory: (limit = 50) =>
     request<DocumentScanLog[]>(`/staff/documents/verify-history?limit=${limit}`),
+
+  // LINE Rich Menu & Flex Templates (Phase 5)
+  getRichMenus: () =>
+    request<any[]>('/admin/line/rich-menus'),
+  getRichMenu: (id: string) =>
+    request<any>(`/admin/line/rich-menus/${encodeURIComponent(id)}`),
+  createRichMenu: (data: any) =>
+    request<any>('/admin/line/rich-menus', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateRichMenu: (id: string, data: any) =>
+    request<any>(`/admin/line/rich-menus/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteRichMenu: (id: string) =>
+    request<{ success: boolean }>(`/admin/line/rich-menus/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+  initDefaultRichMenus: () =>
+    request<{ success: boolean; message: string }>('/admin/line/rich-menus/init-defaults', {
+      method: 'POST',
+    }),
+  publishRichMenu: (id: string) =>
+    request<any>(`/admin/line/rich-menus/${encodeURIComponent(id)}/publish`, {
+      method: 'POST',
+    }),
+  setDefaultRichMenu: (id: string) =>
+    request<any>(`/admin/line/rich-menus/${encodeURIComponent(id)}/set-default`, {
+      method: 'POST',
+    }),
+  uploadRichMenuImage: (id: string, imageData: string, mimeType: string) =>
+    request<{ success: boolean; width: number; height: number }>(
+      `/admin/line/rich-menus/${encodeURIComponent(id)}/upload-image`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ imageData, mimeType }),
+      },
+    ),
+  linkRichMenuUser: (lineUserId: string, richMenuId: string) =>
+    request<{ success: boolean }>('/admin/line/rich-menus/link-user', {
+      method: 'POST',
+      body: JSON.stringify({ lineUserId, richMenuId }),
+    }),
+  unlinkRichMenuUser: (lineUserId: string) =>
+    request<{ success: boolean }>('/admin/line/rich-menus/unlink-user', {
+      method: 'POST',
+      body: JSON.stringify({ lineUserId }),
+    }),
+  switchUserRole: (lineUserId: string, role?: string) =>
+    request<{ switched: boolean; menuType: string; richMenuId?: string }>(
+      '/admin/line/rich-menus/switch-user-role',
+      {
+        method: 'POST',
+        body: JSON.stringify({ lineUserId, role }),
+      },
+    ),
+  getFlexTemplates: () =>
+    request<any[]>('/admin/line/flex-templates'),
+  upsertFlexTemplate: (dto: any) =>
+    request<any>('/admin/line/flex-templates', {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    }),
+  previewFlexTemplate: (eventType: string, sampleData?: any) =>
+    request<any>('/admin/line/flex-templates/preview', {
+      method: 'POST',
+      body: JSON.stringify({ eventType, sampleData }),
+    }),
 };
 
 // ===== Thai date formatting helpers =====

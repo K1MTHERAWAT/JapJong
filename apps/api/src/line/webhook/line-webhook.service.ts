@@ -1,8 +1,9 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, Optional, UnauthorizedException } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { DbService } from '../../db/db.service';
 import { LineMessagingService } from '../messaging/line-messaging.service';
 import { LineMessageObject } from '../messaging/line-messaging.types';
+import { LineRichMenuService } from '../rich-menu/line-rich-menu.service';
 import { LineWebhookEventPayload, LineWebhookRequestBody } from './line-webhook.types';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class LineWebhookService {
   constructor(
     private readonly db: DbService,
     private readonly messaging: LineMessagingService,
+    @Optional() private readonly richMenuService?: LineRichMenuService,
   ) {}
 
   private get channelSecret(): string {
@@ -130,6 +132,14 @@ export class LineWebhookService {
         await this.db.updateLineFriendshipStatus(lineUserId, 'FRIEND', eventTime);
         status = 'PROCESSED';
 
+        // Role-based Rich Menu switching (derive role strictly from verified DB account)
+        if (typeof (this.db as any).findUserByLineUserId === 'function' && this.richMenuService) {
+          const linkedUser = await this.db.findUserByLineUserId(lineUserId);
+          await this.richMenuService
+            .switchUserRichMenuByRole(lineUserId, linkedUser?.role)
+            .catch((err) => this.logger.warn(`Failed to switch rich menu on follow: ${err.message}`));
+        }
+
         // ส่งข้อความต้อนรับแนะนำบริการ
         if (ev.replyToken) {
           await this.replyFollowWelcome(ev.replyToken);
@@ -137,6 +147,7 @@ export class LineWebhookService {
       } else if (ev.type === 'unfollow' && lineUserId) {
         await this.db.updateLineFriendshipStatus(lineUserId, 'BLOCKED', eventTime);
         status = 'PROCESSED';
+        // เมื่อ unfollow ต้องไม่พยายามส่งข้อความหรือจัดการเมนูที่ผู้ใช้ไม่สามารถรับได้
       } else if (ev.type === 'message' && lineUserId) {
         await this.db.updateLineFriendshipStatus(lineUserId, 'FRIEND', eventTime);
         status = 'PROCESSED';

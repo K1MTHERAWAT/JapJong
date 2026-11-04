@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as crypto from 'crypto';
-import { LineMessageObject, LinePushResult } from './line-messaging.types';
+import {
+  LineApiResult,
+  LineMessageObject,
+  LinePushResult,
+  LineRichMenuObject,
+} from './line-messaging.types';
 
 const LINE_PUSH_ENDPOINT = 'https://api.line.me/v2/bot/message/push';
 const LINE_REPLY_ENDPOINT = 'https://api.line.me/v2/bot/message/reply';
@@ -220,6 +225,90 @@ export class LineMessagingService {
         errorMessage: safeMsg,
         retryable: false,
       };
+    }
+  }
+
+  // ===================== Phase 5: Rich Menu API =====================
+
+  /** true เมื่อเรียก LINE API จริงได้ (เปิดใช้งาน + มี Token) — นอกนั้นเป็น Mock สำหรับ Dev/Test */
+  get canCallLineApi(): boolean {
+    return this.isEnabled && !!this.channelAccessToken;
+  }
+
+  /** สร้าง Rich Menu บน LINE และคืน richMenuId */
+  async createRichMenu(definition: LineRichMenuObject | Record<string, unknown>): Promise<LineApiResult<{ richMenuId: string }>> {
+    const res = await this.callLineApi('POST', 'https://api.line.me/v2/bot/richmenu', JSON.stringify(definition), 'application/json');
+    if (!res.ok) return res as LineApiResult<{ richMenuId: string }>;
+    const richMenuId = (res.data as { richMenuId?: string } | undefined)?.richMenuId
+      || (res.mock ? `richmenu-mock${crypto.randomBytes(12).toString('hex')}` : '');
+    if (!richMenuId) {
+      return { ok: false, statusCode: 502, errorCode: 'LINE_BAD_RESPONSE', errorMessage: 'LINE ไม่ส่ง richMenuId กลับมา', retryable: false };
+    }
+    return { ...res, data: { richMenuId } };
+  }
+
+  /** อัปโหลดภาพ Rich Menu (PNG/JPEG) */
+  uploadRichMenuImage(richMenuId: string, image: Buffer, mimeType: 'image/png' | 'image/jpeg') {
+    return this.callLineApi(
+      'POST',
+      `https://api-data.line.me/v2/bot/richmenu/${encodeURIComponent(richMenuId)}/content`,
+      image,
+      mimeType,
+    );
+  }
+
+  deleteRichMenu(richMenuId: string) {
+    return this.callLineApi('DELETE', `https://api.line.me/v2/bot/richmenu/${encodeURIComponent(richMenuId)}`);
+  }
+
+  setDefaultRichMenu(richMenuId: string) {
+    return this.callLineApi('POST', `https://api.line.me/v2/bot/user/all/richmenu/${encodeURIComponent(richMenuId)}`);
+  }
+
+  linkRichMenuToUser(lineUserId: string, richMenuId: string) {
+    return this.callLineApi(
+      'POST',
+      `https://api.line.me/v2/bot/user/${encodeURIComponent(lineUserId)}/richmenu/${encodeURIComponent(richMenuId)}`,
+    );
+  }
+
+  unlinkRichMenuFromUser(lineUserId: string) {
+    return this.callLineApi('DELETE', `https://api.line.me/v2/bot/user/${encodeURIComponent(lineUserId)}/richmenu`);
+  }
+
+  private async callLineApi(
+    method: 'GET' | 'POST' | 'DELETE',
+    url: string,
+    body?: string | Buffer,
+    contentType?: string,
+  ): Promise<LineApiResult<unknown>> {
+    if (!this.canCallLineApi) {
+      this.logger.log(`[MOCK LINE API] ${method} ${url.replace(/\/user\/U[0-9a-f]+/i, '/user/U***')}`);
+      return { ok: true, statusCode: 200, retryable: false, mock: true };
+    }
+    try {
+      const headers: Record<string, string> = { Authorization: `Bearer ${this.channelAccessToken}` };
+      if (contentType) headers['Content-Type'] = contentType;
+      const response = await fetch(url, {
+        method,
+        headers,
+        body: body === undefined ? undefined : (body as unknown as BodyInit),
+      });
+      let data: unknown;
+      try {
+        data = await response.json();
+      } catch {
+        data = undefined;
+      }
+      if (response.ok) {
+        return { ok: true, statusCode: response.status, retryable: false, data };
+      }
+      const detail = this.sanitizeErrorMessage((data as { message?: string } | undefined)?.message || `HTTP ${response.status}`);
+      return this.classifyHttpError(response.status, detail);
+    } catch (err) {
+      const safeMsg = this.sanitizeErrorMessage(err instanceof Error ? err.message : 'Network error connecting to LINE API');
+      this.logger.error(`LINE API network failure: ${safeMsg}`);
+      return { ok: false, statusCode: 503, errorCode: 'NETWORK_ERROR', errorMessage: safeMsg, retryable: true };
     }
   }
 

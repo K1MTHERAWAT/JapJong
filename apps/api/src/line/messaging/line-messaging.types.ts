@@ -23,6 +23,38 @@ export interface LinePushResult {
   mock?: boolean;
 }
 
+export interface LineApiResult<T = unknown> extends LinePushResult {
+  data?: T;
+}
+
+export interface LineRichMenuArea {
+  bounds: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  action: {
+    type: 'uri' | 'message' | 'postback';
+    label?: string;
+    uri?: string;
+    text?: string;
+    data?: string;
+    displayText?: string;
+  };
+}
+
+export interface LineRichMenuObject {
+  size: {
+    width: number;
+    height: number;
+  };
+  selected: boolean;
+  name: string;
+  chatBarText: string;
+  areas: LineRichMenuArea[];
+}
+
 export type NotificationEventKey =
   // Booking — Citizen
   | 'BOOKING_SUBMITTED'

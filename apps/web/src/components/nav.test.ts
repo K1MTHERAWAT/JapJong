@@ -93,6 +93,7 @@ describe('Navigation Menu Access Control (getVisibleNav)', () => {
     expect(visible.some((i) => i.href === '/staff/handover')).toBe(false);
     expect(visible.some((i) => i.href === '/approver')).toBe(false);
     expect(visible.some((i) => i.href === '/admin')).toBe(false);
+    expect(visible.some((i) => i.href === '/admin/line')).toBe(false);
   });
 
   it('renders staff operations menus for staff role', () => {
@@ -119,6 +120,7 @@ describe('Navigation Menu Access Control (getVisibleNav)', () => {
   it('renders admin and governance menus for Admin role', () => {
     const visible = getVisibleNav(baseAdmin);
     expect(visible.some((i) => i.href === '/admin')).toBe(true);
+    expect(visible.some((i) => i.href === '/admin/line')).toBe(true);
     expect(visible.some((i) => i.href === '/admin/notifications')).toBe(true);
     expect(visible.some((i) => i.href === '/admin/resources')).toBe(true);
     expect(visible.some((i) => i.href === '/admin/permissions')).toBe(true);

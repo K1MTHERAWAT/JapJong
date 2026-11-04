@@ -294,8 +294,8 @@ export function canAccessRoute(
     };
   }
 
-  // 3. หน้าโฮมแอดมิน (/admin) และระบบจัดการแจ้งเตือน (/admin/notifications)
-  if (pathname === '/admin' || pathname.startsWith('/admin/notifications')) {
+  // 3. หน้าโฮมแอดมิน (/admin), ระบบแจ้งเตือน (/admin/notifications) และ LINE Rich Menu (/admin/line)
+  if (pathname === '/admin' || pathname.startsWith('/admin/notifications') || pathname.startsWith('/admin/line')) {
     const ok = account.role === 'ADMIN' || hasPermission(account, 'manageUsers');
     return {
       allowed: ok,
