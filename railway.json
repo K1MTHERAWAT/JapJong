@@ -1,0 +1,10 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "buildCommand": "pnpm install && pnpm build:shared && pnpm --filter @japjong/api prisma:generate && pnpm --filter @japjong/api build"
+  },
+  "deploy": {
+    "startCommand": "pnpm --filter @japjong/api start",
+    "healthcheckPath": "/api/health"
+  }
+}
