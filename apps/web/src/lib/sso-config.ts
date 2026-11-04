@@ -1,7 +1,8 @@
-import type { GovSsoConfig } from 'gov-sso-login';
+import type { GovSsoConfig, SsoCallbackResult } from 'gov-sso-login';
 
 const GOVCENTER_ALLOWED_DOMAINS = ['govcenter.co', 'gov.co'];
 const GOVCENTER_LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+export const GOV_SSO_STATE_KEY = 'gov_sso_state';
 
 function resolveCallbackUrlWithSource(): { url: string; source: string } {
   if (
@@ -55,6 +56,129 @@ function resolveApiBaseUrl(): string {
   );
 }
 
+export function resolveIamApiUrl(): string {
+  return (process.env.NEXT_PUBLIC_IAM_API_URL || 'https://api-auth.govcenter.co').replace(/\/+$/, '');
+}
+
+export function resolveGovLineChannelId(): string {
+  return (process.env.NEXT_PUBLIC_GOV_LINE_CHANNEL_ID || '2008946775').trim();
+}
+
+/**
+ * สร้างรหัส CSRF State 64-hex และบันทึกลง sessionStorage (มาตรฐานเดียวกับ TownTrack)
+ */
+export function generateGovSsoState(): string {
+  const bytes = new Uint8Array(32);
+  if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+    window.crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i += 1) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  const state = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  if (typeof window !== 'undefined') {
+    try {
+      sessionStorage.setItem(GOV_SSO_STATE_KEY, state);
+    } catch {
+      // ignore storage errors
+    }
+  }
+  return state;
+}
+
+/**
+ * สร้าง URL สำหรับเข้าสู่ระบบ Gov Center ผ่าน LINE OAuth โดยตรงไปยัง api-auth.govcenter.co/auth/line/callback
+ * (ทำงานเหมือน TownTrack `qne` เพื่อหลีกเลี่ยง Domain Filter บนหน้า auth.govcenter.co/auth/login ที่บังคับดีดไป /dashboard)
+ */
+export function buildGovCenterLineAuthorizeUrl(): {
+  authorizeUrl: string;
+  state: string;
+  callbackWithState: string;
+  lineRedirectUri: string;
+} {
+  const state = generateGovSsoState();
+  const callbackUrlObj = new URL(resolveCallbackUrl());
+  callbackUrlObj.searchParams.set('state', state);
+  const callbackWithState = callbackUrlObj.toString();
+
+  const iamApiUrl = resolveIamApiUrl();
+  const lineChannelId = resolveGovLineChannelId();
+  const serviceCode = ssoConfig.serviceCode;
+  const lineRedirectUri = `${iamApiUrl}/auth/line/callback`;
+
+  const innerState = new URLSearchParams({
+    callback: callbackWithState,
+    service: serviceCode,
+  }).toString();
+
+  const authorizeParams = new URLSearchParams({
+    response_type: 'code',
+    client_id: lineChannelId,
+    redirect_uri: lineRedirectUri,
+    state: innerState,
+    scope: 'profile openid email',
+  });
+
+  return {
+    authorizeUrl: `https://access.line.me/oauth2/v2.1/authorize?${authorizeParams.toString()}`,
+    state,
+    callbackWithState,
+    lineRedirectUri,
+  };
+}
+
+/**
+ * เข้าสู่ระบบ Gov Center ด้วยอีเมลและรหัสผ่านผ่าน Backend API (Server-to-Server แบบเดียวกับ TownTrack)
+ */
+export async function loginGovCenterWithPassword(
+  email: string,
+  password: string,
+): Promise<SsoCallbackResult> {
+  const endpoint = `${ssoConfig.apiBaseUrl}/api/auth/sso-login`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email.trim(), password }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const msg =
+      (Array.isArray(data?.message) ? data.message.join(', ') : data?.message) ||
+      data?.error ||
+      `เข้าสู่ระบบ Gov Center ไม่สำเร็จ (${response.status})`;
+    throw new Error(msg);
+  }
+  return data as SsoCallbackResult;
+}
+
+/**
+ * แลก Authorization Code หรือ LINE Ticket กับ Backend API
+ */
+export async function exchangeGovSsoCallback(payload: {
+  code?: string;
+  ticket?: string;
+  state?: string;
+}): Promise<SsoCallbackResult> {
+  const endpoint = `${ssoConfig.apiBaseUrl}${ssoConfig.ssoCallbackPath || '/api/auth/sso-callback'}`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const msg =
+      (Array.isArray(data?.message) ? data.message.join(', ') : data?.message) ||
+      data?.error ||
+      `การยืนยันตัวตนกับ Gov Center ไม่สำเร็จ (${response.status})`;
+    throw new Error(msg);
+  }
+  return data as SsoCallbackResult;
+}
+
 /**
  * จำลองการทำงานของฟังก์ชัน normalizeRedirectUrl ใน auth.govcenter.co
  * เพื่อแสดง Log ว่าทำไมและจุดไหนที่ auth.govcenter.co โยนกลับไปหน้า /dashboard
@@ -62,6 +186,7 @@ function resolveApiBaseUrl(): string {
 export function inspectGovCenterRedirectBehavior() {
   const { url: callbackUrl, source: callbackSource } = resolveCallbackUrlWithSource();
   const iamAuthUrl = process.env.NEXT_PUBLIC_IAM_GOV_FRONTEND_URL || 'https://auth.govcenter.co';
+  const iamApiUrl = resolveIamApiUrl();
   const serviceCode = process.env.NEXT_PUBLIC_E_SERVICE_CODE || 'jap-jong';
   const apiBaseUrl = resolveApiBaseUrl();
 
@@ -86,7 +211,7 @@ export function inspectGovCenterRedirectBehavior() {
     } else if (protocol !== 'https:' && !isLocalhost) {
       rejectReason = `ไม่ใช่ HTTPS และไม่ใช่ localhost (${callbackUrl})`;
     } else if (!isLocalhost && !isWhitelistedDomain) {
-      rejectReason = `Hostname "${hostname}" ไม่อยู่ใน Whitelist ของ auth.govcenter.co (อนุญาตเฉพาะ ${GOVCENTER_ALLOWED_DOMAINS.join(', ')} และ localhost)`;
+      rejectReason = `Hostname "${hostname}" ไม่อยู่ใน Frontend Whitelist ของ auth.govcenter.co (จึงใช้ Direct API Flow ผ่าน ${iamApiUrl} แบบเดียวกับ TownTrack)`;
     } else {
       normalizedOnGovCenter = parsed.toString();
     }
@@ -99,6 +224,7 @@ export function inspectGovCenterRedirectBehavior() {
 
   return {
     iamAuthUrl,
+    iamApiUrl,
     serviceCode,
     apiBaseUrl,
     callbackUrl,
@@ -123,28 +249,12 @@ export function logGovSsoDiagnostic(stage: string) {
   console.log('2. Service Code:', info.serviceCode);
   console.log('3. Callback URL ที่ส่งไป:', info.callbackUrl, `(ที่มา: ${info.callbackSource})`);
   console.log('4. API Base URL:', info.apiBaseUrl);
-  console.log('5. IAM Auth URL:', info.iamAuthUrl);
-
-  if (info.willRedirectToGovDashboard) {
-    console.warn(
-      '⚠️ [จุดที่ถูกโยนไป /dashboard บน auth.govcenter.co]:',
-      `\n  • สาเหตุ: ${info.rejectReason}`,
-      `\n  • จุดที่ 1 (ตอนโหลดหน้า auth.govcenter.co/auth/login):`,
-      `\n      A = normalizeRedirectUrl("${info.callbackUrl}") || "/dashboard"`,
-      `\n      ผลลัพธ์: normalizeRedirectUrl คืนค่า null -> ตัวแปร A จึงกลายเป็น "/dashboard"`,
-      `\n  • จุดที่ 2 (ตอนกดปุ่มเข้าสู่ระบบ Email/Password บน GovCenter):`,
-      `\n      if (A.startsWith("http")) { window.location.assign(A) } else { router.push(A) }`,
-      `\n      ผลลัพธ์: เนื่องจาก A คือ "/dashboard" (ไม่ได้ขึ้นต้นด้วย http) ระบบจึงสั่ง router.push("/dashboard")`,
-      `\n  • จุดที่ 3 (ตอนกดปุ่มเข้าสู่ระบบด้วย LINE บน GovCenter):`,
-      `\n      isSafeRedirectUrl(A) -> ส่งพารามิเตอร์ callback=%2Fdashboard ไปยัง LINE Login แทน URL ของ Vercel`,
-    );
-  } else {
-    console.info(
-      '✅ [ผ่านเกณฑ์ Whitelist ของ auth.govcenter.co]:',
-      `\n  • normalizeRedirectUrl("${info.callbackUrl}") -> "${info.normalizedOnGovCenter}"`,
-      `\n  • ตัวแปร A เริ่มต้นด้วย "http" -> เมื่อล็อกอินเสร็จจะเรียก window.location.assign("${info.normalizedOnGovCenter}?code=...&service=${info.serviceCode}") กลับมาที่เว็บเราสำเร็จ`,
-    );
-  }
+  console.log('5. IAM API URL (Direct SSO):', info.iamApiUrl);
+  console.info(
+    '✅ [โหมด Direct Gov Center SSO (TownTrack Pattern)]:',
+    `\n  • LINE Login ของ Gov Center -> ส่งตรงไป ${info.iamApiUrl}/auth/line/callback (ตรวจสอบกับฐานข้อมูล EService baseUrl="https://japjong.vercel.app")`,
+    `\n  • Email/Password ของ Gov Center -> ส่งตรงไป POST ${info.apiBaseUrl}/api/auth/sso-login -> ${info.iamApiUrl}/auth/login?service=${info.serviceCode}`,
+  );
   console.groupEnd();
 
   return info;
@@ -161,4 +271,3 @@ export const ssoConfig: GovSsoConfig = {
   },
   ssoCallbackPath: '/api/auth/sso-callback',
 };
-

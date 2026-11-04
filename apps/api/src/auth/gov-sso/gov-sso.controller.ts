@@ -2,7 +2,12 @@ import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../auth.guard';
-import { GovSsoCallbackDto, GovSsoExchangeDto, SearchResidenceDto } from './gov-sso.dto';
+import {
+  GovSsoCallbackDto,
+  GovSsoExchangeDto,
+  GovSsoPasswordLoginDto,
+  SearchResidenceDto,
+} from './gov-sso.dto';
 import { GovSsoService } from './gov-sso.service';
 
 @ApiTags('GovCenter SSO')
@@ -13,9 +18,17 @@ export class GovSsoController {
   @Throttle({ auth: { limit: 15, ttl: 60000 } })
   @Public()
   @Post('sso-callback')
-  @ApiOperation({ summary: 'รับ Authorization Code จาก Gov Center SSO เพื่อยืนยันตัวตนและเข้าสู่ระบบ' })
+  @ApiOperation({ summary: 'รับ Authorization Code หรือ Ticket จาก Gov Center SSO เพื่อยืนยันตัวตนและเข้าสู่ระบบ' })
   async ssoCallback(@Body() body: GovSsoCallbackDto) {
-    return this.ssoService.handleSsoCallback(body.code);
+    return this.ssoService.handleSsoCallback(body?.code, body?.ticket);
+  }
+
+  @Throttle({ auth: { limit: 15, ttl: 60000 } })
+  @Public()
+  @Post('sso-login')
+  @ApiOperation({ summary: 'เข้าสู่ระบบด้วยอีเมลและรหัสผ่านของ Gov Center โดยตรง (Server-to-Server)' })
+  async ssoPasswordLogin(@Body() body: GovSsoPasswordLoginDto) {
+    return this.ssoService.loginWithPassword(body.email, body.password);
   }
 
   @Throttle({ auth: { limit: 15, ttl: 60000 } })

@@ -44,6 +44,7 @@ async function bootstrap() {
       req.url.startsWith('/auth/line') ||
       req.url.startsWith('/line/webhook') ||
       req.url.startsWith('/auth/sso-callback') ||
+      req.url.startsWith('/auth/sso-login') ||
       req.url.startsWith('/auth/sso-session') ||
       req.url.startsWith('/auth/me')
     ) {
