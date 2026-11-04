@@ -71,7 +71,9 @@ export class GovSsoService {
    */
   async handleSsoCallback(code: string) {
     const trimmedCode = (code || '').trim();
+    this.logger.log(`[GovSSO] รับคำขอ POST /auth/sso-callback (code length=${trimmedCode.length}, prefix=${trimmedCode.slice(0, 8)}...)`);
     if (!trimmedCode) {
+      this.logger.warn('[GovSSO] ปฏิเสธคำขอ: ไม่พบ authorization code');
       throw new UnauthorizedException('กรุณาระบุ authorization code');
     }
 
@@ -79,6 +81,7 @@ export class GovSsoService {
 
     // รองรับ Mock Code สำหรับโหมดทดสอบ / เดโม หรือ Unit Test
     if (trimmedCode === 'mock-sso-code' || (process.env.DEMO_MODE === 'true' && trimmedCode.startsWith('demo-'))) {
+      this.logger.log(`[GovSSO] ใช้ Mock Verify Result สำหรับ code=${trimmedCode}`);
       data = this.getMockVerifyResult(trimmedCode);
     } else {
       data = await this.verifyCodeWithIam(trimmedCode);
@@ -86,11 +89,13 @@ export class GovSsoService {
 
     const iamUser = data.user;
     if (!iamUser || !iamUser.id) {
+      this.logger.warn(`[GovSSO] ข้อมูลผู้ใช้จาก IAM-GOV ไม่สมบูรณ์: ${JSON.stringify(data)}`);
       throw new UnauthorizedException('ข้อมูลผู้ใช้งานจาก IAM-GOV ไม่ถูกต้องหรือไม่พบผู้ใช้');
     }
 
     const account = await this.upsertAccountFromIam(iamUser, data.residences || []);
     const token = await this.db.createSession(account.id);
+    this.logger.log(`[GovSSO] ล็อกอินสำเร็จ: accountId=${account.id}, username=${account.username}, role=${account.role}`);
 
     await this.db.log('user', 'เข้าสู่ระบบด้วย Gov Center SSO', `ผู้ใช้ ${account.name} (IAM ID: ${iamUser.id}) เข้าสู่ระบบสำเร็จ`, {
       id: account.id,

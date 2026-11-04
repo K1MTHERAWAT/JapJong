@@ -10,6 +10,7 @@ import { roleHomePath } from '@/components/shell';
 import { Icon } from '@/components/icons';
 import { Chip } from '@/components/ui';
 import { api, setStoredAuth } from '@/lib/api';
+import { logGovSsoDiagnostic, ssoConfig } from '@/lib/sso-config';
 
 const DEFAULT_DEMO_ACCOUNTS: DemoAccountSummary[] = [
   { id: 'u-somchai', name: 'สมชาย ใจดี', role: 'USER', position: 'ประชาชน', department: 'กลุ่มแม่บ้านบ้านหนองบัว', initial: 'ส', nickname: 'สมชาย' },
@@ -54,6 +55,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    logGovSsoDiagnostic('LoginPage โหลดสำเร็จ');
 
     const params = new URLSearchParams(window.location.search);
     const lineToken = params.get('line_token');
@@ -192,11 +194,32 @@ export default function LoginPage() {
 
           {/* ปุ่ม Single Sign-On (Gov Center & LINE) */}
           <div className="flex flex-col gap-2.5">
-            <SsoLoginButton
-              label="เข้าสู่ระบบด้วย Gov Center (SSO)"
-              className="h-[52px] w-full rounded-full bg-[#0F766E] hover:bg-[#0D6860] active:scale-[0.99] text-white font-semibold text-[15px] sm:text-[16px] flex items-center justify-center gap-2.5 shadow-low transition cursor-pointer"
-              icon={<GovIcon className="w-5 h-5 text-teal-100" />}
-            />
+            <div
+              onClickCapture={() => {
+                const diag = logGovSsoDiagnostic('ผู้ใช้กดปุ่ม "เข้าสู่ระบบด้วย Gov Center (SSO)"');
+                const previewLoginUrl = `${ssoConfig.iamAuthUrl}/auth/login?service=${encodeURIComponent(ssoConfig.serviceCode)}&callback=${encodeURIComponent(ssoConfig.callbackUrl)}&state=<generated_state>`;
+                console.info('[GovSSO Trace] 🚀 กำลัง Redirect ไปยัง:', previewLoginUrl);
+                try {
+                  localStorage.setItem(
+                    'japjong_sso_last_attempt',
+                    JSON.stringify({
+                      timestamp: new Date().toISOString(),
+                      origin: window.location.origin,
+                      loginUrl: previewLoginUrl,
+                      diagnostic: diag,
+                    }),
+                  );
+                } catch {
+                  // ข้ามหาก storage เต็ม
+                }
+              }}
+            >
+              <SsoLoginButton
+                label="เข้าสู่ระบบด้วย Gov Center (SSO)"
+                className="h-[52px] w-full rounded-full bg-[#0F766E] hover:bg-[#0D6860] active:scale-[0.99] text-white font-semibold text-[15px] sm:text-[16px] flex items-center justify-center gap-2.5 shadow-low transition cursor-pointer"
+                icon={<GovIcon className="w-5 h-5 text-teal-100" />}
+              />
+            </div>
 
             <button
               type="button"
