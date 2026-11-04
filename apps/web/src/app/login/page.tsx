@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { SsoLoginButton } from 'gov-sso-login';
 import { DemoAccountSummary, ROLE_LABEL, ROLE_TONE } from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
 import { roleHomePath } from '@/components/shell';
@@ -23,6 +24,17 @@ function LineIcon({ className = 'w-5 h-5' }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
       <path d="M19.365 9.863c.349.002.63.285.63.631 0 .348-.281.63-.63.63h-2.12v1.341h2.12c.349 0 .63.283.63.631 0 .348-.281.63-.63.63h-2.752a.63.63 0 0 1-.63-.63V7.868c0-.348.281-.63.63-.63h2.752c.349 0 .63.282.63.63 0 .348-.281.63-.63.63h-2.12v1.365h2.12zm-4.704 3.232c0 .348-.282.63-.63.63a.628.628 0 0 1-.504-.254l-2.023-2.775v2.4c0 .347-.282.629-.63.629a.63.63 0 0 1-.631-.63V7.868c0-.348.282-.63.631-.63a.63.63 0 0 1 .504.254l2.023 2.776V7.868c0-.348.281-.63.63-.63.348 0 .63.282.63.63v5.227zm-5.864 0c0 .348-.282.63-.63.63a.63.63 0 0 1-.631-.63V7.868c0-.348.282-.63.631-.63.348 0 .63.282.63.63v5.227zM6.55 10.494h-2.12v2.601c0 .348-.282.63-.63.63a.63.63 0 0 1-.63-.63V7.868c0-.348.281-.63.63-.63.348 0 .63.282.63.63v2.626h2.12c.349 0 .63.282.63.63 0 .348-.281.63-.63.63zM12 2C6.477 2 2 5.925 2 10.767c0 4.398 3.668 8.082 8.618 8.683.336.073.792.222.908.51.104.258.068.663.033.924l-.145.875c-.044.267-.206 1.043.914.569 1.12-.474 6.046-3.56 8.249-6.096C21.65 14.07 22 12.482 22 10.767 22 5.925 17.523 2 12 2z" />
+    </svg>
+  );
+}
+
+function GovIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M3 21h18" />
+      <path d="M5 21V10l7-5 7 5v11" />
+      <path d="M9 21v-4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4" />
+      <line x1="10" y1="10" x2="14" y2="10" />
     </svg>
   );
 }
@@ -178,16 +190,24 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* ปุ่ม LINE Login */}
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={handleLineLogin}
-            className="h-[52px] rounded-full bg-[#06C755] hover:bg-[#05b34c] active:scale-[0.99] text-white font-semibold text-[16px] flex items-center justify-center gap-2.5 shadow-low transition disabled:opacity-50 cursor-pointer"
-          >
-            <LineIcon className="w-6 h-6" />
-            <span>เข้าสู่ระบบด้วย LINE</span>
-          </button>
+          {/* ปุ่ม Single Sign-On (Gov Center & LINE) */}
+          <div className="flex flex-col gap-2.5">
+            <SsoLoginButton
+              label="เข้าสู่ระบบด้วย Gov Center (SSO)"
+              className="h-[52px] w-full rounded-full bg-[#0F766E] hover:bg-[#0D6860] active:scale-[0.99] text-white font-semibold text-[15px] sm:text-[16px] flex items-center justify-center gap-2.5 shadow-low transition cursor-pointer"
+              icon={<GovIcon className="w-5 h-5 text-teal-100" />}
+            />
+
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={handleLineLogin}
+              className="h-[52px] rounded-full bg-[#06C755] hover:bg-[#05b34c] active:scale-[0.99] text-white font-semibold text-[15px] sm:text-[16px] flex items-center justify-center gap-2.5 shadow-low transition disabled:opacity-50 cursor-pointer"
+            >
+              <LineIcon className="w-6 h-6" />
+              <span>เข้าสู่ระบบด้วย LINE</span>
+            </button>
+          </div>
 
           <div className="flex items-center gap-3 text-[12px] text-ink-mute">
             <span className="flex-1 h-px bg-line" />

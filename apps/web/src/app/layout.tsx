@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { AuthProvider } from '@/components/auth-context';
+import { GovSsoClientProvider } from '@/components/gov-sso-provider';
 import { SidebarPreferenceProvider } from '@/components/sidebar-preference';
 
 export const metadata: Metadata = {
@@ -18,7 +19,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="th">
       <body className="bg-bg font-sans text-body text-ink antialiased">
         <AuthProvider>
-          <SidebarPreferenceProvider>{children}</SidebarPreferenceProvider>
+          <GovSsoClientProvider>
+            <SidebarPreferenceProvider>{children}</SidebarPreferenceProvider>
+          </GovSsoClientProvider>
         </AuthProvider>
       </body>
     </html>

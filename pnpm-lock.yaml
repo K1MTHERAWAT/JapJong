@@ -114,6 +114,9 @@ importers:
       '@line/liff':
         specifier: ^2.31.2
         version: 2.31.2(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)
+      gov-sso-login:
+        specifier: ^1.4.0
+        version: 1.4.0(react@19.3.1)
       html5-qrcode:
         specifier: ^2.3.8
         version: 2.3.8
@@ -2141,6 +2144,11 @@ packages:
   gopd@1.2.0:
     resolution: {integrity: sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==}
     engines: {node: '>= 0.4'}
+
+  gov-sso-login@1.4.0:
+    resolution: {integrity: sha512-+naI0ZtQ+dxDVxr/8Szv7XS1FYYmtq/LL/SP0yD9kqimKYJRb7KGv1LadZKu0Ci5TibLIH2d0MnpFOS+mTuNJg==}
+    peerDependencies:
+      react: '>=18.0.0'
 
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
@@ -5564,6 +5572,10 @@ snapshots:
       path-scurry: 2.0.2
 
   gopd@1.2.0: {}
+
+  gov-sso-login@1.4.0(react@19.3.1):
+    dependencies:
+      react: 19.3.1
 
   graceful-fs@4.2.11: {}
 
