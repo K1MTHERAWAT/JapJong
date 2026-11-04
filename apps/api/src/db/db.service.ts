@@ -207,6 +207,16 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
           await this.seedProductionAdmin();
         }
       }
+      const venueCount = await this.prisma.venue.count();
+      if (venueCount === 0) {
+        this.logger.log('Seeding default municipal venues and equipment into PostgreSQL...');
+        for (const v of mockVenues) {
+          await this.persistVenue(v);
+        }
+        for (const e of mockEquipment) {
+          await this.persistEquipment(e);
+        }
+      }
       await this.loadFromDatabase();
       if (process.env.DEMO_MODE === 'true') {
         const bkkNow = this.getBangkokTime();
@@ -240,6 +250,12 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   async seedInMemoryFallback() {
     if (process.env.DEMO_MODE === 'false' && process.env.SEED_DEMO !== 'true') {
       await this.seedProductionAdmin();
+      if (this.venues.length === 0) {
+        this.venues = clone(mockVenues);
+      }
+      if (this.equipment.length === 0) {
+        this.equipment = clone(mockEquipment);
+      }
       return;
     }
     const hashedAccounts: Account[] = [];
@@ -343,6 +359,12 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     };
     this.accounts.push(adminAccount);
     await this.persistAccount(adminAccount);
+    if (this.venues.length === 0) {
+      this.venues = clone(mockVenues);
+    }
+    if (this.equipment.length === 0) {
+      this.equipment = clone(mockEquipment);
+    }
     this.logger.log('Created initial admin account (username: admin) with password from ADMIN_INITIAL_PASSWORD');
   }
 
