@@ -87,6 +87,28 @@ export const NAV: NavItem[] = [
 
 export function getVisibleNav(account: PublicAccount | null): NavItem[] {
   return NAV.filter((item) => {
+    // สำหรับ Admin: ซ่อนบริการประชาชนและงานเจ้าหน้าที่ใน Sidebar (ตามภาพที่ 2) ให้แสดงเฉพาะเมนูระบบและผู้ดูแล
+    if (account?.role === 'ADMIN') {
+      const isCitizenOrStaffService = [
+        '/',
+        '/booking',
+        '/borrow',
+        '/repair',
+        '/borrow/my',
+        '/history',
+        '/notifications',
+        '/account',
+        '/staff/review',
+        '/staff/handover',
+        '/staff/walk-in',
+        '/staff/verify',
+      ].includes(item.href);
+
+      if (isCitizenOrStaffService) {
+        return false;
+      }
+    }
+
     if (item.roles && !account) {
       return false;
     }

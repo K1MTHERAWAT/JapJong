@@ -36,7 +36,7 @@ export function Sidebar({ items }: { items: NavItem[] }) {
     items.filter((item) => ['/', '/booking', '/borrow', '/repair', '/borrow/my', '/history', '/notifications', '/account'].includes(item.href)),
     items.filter((item) => ['/staff/review', '/staff/handover', '/staff/walk-in', '/staff/verify'].includes(item.href)),
     items.filter((item) => ['/approver'].includes(item.href)),
-    items.filter((item) => ['/admin', '/admin/notifications', '/admin/resources', '/admin/permissions'].includes(item.href)),
+    items.filter((item) => ['/admin', '/admin/line', '/admin/notifications', '/admin/resources', '/admin/permissions'].includes(item.href)),
   ].filter((group) => group.length > 0);
 
   return (
@@ -74,7 +74,11 @@ export function Sidebar({ items }: { items: NavItem[] }) {
         <div className="relative flex flex-col gap-1 overflow-visible flex-1">
           {/* Header */}
           <div className={`relative flex items-center mb-2 ${open ? 'h-11 justify-between pl-2' : 'h-11 justify-center'}`}>
-            <Link href="/" className={`flex items-center gap-2.5 min-w-0 ${open ? '' : 'justify-center'}`} title="จับจอง">
+            <Link
+              href={account?.role === 'ADMIN' ? '/admin' : '/'}
+              className={`flex items-center gap-2.5 min-w-0 ${open ? '' : 'justify-center'}`}
+              title="จับจอง"
+            >
               <div className={`size-8 rounded-control overflow-hidden shrink-0 flex items-center justify-center bg-surface-muted border border-line-soft ${open ? '' : 'lg:mx-auto'}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
