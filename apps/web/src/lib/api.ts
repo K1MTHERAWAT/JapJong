@@ -329,8 +329,14 @@ export const api = {
   }) => request<RequestWithTimeline>('/requests/repair', { method: 'POST', body: JSON.stringify(payload) }),
   signRequest: (id: string, payload: { decision: 'approve' | 'reject'; note?: string; pin?: string; signature?: string }) =>
     request<RequestWithTimeline>(`/requests/${id}/sign`, { method: 'POST', body: JSON.stringify(payload) }),
-  reschedule: (id: string, periods: Period[]) =>
-    request<RequestWithTimeline>(`/requests/${id}/reschedule`, { method: 'POST', body: JSON.stringify({ periods }) }),
+  reschedule: (
+    id: string,
+    payload: Period[] | { periods?: Period[]; pickupDate?: string; returnDate?: string },
+  ) =>
+    request<RequestWithTimeline>(`/requests/${id}/reschedule`, {
+      method: 'POST',
+      body: JSON.stringify(Array.isArray(payload) ? { periods: payload } : payload),
+    }),
   cancelRequest: (id: string, reason?: string) =>
     request<RequestWithTimeline>(`/requests/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) }),
   returnRequest: (id: string) =>

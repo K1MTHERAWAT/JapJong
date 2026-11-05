@@ -128,6 +128,26 @@ export class NotificationEventsService {
     }
   }
 
+  async onBorrowRescheduled(req: BorrowRequest) {
+    try {
+      const equipmentSummary = this.getEquipmentSummary(req.items);
+      await this.notifications.dispatchToRole(
+        'STAFF',
+        {
+          event: 'STAFF_NEW_BORROW',
+          requestId: req.id,
+          requestCode: req.code,
+          requesterName: req.requesterName,
+          equipmentSummary,
+          dateText: `${req.pickupDate} ถึง ${req.returnDate}`,
+        },
+        `staff_borrow_rescheduled:${req.id}:r${req.approvalRound || 1}`,
+      );
+    } catch (err) {
+      this.logger.error('Error in onBorrowRescheduled notification event', err);
+    }
+  }
+
   async onBorrowReturnRequested(req: BorrowRequest) {
     try {
       await this.notifications.dispatchToRole(

@@ -26,11 +26,13 @@ describe('End-to-End System Workflows (E2E)', () => {
   let adminToken: string;
 
   const getWeekdayDateStr = (daysAhead: number): string => {
-    const d = new Date(Date.now() + daysAhead * 86400000);
+    const d = new Date();
+    d.setDate(d.getDate() + daysAhead);
     const day = d.getDay();
     if (day === 0) d.setDate(d.getDate() + 1);
     if (day === 6) d.setDate(d.getDate() + 2);
-    return d.toISOString().slice(0, 10);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   };
 
   beforeAll(async () => {

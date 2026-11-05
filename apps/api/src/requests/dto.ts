@@ -248,9 +248,17 @@ export class SignDto {
 }
 
 export class RescheduleDto {
+  @IsOptional()
   @IsArray()
-  @ArrayNotEmpty({ message: 'กรุณาระบุช่วงเวลาใหม่' })
-  periods!: Period[];
+  periods?: Period[];
+
+  @IsOptional()
+  @IsString()
+  pickupDate?: string;
+
+  @IsOptional()
+  @IsString()
+  returnDate?: string;
 }
 
 export class HandoverDto {

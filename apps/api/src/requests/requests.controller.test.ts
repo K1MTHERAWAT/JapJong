@@ -164,12 +164,14 @@ describe('RequestsController Unit Tests', () => {
 
   describe('Booking Creation (POST /requests/booking)', () => {
     const validBookingBody = () => {
-      const futureDate = new Date(Date.now() + 3 * 86400000);
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 4);
       const day = futureDate.getDay();
       // Ensure weekday 1-5
       if (day === 0) futureDate.setDate(futureDate.getDate() + 1);
       if (day === 6) futureDate.setDate(futureDate.getDate() + 2);
-      const dateStr = futureDate.toISOString().slice(0, 10);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const dateStr = `${futureDate.getFullYear()}-${pad(futureDate.getMonth() + 1)}-${pad(futureDate.getDate())}`;
 
       return {
         venueIds: ['v-01'],

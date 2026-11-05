@@ -65,22 +65,28 @@ export default function RequestDetailPage() {
           </Link>
         ) : req.status !== 'cancelled' && req.status !== 'rejected' ? (
           <div className="flex w-full sm:w-auto gap-2.5">
-            {req.type === 'booking' && (
-              <>
+            {/* ยกเลิกคำขอ: สามารถยกเลิกได้ตลอดทุกสถานะก่อนการใช้งานเสร็จสิ้น */}
+            {(req.type === 'booking' || req.type === 'borrow') &&
+              ['pending_staff', 'pending_l2', 'pending_l1', 'approved'].includes(req.status) && (
                 <Link
                   href={`/requests/${req.id}/reschedule?mode=cancel`}
                   className="jw-btn-red flex-1 sm:w-40"
                 >
                   ยกเลิกคำขอ
                 </Link>
+              )}
+
+            {/* ขอเลื่อนวัน / แก้ไข: แสดงเฉพาะก่อนปลัดหรือนายกลงนาม (pending_staff หรือ pending_l2 เท่านั้น)
+                ถ้าปลัด (L2) หรือ นายก (L1) ลงนามแล้ว (pending_l1 หรือ approved) ปุ่มนี้จะหายไป */}
+            {(req.type === 'booking' || req.type === 'borrow') &&
+              ['pending_staff', 'pending_l2'].includes(req.status) && (
                 <Link
                   href={`/requests/${req.id}/reschedule?mode=reschedule`}
                   className="jw-btn flex-[1.4] sm:w-48"
                 >
                   ขอเลื่อนวัน / แก้ไข
                 </Link>
-              </>
-            )}
+              )}
             {req.type === 'borrow' && req.status === 'borrowing' && (
               <Link href="/borrow/my" className="jw-btn flex-1 sm:w-48">
                 ไปหน้าแจ้งคืนอุปกรณ์

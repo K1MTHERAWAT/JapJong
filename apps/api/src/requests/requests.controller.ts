@@ -694,28 +694,53 @@ export class RequestsController {
     return this.enrich(req);
   }
 
-  /** ขอเลื่อนวัน หรือ ยกเลิกคำขอ (เฉพาะเจ้าของคำขอ หรือ เจ้าหน้าที่ที่มีสิทธิ์ตรวจคำขอ) */
+  /** ขอเลื่อนวัน หรือ แก้ไขวันขอใช้ (เฉพาะเจ้าของคำขอ หรือ เจ้าหน้าที่ที่มีสิทธิ์ตรวจคำขอ) */
   @Post(':id/reschedule')
   async reschedule(@CurrentUser() user: Account, @Param('id') id: string, @Body() body: RescheduleDto) {
     return this.bookingMutex.runExclusive(async () => {
-      const req = this.db.requests.find((r): r is BookingRequest => (r.id === id || r.code === id) && r.type === 'booking');
-      if (!req) throw new NotFoundException('ไม่พบคำขอจอง');
+      const req = this.db.requests.find((r) => r.id === id || r.code === id);
+      if (!req) throw new NotFoundException('ไม่พบคำขอ');
       if (req.requesterId !== user.id && !hasPermission(user, 'review')) {
         throw new ForbiddenException('เฉพาะเจ้าของคำขอ หรือเจ้าหน้าที่ผู้รับผิดชอบเท่านั้นที่สามารถขอเลื่อนวันได้');
       }
-      if (!['pending_staff', 'pending_l2', 'pending_l1', 'approved'].includes(req.status)) {
+      if (!['pending_staff', 'pending_l2'].includes(req.status)) {
+        if (['pending_l1', 'approved'].includes(req.status)) {
+          throw new BadRequestException('ไม่สามารถขอเลื่อนวันหรือแก้ไขได้ เนื่องจากคำขอผ่านการลงนามโดยปลัดหรือนายกแล้ว');
+        }
         throw new BadRequestException('คำขอนี้ไม่อยู่ในสถานะที่ขอเลื่อนวันได้');
       }
-      const periods = Array.isArray(body.periods) ? body.periods : [];
-      this.validatePeriodsAndVenues(req.venueIds, periods, req.id);
 
-      // ตรวจสอบสต็อกอุปกรณ์เสริม (extraItems) สำหรับช่วงเวลาใหม่ด้วย
-      if (req.extraItems && req.extraItems.length > 0) {
-        const dates = periods.flatMap((p) => [p.start.slice(0, 10), p.end.slice(0, 10)]).sort();
-        this.validateBorrowInventory(req.extraItems, dates[0], dates[dates.length - 1], req.id);
+      if (req.type === 'booking') {
+        const periods = Array.isArray(body.periods) ? body.periods : [];
+        this.validatePeriodsAndVenues(req.venueIds, periods, req.id);
+
+        // ตรวจสอบสต็อกอุปกรณ์เสริม (extraItems) สำหรับช่วงเวลาใหม่ด้วย
+        if (req.extraItems && req.extraItems.length > 0) {
+          const dates = periods.flatMap((p) => [p.start.slice(0, 10), p.end.slice(0, 10)]).sort();
+          this.validateBorrowInventory(req.extraItems, dates[0], dates[dates.length - 1], req.id);
+        }
+
+        req.periods = periods.map((p) => ({ start: p.start, end: p.end }));
+      } else if (req.type === 'borrow') {
+        let pickupDate = body.pickupDate;
+        let returnDate = body.returnDate;
+        if ((!pickupDate || !returnDate) && body.periods && body.periods.length > 0) {
+          pickupDate = body.periods[0].start.slice(0, 10);
+          returnDate = body.periods[body.periods.length - 1].end.slice(0, 10);
+        }
+        if (!pickupDate || !returnDate) {
+          throw new BadRequestException('กรุณาระบุวันรับและวันคืนอุปกรณ์ใหม่');
+        }
+        if (pickupDate > returnDate) {
+          throw new BadRequestException('วันรับอุปกรณ์ต้องไม่เกินวันกำหนดคืน');
+        }
+        this.validateBorrowInventory(req.items, pickupDate, returnDate, req.id);
+        req.pickupDate = pickupDate;
+        req.returnDate = returnDate;
+      } else {
+        throw new BadRequestException('คำขอประเภทนี้ไม่รองรับการขอเลื่อนวัน');
       }
 
-      req.periods = periods.map((p) => ({ start: p.start, end: p.end }));
       req.status = 'pending_staff';
       // รอบการอนุมัติใหม่ (Immutable Audit Trail: รักษาประวัติลายเซ็นรอบเก่าไว้ใน DB)
       req.approvalRound = (req.approvalRound || 1) + 1;
@@ -723,9 +748,13 @@ export class RequestsController {
       req.updatedAt = new Date().toISOString();
       await this.db.persistRequest(req);
       if (this.notificationEvents) {
-        await this.notificationEvents.onBookingRescheduled(req);
+        if (req.type === 'booking') {
+          await this.notificationEvents.onBookingRescheduled(req as BookingRequest);
+        } else if (req.type === 'borrow') {
+          await this.notificationEvents.onBorrowRescheduled(req as BorrowRequest);
+        }
       }
-      await this.db.log('request', `ขอเลื่อนวัน ${req.code} (รอบที่ ${req.approvalRound})`, user.name, {
+      await this.db.log('request', `ขอเลื่อนวัน ${req.code} (ส่งกลับให้เจ้าหน้าที่ลงนามใหม่ รอบที่ ${req.approvalRound})`, user.name, {
         id: user.id,
         name: user.name,
         role: user.role,
