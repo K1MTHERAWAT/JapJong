@@ -227,16 +227,6 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
           this.logger.debug('Schema init notice: ' + (err?.message || err));
         });
       }
-      const count = await this.prisma.account.count();
-      if (count === 0) {
-        if (process.env.DEMO_MODE === 'true' || process.env.SEED_DEMO === 'true') {
-          this.logger.log('DEMO_MODE=true: Seeding demo data into PostgreSQL...');
-          await this.seedDatabase();
-        } else {
-          this.logger.log('Seeding initial production admin account into PostgreSQL...');
-          await this.seedProductionAdmin();
-        }
-      }
       await this.loadFromDatabase();
       if (process.env.ENABLE_NIGHTLY_DEMO_RESET === 'true') {
         const bkkNow = this.getBangkokTime();
