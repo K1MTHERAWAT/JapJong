@@ -13,6 +13,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { UsersModule } from './users/users.module';
 import { RequestsController } from './requests/requests.controller';
 import { ResourcesController } from './resources/resources.controller';
+import { StorageModule } from './storage/storage.module';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -23,6 +24,7 @@ import { HealthController } from './health/health.controller';
     LineAuthModule,
     GovSsoModule,
     UsersModule,
+    StorageModule,
     ThrottlerModule.forRoot([
       {
         name: 'default',

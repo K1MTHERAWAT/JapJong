@@ -335,12 +335,32 @@ async function main() {
     () => sourcePrisma.venue.findMany(),
     (data) => targetPrisma.venue.createMany({ data, skipDuplicates: true }),
   );
+  try {
+    const venueImages = await sourcePrisma.$queryRawUnsafe<{ id: string; images: string[] }[]>(
+      'SELECT id, images FROM venues WHERE images IS NOT NULL',
+    );
+    for (const v of venueImages) {
+      if (v.images && v.images.length > 0) {
+        await targetPrisma.$executeRawUnsafe('UPDATE venues SET images = $1 WHERE id = $2', v.images, v.id);
+      }
+    }
+  } catch {}
 
   await copyTable(
     'equipments',
     () => sourcePrisma.equipment.findMany(),
     (data) => targetPrisma.equipment.createMany({ data, skipDuplicates: true }),
   );
+  try {
+    const equipImages = await sourcePrisma.$queryRawUnsafe<{ id: string; images: string[] }[]>(
+      'SELECT id, images FROM equipments WHERE images IS NOT NULL',
+    );
+    for (const e of equipImages) {
+      if (e.images && e.images.length > 0) {
+        await targetPrisma.$executeRawUnsafe('UPDATE equipments SET images = $1 WHERE id = $2', e.images, e.id);
+      }
+    }
+  } catch {}
 
   await copyTable(
     'sequences',
