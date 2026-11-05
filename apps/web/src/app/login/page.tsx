@@ -286,7 +286,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* ปุ่ม Single Sign-On (Gov Center & LINE) */}
+          {/* ปุ่ม Single Sign-On (Gov Center SSO) */}
           <div className="flex flex-col gap-2.5">
             <button
               type="button"
@@ -296,16 +296,6 @@ export default function LoginPage() {
             >
               <GovIcon className="w-5 h-5 text-teal-100" />
               <span>เข้าสู่ระบบด้วย Gov Center (SSO)</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={submitting}
-              onClick={handleLineLogin}
-              className="h-[52px] rounded-full bg-[#06C755] hover:bg-[#05b34c] active:scale-[0.99] text-white font-semibold text-[15px] sm:text-[16px] flex items-center justify-center gap-2.5 shadow-low transition disabled:opacity-50 cursor-pointer"
-            >
-              <LineIcon className="w-6 h-6" />
-              <span>เข้าสู่ระบบด้วย LINE</span>
             </button>
           </div>
 

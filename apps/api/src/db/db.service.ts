@@ -380,13 +380,15 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
     this.memorySessions.set(token, { accountId, expiresAt });
     if (this.dbAvailable) {
-      await this.prisma.session.create({
-        data: {
-          token,
-          accountId,
-          expiresAt,
-        },
-      });
+      await this.prisma.session
+        .create({
+          data: {
+            token,
+            accountId,
+            expiresAt,
+          },
+        })
+        .catch((err) => this.logger.error('Failed to persist session', err));
     }
     return token;
   }
@@ -700,56 +702,68 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
   async persistAccount(a: Account) {
     if (!this.dbAvailable) return;
-    await this.prisma.account.upsert({
-      where: { id: a.id },
-      create: {
-        id: a.id,
-        username: a.username,
-        password: a.password,
-        name: a.name,
-        nickname: a.nickname,
-        initial: a.initial,
-        role: a.role,
-        position: a.position,
-        department: a.department,
-        phone: a.phone,
-        lineName: a.lineName ?? null,
-        permissions: a.permissions as any,
-        signature: a.signature ?? null,
-        pin: a.pin ?? null,
-        isDemo: a.isDemo ?? false,
-        active: a.active ?? true,
-        createdAt: new Date(a.createdAt),
-      },
-      update: {
-        username: a.username,
-        password: a.password,
-        name: a.name,
-        nickname: a.nickname,
-        initial: a.initial,
-        role: a.role,
-        position: a.position,
-        department: a.department,
-        phone: a.phone,
-        lineName: a.lineName ?? null,
-        permissions: a.permissions as any,
-        signature: a.signature ?? null,
-        pin: a.pin ?? null,
-        isDemo: a.isDemo ?? false,
-        active: a.active ?? true,
-      },
-    });
-    await this.prisma.$executeRaw`
-      UPDATE "accounts"
-      SET "address_house_no" = ${a.addressHouseNo ?? null},
-          "address_moo" = ${a.addressMoo ?? null},
-          "address_subdistrict" = ${a.addressSubdistrict ?? null},
-          "address_district" = ${a.addressDistrict ?? null},
-          "address_province" = ${a.addressProvince ?? null},
-          "email" = ${a.email ?? null},
-          "email_verified" = ${a.emailVerified ?? false}
-      WHERE "id" = ${a.id}
-    `;
+    try {
+      const existingByUsername = await this.prisma.account.findUnique({
+        where: { username: a.username },
+        select: { id: true },
+      });
+      if (existingByUsername && existingByUsername.id !== a.id) {
+        a.id = existingByUsername.id;
+      }
+
+      await this.prisma.account.upsert({
+        where: { id: a.id },
+        create: {
+          id: a.id,
+          username: a.username,
+          password: a.password,
+          name: a.name,
+          nickname: a.nickname,
+          initial: a.initial,
+          role: a.role,
+          position: a.position,
+          department: a.department,
+          phone: a.phone,
+          lineName: a.lineName ?? null,
+          permissions: a.permissions as any,
+          signature: a.signature ?? null,
+          pin: a.pin ?? null,
+          isDemo: a.isDemo ?? false,
+          active: a.active ?? true,
+          createdAt: new Date(a.createdAt),
+        },
+        update: {
+          username: a.username,
+          password: a.password,
+          name: a.name,
+          nickname: a.nickname,
+          initial: a.initial,
+          role: a.role,
+          position: a.position,
+          department: a.department,
+          phone: a.phone,
+          lineName: a.lineName ?? null,
+          permissions: a.permissions as any,
+          signature: a.signature ?? null,
+          pin: a.pin ?? null,
+          isDemo: a.isDemo ?? false,
+          active: a.active ?? true,
+        },
+      });
+      await this.prisma.$executeRaw`
+        UPDATE "accounts"
+        SET "address_house_no" = ${a.addressHouseNo ?? null},
+            "address_moo" = ${a.addressMoo ?? null},
+            "address_subdistrict" = ${a.addressSubdistrict ?? null},
+            "address_district" = ${a.addressDistrict ?? null},
+            "address_province" = ${a.addressProvince ?? null},
+            "email" = ${a.email ?? null},
+            "email_verified" = ${a.emailVerified ?? false}
+        WHERE "id" = ${a.id}
+      `;
+    } catch (err) {
+      this.logger.error('Failed to persistAccount in DB', err);
+    }
   }
 
   async persistVenue(v: Venue) {
@@ -1432,6 +1446,12 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     );
     this.userLineAccounts.push(record);
 
+    for (const acc of this.accounts) {
+      if (acc.lineUserId === data.lineUserId && acc.id !== userId) {
+        acc.lineUserId = undefined;
+        acc.lineName = undefined;
+      }
+    }
     const user = this.accounts.find((a) => a.id === userId);
     if (user) {
       user.lineUserId = data.lineUserId;
@@ -1440,6 +1460,16 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
     if (this.dbAvailable) {
       try {
+        await this.prisma.$executeRawUnsafe(
+          `DELETE FROM "user_line_accounts" WHERE "line_user_id" = $1 AND "user_id" <> $2`,
+          data.lineUserId,
+          userId,
+        ).catch(() => {});
+        await this.prisma.$executeRawUnsafe(
+          `UPDATE "accounts" SET "line_user_id" = NULL, "line_name" = NULL WHERE "line_user_id" = $1 AND "id" <> $2`,
+          data.lineUserId,
+          userId,
+        ).catch(() => {});
         await this.prisma.$executeRawUnsafe(
           `INSERT INTO "user_line_accounts" ("id", "user_id", "line_user_id", "display_name", "picture_url", "linked_at", "is_active", "created_at", "updated_at")
            VALUES ($1, $2, $3, $4, $5, $6::timestamptz, true, $7::timestamptz, $8::timestamptz)

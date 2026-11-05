@@ -388,12 +388,6 @@ export class LineAuthService {
 
       // กรณีเชื่อมต่อบัญชี LINE จากหน้าจัดการบัญชีผู้ใช้งาน (Link LINE)
       if (linkUserId) {
-        const existingLinkedUser = await this.db.findUserByLineUserId(lineUserId);
-        if (existingLinkedUser && existingLinkedUser.id !== linkUserId) {
-          return {
-            redirectUrl: `${this.frontendUrl}/account?line_error=${encodeURIComponent('บัญชี LINE นี้ถูกเชื่อมต่อกับบัญชีผู้ใช้อื่นในระบบแล้ว')}`,
-          };
-        }
         const targetUser = this.db.accounts.find((a) => a.id === linkUserId);
         if (!targetUser) {
           return {
@@ -418,36 +412,14 @@ export class LineAuthService {
         };
       }
 
-      // 4. Find linked JapJong account
-      const user = await this.db.findUserByLineUserId(lineUserId);
-
-      if (user) {
-        // Check account active / suspended status
-        if (user.active === false || user.accountStatus === 'SUSPENDED') {
-          return {
-            redirectUrl: `${this.frontendUrl}/login?line_error=${encodeURIComponent('บัญชีผู้ใช้งานนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ')}`,
-          };
-        }
-
-        // Existing User -> Create Session & Redirect directly to service
-        if (this.richMenuService) {
-          await this.richMenuService.switchUserRichMenuByRole(lineUserId, user.role).catch(() => {});
-        }
-        const sessionToken = await this.db.createSession(user.id);
-        return {
-          redirectUrl: `${this.frontendUrl}/login?line_token=${sessionToken}&account_id=${user.id}`,
-        };
-      } else {
-        // First-time User -> Issue Registration Ticket & Redirect to /register/line
-        const ticket = this.issueRegistrationTicket(lineUserId, displayName, pictureUrl);
-        return {
-          redirectUrl: `${this.frontendUrl}/register/line?ticket=${ticket}`,
-        };
-      }
+      return {
+        redirectUrl: `${this.frontendUrl}/account?line_error=${encodeURIComponent('กรุณาเข้าสู่ระบบก่อน แล้วทำการเชื่อมต่อบัญชี LINE (Link LINE) ที่หน้าจัดการบัญชีผู้ใช้งาน')}`,
+      };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการยืนยันตัวตนกับ LINE';
+      const targetPath = linkUserId ? '/account' : '/login';
       return {
-        redirectUrl: `${this.frontendUrl}/login?line_error=${encodeURIComponent(message)}`,
+        redirectUrl: `${this.frontendUrl}${targetPath}?line_error=${encodeURIComponent(message)}`,
       };
     }
   }

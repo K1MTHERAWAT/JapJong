@@ -378,13 +378,49 @@ export class GovSsoService {
     const email = iamUser.email ? iamUser.email.trim().toLowerCase() : undefined;
     const phoneDigits = iamUser.phone ? iamUser.phone.replace(/\D/g, '') : '';
 
-    // ค้นหาบัญชีเดิมตาม SSO username, email หรือเบอร์โทร
+    // ค้นหาบัญชีเดิมตาม SSO username, email หรือเบอร์โทร (ใน memory ก่อน แล้วตรวจสอบใน DB กรณีมีหลาย instance)
     let account = this.db.accounts.find(
       (a) =>
         a.username === ssoUsername ||
         (email && a.email && a.email.toLowerCase() === email) ||
         (phoneDigits && phoneDigits.length >= 9 && a.phone.replace(/\D/g, '') === phoneDigits),
     );
+
+    if (!account && this.db.dbAvailable) {
+      try {
+        const dbAcc = await this.db.prisma.account.findFirst({
+          where: { username: ssoUsername },
+        });
+        if (dbAcc) {
+          account = {
+            id: dbAcc.id,
+            username: dbAcc.username,
+            password: dbAcc.password,
+            name: dbAcc.name,
+            nickname: dbAcc.nickname,
+            initial: dbAcc.initial,
+            role: (dbAcc.role as Role) || 'USER',
+            position: dbAcc.position,
+            department: dbAcc.department,
+            phone: dbAcc.phone,
+            lineName: dbAcc.lineName ?? undefined,
+            lineUserId: dbAcc.lineUserId ?? undefined,
+            permissions:
+              dbAcc.permissions && typeof dbAcc.permissions === 'object'
+                ? (dbAcc.permissions as any)
+                : { ...DEFAULT_PERMISSIONS[(dbAcc.role as Role) || 'USER'] },
+            signature: dbAcc.signature,
+            pin: dbAcc.pin,
+            isDemo: dbAcc.isDemo,
+            active: dbAcc.active,
+            createdAt: dbAcc.createdAt.toISOString(),
+          };
+          this.db.accounts.unshift(account);
+        }
+      } catch {
+        // fallback to creating new account
+      }
+    }
 
     if (account && (account.active === false || account.accountStatus === 'SUSPENDED')) {
       throw new UnauthorizedException('บัญชีผู้ใช้งานนี้ถูกระงับการใช้งานชั่วคราว กรุณาติดต่อผู้ดูแลระบบ');
