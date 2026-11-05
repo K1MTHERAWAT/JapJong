@@ -11,6 +11,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "tsx prisma/migrate-supabase.ts",
+    "prisma:migrate-railway": "tsx prisma/migrate-to-railway.ts",
     "prisma:deploy": "tsx prisma/migrate-supabase.ts",
     "prisma:studio": "prisma studio",
     "prisma:seed": "tsx prisma/seed.ts"

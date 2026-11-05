@@ -18,6 +18,7 @@
     "db:logs": "docker compose logs -f postgres",
     "db:psql": "docker exec -it japjong-postgres psql -U japjong -d japjong",
     "db:seed": "pnpm --filter @japjong/api prisma:seed",
+    "db:migrate-railway": "pnpm --filter @japjong/api prisma:migrate-railway",
     "db:clear": "pnpm --filter @japjong/api exec tsx prisma/clear.ts",
     "db:studio": "pnpm --filter @japjong/api prisma:studio"
   },
