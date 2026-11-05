@@ -39,6 +39,20 @@ import { hashSecret } from '../auth/secret';
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
+function resolveDatabaseUrl(): string | undefined {
+  const raw = process.env.DATABASE_URL;
+  if (!raw) return undefined;
+  // แปลง Supabase Direct Host (db.<ref>.supabase.co ซึ่งเป็น IPv6-only)
+  // ให้เป็น Supabase Session Pooler (IPv4) อัตโนมัติ เพื่อให้ Railway / Cloud ที่ไม่มี IPv6 เชื่อมต่อฐานข้อมูลจริงได้
+  const m = /^(postgresql:\/\/)postgres:([^@]+)@db\.([a-z0-9]+)\.supabase\.co:5432\/(.*)$/i.exec(raw.trim());
+  if (m) {
+    const [, proto, pass, projectRef, rest] = m;
+    const region = process.env.SUPABASE_POOLER_REGION || 'ap-northeast-1';
+    return `${proto}postgres.${projectRef}:${pass}@aws-0-${region}.pooler.supabase.com:5432/${rest}`;
+  }
+  return raw;
+}
+
 /**
  * บริการฐานข้อมูล PostgreSQL ผ่าน Prisma ORM
  * - เมื่อเริ่มต้นระบบ (OnModuleInit) หากตารางยังว่างอยู่ จะ Seed ข้อมูลเริ่มต้นให้อัตโนมัติ
@@ -47,7 +61,9 @@ const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 @Injectable()
 export class DbService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DbService.name);
-  readonly prisma = new PrismaClient();
+  readonly prisma = new PrismaClient({
+    datasources: resolveDatabaseUrl() ? { db: { url: resolveDatabaseUrl() } } : undefined,
+  });
 
   accounts: Account[] = [];
   venues: Venue[] = [];
@@ -214,7 +230,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         }
       }
       await this.loadFromDatabase();
-      if (process.env.DEMO_MODE === 'true') {
+      if (process.env.ENABLE_NIGHTLY_DEMO_RESET === 'true') {
         const bkkNow = this.getBangkokTime();
         this.lastDemoResetDateUtc = new Date(bkkNow.getTime() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
         this.scheduleNightlyReset();
@@ -232,7 +248,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         'Failed to initialize PostgreSQL connection — falling back to in-memory cache',
       );
       await this.seedInMemoryFallback();
-      if (process.env.DEMO_MODE === 'true') {
+      if (process.env.ENABLE_NIGHTLY_DEMO_RESET === 'true') {
         const bkkNow = this.getBangkokTime();
         this.lastDemoResetDateUtc = new Date(bkkNow.getTime() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
         this.scheduleNightlyReset();
@@ -320,7 +336,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
   /** ตรวจสอบและรีเซ็ตกรณี instance ตื่นจากการหลับ (Serverless / Free tier) */
   async checkPendingDemoReset() {
-    if (process.env.DEMO_MODE !== 'true') return;
+    if (process.env.ENABLE_NIGHTLY_DEMO_RESET !== 'true') return;
     const bkkNow = this.getBangkokTime();
     const currentDemoDay = new Date(bkkNow.getTime() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
     if (this.lastDemoResetDateUtc && this.lastDemoResetDateUtc < currentDemoDay) {
