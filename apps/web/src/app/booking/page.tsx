@@ -12,12 +12,13 @@ import {
   EquipmentCategory,
   OfficialFormPurposeItem,
   Period,
+  PublicAccount,
   VENUE_TYPE_LABEL,
   Venue,
   VenueType,
   periodDurationText,
 } from '@japjong/shared';
-import { useAuth } from '@/components/auth-context';
+import { roleHomePath, useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
 import {
@@ -37,12 +38,18 @@ const STEPS = ['เลือกสถานที่', 'วัน-เวลา',
 
 export default function BookingWizardPage() {
   const router = useRouter();
-  const { account } = useAuth();
+  const { account, accounts } = useAuth();
+  const isStaff = account?.role === 'STAFF' || account?.role === 'ADMIN';
   const [step, setStep] = useState(1);
+
+  // โหมดกรอกคำขอแทนผู้มาติดต่อ (สำหรับเจ้าหน้าที่)
+  const [isWalkIn, setIsWalkIn] = useState(false);
+  const [walkInQuery, setWalkInQuery] = useState('');
+  const [foundUser, setFoundUser] = useState<PublicAccount | null>(null);
 
   // Step 1 state
   const [venues, setVenues] = useState<Venue[]>([]);
-  const [selectedIds, setSelectedIds] = useState<string[]>(['v-main-hall']);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [catFilter, setCatFilter] = useState<'all' | VenueType>('all');
   const [buildingFilter, setBuildingFilter] = useState('all');
   const [onlyAvailable, setOnlyAvailable] = useState(false);
@@ -72,6 +79,7 @@ export default function BookingWizardPage() {
   // Step 4 state (ตามแบบขอใช้สถานที่ราชการ)
   const [writtenAt, setWrittenAt] = useState('');
   const [requesterName, setRequesterName] = useState(account?.name || '');
+  const [requesterPhone, setRequesterPhone] = useState(account?.phone || '');
   const [requesterPosition, setRequesterPosition] = useState(
     account?.position && account.position !== 'ประชาชน'
       ? account.position
@@ -106,6 +114,7 @@ export default function BookingWizardPage() {
     ...[
       ['สถานที่เขียนคำขอ', writtenAt],
       ['ชื่อ-นามสกุลผู้ยื่นคำขอ', requesterName],
+      ['เบอร์โทรศัพท์ติดต่อ', requesterPhone],
       ['ตำแหน่ง', requesterPosition],
       ['บ้านเลขที่', addressHouseNo],
       ['หมู่ที่', addressMoo],
@@ -127,12 +136,61 @@ export default function BookingWizardPage() {
 
   // Step 5 state (ต้องวาดลายเซ็นบนหน้าจอ ไม่ใช้การพิมพ์)
   const [signature, setSignature] = useState('');
+  const [staffSignature, setStaffSignature] = useState('');
   const [draftSaved, setDraftSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const applyAccountFields = (acc: PublicAccount | null) => {
+    setRequesterName(acc?.name || '');
+    setRequesterPhone(acc?.phone || '');
+    setRequesterPosition(acc?.position && acc.position !== 'ประชาชน' ? acc.position : '');
+    setOrganization(acc?.department || '');
+    setAddressHouseNo(acc?.addressHouseNo || '');
+    setAddressMoo(acc?.addressMoo || '');
+    setAddressSubdistrict(acc?.addressSubdistrict || '');
+    setAddressDistrict(acc?.addressDistrict || '');
+    setAddressProvince(acc?.addressProvince || '');
+  };
+
+  const handleToggleWalkIn = (walkInMode: boolean) => {
+    setIsWalkIn(walkInMode);
+    setFoundUser(null);
+    setWalkInQuery('');
+    if (walkInMode) {
+      applyAccountFields(null);
+      setSignature('');
+    } else if (account) {
+      applyAccountFields(account);
+    }
+  };
+
+  const handleSearchWalkInUser = () => {
+    const q = walkInQuery.trim().toLowerCase();
+    if (!q) return;
+    const digits = q.replace(/\D/g, '');
+    const match = accounts.find(
+      (a) =>
+        a.name.toLowerCase().includes(q) ||
+        a.username.toLowerCase().includes(q) ||
+        (digits && a.phone.replace(/\D/g, '').includes(digits)),
+    );
+    if (match) {
+      setFoundUser(match);
+      applyAccountFields(match);
+    } else {
+      setFoundUser(null);
+      if (digits.length >= 9) {
+        setRequesterPhone(walkInQuery.trim());
+      } else {
+        setRequesterName(walkInQuery.trim());
+      }
+    }
+  };
+
   useEffect(() => {
-    if (account) {
+    if (account && !isWalkIn) {
       setRequesterName(account.name);
+      setRequesterPhone(account.phone || '');
       setOrganization(account.department);
       if (account.addressHouseNo) setAddressHouseNo(account.addressHouseNo);
       if (account.addressMoo) setAddressMoo(account.addressMoo);
@@ -140,7 +198,7 @@ export default function BookingWizardPage() {
       if (account.addressDistrict) setAddressDistrict(account.addressDistrict);
       if (account.addressProvince) setAddressProvince(account.addressProvince);
     }
-  }, [account]);
+  }, [account, isWalkIn]);
 
   useEffect(() => {
     api.venues().then(setVenues).catch(() => {});
@@ -293,8 +351,11 @@ export default function BookingWizardPage() {
         organization,
         attachments: attachmentFiles.map((file) => file.name),
         extraItems: selectedExtraItems.map((s) => ({ equipmentId: s.eq.id, qty: s.qty })),
+        requesterId: isWalkIn && foundUser ? foundUser.id : undefined,
         requesterName,
+        requesterPhone,
         requesterSignature: signature,
+        createdByStaffSignature: isWalkIn && staffSignature.trim() ? staffSignature : undefined,
         writtenAt,
         requesterPosition,
         addressHouseNo,
@@ -323,7 +384,7 @@ export default function BookingWizardPage() {
           ? 'แบบคำขอใช้สถานที่'
           : 'ลงนามและส่งคำขอ'
       }
-      backHref={step === 1 ? '/' : undefined}
+      backHref={step === 1 ? (account ? roleHomePath(account.role) : '/') : undefined}
       onBack={step > 1 ? () => setStep((s) => s - 1) : undefined}
       rightLabel={account?.name}
       maxWidth="max-w-[1440px]"
@@ -577,12 +638,20 @@ export default function BookingWizardPage() {
                     } ${isSelected ? 'ring-2 ring-brand' : 'border border-line/60'}`}
                   >
                     {isSelected && (
-                      <div className="absolute top-2 right-2 w-[22px] h-[22px] rounded-full bg-brand text-white flex items-center justify-center">
+                      <div className="absolute top-2 right-2 z-10 w-[22px] h-[22px] rounded-full bg-brand text-white flex items-center justify-center shadow">
                         <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} />
                       </div>
                     )}
-                    <div className="h-20 sm:h-28 bg-brand-mint text-brand flex items-center justify-center">
-                      <Icon name={venueIconName(v.type)} className="w-8 h-8 sm:w-10 sm:h-10" strokeWidth={1.6} />
+                    <div className="h-28 sm:h-36 bg-brand-mint text-brand flex items-center justify-center overflow-hidden">
+                      {v.images?.[0] ? (
+                        <img
+                          src={v.images[0]}
+                          alt={v.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Icon name={venueIconName(v.type)} className="w-8 h-8 sm:w-10 sm:h-10" strokeWidth={1.6} />
+                      )}
                     </div>
                     <div className="p-3 flex flex-col gap-1">
                       <b className="text-[14px] sm:text-[15px] text-ink truncate">{v.name}</b>
@@ -611,8 +680,12 @@ export default function BookingWizardPage() {
             ) : (
               selectedVenues.map((v) => (
                 <div key={v.id} className="border border-line rounded-2xl p-3 flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-brand-mint text-brand flex items-center justify-center shrink-0">
-                    <Icon name={venueIconName(v.type)} className="w-6 h-6" />
+                  <div className="w-12 h-12 rounded-2xl bg-brand-mint text-brand flex items-center justify-center shrink-0 overflow-hidden">
+                    {v.images?.[0] ? (
+                      <img src={v.images[0]} alt={v.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <Icon name={venueIconName(v.type)} className="w-6 h-6" />
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <b className="block text-[14px] truncate">{v.name}</b>
@@ -852,11 +925,15 @@ export default function BookingWizardPage() {
                     }`}
                   >
                     <div
-                      className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                      className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden ${
                         isSelected ? 'bg-brand text-white' : 'bg-brand-mint text-brand'
                       }`}
                     >
-                      <Icon name={equipmentIconName(eq.category)} className="w-6 h-6" />
+                      {eq.images?.[0] ? (
+                        <img src={eq.images[0]} alt={eq.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Icon name={equipmentIconName(eq.category)} className="w-6 h-6" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <b className="block text-[15px] text-ink truncate">{eq.name}</b>
@@ -864,7 +941,7 @@ export default function BookingWizardPage() {
                         {EQUIPMENT_CATEGORY_LABEL[eq.category]} · พร้อมให้บริการ {eq.stock} รายการ
                       </span>
                     </div>
-                    <div className="flex items-center gap-2.5 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0">
                       <button
                         type="button"
                         disabled={qty <= 0}
@@ -873,9 +950,20 @@ export default function BookingWizardPage() {
                       >
                         <Icon name="minus" className="w-4 h-4" />
                       </button>
-                      <b className={`min-w-[24px] text-center text-[15px] ${isSelected ? 'text-brand font-bold' : ''}`}>
-                        {qty}
-                      </b>
+                      <input
+                        type="number"
+                        min={0}
+                        max={eq.stock}
+                        value={qty}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
+                          setEquipmentQty(eq.id, eq.stock, Number.isNaN(val) ? 0 : val);
+                        }}
+                        onFocus={(e) => e.target.select()}
+                        className={`w-12 h-9 text-center text-[15px] font-bold rounded-xl border border-line bg-white text-ink focus:border-brand focus:ring-1 focus:ring-brand focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                          isSelected ? 'text-brand border-brand/60' : ''
+                        }`}
+                      />
                       <button
                         type="button"
                         disabled={qty >= eq.stock}
@@ -934,7 +1022,81 @@ export default function BookingWizardPage() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+          {isStaff && (
+            <div className="rounded-2xl border border-brand/30 bg-brand-mint/25 p-4 flex flex-col gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <b className="text-[14px] text-ink block">สำหรับเจ้าหน้าที่: รูปแบบการยื่นคำขอ</b>
+                  <span className="text-[12px] text-ink-mute">
+                    เลือกว่าต้องการยื่นคำขอในนามตนเอง หรือกรอกคำขอแทนประชาชนผู้มาติดต่อ
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleWalkIn(false)}
+                    className={`h-9 px-3.5 rounded-full text-[12.5px] font-semibold border transition ${
+                      !isWalkIn
+                        ? 'bg-brand border-brand text-white'
+                        : 'bg-white border-line text-ink hover:border-brand'
+                    }`}
+                  >
+                    ยื่นในนามตนเอง
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleWalkIn(true)}
+                    className={`h-9 px-3.5 rounded-full text-[12.5px] font-semibold border transition ${
+                      isWalkIn
+                        ? 'bg-brand border-brand text-white'
+                        : 'bg-white border-line text-ink hover:border-brand'
+                    }`}
+                  >
+                    กรอกคำขอแทนผู้มาติดต่อ
+                  </button>
+                </div>
+              </div>
+
+              {isWalkIn && (
+                <div className="pt-2 border-t border-brand/15 flex flex-col gap-2.5">
+                  <label className="jw-lbl mb-0">ค้นหาข้อมูลผู้มาติดต่อ (เบอร์โทรหรือชื่อ)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={walkInQuery}
+                      onChange={(e) => setWalkInQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleSearchWalkInUser();
+                        }
+                      }}
+                      placeholder="กรอกเบอร์โทรหรือชื่อเพื่อดึงข้อมูลอัตโนมัติ หรือพิมพ์ข้อมูลด้านล่างโดยตรง"
+                      className="jw-in flex-1 bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSearchWalkInUser}
+                      className="jw-btn jw-btn-sm shrink-0"
+                    >
+                      ค้นหา
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {foundUser ? (
+                      <Chip tone="green">
+                        <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} /> พบผู้ใช้ในระบบ: {foundUser.name} ({foundUser.phone})
+                      </Chip>
+                    ) : (
+                      <Chip tone="amber">ผู้มาติดต่อทั่วไป (กรอกชื่อและเบอร์โทรด้านล่างได้เลย)</Chip>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             <div>
               <label className="jw-lbl">เขียนที่<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
               <input
@@ -954,6 +1116,17 @@ export default function BookingWizardPage() {
                 onChange={(e) => setRequesterName(e.target.value)}
                 className="jw-in"
                 placeholder="ระบุชื่อ-นามสกุล"
+                required
+              />
+            </div>
+            <div>
+              <label className="jw-lbl">เบอร์โทรศัพท์ติดต่อ<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
+              <input
+                type="tel"
+                value={requesterPhone}
+                onChange={(e) => setRequesterPhone(e.target.value)}
+                className="jw-in"
+                placeholder="เช่น 081-234-5678"
                 required
               />
             </div>
@@ -1223,16 +1396,33 @@ export default function BookingWizardPage() {
             }}
           />
 
-          <div className="jw-card p-5 flex flex-col gap-2">
-            <label className="jw-lbl">
-              ลงลายมือชื่อผู้ขออนุญาตใช้สถานที่ราชการ ({requesterName})
-            </label>
-            <SignatureBox
-              value={signature}
-              onChange={setSignature}
-              savedSignature={account?.signature}
-              signerLabel={`${requesterName} · ผู้ขออนุญาตใช้สถานที่ราชการ`}
-            />
+          <div className="jw-card p-5 flex flex-col gap-3">
+            <div>
+              <label className="jw-lbl">
+                {isWalkIn ? `1. ลงลายมือชื่อผู้ขออนุญาตใช้สถานที่ราชการ (${requesterName})` : `ลงลายมือชื่อผู้ขออนุญาตใช้สถานที่ราชการ (${requesterName})`}
+              </label>
+              <SignatureBox
+                value={signature}
+                onChange={setSignature}
+                savedSignature={isWalkIn ? undefined : account?.signature}
+                signerLabel={`${requesterName} · ผู้ขออนุญาตใช้สถานที่ราชการ`}
+              />
+            </div>
+
+            {isWalkIn && (
+              <div className="pt-2 border-t border-line">
+                <label className="jw-lbl">
+                  2. ลงลายมือชื่อเจ้าหน้าที่ผู้กรอกแทน ({account?.name || 'เจ้าหน้าที่'})
+                </label>
+                <SignatureBox
+                  value={staffSignature}
+                  onChange={setStaffSignature}
+                  savedSignature={account?.signature}
+                  signerLabel={`${account?.name || 'เจ้าหน้าที่'} · เจ้าหน้าที่ผู้กรอกคำขอแทน`}
+                />
+              </div>
+            )}
+
             <p className="text-[13px] text-ink-mute mt-1">
               ต้องลงนามทุกฝ่าย (4 ฝ่าย): (1) ผู้ขออนุญาตใช้สถานที่ราชการ → (2) ความเห็นของเจ้าหน้าที่ → (3) ความเห็นของปลัด → (4) คำสั่งของผู้มีอำนาจอนุมัติ
             </p>

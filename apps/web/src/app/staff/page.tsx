@@ -3,22 +3,21 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Building2, Package, Wrench } from 'lucide-react';
 import { RequestWithTimeline, hasPermission } from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
-import { Chip, StatusChip } from '@/components/ui';
+import { Chip, ServiceCard, StatusChip } from '@/components/ui';
 import { api, formatPeriodRange, formatThaiDate } from '@/lib/api';
 
 export default function StaffHomePage() {
   const router = useRouter();
   const { account } = useAuth();
   const [queue, setQueue] = useState<RequestWithTimeline[]>([]);
-  const [handoverQueue, setHandoverQueue] = useState<RequestWithTimeline[]>([]);
 
   useEffect(() => {
     api.listRequests({ queue: 'staff' }).then(setQueue).catch(() => {});
-    api.listRequests({ queue: 'handover' }).then(setHandoverQueue).catch(() => {});
   }, [account?.id]);
 
   const repairCount = queue.filter((r) => r.type === 'repair').length;
@@ -26,16 +25,39 @@ export default function StaffHomePage() {
 
   return (
     <AppShell title="หน้าหลักเจ้าหน้าที่" maxWidth="max-w-[1100px]">
-      <div className="flex flex-col gap-5">
-        {/* KPI 3 การ์ด */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+      <div className="flex flex-col gap-6">
+        {/* บริการหลัก: ขอใช้สถานที่, ยืม-คืนอุปกรณ์, แจ้งซ่อมและปัญหา */}
+        <section aria-label="บริการหลัก">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-[17px] font-bold text-ink">บริการระบบสำหรับเจ้าหน้าที่</h2>
+          </div>
+          <div className="grid gap-3.5 sm:grid-cols-3">
+            <ServiceCard
+              href="/booking"
+              title="ขอใช้สถานที่"
+              description="ห้องประชุม ศาลา สนามกีฬา และพื้นที่จัดกิจกรรมส่วนกลาง"
+              icon={Building2}
+            />
+            <ServiceCard
+              href="/borrow"
+              title="ยืม–คืนอุปกรณ์"
+              description="เครื่องเสียง โปรเจกเตอร์ เต็นท์ โต๊ะ เก้าอี้ และครุภัณฑ์"
+              icon={Package}
+            />
+            <ServiceCard
+              href="/repair"
+              title="แจ้งซ่อมและปัญหา"
+              description="แจ้งอุปกรณ์ชำรุด อาคารสถานที่เสียหาย และติดตามผลการซ่อม"
+              icon={Wrench}
+            />
+          </div>
+        </section>
+
+        {/* KPI 2 การ์ด */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div className="jw-card p-3.5 sm:p-5 flex flex-col gap-1">
             <span className="text-[12px] sm:text-[13px] text-ink-mute">รอตรวจคำขอ</span>
             <b className="text-[26px] sm:text-[32px] text-status-crit leading-tight">{reviewCount || queue.length}</b>
-          </div>
-          <div className="jw-card p-3.5 sm:p-5 flex flex-col gap-1">
-            <span className="text-[12px] sm:text-[13px] text-ink-mute">รับมอบ-คืนวันนี้</span>
-            <b className="text-[26px] sm:text-[32px] text-ink leading-tight">{handoverQueue.length}</b>
           </div>
           <div className="jw-card p-3.5 sm:p-5 flex flex-col gap-1">
             <span className="text-[12px] sm:text-[13px] text-ink-mute">แจ้งซ่อมใหม่</span>
@@ -45,8 +67,8 @@ export default function StaffHomePage() {
 
         {/* งานของฉัน (ตามสิทธิ์ที่เปิดใช้งาน) */}
         <div>
-          <h2 className="text-[16px] sm:text-[18px] font-bold text-ink mb-3">งานของฉัน</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+          <h2 className="text-[16px] sm:text-[18px] font-bold text-ink mb-3">งานเจ้าหน้าที่</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Link
               href="/staff/review"
               className={`jw-card p-4 border-[1.5px] border-brand flex flex-col items-center text-center gap-2 hover:shadow-high transition ${
@@ -58,32 +80,6 @@ export default function StaffHomePage() {
               </div>
               <b className="text-[14px] sm:text-[15px]">ตรวจคำขอ & งานซ่อม</b>
               <span className="text-[12px] text-ink-mute">รอ {queue.length} รายการ</span>
-            </Link>
-
-            <Link
-              href="/staff/handover"
-              className={`jw-card p-4 flex flex-col items-center text-center gap-2 hover:shadow-high transition ${
-                !hasPermission(account, 'handover') ? 'opacity-50' : ''
-              }`}
-            >
-              <div className="w-12 h-12 rounded-full bg-brand-mint text-brand flex items-center justify-center">
-                <Icon name="package" className="w-6 h-6" />
-              </div>
-              <b className="text-[14px] sm:text-[15px]">รับมอบ-คืน</b>
-              <span className="text-[12px] text-ink-mute">เช็คลิสต์ ({handoverQueue.length})</span>
-            </Link>
-
-            <Link
-              href="/staff/walk-in"
-              className={`jw-card p-4 flex flex-col items-center text-center gap-2 hover:shadow-high transition ${
-                !hasPermission(account, 'walkIn') ? 'opacity-50' : ''
-              }`}
-            >
-              <div className="w-12 h-12 rounded-full bg-brand-mint text-brand flex items-center justify-center">
-                <Icon name="user-circle" className="w-6 h-6" />
-              </div>
-              <b className="text-[14px] sm:text-[15px]">กรอกคำขอแทน</b>
-              <span className="text-[12px] text-ink-mute">หน้าเคาน์เตอร์</span>
             </Link>
 
             <Link

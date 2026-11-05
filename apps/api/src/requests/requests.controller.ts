@@ -355,7 +355,8 @@ export class RequestsController {
 
       const isWalkIn =
         Boolean(body.createdByStaffSignature) ||
-        Boolean(body.requesterId && body.requesterId !== user.id);
+        Boolean(body.requesterId && body.requesterId !== user.id) ||
+        Boolean((user.role === 'STAFF' || user.role === 'ADMIN') && body.requesterName && body.requesterName.trim() !== user.name);
       if (isWalkIn && !hasPermission(user, 'walkIn')) {
         throw new ForbiddenException(
           'ไม่มีสิทธิ์กรอกคำขอแทนผู้มาติดต่อ (Walk-in): ต้องเปิดสิทธิ์ "กรอกคำขอแทนผู้มาติดต่อหน้าเคาน์เตอร์"',
@@ -364,7 +365,7 @@ export class RequestsController {
       if (isWalkIn && body.requesterId && !this.db.accounts.some((a) => a.id === body.requesterId)) {
         throw new BadRequestException('ไม่พบผู้ใช้ที่ระบุ');
       }
-      const staffSig = isWalkIn ? requireDrawnSignature(body.createdByStaffSignature, 'เจ้าหน้าที่ผู้กรอกแทน') : undefined;
+      const staffSig = isWalkIn && body.createdByStaffSignature ? requireDrawnSignature(body.createdByStaffSignature, 'เจ้าหน้าที่ผู้กรอกแทน') : undefined;
 
       const extraItems = this.sanitizeItems(body.extraItems);
       if (extraItems.length > 0) {
@@ -386,6 +387,7 @@ export class RequestsController {
         approvalRound: 1,
         requesterId: isWalkIn ? body.requesterId ?? user.id : user.id,
         requesterName: body.requesterName?.trim() || user.name,
+        requesterPhone: body.requesterPhone ? String(body.requesterPhone).trim().slice(0, 40) : (isWalkIn ? undefined : user.phone),
         requesterSignature: requesterSig,
         organization: String(body.organization ?? '').slice(0, 200) || user.department,
         createdAt: now,
@@ -444,14 +446,15 @@ export class RequestsController {
 
       const isWalkIn =
         Boolean(body.createdByStaffSignature) ||
-        Boolean(body.requesterId && body.requesterId !== user.id);
+        Boolean(body.requesterId && body.requesterId !== user.id) ||
+        Boolean((user.role === 'STAFF' || user.role === 'ADMIN') && body.requesterName && body.requesterName.trim() !== user.name);
 
       if (isWalkIn && !hasPermission(user, 'walkIn')) {
         throw new ForbiddenException('ไม่มีสิทธิ์กรอกคำขอแทนที่เคาน์เตอร์');
       }
 
       const requesterSig = requireDrawnSignature(body.requesterSignature, 'ผู้ขอยืม');
-      const staffSig = isWalkIn ? requireDrawnSignature(body.createdByStaffSignature, 'เจ้าหน้าที่ผู้กรอกแทน') : undefined;
+      const staffSig = isWalkIn && body.createdByStaffSignature ? requireDrawnSignature(body.createdByStaffSignature, 'เจ้าหน้าที่ผู้กรอกแทน') : undefined;
 
       const now = new Date().toISOString();
       const code = await this.db.nextCode('BR');
@@ -467,6 +470,7 @@ export class RequestsController {
         approvalRound: 1,
         requesterId: isWalkIn ? body.requesterId ?? user.id : user.id,
         requesterName: body.requesterName?.trim() || user.name,
+        requesterPhone: body.requesterPhone ? String(body.requesterPhone).trim().slice(0, 40) : (isWalkIn ? undefined : user.phone),
         requesterSignature: requesterSig,
         organization: String(body.organization ?? '').slice(0, 200) || user.department,
         createdAt: now,
@@ -531,6 +535,13 @@ export class RequestsController {
 
     const now = new Date().toISOString();
     const code = await this.db.nextCode('RP');
+    const attachments = Array.isArray(body.attachments)
+      ? body.attachments.map((img) => String(img).trim()).filter(Boolean).slice(0, 3)
+      : [];
+    const photosCount =
+      attachments.length > 0
+        ? attachments.length
+        : Math.max(0, Math.min(3, Math.floor(Number(body.photos ?? 0)) || 0));
     const req: RepairRequest = {
       id: `r-${code.toLowerCase()}`,
       code,
@@ -538,7 +549,8 @@ export class RequestsController {
       status: 'repair_submitted',
       approvalRound: 1,
       requesterId: isWalkIn ? body.requesterId ?? user.id : user.id,
-      requesterName: (isWalkIn ? body.requesterName?.trim() : '') || user.name,
+      requesterName: (isWalkIn ? body.requesterName?.trim() : body.requesterName?.trim()) || user.name,
+      requesterPhone: body.requesterPhone ? String(body.requesterPhone).trim().slice(0, 40) : (isWalkIn ? undefined : user.phone),
       requesterSignature: requesterSig,
       organization: String(body.organization ?? '').slice(0, 200) || user.department,
       createdAt: now,
@@ -550,7 +562,8 @@ export class RequestsController {
       location: String(body.location ?? '').slice(0, 200) || 'ทั่วไป',
       category: String(body.category ?? '').slice(0, 50) || 'อื่น ๆ',
       detail: body.detail.trim().slice(0, 2000),
-      photos: Math.max(0, Math.min(3, Math.floor(Number(body.photos ?? 0)) || 0)),
+      photos: photosCount,
+      attachments,
     };
     this.db.requests.unshift(req);
     await this.db.persistRequest(req);

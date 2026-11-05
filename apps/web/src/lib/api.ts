@@ -206,10 +206,14 @@ export const api = {
     request<Venue>('/resources/venues', { method: 'POST', body: JSON.stringify(payload) }),
   updateVenue: (id: string, payload: Partial<Venue>) =>
     request<Venue>(`/resources/venues/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  deleteVenue: (id: string) =>
+    request<{ ok: boolean; id: string }>(`/resources/venues/${id}`, { method: 'DELETE' }),
   createEquipment: (payload: Partial<Equipment>) =>
     request<Equipment>('/resources/equipment', { method: 'POST', body: JSON.stringify(payload) }),
   updateEquipment: (id: string, payload: Partial<Equipment>) =>
     request<Equipment>(`/resources/equipment/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  deleteEquipment: (id: string) =>
+    request<{ ok: boolean; id: string }>(`/resources/equipment/${id}`, { method: 'DELETE' }),
   availability: (venueIds: string[], month: string) =>
     request<DayAvailability[]>(`/resources/availability?venueIds=${venueIds.join(',')}&month=${month}`),
   checkConflicts: (venueIds: string[], periods: Period[], excludeRequestId?: string) =>
@@ -239,6 +243,7 @@ export const api = {
     extraItems?: ItemQty[];
     requesterId?: string;
     requesterName?: string;
+    requesterPhone?: string;
     requesterSignature?: string;
     createdByStaffSignature?: string;
     writtenAt?: string;
@@ -259,6 +264,7 @@ export const api = {
     attachments?: string[];
     requesterId?: string;
     requesterName?: string;
+    requesterPhone?: string;
     requesterSignature?: string;
     createdByStaffSignature?: string;
     writtenAt?: string;
@@ -277,8 +283,10 @@ export const api = {
     category: string;
     detail: string;
     photos?: number;
+    attachments?: string[];
     requesterId?: string;
     requesterName?: string;
+    requesterPhone?: string;
     organization?: string;
     requesterSignature?: string;
     createdByStaffSignature?: string;
@@ -530,4 +538,59 @@ export function formatPeriodRange(p: Period): string {
 export function formatMonthTitle(ym: string): string {
   const [y, m] = ym.split('-').map(Number);
   return `${THAI_MONTHS_FULL[(m || 1) - 1]} ${(y || 2026) + 543}`;
+}
+
+/**
+ * อ่านไฟล์รูปภาพจาก <input type="file"> และย่อขนาดอัตโนมัติ (สูงสุด 1000px) เป็น Data URL
+ */
+export async function readAndCompressImages(
+  fileList: FileList | File[] | null,
+  maxCount = 3,
+): Promise<string[]> {
+  if (!fileList) return [];
+  const files = Array.from(fileList)
+    .filter((f) => f.type.startsWith('image/'))
+    .slice(0, maxCount);
+
+  const readSingle = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('ไม่สามารถอ่านไฟล์รูปภาพได้'));
+      reader.onload = () => {
+        const rawDataUrl = String(reader.result || '');
+        const img = new Image();
+        img.onerror = () => resolve(rawDataUrl);
+        img.onload = () => {
+          try {
+            const maxDim = 1000;
+            let { width, height } = img;
+            if (width > maxDim || height > maxDim) {
+              if (width >= height) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              } else {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              resolve(rawDataUrl);
+              return;
+            }
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.82));
+          } catch {
+            resolve(rawDataUrl);
+          }
+        };
+        img.src = rawDataUrl;
+      };
+      reader.readAsDataURL(file);
+    });
+
+  return Promise.all(files.map(readSingle));
 }

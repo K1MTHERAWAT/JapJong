@@ -35,7 +35,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
   app.setGlobalPrefix('api');
 
   // รองรับทั้ง /auth/line, /line/webhook (ตาม LINE Developer Console) และ /api/*
@@ -66,16 +66,16 @@ async function bootstrap() {
     }),
   );
 
-  // ตั้ง body limit ให้ตรงกับขนาดข้อมูลรวมภาพลายเซ็น และเก็บ rawBody สำหรับตรวจสอบ X-Line-Signature
+  // ตั้ง body limit ให้รองรับภาพลายเซ็นและรูปภาพประกอบ (สูงสุด 3 รูป) และเก็บ rawBody สำหรับตรวจสอบ X-Line-Signature
   app.use(
     express.json({
-      limit: '2mb',
+      limit: '8mb',
       verify: (req: any, _res, buf) => {
         req.rawBody = buf;
       },
     }),
   );
-  app.use(express.urlencoded({ limit: '2mb', extended: true }));
+  app.use(express.urlencoded({ limit: '8mb', extended: true }));
 
   const allowedOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:3000,http://127.0.0.1:3000')
     .split(',')

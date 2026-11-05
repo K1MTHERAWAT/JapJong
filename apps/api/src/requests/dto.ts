@@ -54,6 +54,10 @@ export class CreateBookingDto {
 
   @IsOptional()
   @IsString()
+  requesterPhone?: string;
+
+  @IsOptional()
+  @IsString()
   requesterSignature?: string;
 
   @IsOptional()
@@ -128,6 +132,10 @@ export class CreateBorrowDto {
 
   @IsOptional()
   @IsString()
+  requesterPhone?: string;
+
+  @IsOptional()
+  @IsString()
   requesterSignature?: string;
 
   @IsOptional()
@@ -194,12 +202,20 @@ export class CreateRepairDto {
   photos?: number;
 
   @IsOptional()
+  @IsArray()
+  attachments?: string[];
+
+  @IsOptional()
   @IsString()
   requesterId?: string;
 
   @IsOptional()
   @IsString()
   requesterName?: string;
+
+  @IsOptional()
+  @IsString()
+  requesterPhone?: string;
 
   @IsOptional()
   @IsString()

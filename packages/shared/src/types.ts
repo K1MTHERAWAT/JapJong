@@ -74,6 +74,8 @@ export interface Venue {
   advanceDays: number;
   formName: string;
   approvalLevels: number;
+  /** รูปภาพสถานที่ (ไม่เกิน 3 รูป, data URL หรือ URL) */
+  images?: string[];
 }
 
 export type EquipmentCategory = 'audio' | 'tent' | 'it';
@@ -84,6 +86,8 @@ export interface Equipment {
   category: EquipmentCategory;
   stock: number;
   enabled: boolean;
+  /** รูปภาพอุปกรณ์/ครุภัณฑ์ (ไม่เกิน 3 รูป, data URL หรือ URL) */
+  images?: string[];
 }
 
 // ===== Requests =====
@@ -148,6 +152,8 @@ interface BaseRequest {
   status: RequestStatus;
   requesterId: string;
   requesterName: string;
+  /** เบอร์โทรศัพท์ติดต่อผู้ยื่นคำขอ (เก็บในระบบ ไม่แสดงบนกระดาษแบบฟอร์มราชการ) */
+  requesterPhone?: string;
   organization: string;
   createdAt: string;
   updatedAt: string;
@@ -203,6 +209,8 @@ export interface RepairRequest extends BaseRequest {
   category: string;
   detail: string;
   photos: number;
+  /** รูปภาพประกอบการแจ้งซ่อม (ไม่เกิน 3 รูป, data URL หรือ URL) */
+  attachments?: string[];
   acceptedAt?: string;
   startedAt?: string;
   finishedAt?: string;

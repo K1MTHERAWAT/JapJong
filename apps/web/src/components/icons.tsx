@@ -19,6 +19,7 @@ export type IconName =
   | 'chevron-right'
   | 'clock'
   | 'device-projector'
+  | 'edit'
   | 'eraser'
   | 'file-text'
   | 'filter'
@@ -40,6 +41,7 @@ export type IconName =
   | 'shield-check'
   | 'tent'
   | 'tool'
+  | 'trash'
   | 'upload'
   | 'user'
   | 'user-circle'
@@ -154,6 +156,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M6 15h1" />
       <path d="M7 18l-1 2" />
       <path d="M18 18l1 2" />
+    </>
+  ),
+  edit: (
+    <>
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
     </>
   ),
   eraser: (
@@ -281,6 +289,15 @@ const PATHS: Record<IconName, React.ReactNode> = {
   tent: <path d="M11 14l4 6h6l-9 -16l-9 16h6l4 -6" />,
   tool: (
     <path d="M7 10h3v-3l-3.5 -3.5a6 6 0 0 1 8 8l6 6a2 2 0 0 1 -3 3l-6 -6a6 6 0 0 1 -8 -8l3.5 3.5" />
+  ),
+  trash: (
+    <>
+      <path d="M4 7l16 0" />
+      <path d="M10 11l0 6" />
+      <path d="M14 11l0 6" />
+      <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
+      <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
+    </>
   ),
   upload: (
     <>

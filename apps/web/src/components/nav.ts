@@ -61,8 +61,6 @@ export const NAV: NavItem[] = [
 
   // เจ้าหน้าที่
   { href: '/staff/review', label: 'ตรวจคำขอ & งานซ่อม', icon: ClipboardList, section: 'งานเจ้าหน้าที่', roles: ['STAFF', 'ADMIN'] },
-  { href: '/staff/handover', label: 'รับมอบ–รับคืน', icon: CheckSquare, section: 'งานเจ้าหน้าที่', roles: ['STAFF', 'ADMIN'] },
-  { href: '/staff/walk-in', label: 'กรอกคำขอแทน (Walk-in)', icon: PenTool, section: 'งานเจ้าหน้าที่', roles: ['STAFF', 'ADMIN'] },
   { href: '/staff/verify', label: 'ตรวจสอบเอกสาร QR Code', icon: QrCode, section: 'งานเจ้าหน้าที่', roles: ['STAFF', 'ADMIN'] },
 
   // ผู้อนุมัติ (ปลัด / นายก)

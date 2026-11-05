@@ -17,23 +17,23 @@ export default function StaffWalkInPage() {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
 
   // ข้อมูลผู้มาติดต่อ
-  const [query, setQuery] = useState('081-234-5678');
-  const [foundUser, setFoundUser] = useState<PublicAccount | null>(accounts[0] ?? null);
-  const [borrowerName, setBorrowerName] = useState('สมชาย ใจดี');
-  const [organization, setOrganization] = useState('กลุ่มแม่บ้านบ้านหนองบัว');
+  const [query, setQuery] = useState('');
+  const [foundUser, setFoundUser] = useState<PublicAccount | null>(null);
+  const [borrowerName, setBorrowerName] = useState('');
+  const [organization, setOrganization] = useState('');
 
   // จองสถานที่ (booking)
-  const [venueId, setVenueId] = useState('v-main-hall');
+  const [venueId, setVenueId] = useState('');
   const [date, setDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 3);
     return d.toISOString().slice(0, 10);
   });
-  const [timeSlot, setTimeSlot] = useState('13:00–17:00');
-  const [purpose, setPurpose] = useState('ประชุมสมาชิกกลุ่มประจำเดือน');
+  const [timeSlot, setTimeSlot] = useState('09:00–12:00');
+  const [purpose, setPurpose] = useState('');
 
   // ยืม–คืนอุปกรณ์ (borrow)
-  const [equipmentId, setEquipmentId] = useState('e-audio');
+  const [equipmentId, setEquipmentId] = useState('');
   const [equipmentQty, setEquipmentQty] = useState(1);
   const [pickupDate, setPickupDate] = useState(() => {
     const d = new Date();
@@ -48,11 +48,11 @@ export default function StaffWalkInPage() {
 
   // แจ้งซ่อม (repair)
   const [building, setBuilding] = useState('อาคารสำนักงาน');
-  const [floor, setFloor] = useState('ชั้น 2');
-  const [location, setLocation] = useState('ห้องประชุมใหญ่ · เครื่องปรับอากาศ');
-  const [category, setCategory] = useState('เครื่องปรับอากาศ');
-  const [detail, setDetail] = useState('แอร์ไม่เย็นและมีเสียงดังขณะเปิดใช้งาน');
-  const [photos, setPhotos] = useState(1);
+  const [floor, setFloor] = useState('ชั้น 1');
+  const [location, setLocation] = useState('');
+  const [category, setCategory] = useState<string>(REPAIR_CATEGORIES[0] ?? 'ไฟฟ้า');
+  const [detail, setDetail] = useState('');
+  const [photos, setPhotos] = useState(0);
 
   // บันทึกร่าง & ลงนาม 2 ฝ่าย
   const [draftSaved, setDraftSaved] = useState(false);
@@ -62,8 +62,20 @@ export default function StaffWalkInPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    api.venues().then(setVenues).catch(() => {});
-    api.equipment().then(setEquipment).catch(() => {});
+    api
+      .venues()
+      .then((list) => {
+        setVenues(list);
+        if (list.length > 0) setVenueId((prev) => prev || list[0].id);
+      })
+      .catch(() => {});
+    api
+      .equipment()
+      .then((list) => {
+        setEquipment(list);
+        if (list.length > 0) setEquipmentId((prev) => prev || list[0].id);
+      })
+      .catch(() => {});
   }, []);
 
   const handleSearch = () => {
@@ -216,6 +228,7 @@ export default function StaffWalkInPage() {
                 type="text"
                 value={borrowerName}
                 onChange={(e) => setBorrowerName(e.target.value)}
+                placeholder="กรอกชื่อ-นามสกุล"
                 className="jw-in"
               />
             </div>
@@ -225,6 +238,7 @@ export default function StaffWalkInPage() {
                 type="text"
                 value={organization}
                 onChange={(e) => setOrganization(e.target.value)}
+                placeholder="กรอกชื่อหน่วยงานหรือชุมชน"
                 className="jw-in"
               />
             </div>
@@ -264,6 +278,7 @@ export default function StaffWalkInPage() {
                   rows={2}
                   value={purpose}
                   onChange={(e) => setPurpose(e.target.value)}
+                  placeholder="ระบุวัตถุประสงค์การขอใช้สถานที่..."
                   className="jw-in h-20 py-2.5"
                 />
               </div>
@@ -327,6 +342,7 @@ export default function StaffWalkInPage() {
                   rows={2}
                   value={purpose}
                   onChange={(e) => setPurpose(e.target.value)}
+                  placeholder="ระบุวัตถุประสงค์การขอยืมอุปกรณ์..."
                   className="jw-in h-20 py-2.5"
                 />
               </div>
@@ -360,6 +376,7 @@ export default function StaffWalkInPage() {
                   type="text"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
+                  placeholder="เช่น ห้องประชุมใหญ่ · เครื่องปรับอากาศ"
                   className="jw-in"
                 />
               </div>
@@ -390,6 +407,7 @@ export default function StaffWalkInPage() {
                   rows={2}
                   value={detail}
                   onChange={(e) => setDetail(e.target.value)}
+                  placeholder="ระบุอาการชำรุดหรือรายละเอียดปัญหาที่พบ..."
                   className="jw-in h-20 py-2.5"
                 />
               </div>

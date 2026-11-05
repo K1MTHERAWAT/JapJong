@@ -154,6 +154,7 @@ export default function RequestDetailPage() {
             <b className="w-24 shrink-0 text-ink-mute">ผู้ขอ</b>
             <span>
               {req.requesterName} · {req.organization}
+              {req.requesterPhone ? ` · โทร. ${req.requesterPhone}` : ''}
             </span>
           </div>
           <div className="flex gap-2">

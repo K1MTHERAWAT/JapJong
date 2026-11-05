@@ -1,34 +1,50 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
-import { REPAIR_CATEGORIES, RepairRequest, RequestWithTimeline } from '@japjong/shared';
-import { useAuth } from '@/components/auth-context';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Equipment, PublicAccount, REPAIR_CATEGORIES, RepairRequest, RequestWithTimeline, Venue } from '@japjong/shared';
+import { roleHomePath, useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
-import { StatusChip, Tabs, Timeline } from '@/components/ui';
-import { api, formatThaiDateTime } from '@/lib/api';
+import { Chip, StatusChip, Tabs, Timeline } from '@/components/ui';
+import { api, formatThaiDateTime, readAndCompressImages } from '@/lib/api';
 
 type Mode = 'form' | 'track';
 type TrackFilter = 'all' | 'in_progress' | 'acceptance';
+type TargetType = 'venue' | 'equipment' | 'other';
 
 export default function RepairPage() {
-  const { account } = useAuth();
+  const { account, accounts } = useAuth();
+  const isStaff = account?.role === 'STAFF' || account?.role === 'ADMIN';
   const [mode, setMode] = useState<Mode>('form');
 
+  // โหมดกรอกแจ้งซ่อมแทนผู้มาติดต่อ (สำหรับเจ้าหน้าที่)
+  const [isWalkIn, setIsWalkIn] = useState(false);
+  const [walkInQuery, setWalkInQuery] = useState('');
+  const [foundUser, setFoundUser] = useState<PublicAccount | null>(null);
+  const [requesterName, setRequesterName] = useState(account?.name || '');
+  const [requesterPhone, setRequesterPhone] = useState(account?.phone || '');
+  const [organization, setOrganization] = useState(account?.department || '');
+
+  // Resource list
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
+
   // Form state
-  const [building, setBuilding] = useState('อาคารสำนักงาน');
-  const [floor, setFloor] = useState('ชั้น 2');
-  const [location, setLocation] = useState('ห้องประชุมใหญ่ · เครื่องปรับอากาศ');
-  const [category, setCategory] = useState('เครื่องปรับอากาศ');
-  const [detail, setDetail] = useState('เปิดแอร์แล้วไม่เย็น มีน้ำหยดจากเครื่องด้านใน เริ่มเป็นตั้งแต่เมื่อวาน');
-  const [photos, setPhotos] = useState(2);
+  const [targetType, setTargetType] = useState<TargetType>('venue');
+  const [selectedResourceId, setSelectedResourceId] = useState<string>('');
+  const [customLocation, setCustomLocation] = useState('');
+  const [category, setCategory] = useState<string>(REPAIR_CATEGORIES[0] ?? 'ไฟฟ้า');
+  const [detail, setDetail] = useState('');
+  const [images, setImages] = useState<string[]>([]);
+  const [previewImg, setPreviewImg] = useState<string | null>(null);
   const [draftSaved, setDraftSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Track state
   const [repairs, setRepairs] = useState<(RequestWithTimeline & RepairRequest)[]>([]);
   const [trackFilter, setTrackFilter] = useState<TrackFilter>('all');
-  const [activeId, setActiveId] = useState<string>('r-rp-0057');
+  const [activeId, setActiveId] = useState<string>('');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -42,6 +58,60 @@ export default function RepairPage() {
     } else if (modeParam === 'track') {
       setMode('track');
     }
+  }, []);
+
+  useEffect(() => {
+    if (account && !isWalkIn) {
+      setRequesterName(account.name);
+      setRequesterPhone(account.phone || '');
+      setOrganization(account.department || '');
+    }
+  }, [account, isWalkIn]);
+
+  const handleToggleWalkIn = (walkInMode: boolean) => {
+    setIsWalkIn(walkInMode);
+    setFoundUser(null);
+    setWalkInQuery('');
+    if (walkInMode) {
+      setRequesterName('');
+      setRequesterPhone('');
+      setOrganization('');
+    } else if (account) {
+      setRequesterName(account.name);
+      setRequesterPhone(account.phone || '');
+      setOrganization(account.department || '');
+    }
+  };
+
+  const handleSearchWalkInUser = () => {
+    const q = walkInQuery.trim().toLowerCase();
+    if (!q) return;
+    const digits = q.replace(/\D/g, '');
+    const match = accounts.find(
+      (a) =>
+        a.name.toLowerCase().includes(q) ||
+        a.username.toLowerCase().includes(q) ||
+        (digits && a.phone.replace(/\D/g, '').includes(digits)),
+    );
+    if (match) {
+      setFoundUser(match);
+      setRequesterName(match.name);
+      setRequesterPhone(match.phone || '');
+      setOrganization(match.department || '');
+    } else {
+      setFoundUser(null);
+      if (digits.length >= 9) {
+        setRequesterPhone(walkInQuery.trim());
+      } else {
+        setRequesterName(walkInQuery.trim());
+      }
+    }
+  };
+
+  // โหลดรายการสถานที่และอุปกรณ์จริงจากระบบ
+  useEffect(() => {
+    api.venues().then(setVenues).catch(() => {});
+    api.equipment().then(setEquipmentList).catch(() => {});
   }, []);
 
   const loadRepairs = useCallback(() => {
@@ -61,17 +131,63 @@ export default function RepairPage() {
     loadRepairs();
   }, [loadRepairs, account?.id]);
 
+  const handleSelectFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const remaining = Math.max(0, 3 - images.length);
+    if (remaining === 0) return;
+    const newDataUrls = await readAndCompressImages(e.target.files, remaining);
+    if (newDataUrls.length) {
+      setImages((prev) => [...prev, ...newDataUrls].slice(0, 3));
+    }
+    e.target.value = '';
+  };
+
+  const removeImage = (idx: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  // ดึงข้อมูลสถานที่หรืออุปกรณ์ที่เลือก
+  const selectedVenue = venues.find((v) => v.id === selectedResourceId);
+  const selectedEquipment = equipmentList.find((e) => e.id === selectedResourceId);
+
+  const getResolvedLocation = () => {
+    if (targetType === 'venue') {
+      return selectedVenue ? selectedVenue.name : customLocation.trim();
+    }
+    if (targetType === 'equipment') {
+      return selectedEquipment ? selectedEquipment.name : customLocation.trim();
+    }
+    return customLocation.trim();
+  };
+
+  const isFormValid = Boolean(getResolvedLocation()) && Boolean(detail.trim());
+
   const handleSubmit = async () => {
+    const resolvedLocation = getResolvedLocation();
+    if (!resolvedLocation || !detail.trim()) return;
+
     setSubmitting(true);
     try {
+      const building = targetType === 'venue' && selectedVenue?.building ? selectedVenue.building : 'อาคารสำนักงาน';
+      const floor = targetType === 'venue' && selectedVenue?.floor ? selectedVenue.floor : '-';
+
       const created = await api.createRepair({
         building,
         floor,
-        location,
+        location: resolvedLocation,
         category,
         detail,
-        photos,
+        photos: images.length,
+        attachments: images,
+        requesterId: isWalkIn && foundUser ? foundUser.id : undefined,
+        requesterName: requesterName.trim() || undefined,
+        requesterPhone: requesterPhone.trim() || undefined,
+        organization: organization.trim() || undefined,
       });
+
+      setSelectedResourceId('');
+      setCustomLocation('');
+      setDetail('');
+      setImages([]);
       await loadRepairs();
       setActiveId(created.id);
       setTrackFilter('all');
@@ -105,7 +221,7 @@ export default function RepairPage() {
   return (
     <AppShell
       title={mode === 'form' ? 'แจ้งปัญหา / ซ่อมบำรุง' : 'แจ้งซ่อมของฉัน'}
-      backHref="/"
+      backHref={account ? roleHomePath(account.role) : '/'}
       maxWidth="max-w-[1000px]"
       footer={
         mode === 'form' ? (
@@ -122,7 +238,7 @@ export default function RepairPage() {
             </button>
             <button
               type="button"
-              disabled={submitting || !detail.trim()}
+              disabled={submitting || !isFormValid}
               onClick={handleSubmit}
               className="jw-btn flex-[1.5] sm:w-56"
             >
@@ -163,33 +279,196 @@ export default function RepairPage() {
 
         {mode === 'form' ? (
           <div className="jw-card p-5 sm:p-6 flex flex-col gap-4">
+            {isStaff && (
+              <div className="rounded-2xl border border-brand/30 bg-brand-mint/25 p-4 flex flex-col gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <b className="text-[14px] text-ink block">สำหรับเจ้าหน้าที่: รูปแบบการแจ้งซ่อม</b>
+                    <span className="text-[12px] text-ink-mute">
+                      เลือกว่าต้องการแจ้งซ่อมในนามตนเอง หรือกรอกแจ้งซ่อมแทนผู้มาติดต่อ
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleWalkIn(false)}
+                      className={`h-9 px-3.5 rounded-full text-[12.5px] font-semibold border transition ${
+                        !isWalkIn
+                          ? 'bg-brand border-brand text-white'
+                          : 'bg-white border-line text-ink hover:border-brand'
+                      }`}
+                    >
+                      แจ้งในนามตนเอง
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleWalkIn(true)}
+                      className={`h-9 px-3.5 rounded-full text-[12.5px] font-semibold border transition ${
+                        isWalkIn
+                          ? 'bg-brand border-brand text-white'
+                          : 'bg-white border-line text-ink hover:border-brand'
+                      }`}
+                    >
+                      กรอกคำขอแทนผู้มาติดต่อ
+                    </button>
+                  </div>
+                </div>
+
+                {isWalkIn && (
+                  <div className="pt-2 border-t border-brand/15 flex flex-col gap-2.5">
+                    <label className="jw-lbl mb-0">ค้นหาข้อมูลผู้มาติดต่อ (เบอร์โทรหรือชื่อ)</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={walkInQuery}
+                        onChange={(e) => setWalkInQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleSearchWalkInUser();
+                          }
+                        }}
+                        placeholder="กรอกเบอร์โทรหรือชื่อเพื่อดึงข้อมูลอัตโนมัติ หรือพิมพ์ข้อมูลด้านล่างโดยตรง"
+                        className="jw-in flex-1 bg-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSearchWalkInUser}
+                        className="jw-btn jw-btn-sm shrink-0"
+                      >
+                        ค้นหา
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {foundUser ? (
+                        <Chip tone="green">
+                          <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} /> พบผู้ใช้ในระบบ: {foundUser.name} ({foundUser.phone})
+                        </Chip>
+                      ) : (
+                        <Chip tone="amber">ผู้มาติดต่อทั่วไป (กรอกชื่อและเบอร์โทรด้านล่างได้เลย)</Chip>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
-                <label className="jw-lbl">อาคาร</label>
-                <select value={building} onChange={(e) => setBuilding(e.target.value)} className="jw-in">
-                  <option>อาคารสำนักงาน</option>
-                  <option>ศาลา หมู่ 5</option>
-                  <option>สนามกีฬากลาง</option>
-                </select>
+                <label className="jw-lbl">ชื่อ-นามสกุลผู้แจ้ง</label>
+                <input
+                  type="text"
+                  value={requesterName}
+                  onChange={(e) => setRequesterName(e.target.value)}
+                  placeholder="ระบุชื่อ-นามสกุลผู้แจ้ง"
+                  className="jw-in"
+                />
               </div>
               <div>
-                <label className="jw-lbl">ชั้น</label>
-                <select value={floor} onChange={(e) => setFloor(e.target.value)} className="jw-in">
-                  <option>ชั้น 1</option>
-                  <option>ชั้น 2</option>
-                  <option>ชั้น 3</option>
-                </select>
+                <label className="jw-lbl">เบอร์โทรศัพท์ติดต่อ</label>
+                <input
+                  type="tel"
+                  value={requesterPhone}
+                  onChange={(e) => setRequesterPhone(e.target.value)}
+                  placeholder="เช่น 081-234-5678"
+                  className="jw-in"
+                />
               </div>
             </div>
 
+            {/* เลือกหมวดหมู่ของสิ่งที่ชำรุด */}
             <div>
-              <label className="jw-lbl">ห้อง / อุปกรณ์</label>
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="jw-in"
-              />
+              <label className="jw-lbl">รายการที่ต้องการแจ้งปัญหา / ซ่อมแซม</label>
+              <div className="flex flex-wrap gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTargetType('venue');
+                    setSelectedResourceId('');
+                  }}
+                  className={`h-9 px-4 rounded-full border-[1.5px] text-[13px] font-semibold transition ${
+                    targetType === 'venue'
+                      ? 'bg-brand border-brand text-white'
+                      : 'bg-white border-line text-ink hover:border-brand'
+                  }`}
+                >
+                  สถานที่ ({venues.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTargetType('equipment');
+                    setSelectedResourceId('');
+                  }}
+                  className={`h-9 px-4 rounded-full border-[1.5px] text-[13px] font-semibold transition ${
+                    targetType === 'equipment'
+                      ? 'bg-brand border-brand text-white'
+                      : 'bg-white border-line text-ink hover:border-brand'
+                  }`}
+                >
+                  อุปกรณ์ / ครุภัณฑ์ ({equipmentList.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTargetType('other');
+                    setSelectedResourceId('');
+                  }}
+                  className={`h-9 px-4 rounded-full border-[1.5px] text-[13px] font-semibold transition ${
+                    targetType === 'other'
+                      ? 'bg-brand border-brand text-white'
+                      : 'bg-white border-line text-ink hover:border-brand'
+                  }`}
+                >
+                  อื่น ๆ / ระบุเอง
+                </button>
+              </div>
+
+              {targetType === 'venue' && (
+                <div>
+                  <select
+                    value={selectedResourceId}
+                    onChange={(e) => setSelectedResourceId(e.target.value)}
+                    className="jw-in"
+                  >
+                    <option value="">-- กรุณาเลือกสถานที่ --</option>
+                    {venues.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.name} ({v.building || 'อาคารสำนักงาน'} {v.floor && v.floor !== '-' ? `· ${v.floor}` : ''})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {targetType === 'equipment' && (
+                <div>
+                  <select
+                    value={selectedResourceId}
+                    onChange={(e) => setSelectedResourceId(e.target.value)}
+                    className="jw-in"
+                  >
+                    <option value="">-- กรุณาเลือกอุปกรณ์ / ครุภัณฑ์ --</option>
+                    {equipmentList.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {targetType === 'other' && (
+                <div>
+                  <input
+                    type="text"
+                    value={customLocation}
+                    onChange={(e) => setCustomLocation(e.target.value)}
+                    placeholder="ระบุสถานที่ จุดเกิดเหตุ หรืออุปกรณ์ที่ต้องการแจ้งซ่อม"
+                    className="jw-in"
+                  />
+                </div>
+              )}
             </div>
 
             <div>
@@ -218,33 +497,50 @@ export default function RepairPage() {
                 rows={3}
                 value={detail}
                 onChange={(e) => setDetail(e.target.value)}
+                placeholder="ระบุอาการชำรุดหรือรายละเอียดปัญหาที่พบ..."
                 className="jw-in h-24 py-2.5"
               />
             </div>
 
             <div>
               <label className="jw-lbl">รูปภาพประกอบ (ไม่เกิน 3 รูป)</label>
-              <div className="flex gap-3">
-                {Array.from({ length: photos }).map((_, idx) => (
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleSelectFiles}
+                className="hidden"
+              />
+              <div className="flex flex-wrap gap-3">
+                {images.map((src, idx) => (
                   <div
                     key={idx}
-                    className="w-20 h-20 rounded-2xl bg-brand-mint text-brand flex items-center justify-center relative"
+                    className="w-20 h-20 rounded-2xl bg-brand-mint text-brand relative border border-line"
                   >
-                    <Icon name="photo" className="w-7 h-7" strokeWidth={1.6} />
                     <button
                       type="button"
-                      onClick={() => setPhotos((p) => Math.max(0, p - 1))}
-                      className="w-5 h-5 rounded-full bg-ink text-white absolute -top-1.5 -right-1.5 flex items-center justify-center"
+                      onClick={() => setPreviewImg(src)}
+                      className="w-full h-full rounded-2xl overflow-hidden block"
+                      title="คลิกเพื่อดูรูปขนาดใหญ่"
+                    >
+                      <img src={src} alt={`รูปประกอบ ${idx + 1}`} className="w-full h-full object-cover" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeImage(idx)}
+                      className="w-5 h-5 rounded-full bg-ink text-white absolute -top-1.5 -right-1.5 flex items-center justify-center shadow"
+                      title="ลบรูป"
                     >
                       <Icon name="x" className="w-3 h-3" />
                     </button>
                   </div>
                 ))}
-                {photos < 3 && (
+                {images.length < 3 && (
                   <button
                     type="button"
-                    onClick={() => setPhotos((p) => Math.min(3, p + 1))}
-                    className="w-20 h-20 rounded-2xl bg-white border-[1.5px] border-dashed border-[#7A7A7A] text-ink-mute text-[13px] flex flex-col items-center justify-center gap-1 hover:border-brand"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-20 h-20 rounded-2xl bg-white border-[1.5px] border-dashed border-[#7A7A7A] text-ink-mute text-[13px] flex flex-col items-center justify-center gap-1 hover:border-brand hover:text-brand transition"
                   >
                     <Icon name="plus" className="w-5 h-5" />
                     <span>+ รูป</span>
@@ -281,11 +577,26 @@ export default function RepairPage() {
                   <div>
                     <b className="text-[16px] text-ink block">{activeRepair.title}</b>
                     <span className="text-[13px] text-ink-mute">
-                      {activeRepair.code} · {activeRepair.location} ({activeRepair.floor})
+                      {activeRepair.code} · {activeRepair.location}
                     </span>
                   </div>
                   <StatusChip status={activeRepair.status} />
                 </div>
+
+                {activeRepair.attachments && activeRepair.attachments.length > 0 && (
+                  <div className="flex flex-wrap gap-2.5">
+                    {activeRepair.attachments.map((src, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setPreviewImg(src)}
+                        className="w-20 h-20 rounded-2xl overflow-hidden border border-line hover:ring-2 hover:ring-brand transition"
+                      >
+                        <img src={src} alt={`รูปแจ้งซ่อม ${idx + 1}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 <Timeline steps={activeRepair.timeline} orientation="horizontal" />
 
@@ -365,6 +676,24 @@ export default function RepairPage() {
           </div>
         )}
       </div>
+
+      {previewImg && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setPreviewImg(null)}
+        >
+          <div className="relative max-w-[90vw] max-h-[85vh]">
+            <img src={previewImg} alt="ตัวอย่างรูปภาพ" className="max-w-full max-h-[85vh] rounded-2xl object-contain" />
+            <button
+              type="button"
+              onClick={() => setPreviewImg(null)}
+              className="w-8 h-8 rounded-full bg-ink text-white absolute -top-3 -right-3 flex items-center justify-center shadow-lg"
+            >
+              <Icon name="x" className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }

@@ -1,37 +1,37 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { EquipmentCategory, FACILITIES, VENUE_TYPE_LABEL, VenueType } from '@japjong/shared';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
 import { Chip, Stepper, Tabs, Toggle } from '@/components/ui';
-import { api } from '@/lib/api';
+import { api, readAndCompressImages } from '@/lib/api';
 
 type Kind = 'venue' | 'equipment';
 const DAYS_TH = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
 export default function AddResourcePage() {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [kind, setKind] = useState<Kind>('venue');
   const [mobileStep, setMobileStep] = useState(1);
 
-  // Venue fields (Step 1/2 ข้อมูลทั่วไป + Step 2/2 เงื่อนไขและการอนุมัติ)
-  const [photos, setPhotos] = useState(2);
-  const [name, setName] = useState('ห้องประชุมใหญ่ อบต.');
+  // รูปภาพจริง (สูงสุด 3 รูป)
+  const [images, setImages] = useState<string[]>([]);
+  const [previewImg, setPreviewImg] = useState<string | null>(null);
+
+  // Venue / Equipment fields (เริ่มต้นเป็นค่าว่าง ไม่ใช้ Mock)
+  const [name, setName] = useState('');
   const [venueType, setVenueType] = useState<VenueType>('meeting');
-  const [building, setBuilding] = useState('อาคารสำนักงาน');
-  const [floor, setFloor] = useState('ชั้น 2');
-  const [capacity, setCapacity] = useState(120);
-  const [facilities, setFacilities] = useState<string[]>([
-    'เครื่องเสียง',
-    'โปรเจกเตอร์',
-    'เครื่องปรับอากาศ',
-  ]);
+  const [building, setBuilding] = useState('');
+  const [floor, setFloor] = useState('');
+  const [capacity, setCapacity] = useState(50);
+  const [facilities, setFacilities] = useState<string[]>([]);
   const [openTime, setOpenTime] = useState('08:00');
   const [closeTime, setCloseTime] = useState('17:00');
   const [openDays, setOpenDays] = useState<number[]>([1, 2, 3, 4, 5]);
-  const [advanceDays, setAdvanceDays] = useState(7);
+  const [advanceDays, setAdvanceDays] = useState(3);
   const [formName, setFormName] = useState('แบบคำขอใช้สถานที่');
   const [enabled, setEnabled] = useState(true);
   const [approvalOrder, setApprovalOrder] = useState<string[]>([
@@ -40,6 +40,13 @@ export default function AddResourcePage() {
     'ผู้อนุมัติระดับ 1 (นายก อบต.)',
   ]);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+
+  // Equipment fields
+  const [eqCategory, setEqCategory] = useState<EquipmentCategory>('audio');
+  const [stock, setStock] = useState(1);
+
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   const moveApprovalStep = (from: number, to: number) => {
     if (to < 0 || to >= approvalOrder.length || from === to) return;
@@ -51,12 +58,6 @@ export default function AddResourcePage() {
     });
   };
 
-  // Equipment fields
-  const [eqCategory, setEqCategory] = useState<EquipmentCategory>('audio');
-  const [stock, setStock] = useState(5);
-
-  const [submitting, setSubmitting] = useState(false);
-
   const toggleFacility = (f: string) => {
     setFacilities((prev) => (prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]));
   };
@@ -65,15 +66,39 @@ export default function AddResourcePage() {
     setOpenDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
   };
 
+  const handleSelectFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const remaining = Math.max(0, 3 - images.length);
+    if (remaining === 0) return;
+    try {
+      const added = await readAndCompressImages(e.target.files, remaining);
+      if (added.length > 0) {
+        setImages((prev) => [...prev, ...added].slice(0, 3));
+      }
+    } catch (err) {
+      setError((err as Error).message || 'ไม่สามารถอ่านไฟล์รูปภาพได้');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const removeImage = (idx: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   const handleSave = async () => {
+    if (!name.trim()) {
+      setError(kind === 'venue' ? 'กรุณากรอกชื่อสถานที่' : 'กรุณากรอกชื่ออุปกรณ์ / ครุภัณฑ์');
+      return;
+    }
+    setError('');
     setSubmitting(true);
     try {
       if (kind === 'venue') {
         await api.createVenue({
-          name,
+          name: name.trim(),
           type: venueType,
-          building,
-          floor,
+          building: building.trim() || 'อาคารสำนักงาน',
+          floor: floor.trim() || 'ชั้น 1',
           capacity,
           facilities,
           openTime,
@@ -82,16 +107,20 @@ export default function AddResourcePage() {
           advanceDays,
           formName,
           enabled,
+          images,
         });
       } else {
         await api.createEquipment({
-          name,
+          name: name.trim(),
           category: eqCategory,
           stock,
           enabled,
+          images,
         });
       }
       router.push('/admin/resources');
+    } catch (err) {
+      setError((err as Error).message || 'บันทึกรายการไม่สำเร็จ');
     } finally {
       setSubmitting(false);
     }
@@ -104,7 +133,6 @@ export default function AddResourcePage() {
       rightLabel="แอดมิน"
       footer={
         <div className="flex w-full sm:w-auto gap-2.5">
-          {/* บนมือถือแสดงปุ่มสลับขั้นตอน 1/2 และ 2/2 */}
           {mobileStep === 2 ? (
             <button
               type="button"
@@ -138,7 +166,7 @@ export default function AddResourcePage() {
               onClick={handleSave}
               className="lg:hidden jw-btn flex-[1.5]"
             >
-              บันทึกรายการ
+              {submitting ? 'กำลังบันทึก...' : 'บันทึกรายการ'}
             </button>
           )}
 
@@ -161,7 +189,11 @@ export default function AddResourcePage() {
         </div>
         <Tabs<Kind>
           value={kind}
-          onChange={setKind}
+          onChange={(nextKind) => {
+            setKind(nextKind);
+            setError('');
+            setFormName(nextKind === 'venue' ? 'แบบคำขอใช้สถานที่' : 'แบบคำขอยืมครุภัณฑ์');
+          }}
           className="w-full sm:w-80"
           options={[
             { value: 'venue', label: 'สถานที่' },
@@ -170,7 +202,13 @@ export default function AddResourcePage() {
         />
       </div>
 
-      {/* Stepper บนมือถือ (1/2 ข้อมูลทั่วไป · 2/2 เงื่อนไขและอนุมัติ) */}
+      {error && (
+        <div className="mb-4 rounded-2xl bg-[#FDE8E8] border border-[#f9b4b4] px-4 py-2.5 text-[13px] text-[#7a1010]">
+          {error}
+        </div>
+      )}
+
+      {/* Stepper บนมือถือ */}
       <div className="lg:hidden mb-4">
         <Stepper
           steps={['ข้อมูลทั่วไป', 'เงื่อนไขและอนุมัติ']}
@@ -179,7 +217,6 @@ export default function AddResourcePage() {
         />
       </div>
 
-      {/* บน Desktop แสดง 2 คอลัมน์เคียงกันเหมือนหน้า "เพิ่มรายการ (แอดมิน) · Desktop 1440×900" */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* คอลัมน์ที่ 1: ข้อมูลทั่วไป */}
         <div
@@ -189,27 +226,42 @@ export default function AddResourcePage() {
         >
           <div>
             <label className="jw-lbl">รูปภาพ (ไม่เกิน 3 รูป)</label>
-            <div className="flex gap-3">
-              {Array.from({ length: photos }).map((_, idx) => (
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleSelectFiles}
+              className="hidden"
+            />
+            <div className="flex flex-wrap gap-3">
+              {images.map((src, idx) => (
                 <div
                   key={idx}
-                  className="w-20 h-20 rounded-2xl bg-brand-mint text-brand flex items-center justify-center relative"
+                  className="w-20 h-20 rounded-2xl border border-line bg-surface overflow-hidden relative group"
                 >
-                  <Icon name="photo" className="w-7 h-7" strokeWidth={1.6} />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={src}
+                    alt={`รูปที่ ${idx + 1}`}
+                    onClick={() => setPreviewImg(src)}
+                    className="w-full h-full object-cover cursor-pointer"
+                  />
                   <button
                     type="button"
-                    onClick={() => setPhotos((p) => Math.max(0, p - 1))}
-                    className="w-5 h-5 rounded-full bg-ink text-white absolute -top-1.5 -right-1.5 flex items-center justify-center"
+                    onClick={() => removeImage(idx)}
+                    className="w-5 h-5 rounded-full bg-ink text-white absolute top-1 right-1 flex items-center justify-center shadow"
+                    title="ลบรูปภาพ"
                   >
                     <Icon name="x" className="w-3 h-3" />
                   </button>
                 </div>
               ))}
-              {photos < 3 && (
+              {images.length < 3 && (
                 <button
                   type="button"
-                  onClick={() => setPhotos((p) => Math.min(3, p + 1))}
-                  className="w-20 h-20 rounded-2xl bg-white border-[1.5px] border-dashed border-[#7A7A7A] text-ink-mute text-[12px] flex flex-col items-center justify-center gap-1 hover:border-brand"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-20 h-20 rounded-2xl bg-white border-[1.5px] border-dashed border-[#7A7A7A] text-ink-mute text-[12px] flex flex-col items-center justify-center gap-1 hover:border-brand hover:text-brand transition cursor-pointer"
                 >
                   <Icon name="upload" className="w-5 h-5" />
                   <span>เพิ่มรูป</span>
@@ -220,7 +272,17 @@ export default function AddResourcePage() {
 
           <div>
             <label className="jw-lbl">{kind === 'venue' ? 'ชื่อสถานที่' : 'ชื่ออุปกรณ์ / ครุภัณฑ์'}</label>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="jw-in" />
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={
+                kind === 'venue'
+                  ? 'เช่น ห้องประชุมใหญ่ อบต. หรือ ศาลาประชาคม'
+                  : 'เช่น ชุดเครื่องเสียงเคลื่อนที่ หรือ เต็นท์โค้งขาว'
+              }
+              className="jw-in"
+            />
           </div>
 
           {kind === 'venue' ? (
@@ -252,6 +314,7 @@ export default function AddResourcePage() {
                     type="text"
                     value={building}
                     onChange={(e) => setBuilding(e.target.value)}
+                    placeholder="เช่น อาคารสำนักงาน"
                     className="jw-in"
                   />
                 </div>
@@ -261,6 +324,7 @@ export default function AddResourcePage() {
                     type="text"
                     value={floor}
                     onChange={(e) => setFloor(e.target.value)}
+                    placeholder="เช่น ชั้น 1"
                     className="jw-in"
                   />
                 </div>
@@ -329,8 +393,9 @@ export default function AddResourcePage() {
                 <label className="jw-lbl">จำนวนคงเหลือ</label>
                 <input
                   type="number"
+                  min={0}
                   value={stock}
-                  onChange={(e) => setStock(Number(e.target.value))}
+                  onChange={(e) => setStock(Math.max(0, Number(e.target.value)))}
                   className="jw-in"
                 />
               </div>
@@ -480,6 +545,30 @@ export default function AddResourcePage() {
           </div>
         </div>
       </div>
+
+      {/* Modal ดูรูปภาพขนาดใหญ่ */}
+      {previewImg && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setPreviewImg(null)}
+        >
+          <div className="relative max-w-[90vw] max-h-[85vh]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewImg}
+              alt="ตัวอย่างรูปภาพ"
+              className="max-w-full max-h-[85vh] rounded-2xl object-contain bg-white"
+            />
+            <button
+              type="button"
+              onClick={() => setPreviewImg(null)}
+              className="w-8 h-8 rounded-full bg-black/80 text-white absolute -top-3 -right-3 flex items-center justify-center"
+            >
+              <Icon name="x" className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }

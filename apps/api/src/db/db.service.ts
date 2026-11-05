@@ -132,6 +132,12 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
            ADD COLUMN IF NOT EXISTS "address_province" TEXT,
            ADD COLUMN IF NOT EXISTS "email" TEXT,
            ADD COLUMN IF NOT EXISTS "email_verified" BOOLEAN NOT NULL DEFAULT false`,
+        `ALTER TABLE "venues"
+           ADD COLUMN IF NOT EXISTS "images" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]`,
+        `ALTER TABLE "equipments"
+           ADD COLUMN IF NOT EXISTS "images" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]`,
+        `ALTER TABLE "requests"
+           ADD COLUMN IF NOT EXISTS "requester_phone" TEXT`,
         `DO $$ BEGIN
            CREATE TYPE "VerificationStatus" AS ENUM ('VALID', 'REVOKED', 'INVALID');
          EXCEPTION
@@ -205,16 +211,6 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         } else {
           this.logger.log('Seeding initial production admin account into PostgreSQL...');
           await this.seedProductionAdmin();
-        }
-      }
-      const venueCount = await this.prisma.venue.count();
-      if (venueCount === 0) {
-        this.logger.log('Seeding default municipal venues and equipment into PostgreSQL...');
-        for (const v of mockVenues) {
-          await this.persistVenue(v);
-        }
-        for (const e of mockEquipment) {
-          await this.persistEquipment(e);
         }
       }
       await this.loadFromDatabase();
@@ -794,6 +790,24 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         approvalLevels: v.approvalLevels,
       },
     });
+    const imgs = Array.isArray(v.images) ? v.images.filter(Boolean).slice(0, 3) : [];
+    await this.prisma.$executeRaw`
+      UPDATE "venues" SET "images" = ${imgs}::text[] WHERE "id" = ${v.id}
+    `.catch(() => {});
+  }
+
+  async deleteVenue(id: string) {
+    this.venues = this.venues.filter((v) => v.id !== id);
+    if (!this.dbAvailable) return;
+    await this.prisma.$executeRaw`DELETE FROM "request_venues" WHERE "venueId" = ${id}`.catch(() => {});
+    await this.prisma.venue.delete({ where: { id } }).catch(() => {});
+  }
+
+  async deleteEquipment(id: string) {
+    this.equipment = this.equipment.filter((e) => e.id !== id);
+    if (!this.dbAvailable) return;
+    await this.prisma.$executeRaw`DELETE FROM "request_items" WHERE "itemId" = ${id}`.catch(() => {});
+    await this.prisma.equipment.delete({ where: { id } }).catch(() => {});
   }
 
   async persistEquipment(e: Equipment) {
@@ -814,6 +828,10 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         enabled: e.enabled,
       },
     });
+    const imgs = Array.isArray(e.images) ? e.images.filter(Boolean).slice(0, 3) : [];
+    await this.prisma.$executeRaw`
+      UPDATE "equipments" SET "images" = ${imgs}::text[] WHERE "id" = ${e.id}
+    `.catch(() => {});
   }
 
   async persistRequest(r: AnyRequest) {
@@ -837,7 +855,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       purpose: r.type === 'booking' || r.type === 'borrow' ? r.purpose : null,
       activity: r.type === 'booking' ? r.activity : null,
       attendees: r.type === 'booking' ? r.attendees : null,
-      attachments: r.type === 'booking' || r.type === 'borrow' ? r.attachments : [],
+      attachments: Array.isArray(r.attachments) ? r.attachments : [],
       pickupDate: r.type === 'borrow' ? new Date(`${r.pickupDate}T00:00:00.000Z`) : null,
       returnDate: r.type === 'borrow' ? new Date(`${r.returnDate}T00:00:00.000Z`) : null,
       returnRequestedAt: r.type === 'borrow' && r.returnRequestedAt ? new Date(r.returnRequestedAt) : null,
@@ -957,6 +975,10 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         }
       }
     });
+
+    await this.prisma.$executeRaw`
+      UPDATE "requests" SET "requester_phone" = ${r.requesterPhone ?? null} WHERE "id" = ${r.id}
+    `.catch(() => {});
   }
 
   async persistHandover(h: HandoverRecord) {
@@ -2329,6 +2351,22 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       };
     });
 
+    let venueImagesMap = new Map<string, string[]>();
+    let equipmentImagesMap = new Map<string, string[]>();
+    let reqPhoneMap = new Map<string, string>();
+    try {
+      const [vRows, eRows, rPhoneRows] = await Promise.all([
+        this.prisma.$queryRaw<{ id: string; images: string[] | null }[]>`SELECT "id", "images" FROM "venues"`,
+        this.prisma.$queryRaw<{ id: string; images: string[] | null }[]>`SELECT "id", "images" FROM "equipments"`,
+        this.prisma.$queryRaw<{ id: string; requester_phone: string | null }[]>`SELECT "id", "requester_phone" FROM "requests"`,
+      ]);
+      venueImagesMap = new Map((vRows || []).map((r) => [r.id, Array.isArray(r.images) ? r.images : []]));
+      equipmentImagesMap = new Map((eRows || []).map((r) => [r.id, Array.isArray(r.images) ? r.images : []]));
+      reqPhoneMap = new Map((rPhoneRows || []).filter((r) => r.requester_phone).map((r) => [r.id, r.requester_phone as string]));
+    } catch {
+      // ignore if column not yet migrated
+    }
+
     this.venues = (dbVenues || []).map((v: any) => ({
       id: v.id,
       name: v.name,
@@ -2345,6 +2383,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       advanceDays: v.advanceDays,
       formName: v.formName,
       approvalLevels: v.approvalLevels,
+      images: venueImagesMap.get(v.id) ?? [],
     }));
 
     this.equipment = (dbEquipment || []).map((e: any) => ({
@@ -2353,6 +2392,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       category: e.category,
       stock: e.stock,
       enabled: e.enabled,
+      images: equipmentImagesMap.get(e.id) ?? [],
     }));
 
     this.requests = (dbRequests || []).map((r: any): AnyRequest => {
@@ -2362,6 +2402,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         status: r.status,
         requesterId: r.requesterId,
         requesterName: r.requesterName,
+        requesterPhone: reqPhoneMap.get(r.id) ?? undefined,
         organization: r.organization,
         createdAt: r.createdAt.toISOString(),
         updatedAt: r.updatedAt.toISOString(),
@@ -2445,7 +2486,8 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         location: r.repairLocation ?? 'ทั่วไป',
         category: r.repairCategory ?? 'อื่น ๆ',
         detail: r.repairDetail ?? '',
-        photos: r.repairPhotos ?? 0,
+        photos: r.repairPhotos ?? (Array.isArray(r.attachments) ? r.attachments.length : 0),
+        attachments: Array.isArray(r.attachments) ? r.attachments : [],
         acceptedAt: r.repairAcceptedAt ? r.repairAcceptedAt.toISOString() : undefined,
         startedAt: r.repairStartedAt ? r.repairStartedAt.toISOString() : undefined,
         finishedAt: r.repairFinishedAt ? r.repairFinishedAt.toISOString() : undefined,

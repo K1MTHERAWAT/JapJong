@@ -8,8 +8,9 @@ import {
   Equipment,
   EquipmentCategory,
   OfficialFormPurposeItem,
+  PublicAccount,
 } from '@japjong/shared';
-import { useAuth } from '@/components/auth-context';
+import { roleHomePath, useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
 import {
@@ -26,21 +27,25 @@ const STEPS = ['เลือกอุปกรณ์', 'กรอกคำขอ
 
 export default function BorrowWizardPage() {
   const router = useRouter();
-  const { account } = useAuth();
+  const { account, accounts } = useAuth();
+  const isStaff = account?.role === 'STAFF' || account?.role === 'ADMIN';
   const [step, setStep] = useState(1);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [equipmentLoading, setEquipmentLoading] = useState(true);
   const [equipmentError, setEquipmentError] = useState('');
   const [cat, setCat] = useState<'all' | EquipmentCategory>('all');
   const [search, setSearch] = useState('');
-  const [quantities, setQuantities] = useState<Record<string, number>>({
-    'e-audio': 1,
-    'e-tent': 2,
-  });
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+
+  // โหมดกรอกคำขอแทนผู้มาติดต่อ (สำหรับเจ้าหน้าที่)
+  const [isWalkIn, setIsWalkIn] = useState(false);
+  const [walkInQuery, setWalkInQuery] = useState('');
+  const [foundUser, setFoundUser] = useState<PublicAccount | null>(null);
 
   // Step 2 (ตามแบบคำขอใช้อุปกรณ์ราชการ)
   const [writtenAt, setWrittenAt] = useState('');
   const [requesterName, setRequesterName] = useState(account?.name || '');
+  const [requesterPhone, setRequesterPhone] = useState(account?.phone || '');
   const [requesterPosition, setRequesterPosition] = useState(
     account?.position && account.position !== 'ประชาชน' ? account.position : '',
   );
@@ -76,8 +81,56 @@ export default function BorrowWizardPage() {
 
   // Step 3
   const [signature, setSignature] = useState('');
+  const [staffSignature, setStaffSignature] = useState('');
   const [draftSaved, setDraftSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const applyAccountFields = (acc: PublicAccount | null) => {
+    setRequesterName(acc?.name || '');
+    setRequesterPhone(acc?.phone || '');
+    setRequesterPosition(acc?.position && acc.position !== 'ประชาชน' ? acc.position : '');
+    setOrganization(acc?.department || '');
+    setAddressHouseNo(acc?.addressHouseNo || '');
+    setAddressMoo(acc?.addressMoo || '');
+    setAddressSubdistrict(acc?.addressSubdistrict || '');
+    setAddressDistrict(acc?.addressDistrict || '');
+    setAddressProvince(acc?.addressProvince || '');
+  };
+
+  const handleToggleWalkIn = (walkInMode: boolean) => {
+    setIsWalkIn(walkInMode);
+    setFoundUser(null);
+    setWalkInQuery('');
+    if (walkInMode) {
+      applyAccountFields(null);
+      setSignature('');
+    } else if (account) {
+      applyAccountFields(account);
+    }
+  };
+
+  const handleSearchWalkInUser = () => {
+    const q = walkInQuery.trim().toLowerCase();
+    if (!q) return;
+    const digits = q.replace(/\D/g, '');
+    const match = accounts.find(
+      (a) =>
+        a.name.toLowerCase().includes(q) ||
+        a.username.toLowerCase().includes(q) ||
+        (digits && a.phone.replace(/\D/g, '').includes(digits)),
+    );
+    if (match) {
+      setFoundUser(match);
+      applyAccountFields(match);
+    } else {
+      setFoundUser(null);
+      if (digits.length >= 9) {
+        setRequesterPhone(walkInQuery.trim());
+      } else {
+        setRequesterName(walkInQuery.trim());
+      }
+    }
+  };
 
   useEffect(() => {
     api.equipment()
@@ -90,8 +143,9 @@ export default function BorrowWizardPage() {
   }, []);
 
   useEffect(() => {
-    if (account) {
+    if (account && !isWalkIn) {
       setRequesterName(account.name);
+      setRequesterPhone(account.phone || '');
       setOrganization(account.department);
       if (account.addressHouseNo) setAddressHouseNo(account.addressHouseNo);
       if (account.addressMoo) setAddressMoo(account.addressMoo);
@@ -99,7 +153,7 @@ export default function BorrowWizardPage() {
       if (account.addressDistrict) setAddressDistrict(account.addressDistrict);
       if (account.addressProvince) setAddressProvince(account.addressProvince);
     }
-  }, [account]);
+  }, [account, isWalkIn]);
 
   const setQty = (id: string, max: number, next: number) => {
     const clamped = Math.max(0, Math.min(max, next));
@@ -138,8 +192,11 @@ export default function BorrowWizardPage() {
         returnDate,
         purpose: purpose || purposeItems[0]?.forWhat || 'ใช้ในกิจกรรมของหน่วยงาน/ชุมชน',
         organization,
+        requesterId: isWalkIn && foundUser ? foundUser.id : undefined,
         requesterName,
+        requesterPhone,
         requesterSignature: signature,
+        createdByStaffSignature: isWalkIn && staffSignature.trim() ? staffSignature : undefined,
         writtenAt,
         requesterPosition,
         addressHouseNo,
@@ -159,7 +216,7 @@ export default function BorrowWizardPage() {
   return (
     <AppShell
       title={step === 1 ? 'อุปกรณ์' : step === 2 ? 'แบบคำขอใช้อุปกรณ์' : 'ลงนามและส่งคำขอ'}
-      backHref={step === 1 ? '/' : undefined}
+      backHref={step === 1 ? (account ? roleHomePath(account.role) : '/') : undefined}
       onBack={step > 1 ? () => setStep((s) => s - 1) : undefined}
       footer={
         step === 1 ? (
@@ -283,8 +340,12 @@ export default function BorrowWizardPage() {
               const qty = quantities[eq.id] ?? 0;
               return (
                 <div key={eq.id} className="jw-card p-3.5 flex items-center gap-3.5">
-                  <div className="w-14 h-14 rounded-2xl bg-brand-mint text-brand flex items-center justify-center shrink-0">
-                    <Icon name={equipmentIconName(eq.category)} className="w-6 h-6" />
+                  <div className="w-14 h-14 rounded-2xl bg-brand-mint text-brand flex items-center justify-center shrink-0 overflow-hidden">
+                    {eq.images?.[0] ? (
+                      <img src={eq.images[0]} alt={eq.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <Icon name={equipmentIconName(eq.category)} className="w-6 h-6" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <b className="block text-[15px] text-ink">{eq.name}</b>
@@ -292,21 +353,32 @@ export default function BorrowWizardPage() {
                       {EQUIPMENT_CATEGORY_LABEL[eq.category]} · คงเหลือ {eq.stock}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
                       disabled={qty <= 0}
                       onClick={() => setQty(eq.id, eq.stock, qty - 1)}
-                      className="w-[34px] h-[34px] rounded-full border-[1.5px] border-ink flex items-center justify-center disabled:opacity-40"
+                      className="w-[34px] h-[34px] rounded-full border-[1.5px] border-line hover:border-ink flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none transition"
                     >
                       <Icon name="minus" className="w-4 h-4" />
                     </button>
-                    <b className="min-w-[20px] text-center text-[15px]">{qty}</b>
+                    <input
+                      type="number"
+                      min={0}
+                      max={eq.stock}
+                      value={qty}
+                      onChange={(e) => {
+                        const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
+                        setQty(eq.id, eq.stock, Number.isNaN(val) ? 0 : val);
+                      }}
+                      onFocus={(e) => e.target.select()}
+                      className="w-12 h-9 text-center text-[15px] font-bold rounded-xl border border-line bg-white text-ink focus:border-brand focus:ring-1 focus:ring-brand focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
                     <button
                       type="button"
                       disabled={qty >= eq.stock}
                       onClick={() => setQty(eq.id, eq.stock, qty + 1)}
-                      className="w-[34px] h-[34px] rounded-full bg-ink text-white flex items-center justify-center disabled:opacity-40"
+                      className="w-[34px] h-[34px] rounded-full bg-brand text-white flex items-center justify-center hover:bg-brand-deep disabled:opacity-30 disabled:pointer-events-none transition"
                     >
                       <Icon name="plus" className="w-4 h-4" />
                     </button>
@@ -328,7 +400,81 @@ export default function BorrowWizardPage() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+          {isStaff && (
+            <div className="rounded-2xl border border-brand/30 bg-brand-mint/25 p-4 flex flex-col gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <b className="text-[14px] text-ink block">สำหรับเจ้าหน้าที่: รูปแบบการยื่นคำขอ</b>
+                  <span className="text-[12px] text-ink-mute">
+                    เลือกว่าต้องการยื่นคำขอในนามตนเอง หรือกรอกคำขอแทนประชาชนผู้มาติดต่อ
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleWalkIn(false)}
+                    className={`h-9 px-3.5 rounded-full text-[12.5px] font-semibold border transition ${
+                      !isWalkIn
+                        ? 'bg-brand border-brand text-white'
+                        : 'bg-white border-line text-ink hover:border-brand'
+                    }`}
+                  >
+                    ยื่นในนามตนเอง
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleWalkIn(true)}
+                    className={`h-9 px-3.5 rounded-full text-[12.5px] font-semibold border transition ${
+                      isWalkIn
+                        ? 'bg-brand border-brand text-white'
+                        : 'bg-white border-line text-ink hover:border-brand'
+                    }`}
+                  >
+                    กรอกคำขอแทนผู้มาติดต่อ
+                  </button>
+                </div>
+              </div>
+
+              {isWalkIn && (
+                <div className="pt-2 border-t border-brand/15 flex flex-col gap-2.5">
+                  <label className="jw-lbl mb-0">ค้นหาข้อมูลผู้มาติดต่อ (เบอร์โทรหรือชื่อ)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={walkInQuery}
+                      onChange={(e) => setWalkInQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleSearchWalkInUser();
+                        }
+                      }}
+                      placeholder="กรอกเบอร์โทรหรือชื่อเพื่อดึงข้อมูลอัตโนมัติ หรือพิมพ์ข้อมูลด้านล่างโดยตรง"
+                      className="jw-in flex-1 bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSearchWalkInUser}
+                      className="jw-btn jw-btn-sm shrink-0"
+                    >
+                      ค้นหา
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {foundUser ? (
+                      <Chip tone="green">
+                        <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} /> พบผู้ใช้ในระบบ: {foundUser.name} ({foundUser.phone})
+                      </Chip>
+                    ) : (
+                      <Chip tone="amber">ผู้มาติดต่อทั่วไป (กรอกชื่อและเบอร์โทรด้านล่างได้เลย)</Chip>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             <div>
               <label className="jw-lbl">เขียนที่</label>
               <input
@@ -347,6 +493,16 @@ export default function BorrowWizardPage() {
                 onChange={(e) => setRequesterName(e.target.value)}
                 className="jw-in"
                 placeholder="ระบุชื่อ-นามสกุล"
+              />
+            </div>
+            <div>
+              <label className="jw-lbl">เบอร์โทรศัพท์ติดต่อ</label>
+              <input
+                type="tel"
+                value={requesterPhone}
+                onChange={(e) => setRequesterPhone(e.target.value)}
+                className="jw-in"
+                placeholder="เช่น 081-234-5678"
               />
             </div>
             <div>
@@ -556,14 +712,35 @@ export default function BorrowWizardPage() {
             }}
           />
 
-          <div className="jw-card p-5 flex flex-col gap-2">
-            <label className="jw-lbl">เขียนลายเซ็นผู้ขอใช้อุปกรณ์ ({requesterName || account?.name || 'สมชาย ใจดี'})</label>
-            <SignatureBox
-              value={signature}
-              onChange={setSignature}
-              savedSignature={account?.signature}
-              signerLabel={`${requesterName || account?.name || 'สมชาย ใจดี'} · ผู้ขออนุญาตใช้อุปกรณ์ราชการ`}
-            />
+          <div className="jw-card p-5 flex flex-col gap-3">
+            <div>
+              <label className="jw-lbl">
+                {isWalkIn
+                  ? `1. เขียนลายเซ็นผู้ขอใช้อุปกรณ์ (${requesterName || 'ผู้ยื่นคำขอ'})`
+                  : `เขียนลายเซ็นผู้ขอใช้อุปกรณ์ (${requesterName || account?.name || 'ผู้ยื่นคำขอ'})`}
+              </label>
+              <SignatureBox
+                value={signature}
+                onChange={setSignature}
+                savedSignature={isWalkIn ? undefined : account?.signature}
+                signerLabel={`${requesterName || account?.name || 'ผู้ยื่นคำขอ'} · ผู้ขออนุญาตใช้อุปกรณ์ราชการ`}
+              />
+            </div>
+
+            {isWalkIn && (
+              <div className="pt-2 border-t border-line">
+                <label className="jw-lbl">
+                  2. ลงลายมือชื่อเจ้าหน้าที่ผู้กรอกแทน ({account?.name || 'เจ้าหน้าที่'})
+                </label>
+                <SignatureBox
+                  value={staffSignature}
+                  onChange={setStaffSignature}
+                  savedSignature={account?.signature}
+                  signerLabel={`${account?.name || 'เจ้าหน้าที่'} · เจ้าหน้าที่ผู้กรอกคำขอแทน`}
+                />
+              </div>
+            )}
+
             <p className="text-[13px] text-ink-mute mt-1">
               ต้องลงนามทุกฝ่าย (4 ฝ่าย): (1) ผู้ยื่นคำขอ → (2) เจ้าหน้าที่ผู้ตรวจสอบ → (3) ปลัด อบต. → (4) นายก อบต.
             </p>

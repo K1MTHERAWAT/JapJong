@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import {
   ACTIVE_BOOKING_STATUSES,
@@ -62,6 +62,9 @@ export class ResourcesController {
       advanceDays: Number.isFinite(advanceDays) ? advanceDays : 3,
       formName: (body.formName ?? 'แบบคำขอใช้สถานที่').trim().slice(0, 120),
       approvalLevels: 3,
+      images: Array.isArray(body.images)
+        ? body.images.map((img) => String(img).trim()).filter(Boolean).slice(0, 3)
+        : [],
     };
     this.db.venues.push(venue);
     await this.db.persistVenue(venue);
@@ -101,6 +104,9 @@ export class ResourcesController {
     if (Array.isArray(body.facilities)) {
       venue.facilities = body.facilities.map((f) => String(f).trim()).filter(Boolean).slice(0, 20);
     }
+    if (Array.isArray(body.images)) {
+      venue.images = body.images.map((img) => String(img).trim()).filter(Boolean).slice(0, 3);
+    }
     if (typeof body.enabled === 'boolean') {
       venue.enabled = body.enabled;
       venue.status = body.enabled ? 'available' : 'maintenance';
@@ -112,6 +118,20 @@ export class ResourcesController {
     }
     await this.db.persistVenue(venue);
     return venue;
+  }
+
+  @Permissions('manageResources')
+  @Delete('venues/:id')
+  async deleteVenue(@CurrentUser() user: Account, @Param('id') id: string) {
+    const venue = this.db.venues.find((v) => v.id === id);
+    if (!venue) throw new NotFoundException('ไม่พบสถานที่');
+    await this.db.deleteVenue(id);
+    await this.db.log('resource', `ลบสถานที่ ${venue.name}`, id, {
+      id: user.id,
+      name: user.name,
+      role: user.role,
+    });
+    return { ok: true, id };
   }
 
   @Permissions('manageResources')
@@ -131,6 +151,9 @@ export class ResourcesController {
           : 'audio',
       stock,
       enabled: body.enabled ?? true,
+      images: Array.isArray(body.images)
+        ? body.images.map((img) => String(img).trim()).filter(Boolean).slice(0, 3)
+        : [],
     };
     this.db.equipment.push(eq);
     await this.db.persistEquipment(eq);
@@ -159,8 +182,25 @@ export class ResourcesController {
       eq.stock = stock;
     }
     if (typeof body.enabled === 'boolean') eq.enabled = body.enabled;
+    if (Array.isArray(body.images)) {
+      eq.images = body.images.map((img) => String(img).trim()).filter(Boolean).slice(0, 3);
+    }
     await this.db.persistEquipment(eq);
     return eq;
+  }
+
+  @Permissions('manageResources')
+  @Delete('equipment/:id')
+  async deleteEquipment(@CurrentUser() user: Account, @Param('id') id: string) {
+    const eq = this.db.equipment.find((e) => e.id === id);
+    if (!eq) throw new NotFoundException('ไม่พบอุปกรณ์');
+    await this.db.deleteEquipment(id);
+    await this.db.log('resource', `ลบอุปกรณ์ ${eq.name}`, id, {
+      id: user.id,
+      name: user.name,
+      role: user.role,
+    });
+    return { ok: true, id };
   }
 
   /** ปฏิทินความว่างรายเดือนของสถานที่ */

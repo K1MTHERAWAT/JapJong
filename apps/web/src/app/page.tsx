@@ -62,12 +62,20 @@ export default function HomePage() {
     }
   }, [router]);
 
+  // หากเป็น STAFF, APPROVER_L2, APPROVER_L1 หรือ ADMIN ให้เด้งไปยังหน้าหลักของบทบาทตนเองทันที
   useEffect(() => {
+    if (account && account.role !== 'USER') {
+      router.replace(roleHomePath(account.role));
+    }
+  }, [account, router]);
+
+  useEffect(() => {
+    if (account && account.role !== 'USER') return;
     api
       .listRequests({ mine: true })
       .then(setRequests)
       .catch(() => {});
-  }, [account?.id]);
+  }, [account?.id, account?.role]);
 
   const filtered = requests.filter((r) => {
     if (tab !== 'all' && r.type !== tab) return false;
@@ -86,6 +94,16 @@ export default function HomePage() {
     (r): r is RequestWithTimeline & BorrowRequest =>
       r.type === 'borrow' && r.status === 'borrowing',
   );
+
+  if (account && account.role !== 'USER') {
+    return (
+      <AppShell>
+        <div className="jw-card p-12 text-center text-ink-mute">
+          กำลังนำคุณไปยังหน้าหลัก {ROLE_LABEL[account.role]}...
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>
@@ -202,7 +220,17 @@ export default function HomePage() {
                         ? `/repair?mode=track&id=${req.id}`
                         : `/requests/${req.id}`;
 
-                    return (
+                    if (account && account.role !== 'USER') {
+    return (
+      <AppShell>
+        <div className="jw-card p-12 text-center text-ink-mute">
+          กำลังนำคุณไปยังหน้าหลัก {ROLE_LABEL[account.role]}...
+        </div>
+      </AppShell>
+    );
+  }
+
+  return (
                       <ListRow
                         key={req.id}
                         href={targetHref}
