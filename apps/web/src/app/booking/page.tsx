@@ -137,7 +137,7 @@ export default function BookingWizardPage() {
       .filter(([, value]) => !String(value).trim())
       .map(([label]) => label),
     ...(attendees < 1 ? ['จำนวนผู้เข้าร่วม'] : []),
-    ...(attachmentFiles.length === 0 ? ['เอกสารประกอบคำขอ'] : []),
+    ...(attachmentFiles.length === 0 ? ['สำเนาบัตรประชาชนหรือเอกสารประกอบคำขอ'] : []),
     ...purposeItems.flatMap((item, index) => [
       ...(!item.item.trim() ? [`รายการที่ ${index + 1}`] : []),
       ...(!item.forWhat.trim() ? [`วัตถุประสงค์ของรายการที่ ${index + 1}`] : []),
@@ -1485,7 +1485,7 @@ export default function BookingWizardPage() {
           </div>
 
           <div>
-            <label className="jw-lbl">แนบเอกสารประกอบคำขอ<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
+            <label className="jw-lbl">แนบสำเนาบัตรประชาชนหรือเอกสารประกอบคำขอ<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
             <input
               type="file"
               className="hidden"
@@ -1523,7 +1523,7 @@ export default function BookingWizardPage() {
               ) : (
                 <button type="button" onClick={() => setAttachmentPanelOpen(true)} className="flex min-h-16 w-full items-center justify-center gap-2 rounded-xl px-3 py-4 text-center text-ink-mute transition hover:bg-canvas">
                   <Upload className="size-4 text-brand" />
-                  <span><span className="font-medium text-ink">คลิกเพื่อเลือกเอกสารประกอบคำขอ</span><span className="mt-0.5 block text-[12px]">PDF / JPG / PNG ไม่เกิน 10 MB ต่อไฟล์</span></span>
+                  <span><span className="font-medium text-ink">คลิกเพื่อเลือกสำเนาบัตรประชาชนหรือเอกสารประกอบคำขอ</span><span className="mt-0.5 block text-[12px]">PDF / JPG / PNG ไม่เกิน 10 MB ต่อไฟล์</span></span>
                 </button>
               )}
             </div>
@@ -1537,7 +1537,7 @@ export default function BookingWizardPage() {
             <header className="flex items-center gap-3 border-b border-line px-4 py-3.5 sm:px-5">
               <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-tint text-brand-ink"><FileText className="size-5" /></span>
               <div className="min-w-0 flex-1">
-                <h2 id="attachment-dialog-title" className="text-[16px] font-bold text-ink">เอกสารประกอบคำขอ</h2>
+                <h2 id="attachment-dialog-title" className="text-[16px] font-bold text-ink">สำเนาบัตรประชาชนหรือเอกสารประกอบคำขอ</h2>
                 <p className="text-[12px] text-ink-mute">แนบได้สูงสุด 3 ไฟล์ · {attachmentFiles.length}/3</p>
               </div>
               <button type="button" aria-label="ปิดหน้าต่างเอกสาร" onClick={() => setAttachmentPanelOpen(false)} className="flex size-9 items-center justify-center rounded-full text-ink-mute hover:bg-soft hover:text-ink"><X className="size-5" /></button>

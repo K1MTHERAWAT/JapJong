@@ -323,7 +323,7 @@ export default function BorrowWizardPage() {
     ]
       .filter(([, value]) => !String(value).trim())
       .map(([label]) => label),
-    ...(attachmentFiles.length === 0 ? ['เอกสารประกอบคำขอ'] : []),
+    ...(attachmentFiles.length === 0 ? ['สำเนาบัตรประชาชนหรือเอกสารประกอบคำขอ'] : []),
     ...purposeItems.flatMap((item, index) => [
       ...(!item.item.trim() ? [`รายการที่ ${index + 1}`] : []),
       ...(!item.forWhat.trim() ? [`วัตถุประสงค์ของรายการที่ ${index + 1}`] : []),
@@ -1254,9 +1254,9 @@ export default function BorrowWizardPage() {
               />
             </div>
 
-            {/* แนบเอกสารประกอบคำขอ */}
+            {/* แนบสำเนาบัตรประชาชนหรือเอกสารประกอบคำขอ */}
             <div>
-              <label className="jw-lbl">แนบเอกสารประกอบคำขอ<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
+              <label className="jw-lbl">แนบสำเนาบัตรประชาชนหรือเอกสารประกอบคำขอ<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
               <input
                 type="file"
                 className="hidden"
@@ -1288,7 +1288,7 @@ export default function BorrowWizardPage() {
               >
                 <div className="font-medium text-ink flex items-center justify-center gap-2">
                   <Icon name="upload" className="w-5 h-5 text-brand" />
-                  <span>ลากไฟล์มาวาง หรือ แตะเพื่อเลือกไฟล์เอกสารประกอบ</span>
+                  <span>ลากไฟล์มาวาง หรือ แตะเพื่อเลือกสำเนาบัตรประชาชนหรือเอกสารประกอบคำขอ</span>
                 </div>
                 <div className="text-[12px] text-ink-mute mt-1">
                   รองรับ PDF หรือรูปภาพ JPG, PNG (แนบได้สูงสุด 3 ไฟล์)
