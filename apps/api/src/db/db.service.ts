@@ -238,10 +238,11 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(
         `PostgreSQL connected: ${this.accounts.length} accounts, ${this.venues.length} venues, ${this.equipment.length} equipment, ${this.requests.length} requests`,
       );
-    } catch (err) {
+    } catch (err: any) {
       this.dbAvailable = false;
+      this.logger.error('Failed to initialize PostgreSQL connection: ' + (err?.message || err), err?.stack);
       if (process.env.REQUIRE_DB === 'true') {
-        this.logger.error('Failed to initialize PostgreSQL connection (REQUIRE_DB=true)', err);
+        this.logger.error('REQUIRE_DB=true is set; throwing initialization error', err);
         throw err;
       }
       this.logger.warn(
