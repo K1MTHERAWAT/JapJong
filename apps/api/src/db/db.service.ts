@@ -124,6 +124,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   private resetCronTimer?: NodeJS.Timeout;
   private lastDemoResetDateUtc?: string;
   dbAvailable = false;
+  lastDbError?: string;
   private memorySessions = new Map<string, { accountId: string; expiresAt: Date }>();
   private memoryOtps: {
     id: string;
@@ -240,6 +241,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       );
     } catch (err: any) {
       this.dbAvailable = false;
+      this.lastDbError = err?.message || String(err);
       this.logger.error('Failed to initialize PostgreSQL connection: ' + (err?.message || err), err?.stack);
       if (process.env.REQUIRE_DB === 'true') {
         this.logger.error('REQUIRE_DB=true is set; throwing initialization error', err);

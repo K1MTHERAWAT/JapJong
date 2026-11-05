@@ -17,6 +17,7 @@ export class HealthController {
       status: 'ok',
       service: 'japjong-api',
       dbAvailable: this.db.dbAvailable,
+      lastDbError: this.db.lastDbError,
       databaseUrlPrefix: (process.env.DATABASE_URL || '').slice(0, 35),
       accountsCount: this.db.accounts.length,
       venuesCount: this.db.venues.length,
