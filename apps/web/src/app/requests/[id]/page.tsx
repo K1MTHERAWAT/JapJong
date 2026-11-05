@@ -157,6 +157,12 @@ export default function RequestDetailPage() {
               {req.requesterPhone ? ` · โทร. ${req.requesterPhone}` : ''}
             </span>
           </div>
+          {req.type !== 'repair' && req.purpose ? (
+            <div className="flex gap-2 items-start bg-amber-50/80 border border-amber-200/80 rounded-xl p-2.5 text-[13px] text-amber-950">
+              <b className="w-24 shrink-0 text-amber-900 font-semibold">ข้อความถึง จนท.</b>
+              <span className="whitespace-pre-wrap">{req.purpose}</span>
+            </div>
+          ) : null}
           <div className="flex gap-2">
             <b className="w-24 shrink-0 text-ink-mute">เอกสาร</b>
             <span>

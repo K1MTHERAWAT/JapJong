@@ -33,6 +33,7 @@ import {
   venueIconName,
 } from '@/components/ui';
 import { api, formatMonthTitle, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
+import { HourlyBookingSection } from '@/components/hourly-booking-section';
 
 const STEPS = ['เลือกสถานที่', 'วัน-เวลา', 'อุปกรณ์เสริม', 'กรอกคำขอ', 'ลงนามและส่ง'];
 
@@ -77,8 +78,18 @@ export default function BookingWizardPage() {
   const [equipmentSearch, setEquipmentSearch] = useState('');
 
   // Step 4 state (ตามแบบขอใช้สถานที่ราชการ)
+  const parseTitleAndName = (rawName?: string) => {
+    const n = (rawName || '').trim();
+    if (n.startsWith('นางสาว')) return { title: 'นางสาว', name: n.slice(6).trim() };
+    if (n.startsWith('นาง')) return { title: 'นาง', name: n.slice(3).trim() };
+    if (n.startsWith('นาย')) return { title: 'นาย', name: n.slice(3).trim() };
+    return { title: 'นาย', name: n };
+  };
+
   const [writtenAt, setWrittenAt] = useState('');
-  const [requesterName, setRequesterName] = useState(account?.name || '');
+  const [requesterTitle, setRequesterTitle] = useState(() => parseTitleAndName(account?.name).title);
+  const [requesterName, setRequesterName] = useState(() => parseTitleAndName(account?.name).name);
+  const fullRequesterName = requesterName.trim() ? `${requesterTitle} ${requesterName.trim()}` : '';
   const [requesterPhone, setRequesterPhone] = useState(account?.phone || '');
   const [requesterPosition, setRequesterPosition] = useState(
     account?.position && account.position !== 'ประชาชน'
@@ -122,7 +133,6 @@ export default function BookingWizardPage() {
       ['อำเภอ / เขต', addressDistrict],
       ['จังหวัด', addressProvince],
       ['หน่วยงาน / ชุมชน', organization],
-      ['รายละเอียด / วัตถุประสงค์เพิ่มเติม', purpose],
     ]
       .filter(([, value]) => !String(value).trim())
       .map(([label]) => label),
@@ -141,7 +151,9 @@ export default function BookingWizardPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const applyAccountFields = (acc: PublicAccount | null) => {
-    setRequesterName(acc?.name || '');
+    const { title, name } = parseTitleAndName(acc?.name);
+    setRequesterTitle(title);
+    setRequesterName(name);
     setRequesterPhone(acc?.phone || '');
     setRequesterPosition(acc?.position && acc.position !== 'ประชาชน' ? acc.position : '');
     setOrganization(acc?.department || '');
@@ -240,6 +252,38 @@ export default function BookingWizardPage() {
   const selectedVenues = venues.filter((v) => selectedIds.includes(v.id));
   const buildings = Array.from(new Set(venues.map((v) => v.building)));
 
+  const [bookingMode, setBookingMode] = useState<'hourly' | 'daily'>('hourly');
+
+  // เงื่อนไขจองล่วงหน้าขั้นต่ำตามที่สถานที่กำหนด (Dynamic minAdvanceDays)
+  const minAdvanceDays = React.useMemo(() => {
+    if (!selectedVenues.length) return 0;
+    return Math.max(...selectedVenues.map((v) => Number(v.advanceDays ?? 0)));
+  }, [selectedVenues]);
+
+  const earliestBookableDate = React.useMemo(() => {
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+    const [y, m, d] = todayStr.split('-').map(Number);
+    const date = new Date(Date.UTC(y, m - 1, d + minAdvanceDays));
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+  }, [minAdvanceDays]);
+
+  // ปรับวันเริ่มต้นอัตโนมัติหากวันเดิมที่เลือกยังไม่ถึงระยะเวลาจองล่วงหน้าขั้นต่ำ
+  useEffect(() => {
+    if (selectedVenues.length > 0 && periods.length > 0) {
+      const firstDate = periods[0].start.slice(0, 10);
+      if (firstDate < earliestBookableDate) {
+        const openTime = selectedVenues[0]?.openTime || '09:00';
+        const closeTime = selectedVenues[0]?.closeTime || '16:00';
+        setPeriods([
+          {
+            start: `${earliestBookableDate}T${openTime}:00+07:00`,
+            end: `${earliestBookableDate}T${closeTime}:00+07:00`,
+          },
+        ]);
+      }
+    }
+  }, [selectedVenues, earliestBookableDate]);
+
   // การจัดการจำนวนอุปกรณ์เสริม
   const setEquipmentQty = (id: string, max: number, next: number) => {
     const clamped = Math.max(0, Math.min(max, next));
@@ -269,7 +313,7 @@ export default function BookingWizardPage() {
       venueList.forEach((v, idx) => {
         generated.push({
           item: v.name,
-          forWhat: prev[idx]?.forWhat || activity || purpose || 'ใช้จัดกิจกรรมและประชุม',
+          forWhat: prev[idx]?.forWhat || activity || 'ใช้จัดกิจกรรมและประชุม',
         });
       });
 
@@ -296,6 +340,7 @@ export default function BookingWizardPage() {
   const effectiveConflicts: ConflictInfo[] = conflicts;
 
   const handlePickCalendarDate = (dateStr: string) => {
+    if (dateStr < earliestBookableDate) return;
     setPeriods((prev) => {
       const idx = Math.min(activePeriodIdx, Math.max(0, prev.length - 1));
       return prev.map((p, i) => {
@@ -352,7 +397,7 @@ export default function BookingWizardPage() {
         attachments: attachmentFiles.map((file) => file.name),
         extraItems: selectedExtraItems.map((s) => ({ equipmentId: s.eq.id, qty: s.qty })),
         requesterId: isWalkIn && foundUser ? foundUser.id : undefined,
-        requesterName,
+        requesterName: fullRequesterName || requesterName,
         requesterPhone,
         requesterSignature: signature,
         createdByStaffSignature: isWalkIn && staffSignature.trim() ? staffSignature : undefined,
@@ -405,7 +450,11 @@ export default function BookingWizardPage() {
             </button>
             <button
               type="button"
-              disabled={effectiveConflicts.length > 0 || periods.length === 0}
+              disabled={
+                effectiveConflicts.length > 0 ||
+                periods.length === 0 ||
+                (bookingMode === 'hourly' && (!periods[0]?.start || !periods[0]?.end))
+              }
               onClick={() => setStep(3)}
               className="jw-btn flex-[1.5] sm:w-56"
             >
@@ -478,7 +527,7 @@ export default function BookingWizardPage() {
         )
       }
     >
-      <div className="max-w-5xl mx-auto mb-5">
+      <div className="w-full mb-5">
         <Stepper steps={STEPS} current={step} onSelect={setStep} />
       </div>
 
@@ -703,144 +752,203 @@ export default function BookingWizardPage() {
 
       {/* ================= STEP 2: เลือกวัน-เวลา ================= */}
       {step === 2 && (
-        <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-6 items-start">
-          <div className="flex flex-col gap-3">
-            <CalendarC4
-              month={month}
-              onMonthChange={setMonth}
-              availability={availability}
-              periods={periods}
-              conflictPeriodIndexes={effectiveConflicts.map((c) => c.periodIndex)}
-              onPickDate={handlePickCalendarDate}
-            />
-
-            <div className="text-[13px] text-ink-mute flex items-center gap-1.5 px-1">
-              <Icon name="calendar" className="w-4 h-4 text-brand" />
-              <span>แตะเลือกวันที่ในปฏิทินเพื่อเปลี่ยนวันของ <b>ช่วงที่ {activePeriodIdx + 1}</b></span>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <b className="text-[17px]">ช่วงเวลาที่ขอใช้</b>
-            {periods.map((p, idx) => {
-              const hasConflict = effectiveConflicts.some((c) => c.periodIndex === idx);
-              const isEditing = activePeriodIdx === idx;
-              const sd = p.start.slice(0, 10);
-              const st = p.start.slice(11, 16);
-              const ed = p.end.slice(0, 10);
-              const et = p.end.slice(11, 16);
-
-              return (
-                <div
-                  key={idx}
-                  onClick={() => setActivePeriodIdx(idx)}
-                  className={`jw-card p-3.5 flex flex-col gap-2.5 cursor-pointer transition ${
-                    hasConflict
-                      ? 'border-[1.5px] border-status-crit'
-                      : isEditing
-                      ? 'ring-2 ring-brand'
-                      : ''
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <b className="flex-1 text-[14px]">ช่วงที่ {idx + 1}</b>
-                    {hasConflict ? (
-                      <Chip tone="red">ไม่ว่าง</Chip>
-                    ) : (
-                      <Chip tone="green">{periodDurationText(p)}</Chip>
-                    )}
-                    {periods.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPeriods((prev) => prev.filter((_, i) => i !== idx));
-                          setActivePeriodIdx(0);
-                        }}
-                        className="w-7 h-7 rounded-full bg-soft text-ink-mute flex items-center justify-center hover:text-status-crit"
-                      >
-                        <Icon name="x" className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-center gap-2">
-                    <div className="border border-line rounded-xl p-2 bg-white flex flex-col gap-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-ink-mute">เริ่มต้น</span>
-                        <span className="text-[11px] text-brand font-semibold">{formatThaiDate(sd, false)}</span>
-                      </div>
-                      <div className="grid grid-cols-[minmax(0,1fr)_94px] gap-2">
-                        <DatePickerField value={sd} label={`วันที่เริ่มต้น ช่วงที่ ${idx + 1}`} onChange={(value) => updatePeriodPart(idx, 'startDate', value)} />
-                        <TimePickerField value={st} label={`เวลาเริ่มต้น ช่วงที่ ${idx + 1}`} onChange={(value) => updatePeriodPart(idx, 'startTime', value)} />
-                      </div>
-                    </div>
-
-                    <span className="hidden sm:inline text-ink-mute">
-                      <Icon name="arrow-right" className="w-4 h-4" />
-                    </span>
-
-                    <div className="border border-line rounded-xl p-2 bg-white flex flex-col gap-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-ink-mute">สิ้นสุด</span>
-                        <span className="text-[11px] text-brand font-semibold">{formatThaiDate(ed, false)}</span>
-                      </div>
-                      <div className="grid grid-cols-[minmax(0,1fr)_94px] gap-2">
-                        <DatePickerField value={ed} label={`วันที่สิ้นสุด ช่วงที่ ${idx + 1}`} onChange={(value) => updatePeriodPart(idx, 'endDate', value)} />
-                        <TimePickerField value={et} label={`เวลาสิ้นสุด ช่วงที่ ${idx + 1}`} onChange={(value) => updatePeriodPart(idx, 'endTime', value)} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
-            <button
-              type="button"
-              onClick={() => {
-                setPeriods((prev) => {
-                  const last = prev[prev.length - 1];
-                  const nextDate = last
-                    ? last.end.slice(0, 10)
-                    : new Date().toISOString().slice(0, 10);
-                  const next = [
-                    ...prev,
-                    { start: `${nextDate}T09:00:00+07:00`, end: `${nextDate}T12:00:00+07:00` },
-                  ];
-                  setActivePeriodIdx(next.length - 1);
-                  return next;
-                });
-              }}
-              className="h-11 border-[1.5px] border-dashed border-brand rounded-sq text-brand font-semibold flex items-center justify-center gap-1.5 hover:bg-brand-mint/50"
-            >
-              <Icon name="plus" className="w-4 h-4" /> เพิ่มช่วงเวลา
-            </button>
-
-            {effectiveConflicts.length > 0 ? (
-              <div className="rounded-2xl bg-[#FDE8E8] border border-[#f9b4b4] p-3.5 flex items-start gap-2.5 text-[13px] text-[#7a1010]">
-                <Icon name="x" className="w-5 h-5 text-status-crit shrink-0 mt-0.5" />
+        bookingMode === 'hourly' ? (
+          <HourlyBookingSection
+            selectedVenues={selectedVenues}
+            availability={availability}
+            month={month}
+            onMonthChange={setMonth}
+            period={periods[0] || null}
+            onSelectPeriod={(p) => {
+              if (p) setPeriods([p]);
+              else setPeriods([]);
+            }}
+            onSwitchToDaily={() => setBookingMode('daily')}
+            bookingMode={bookingMode}
+          />
+        ) : (
+          <div className="flex flex-col gap-4">
+            {/* ส่วนหัวสลับโหมดในหน้าจองรายวัน */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-2xl border border-line shadow-card">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                  2
+                </span>
                 <div>
-                  <b>{effectiveConflicts[0].venueName} ไม่ว่างในช่วงนี้</b>
-                  <br />
-                  วันที่ {formatThaiDateTime(effectiveConflicts[0].start)}–
-                  {new Date(effectiveConflicts[0].end).toTimeString().slice(0, 5)} มีผู้ขอใช้แล้ว กรุณาปรับวัน-เวลาใหม่
+                  <b className="text-[15px] sm:text-[16px] text-ink">เลือกวันและเวลาใช้งาน (จองรายวัน)</b>
+                  <p className="text-[12px] text-ink-mute">
+                    {selectedVenues.map((v) => v.name).join(', ')} · รูปแบบดั้งเดิม (ช่วงวันไป-กลับ)
+                  </p>
                 </div>
               </div>
-            ) : (
-              <div className="jw-card p-3.5 bg-brand-mint flex flex-col gap-1">
-                <div className="flex items-center justify-between">
-                  <b className="text-[14px]">{selectedVenues.map((v) => v.name).join(', ')}</b>
-                  <Chip tone="green">
-                    <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} /> ว่าง
-                  </Chip>
-                </div>
-                <span className="text-[13px] text-ink-mute">
-                  รวม {periods.length} ช่วง · ไม่ซ้ำกับรายการอื่นทุกช่วง
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBookingMode('hourly')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] text-brand hover:text-brand-dark hover:bg-brand-mint border border-brand/30 transition font-semibold"
+                  title="สลับไปใช้งานแบบเลือกรอบรายชั่วโมง (ค่าเริ่มต้น)"
+                >
+                  <Icon name="clock" className="w-3.5 h-3.5" />
+                  <span>สลับไปจองรายชั่วโมง</span>
+                </button>
+                <span className="text-[12px] font-semibold text-ink-soft bg-soft px-3 py-1.5 rounded-full border border-line">
+                  จองรายวัน
+                </span>
+              </div>
+            </div>
+
+            {minAdvanceDays > 0 && (
+              <div className="p-3 bg-brand-mint/50 border border-brand/20 rounded-xl flex items-center gap-2.5 text-[12px] text-brand-dark">
+                <Icon name="info" className="w-4 h-4 text-brand shrink-0" />
+                <span>
+                  <b>เงื่อนไขการจองล่วงหน้า:</b> สถานที่นี้กำหนดให้ต้องจองล่วงหน้าอย่างน้อย <b>{minAdvanceDays} วัน</b>{' '}
+                  (สามารถเลือกวันได้ตั้งแต่วันที่ <b>{formatThaiDate(earliestBookableDate, true)}</b> เป็นต้นไป)
                 </span>
               </div>
             )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-6 items-start">
+              <div className="flex flex-col gap-3">
+                <CalendarC4
+                  month={month}
+                  onMonthChange={setMonth}
+                  availability={availability}
+                  periods={periods}
+                  conflictPeriodIndexes={effectiveConflicts.map((c) => c.periodIndex)}
+                  onPickDate={handlePickCalendarDate}
+                  minAdvanceDays={minAdvanceDays}
+                />
+
+                <div className="text-[13px] text-ink-mute flex items-center gap-1.5 px-1">
+                  <Icon name="calendar" className="w-4 h-4 text-brand" />
+                  <span>แตะเลือกวันที่ในปฏิทินเพื่อเปลี่ยนวันของ <b>ช่วงที่ {activePeriodIdx + 1}</b></span>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <b className="text-[17px]">ช่วงเวลาที่ขอใช้</b>
+                {periods.map((p, idx) => {
+                  const hasConflict = effectiveConflicts.some((c) => c.periodIndex === idx);
+                  const isEditing = activePeriodIdx === idx;
+                  const sd = p.start.slice(0, 10);
+                  const st = p.start.slice(11, 16);
+                  const ed = p.end.slice(0, 10);
+                  const et = p.end.slice(11, 16);
+
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => setActivePeriodIdx(idx)}
+                      className={`jw-card p-3.5 flex flex-col gap-2.5 cursor-pointer transition ${
+                        hasConflict
+                          ? 'border-[1.5px] border-status-crit'
+                          : isEditing
+                          ? 'ring-2 ring-brand'
+                          : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <b className="flex-1 text-[14px]">ช่วงที่ {idx + 1}</b>
+                        {hasConflict ? (
+                          <Chip tone="red">ไม่ว่าง</Chip>
+                        ) : (
+                          <Chip tone="green">{periodDurationText(p)}</Chip>
+                        )}
+                        {periods.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPeriods((prev) => prev.filter((_, i) => i !== idx));
+                              setActivePeriodIdx(0);
+                            }}
+                            className="w-7 h-7 rounded-full bg-soft text-ink-mute flex items-center justify-center hover:text-status-crit"
+                          >
+                            <Icon name="x" className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-center gap-2">
+                        <div className="border border-line rounded-xl p-2 bg-white flex flex-col gap-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] text-ink-mute">เริ่มต้น</span>
+                            <span className="text-[11px] text-brand font-semibold">{formatThaiDate(sd, false)}</span>
+                          </div>
+                          <div className="grid grid-cols-[minmax(0,1fr)_94px] gap-2">
+                            <DatePickerField value={sd} minDate={earliestBookableDate} label={`วันที่เริ่มต้น ช่วงที่ ${idx + 1}`} onChange={(value) => updatePeriodPart(idx, 'startDate', value)} />
+                            <TimePickerField value={st} label={`เวลาเริ่มต้น ช่วงที่ ${idx + 1}`} onChange={(value) => updatePeriodPart(idx, 'startTime', value)} />
+                          </div>
+                        </div>
+
+                        <span className="hidden sm:inline text-ink-mute">
+                          <Icon name="arrow-right" className="w-4 h-4" />
+                        </span>
+
+                        <div className="border border-line rounded-xl p-2 bg-white flex flex-col gap-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] text-ink-mute">สิ้นสุด</span>
+                            <span className="text-[11px] text-brand font-semibold">{formatThaiDate(ed, false)}</span>
+                          </div>
+                          <div className="grid grid-cols-[minmax(0,1fr)_94px] gap-2">
+                            <DatePickerField value={ed} minDate={sd || earliestBookableDate} label={`วันที่สิ้นสุด ช่วงที่ ${idx + 1}`} onChange={(value) => updatePeriodPart(idx, 'endDate', value)} />
+                            <TimePickerField value={et} label={`เวลาสิ้นสุด ช่วงที่ ${idx + 1}`} onChange={(value) => updatePeriodPart(idx, 'endTime', value)} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPeriods((prev) => {
+                      const last = prev[prev.length - 1];
+                      const nextDate = last
+                        ? last.end.slice(0, 10)
+                        : earliestBookableDate;
+                      const next = [
+                        ...prev,
+                        { start: `${nextDate}T09:00:00+07:00`, end: `${nextDate}T12:00:00+07:00` },
+                      ];
+                      setActivePeriodIdx(next.length - 1);
+                      return next;
+                    });
+                  }}
+                  className="h-11 border-[1.5px] border-dashed border-brand rounded-sq text-brand font-semibold flex items-center justify-center gap-1.5 hover:bg-brand-mint/50"
+                >
+                  <Icon name="plus" className="w-4 h-4" /> เพิ่มช่วงเวลา
+                </button>
+
+                {effectiveConflicts.length > 0 ? (
+                  <div className="rounded-2xl bg-[#FDE8E8] border border-[#f9b4b4] p-3.5 flex items-start gap-2.5 text-[13px] text-[#7a1010]">
+                    <Icon name="x" className="w-5 h-5 text-status-crit shrink-0 mt-0.5" />
+                    <div>
+                      <b>{effectiveConflicts[0].venueName} ไม่ว่างในช่วงนี้</b>
+                      <br />
+                      วันที่ {formatThaiDateTime(effectiveConflicts[0].start)}–
+                      {new Date(effectiveConflicts[0].end).toTimeString().slice(0, 5)} มีผู้ขอใช้แล้ว กรุณาปรับวัน-เวลาใหม่
+                    </div>
+                  </div>
+                ) : (
+                  <div className="jw-card p-3.5 bg-brand-mint flex flex-col gap-1">
+                    <div className="flex items-center justify-between">
+                      <b className="text-[14px]">{selectedVenues.map((v) => v.name).join(', ')}</b>
+                      <Chip tone="green">
+                        <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} /> ว่าง
+                      </Chip>
+                    </div>
+                    <span className="text-[13px] text-ink-mute">
+                      รวม {periods.length} ช่วง · ไม่ซ้ำกับรายการอื่นทุกช่วง
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
+        )
       )}
 
       {/* ================= STEP 3: เลือกอุปกรณ์เสริม ================= */}
@@ -1096,8 +1204,8 @@ export default function BookingWizardPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-            <div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3.5">
+            <div className="lg:col-span-3">
               <label className="jw-lbl">เขียนที่<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
               <input
                 type="text"
@@ -1108,8 +1216,21 @@ export default function BookingWizardPage() {
                 required
               />
             </div>
-            <div>
-              <label className="jw-lbl">ข้าพเจ้า (นาย/นาง/นางสาว)<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
+            <div className="lg:col-span-2">
+              <label className="jw-lbl">คำนำหน้า<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
+              <select
+                value={requesterTitle}
+                onChange={(e) => setRequesterTitle(e.target.value)}
+                className="jw-in bg-white"
+                required
+              >
+                <option value="นาย">นาย</option>
+                <option value="นาง">นาง</option>
+                <option value="นางสาว">นางสาว</option>
+              </select>
+            </div>
+            <div className="lg:col-span-3">
+              <label className="jw-lbl">ข้าพเจ้า<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
               <input
                 type="text"
                 value={requesterName}
@@ -1119,7 +1240,7 @@ export default function BookingWizardPage() {
                 required
               />
             </div>
-            <div>
+            <div className="lg:col-span-2">
               <label className="jw-lbl">เบอร์โทรศัพท์ติดต่อ<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
               <input
                 type="tel"
@@ -1130,7 +1251,7 @@ export default function BookingWizardPage() {
                 required
               />
             </div>
-            <div>
+            <div className="lg:col-span-2">
               <label className="jw-lbl">ตำแหน่ง<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
               <input
                 type="text"
@@ -1258,14 +1379,18 @@ export default function BookingWizardPage() {
           </div>
 
           <div>
-            <label className="jw-lbl">รายละเอียด / วัตถุประสงค์เพิ่มเติม<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
+            <label className="jw-lbl">
+              รายละเอียด / วัตถุประสงค์เพิ่มเติม{' '}
+              <span className="text-[12px] font-normal text-ink-mute">
+                (ไม่บังคับ - สำหรับแจ้งเจ้าหน้าที่เพิ่มเติม และจะไม่แสดงในเอกสารราชการ)
+              </span>
+            </label>
             <textarea
               rows={2}
               value={purpose}
               onChange={(e) => setPurpose(e.target.value)}
               className="jw-in h-20 py-2.5"
-              required
-              placeholder="ระบุรายละเอียดการใช้งานและวัตถุประสงค์ให้ชัดเจน"
+              placeholder="ระบุข้อมูลเพิ่มเติมถึงเจ้าหน้าที่ (ถ้ามี) ข้อความนี้จะไม่แสดงในเอกสารราชการ"
             />
           </div>
 
@@ -1383,7 +1508,7 @@ export default function BookingWizardPage() {
           <OfficialGovFormDocument
             customFields={{
               writtenAt,
-              requesterName,
+              requesterName: fullRequesterName || requesterName,
               requesterPosition,
               addressHouseNo,
               addressMoo,
@@ -1396,16 +1521,23 @@ export default function BookingWizardPage() {
             }}
           />
 
+          {purpose.trim() && (
+            <div className="rounded-2xl bg-amber-50/80 border border-amber-200/80 p-3.5 flex items-start gap-2.5 text-[13px] text-amber-950">
+              <span className="font-semibold text-amber-900 shrink-0">ข้อความเพิ่มเติมถึงเจ้าหน้าที่ (ไม่แสดงในเอกสาร):</span>
+              <span className="whitespace-pre-wrap">{purpose}</span>
+            </div>
+          )}
+
           <div className="jw-card p-5 flex flex-col gap-3">
             <div>
               <label className="jw-lbl">
-                {isWalkIn ? `1. ลงลายมือชื่อผู้ขออนุญาตใช้สถานที่ราชการ (${requesterName})` : `ลงลายมือชื่อผู้ขออนุญาตใช้สถานที่ราชการ (${requesterName})`}
+                {isWalkIn ? `1. ลงลายมือชื่อผู้ขออนุญาตใช้สถานที่ราชการ (${fullRequesterName || requesterName})` : `ลงลายมือชื่อผู้ขออนุญาตใช้สถานที่ราชการ (${fullRequesterName || requesterName})`}
               </label>
               <SignatureBox
                 value={signature}
                 onChange={setSignature}
                 savedSignature={isWalkIn ? undefined : account?.signature}
-                signerLabel={`${requesterName} · ผู้ขออนุญาตใช้สถานที่ราชการ`}
+                signerLabel={`${fullRequesterName || requesterName} · ผู้ขออนุญาตใช้สถานที่ราชการ`}
               />
             </div>
 

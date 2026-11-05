@@ -4,6 +4,7 @@ import {
   ACTIVE_BOOKING_STATUSES,
   Account,
   BookingRequest,
+  BorrowRequest,
   ConflictInfo,
   DayAvailability,
   Equipment,
@@ -273,5 +274,181 @@ export class ResourcesController {
       }
     });
     return { conflicts };
+  }
+
+  /** ตรวจสอบความพร้อมใช้งานและจำนวนติดจองของอุปกรณ์ */
+  @Public()
+  @Post('check-equipment-availability')
+  checkEquipmentAvailability(
+    @Body()
+    body: {
+      items: { equipmentId: string; qty: number }[];
+      pickupDate: string;
+      returnDate: string;
+      month?: string;
+      excludeRequestId?: string;
+    },
+  ) {
+    const items = Array.isArray(body.items) ? body.items : [];
+    const pickupDate = String(body.pickupDate || '').slice(0, 10);
+    const returnDate = String(body.returnDate || '').slice(0, 10);
+    const targetMonth =
+      body.month && /^\d{4}-\d{2}$/.test(body.month)
+        ? body.month
+        : pickupDate
+        ? pickupDate.slice(0, 7)
+        : new Date().toISOString().slice(0, 7);
+
+    const [y, m] = targetMonth.split('-').map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+
+    const activeBorrows = this.db.requests.filter(
+      (r): r is BorrowRequest =>
+        r.type === 'borrow' &&
+        ['pending_staff', 'pending_l2', 'pending_l1', 'approved', 'borrowing', 'return_inspect'].includes(r.status) &&
+        r.id !== body.excludeRequestId,
+    );
+
+    const activeBookingsWithItems = this.db.requests.filter(
+      (r): r is BookingRequest =>
+        r.type === 'booking' &&
+        ACTIVE_BOOKING_STATUSES.includes(r.status) &&
+        r.id !== body.excludeRequestId &&
+        Boolean(r.extraItems && r.extraItems.length > 0),
+    );
+
+    // คำนวณรายวันสำหรับปฏิทิน
+    const dayAvailability: {
+      date: string;
+      level: 'many' | 'few' | 'full';
+      isConflict: boolean;
+      bookedHours?: number;
+      details: {
+        equipmentId: string;
+        name: string;
+        requestedQty: number;
+        reservedQty: number;
+        availableQty: number;
+        totalStock: number;
+      }[];
+    }[] = [];
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${targetMonth}-${String(d).padStart(2, '0')}`;
+      let hasShortage = false;
+      let totalReservedCount = 0;
+      let totalStockCount = 0;
+
+      const details = items.map((item) => {
+        const eq = this.db.equipment.find((e) => e.id === item.equipmentId);
+        const name = eq?.name || item.equipmentId;
+        const totalStock = eq?.stock || 0;
+
+        const reservedBorrows = activeBorrows
+          .filter((b) => b.pickupDate <= dateStr && b.returnDate >= dateStr)
+          .reduce((sum, b) => {
+            const found = b.items.find((i) => i.equipmentId === item.equipmentId);
+            return sum + (found ? found.qty : 0);
+          }, 0);
+
+        const reservedBookings = activeBookingsWithItems
+          .filter((b) =>
+            b.periods.some((p) => p.start.slice(0, 10) <= dateStr && p.end.slice(0, 10) >= dateStr),
+          )
+          .reduce((sum, b) => {
+            const found = b.extraItems.find((i) => i.equipmentId === item.equipmentId);
+            return sum + (found ? found.qty : 0);
+          }, 0);
+
+        const reservedQty = reservedBorrows + reservedBookings;
+        const availableQty = Math.max(0, totalStock - reservedQty);
+        if (item.qty > availableQty) {
+          hasShortage = true;
+        }
+        totalReservedCount += reservedQty;
+        totalStockCount += totalStock;
+
+        return {
+          equipmentId: item.equipmentId,
+          name,
+          requestedQty: item.qty,
+          reservedQty,
+          availableQty,
+          totalStock,
+        };
+      });
+
+      const level: 'many' | 'few' | 'full' =
+        hasShortage || (totalStockCount > 0 && totalReservedCount >= totalStockCount)
+          ? 'full'
+          : totalReservedCount > 0
+          ? 'few'
+          : 'many';
+
+      dayAvailability.push({
+        date: dateStr,
+        level,
+        isConflict: hasShortage,
+        details,
+      });
+    }
+
+    // คำนวณสรุปเฉพาะช่วงวันที่ขอใช้ (pickupDate ถึง returnDate)
+    const summary = items.map((item) => {
+      const eq = this.db.equipment.find((e) => e.id === item.equipmentId);
+      const name = eq?.name || item.equipmentId;
+      const totalStock = eq?.stock || 0;
+
+      let maxReservedInPeriod = 0;
+      let minAvailableInPeriod = totalStock;
+
+      if (pickupDate && returnDate && pickupDate <= returnDate) {
+        const sTime = new Date(pickupDate).getTime();
+        const eTime = new Date(returnDate).getTime();
+        for (let t = sTime; t <= eTime; t += 86400000) {
+          const dStr = new Date(t).toISOString().slice(0, 10);
+          const reservedBorrows = activeBorrows
+            .filter((b) => b.pickupDate <= dStr && b.returnDate >= dStr)
+            .reduce((sum, b) => {
+              const found = b.items.find((i) => i.equipmentId === item.equipmentId);
+              return sum + (found ? found.qty : 0);
+            }, 0);
+
+          const reservedBookings = activeBookingsWithItems
+            .filter((b) =>
+              b.periods.some((p) => p.start.slice(0, 10) <= dStr && p.end.slice(0, 10) >= dStr),
+            )
+            .reduce((sum, b) => {
+              const found = b.extraItems.find((i) => i.equipmentId === item.equipmentId);
+              return sum + (found ? found.qty : 0);
+            }, 0);
+
+          const curReserved = reservedBorrows + reservedBookings;
+          const curAvailable = Math.max(0, totalStock - curReserved);
+          if (curReserved > maxReservedInPeriod) maxReservedInPeriod = curReserved;
+          if (curAvailable < minAvailableInPeriod) minAvailableInPeriod = curAvailable;
+        }
+      }
+
+      const isShortage = item.qty > minAvailableInPeriod;
+
+      return {
+        equipmentId: item.equipmentId,
+        name,
+        requestedQty: item.qty,
+        maxReservedInPeriod,
+        minAvailableInPeriod,
+        totalStock,
+        isShortage,
+      };
+    });
+
+    const isAvailable = !summary.some((s) => s.isShortage);
+
+    return {
+      isAvailable,
+      dayAvailability,
+      summary,
+    };
   }
 }

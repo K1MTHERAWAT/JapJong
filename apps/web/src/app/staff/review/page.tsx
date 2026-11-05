@@ -332,12 +332,18 @@ export default function StaffReviewPage() {
               <b className="w-24 shrink-0 text-ink">วัตถุประสงค์</b>
               <span>
                 {current.type === 'booking'
-                  ? `${current.purpose} · ${current.attendees} คน`
+                  ? `${current.activity || current.purposeItems?.[0]?.forWhat || current.purpose || 'ขอใช้สถานที่'} · ${current.attendees} คน`
                   : current.type === 'borrow'
-                    ? current.purpose
+                    ? current.purposeItems?.[0]?.forWhat || current.purpose || 'ขอใช้อุปกรณ์'
                     : current.detail}
               </span>
             </div>
+            {current.type !== 'repair' && current.purpose ? (
+              <div className="flex items-start gap-2 bg-amber-50/80 border border-amber-200/80 rounded-xl p-2.5 text-[13.5px] text-amber-950">
+                <b className="w-24 shrink-0 font-semibold text-amber-900">ข้อความถึง จนท.</b>
+                <span className="whitespace-pre-wrap">{current.purpose}</span>
+              </div>
+            ) : null}
             <div className="flex items-start gap-2">
               <b className="w-24 shrink-0 text-ink">รายการ</b>
               <span>

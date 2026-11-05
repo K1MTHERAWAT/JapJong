@@ -223,6 +223,39 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ venueIds, periods, excludeRequestId }),
     }),
+  checkEquipmentAvailability: (params: {
+    items: { equipmentId: string; qty: number }[];
+    pickupDate: string;
+    returnDate: string;
+    month?: string;
+    excludeRequestId?: string;
+  }) =>
+    request<{
+      isAvailable: boolean;
+      dayAvailability: (DayAvailability & {
+        isConflict: boolean;
+        details: {
+          equipmentId: string;
+          name: string;
+          requestedQty: number;
+          reservedQty: number;
+          availableQty: number;
+          totalStock: number;
+        }[];
+      })[];
+      summary: {
+        equipmentId: string;
+        name: string;
+        requestedQty: number;
+        maxReservedInPeriod: number;
+        minAvailableInPeriod: number;
+        totalStock: number;
+        isShortage: boolean;
+      }[];
+    }>('/resources/check-equipment-availability', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
 
   // Requests
   listRequests: (params?: { mine?: boolean; type?: RequestType; queue?: 'staff' | 'l2' | 'l1' | 'handover' }) => {

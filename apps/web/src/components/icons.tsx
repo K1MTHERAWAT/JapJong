@@ -26,6 +26,7 @@ export type IconName =
   | 'folder'
   | 'grip-vertical'
   | 'home'
+  | 'info'
   | 'layout-grid'
   | 'list-details'
   | 'lock'
@@ -200,6 +201,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M5 12l-2 0l9 -9l9 9l-2 0" />
       <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
       <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+    </>
+  ),
+  info: (
+    <>
+      <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" />
+      <path d="M12 9h.01" />
+      <path d="M11 12h1v4h1" />
     </>
   ),
   'layout-grid': (

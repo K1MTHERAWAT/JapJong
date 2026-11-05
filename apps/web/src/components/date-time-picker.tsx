@@ -8,10 +8,12 @@ export function DatePickerField({
   value,
   onChange,
   label,
+  minDate,
 }: {
   value: string;
   onChange: (value: string) => void;
   label: string;
+  minDate?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState(value ? value.slice(0, 7) : new Date().toISOString().slice(0, 7));
@@ -98,19 +100,25 @@ export function DatePickerField({
                 const date = `${viewMonth}-${String(day).padStart(2, '0')}`;
                 const selected = date === value;
                 const isToday = date === todayString;
+                const isBeforeMin = minDate ? date < minDate : false;
                 return (
                   <button
                     key={date}
                     type="button"
+                    disabled={isBeforeMin}
+                    title={isBeforeMin ? `ต้องจองตั้งแต่วันที่ ${formatThaiDate(minDate, false)} เป็นต้นไป` : undefined}
                     aria-pressed={selected}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (isBeforeMin) return;
                       onChange(date);
                       setOpen(false);
                     }}
                     className={`mx-auto flex size-9 items-center justify-center rounded-full text-[13px] transition ${
                       selected
                         ? 'bg-brand font-bold text-white'
+                        : isBeforeMin
+                        ? 'text-ink-mute/50 line-through cursor-not-allowed'
                         : isToday
                         ? 'border border-brand font-semibold text-brand-ink'
                         : 'text-ink hover:bg-brand-tint'

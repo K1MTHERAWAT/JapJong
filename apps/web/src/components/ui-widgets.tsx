@@ -206,6 +206,10 @@ export function CalendarC4({
   conflictPeriodIndexes = [],
   onPickDate,
   showDots = true,
+  minAdvanceDays = 0,
+  openDays,
+  selectedDate,
+  disabledDates,
 }: {
   month: string; // YYYY-MM
   onMonthChange: (nextYm: string) => void;
@@ -214,6 +218,10 @@ export function CalendarC4({
   conflictPeriodIndexes?: number[];
   onPickDate?: (dateStr: string) => void;
   showDots?: boolean;
+  minAdvanceDays?: number;
+  openDays?: number[];
+  selectedDate?: string;
+  disabledDates?: (dateStr: string) => { disabled: boolean; reason?: string };
 }) {
   const [y, m] = month.split('-').map(Number);
   const firstDow = new Date(y, m - 1, 1).getDay();
@@ -291,11 +299,41 @@ export function CalendarC4({
           const day = idx + 1;
           const dateStr = `${month}-${String(day).padStart(2, '0')}`;
           const av = availMap.get(dateStr);
-          const todayStr = new Date().toISOString().slice(0, 10);
+          const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
           const isPast = dateStr < todayStr;
           const isToday = dateStr === todayStr;
           const isFull = av?.level === 'full';
           const { isEndpoint, isStart, isEnd, isMid, isConflict } = dayState(dateStr);
+
+          // คำนวณเงื่อนไข Advance Booking & Open Days & Disabled Dates
+          const customCheck = disabledDates?.(dateStr);
+          const isCustomDisabled = customCheck?.disabled ?? false;
+          const customReason = customCheck?.reason;
+
+          let diffFromToday = 0;
+          try {
+            const [ty, tm, td] = todayStr.split('-').map(Number);
+            const [cy, cm, cd] = dateStr.split('-').map(Number);
+            diffFromToday = Math.floor((Date.UTC(cy, cm - 1, cd) - Date.UTC(ty, tm - 1, td)) / (24 * 60 * 60 * 1000));
+          } catch {}
+
+          const isAdvanceRestricted = !isPast && minAdvanceDays > 0 && diffFromToday < minAdvanceDays;
+          const [cy, cm, cd] = dateStr.split('-').map(Number);
+          const dow = new Date(Date.UTC(cy, cm - 1, cd)).getUTCDay();
+          const isClosed = openDays && openDays.length > 0 ? !openDays.includes(dow) : false;
+
+          const isDisabled = isPast || isFull || isAdvanceRestricted || isClosed || isCustomDisabled;
+
+          let tooltip = customReason || '';
+          if (!tooltip) {
+            if (isPast) tooltip = 'วันที่ผ่านมาแล้ว';
+            else if (isAdvanceRestricted) tooltip = `ต้องจองล่วงหน้าอย่างน้อย ${minAdvanceDays} วัน`;
+            else if (isClosed) tooltip = 'สถานที่ปิดให้บริการในวันนี้';
+            else if (isFull) tooltip = 'การจองเต็มแล้วทุกช่วงเวลา';
+          }
+
+          const isDirectlySelected = selectedDate === dateStr;
+          const isMarkedSelected = isEndpoint || isDirectlySelected;
 
           const stripBg = isConflict ? 'bg-[#FDE8E8]' : 'bg-brand-calRange';
 
@@ -303,8 +341,14 @@ export function CalendarC4({
             <button
               key={dateStr}
               type="button"
-              onClick={() => onPickDate?.(dateStr)}
-              className="h-10 sm:h-12 relative flex flex-col items-center justify-center text-[14px] sm:text-[15px]"
+              disabled={isDisabled}
+              title={tooltip || undefined}
+              onClick={() => {
+                if (!isDisabled) onPickDate?.(dateStr);
+              }}
+              className={`h-10 sm:h-12 relative flex flex-col items-center justify-center text-[14px] sm:text-[15px] ${
+                isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+              }`}
             >
               {(isMid || isStart || isEnd) && (
                 <span
@@ -315,24 +359,24 @@ export function CalendarC4({
               )}
               <span
                 className={`relative z-10 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition ${
-                  isEndpoint
+                  isMarkedSelected
                     ? isConflict
                       ? 'bg-status-crit text-white font-bold'
-                      : 'bg-brand text-white font-bold'
+                      : 'bg-brand text-white font-bold shadow-xs'
                     : isConflict
                     ? 'text-status-crit font-bold'
                     : isToday
                     ? 'border-[1.5px] border-brand text-brand font-bold'
                     : isFull
                     ? 'text-[#9AA0B4] line-through'
-                    : isPast
+                    : isPast || isAdvanceRestricted || isClosed
                     ? 'text-[#B5B9C9]'
                     : 'text-ink hover:bg-brand-mint'
                 }`}
               >
                 {day}
               </span>
-              {showDots && !isPast && !isFull && av && (
+              {showDots && !isPast && !isFull && !isAdvanceRestricted && !isClosed && av && (
                 <i
                   className={`w-1.5 h-1.5 rounded-full mt-0.5 ${
                     av.level === 'few' ? 'bg-status-warn' : 'bg-status-ok'
@@ -1018,9 +1062,9 @@ export function OfficialGovFormDocument({
     const line1Item = req.title || 'อาคารสถานที่';
     const line1For =
       req.type === 'booking'
-        ? `${req.activity || req.purpose}${req.attendees ? ` (ผู้เข้าร่วม ${req.attendees} คน)` : ''}`
+        ? `${req.activity || 'ใช้จัดกิจกรรมและประชุม'}${req.attendees ? ` (ผู้เข้าร่วม ${req.attendees} คน)` : ''}`
         : req.type === 'borrow'
-        ? req.purpose
+        ? 'ใช้ในกิจกรรมของหน่วยงาน/ชุมชน'
         : req.detail;
     const line2Item =
       req.subtitle ||
@@ -1031,7 +1075,7 @@ export function OfficialGovFormDocument({
         : '');
     const line2For =
       req.type === 'booking'
-        ? req.purpose
+        ? req.activity || 'ใช้จัดกิจกรรมตามระเบียบ'
         : req.type === 'borrow'
         ? 'ใช้ในกิจกรรมของหน่วยงาน/ชุมชน'
         : '';
@@ -1112,7 +1156,7 @@ export function OfficialGovFormDocument({
         {/* ย่อหน้าเนื้อความตามแบบขอใช้สถานที่ราชการ */}
         <div className="flex flex-col gap-1.5 text-left leading-[1.8] mb-3">
           <div className="pl-6 sm:pl-10 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <span>ข้าพเจ้า&nbsp;&nbsp;นาย/นาง/นางสาว</span>
+            <span>ข้าพเจ้า</span>
             <DottedSpan minW="min-w-[170px] sm:min-w-[210px] flex-1">{requesterName}</DottedSpan>
             <span>ตำแหน่ง</span>
             <DottedSpan minW="min-w-[150px] sm:min-w-[180px] flex-1">{requesterPosition}</DottedSpan>
