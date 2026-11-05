@@ -45,7 +45,7 @@ export default {
         paper: '#FAFAF8',
       },
       fontFamily: {
-        sans: ["'Noto Sans Thai'", 'var(--font-noto-thai)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['"Noto Sans Thai"', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
       },
       fontSize: {
         display: ['26px', { lineHeight: '1.3', fontWeight: '700' }],
