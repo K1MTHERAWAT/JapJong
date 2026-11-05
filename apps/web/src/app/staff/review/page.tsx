@@ -17,19 +17,11 @@ import {
 } from '@/components/ui';
 import { api, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
 
-const DEFAULT_CHECKS = [
-  'เบอร์โทรและข้อมูลผู้ยื่นคำขอครบถ้วน',
-  'ไม่มีช่วงเวลาซ้อนทับกับการใช้งานอื่น',
-  'วัตถุประสงค์การใช้งานชัดเจนตามระเบียบ',
-  'เอกสารหลักฐานและข้อมูลประกอบถูกต้อง',
-];
-
 export default function StaffReviewPage() {
   const { account } = useAuth();
   const [queue, setQueue] = useState<RequestWithTimeline[]>([]);
   const [index, setIndex] = useState(0);
   const [showOfficialForm, setShowOfficialForm] = useState(true);
-  const [checks, setChecks] = useState<boolean[]>([true, true, true, true]);
   const [note, setNote] = useState('');
   const [resolution, setResolution] = useState('');
   const [afterPhotos, setAfterPhotos] = useState(0);
@@ -520,28 +512,6 @@ export default function StaffReviewPage() {
                 </div>
               ) : (
                 <>
-                  {/* เช็คลิสต์ 4 ข้อ */}
-                  <div className="jw-card px-4 divide-y divide-line">
-                    {DEFAULT_CHECKS.map((label, i) => {
-                      const checked = checks[i];
-                      return (
-                        <div
-                          key={label}
-                          onClick={() => setChecks((prev) => prev.map((v, idx) => (idx === i ? !v : v)))}
-                          className="py-3 flex items-center gap-2.5 cursor-pointer select-none"
-                        >
-                          <div
-                            className={`w-[22px] h-[22px] rounded-[6px] border-[1.5px] flex items-center justify-center shrink-0 ${checked ? 'bg-brand border-brand text-white' : 'bg-white border-[#7A7A7A]'
-                              }`}
-                          >
-                            {checked && <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} />}
-                          </div>
-                          <span className="text-[14px] flex-1">{label}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-
                   <div>
                     <label className="jw-lbl">เหตุผล / วันที่เสนอแทน (กรณีไม่ผ่าน)</label>
                     <textarea
