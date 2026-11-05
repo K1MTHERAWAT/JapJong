@@ -99,8 +99,7 @@ describe('Navigation Menu Access Control (getVisibleNav)', () => {
   it('renders staff operations menus for staff role', () => {
     const visible = getVisibleNav(baseStaff);
     expect(visible.some((i) => i.href === '/staff/review')).toBe(true);
-    expect(visible.some((i) => i.href === '/staff/handover')).toBe(true);
-    expect(visible.some((i) => i.href === '/staff/walk-in')).toBe(true);
+    expect(visible.some((i) => i.href === '/staff/verify')).toBe(true);
     expect(visible.some((i) => i.href === '/admin/resources')).toBe(true);
 
     // Staff cannot see approver L1/L2 approval queue or admin user management

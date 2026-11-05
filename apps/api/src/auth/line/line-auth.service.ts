@@ -412,9 +412,32 @@ export class LineAuthService {
         };
       }
 
-      return {
-        redirectUrl: `${this.frontendUrl}/account?line_error=${encodeURIComponent('กรุณาเข้าสู่ระบบก่อน แล้วทำการเชื่อมต่อบัญชี LINE (Link LINE) ที่หน้าจัดการบัญชีผู้ใช้งาน')}`,
-      };
+      // 4. Find linked JapJong account
+      const user = await this.db.findUserByLineUserId(lineUserId);
+
+      if (user) {
+        // Check account active / suspended status
+        if (user.active === false || user.accountStatus === 'SUSPENDED') {
+          return {
+            redirectUrl: `${this.frontendUrl}/login?line_error=${encodeURIComponent('บัญชีผู้ใช้งานนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ')}`,
+          };
+        }
+
+        // Existing User -> Create Session & Redirect directly to service
+        if (this.richMenuService) {
+          await this.richMenuService.switchUserRichMenuByRole(lineUserId, user.role).catch(() => {});
+        }
+        const sessionToken = await this.db.createSession(user.id);
+        return {
+          redirectUrl: `${this.frontendUrl}/login?line_token=${sessionToken}&account_id=${user.id}`,
+        };
+      } else {
+        // First-time User -> Issue Registration Ticket & Redirect to /register/line
+        const ticket = this.issueRegistrationTicket(lineUserId, displayName, pictureUrl);
+        return {
+          redirectUrl: `${this.frontendUrl}/register/line?ticket=${ticket}`,
+        };
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการยืนยันตัวตนกับ LINE';
       const targetPath = linkUserId ? '/account' : '/login';

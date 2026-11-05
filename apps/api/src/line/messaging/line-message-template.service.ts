@@ -604,8 +604,8 @@ export class LineMessageTemplateService {
       if (override.headline) headline = override.headline;
       if (override.footerNote) footerNote = override.footerNote;
     }
-    // Template ถูกปิดหรือกำหนดเป็น TEXT -> ส่ง Text Message แทน Flex (In-App ไม่ได้รับผลกระทบ)
-    const useFlex = !!input.useFlex && !(override && (override.status === 'DISABLED' || override.templateType === 'TEXT'));
+    // เปิดใช้ Flex Message เป็นค่าเริ่มต้นเสมอ เว้นแต่จะถูก Override เป็น TEXT หรือ DISABLED
+    const useFlex = input.useFlex !== false && !(override && (override.status === 'DISABLED' || override.templateType === 'TEXT'));
 
     const finalLink = input.linkPath || defaultLink;
     const detailLines = details.map((d) => `${d.label}: ${d.value}`).join('\n');

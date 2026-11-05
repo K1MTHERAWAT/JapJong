@@ -8,6 +8,7 @@ describe('GovSsoService', () => {
   let db: DbService;
 
   beforeEach(() => {
+    process.env.E_SERVICE_API_KEY = 'test-api-key';
     db = new DbService();
     // In-memory fallback
     (db as any).dbAvailable = false;

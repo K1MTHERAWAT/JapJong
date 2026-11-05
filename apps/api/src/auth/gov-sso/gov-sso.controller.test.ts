@@ -13,7 +13,7 @@ describe('GovSsoController', () => {
     const controller = new GovSsoController(mockService);
     const result = await controller.ssoCallback({ code: 'test-code' });
 
-    expect(mockService.handleSsoCallback).toHaveBeenCalledWith('test-code');
+    expect(mockService.handleSsoCallback).toHaveBeenCalledWith('test-code', undefined);
     expect(result).toEqual({ success: true, token: 'mock-token' });
   });
 

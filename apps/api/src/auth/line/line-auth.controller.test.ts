@@ -60,7 +60,7 @@ describe('LineAuthController', () => {
         json: vi.fn(),
       };
 
-      controller.initiateLineLogin(undefined, mockRes);
+      controller.initiateLineLogin(undefined, undefined, mockRes);
       expect(mockRes.redirect).toHaveBeenCalledWith(
         'https://access.line.me/oauth2/v2.1/authorize?mock=1',
       );
@@ -73,7 +73,7 @@ describe('LineAuthController', () => {
         json: vi.fn(),
       };
 
-      controller.initiateLineLogin('false', mockRes);
+      controller.initiateLineLogin('false', undefined, mockRes);
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith({
         url: 'https://access.line.me/oauth2/v2.1/authorize?mock=1',
