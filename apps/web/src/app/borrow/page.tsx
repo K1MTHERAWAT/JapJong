@@ -1227,16 +1227,10 @@ export default function BorrowWizardPage() {
                     <span className="text-[13.5px] font-semibold text-ink-mute shrink-0">เพื่อ</span>
                     <input
                       type="text"
-                      value={row.forWhat}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setPurposeItems((prev) =>
-                          prev.map((item, i) => (i === idx ? { ...item, forWhat: val } : item)),
-                        );
-                      }}
-                      className="jw-in h-10 text-[13.5px]"
-                      placeholder="เช่น ใช้ในกิจกรรมงานประเพณี"
-                      required
+                      value={row.forWhat || 'ใช้ในกิจกรรมของหน่วยงาน/ชุมชน'}
+                      readOnly
+                      disabled
+                      className="jw-in h-10 text-[13.5px] bg-soft/80 text-ink-mute cursor-not-allowed select-none"
                     />
                   </div>
                 </div>
