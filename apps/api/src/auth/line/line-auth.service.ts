@@ -36,6 +36,7 @@ export interface LineIdTokenPayload {
 export interface StoredState {
   nonce: string;
   createdAt: number;
+  linkUserId?: string;
 }
 
 export interface StoredTicket {
@@ -79,7 +80,7 @@ export class LineAuthService {
   /**
    * Generates authorization URL, state (CSRF), and nonce (ID token replay protection)
    */
-  generateAuthUrl(): { url: string; state: string } {
+  generateAuthUrl(linkUserId?: string): { url: string; state: string } {
     if (!this.channelId) {
       throw new BadRequestException('ยังไม่ได้กำหนดค่า LINE_CHANNEL_ID ในระบบ');
     }
@@ -92,6 +93,7 @@ export class LineAuthService {
     this.stateStore.set(state, {
       nonce,
       createdAt: Date.now(),
+      linkUserId: linkUserId?.trim() || undefined,
     });
 
     const params = new URLSearchParams({
@@ -110,7 +112,7 @@ export class LineAuthService {
   /**
    * Validates and consumes state, returning the associated nonce
    */
-  validateAndConsumeState(state: string): { valid: boolean; nonce?: string } {
+  validateAndConsumeState(state: string): { valid: boolean; nonce?: string; linkUserId?: string } {
     if (!state) return { valid: false };
 
     const stored = this.stateStore.get(state);
@@ -121,7 +123,7 @@ export class LineAuthService {
     const isExpired = Date.now() - stored.createdAt > 10 * 60 * 1000;
     if (isExpired) return { valid: false };
 
-    return { valid: true, nonce: stored.nonce };
+    return { valid: true, nonce: stored.nonce, linkUserId: stored.linkUserId };
   }
 
   /**
@@ -367,7 +369,7 @@ export class LineAuthService {
     }
 
     // 1. Verify CSRF state
-    const { valid, nonce } = this.validateAndConsumeState(state);
+    const { valid, nonce, linkUserId } = this.validateAndConsumeState(state);
     if (!valid) {
       return {
         redirectUrl: `${this.frontendUrl}/login?line_error=${encodeURIComponent('ความปลอดภัยไม่ถูกต้อง (State mismatch หรือคำขอหมดอายุ)')}`,
@@ -383,6 +385,38 @@ export class LineAuthService {
       const lineUserId = profile.sub;
       const displayName = profile.name || 'LINE User';
       const pictureUrl = profile.picture || null;
+
+      // กรณีเชื่อมต่อบัญชี LINE จากหน้าจัดการบัญชีผู้ใช้งาน (Link LINE)
+      if (linkUserId) {
+        const existingLinkedUser = await this.db.findUserByLineUserId(lineUserId);
+        if (existingLinkedUser && existingLinkedUser.id !== linkUserId) {
+          return {
+            redirectUrl: `${this.frontendUrl}/account?line_error=${encodeURIComponent('บัญชี LINE นี้ถูกเชื่อมต่อกับบัญชีผู้ใช้อื่นในระบบแล้ว')}`,
+          };
+        }
+        const targetUser = this.db.accounts.find((a) => a.id === linkUserId);
+        if (!targetUser) {
+          return {
+            redirectUrl: `${this.frontendUrl}/account?line_error=${encodeURIComponent('ไม่พบบัญชีผู้ใช้งานที่ต้องการเชื่อมต่อ')}`,
+          };
+        }
+
+        await this.db.linkLineAccount(linkUserId, {
+          lineUserId,
+          displayName,
+          pictureUrl,
+        });
+        targetUser.lineUserId = lineUserId;
+        targetUser.lineName = displayName;
+
+        if (this.richMenuService) {
+          await this.richMenuService.switchUserRichMenuByRole(lineUserId, targetUser.role).catch(() => {});
+        }
+
+        return {
+          redirectUrl: `${this.frontendUrl}/account?line_linked=1`,
+        };
+      }
 
       // 4. Find linked JapJong account
       const user = await this.db.findUserByLineUserId(lineUserId);

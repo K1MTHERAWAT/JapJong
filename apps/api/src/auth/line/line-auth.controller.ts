@@ -38,15 +38,35 @@ export class LineAuthController {
   @Get()
   initiateLineLogin(
     @Query('redirect') redirectQuery: string | undefined,
+    @Query('linkUserId') linkUserId: string | undefined,
     @Res() res: Response,
   ) {
-    const { url, state } = this.lineAuthService.generateAuthUrl();
+    const { url, state } = this.lineAuthService.generateAuthUrl(linkUserId);
 
     if (redirectQuery === 'false') {
       return res.status(200).json({ url, state });
     }
 
     return res.redirect(url);
+  }
+
+  /**
+   * Generate LINE OAuth URL to link current authenticated user's account
+   * GET /auth/line/link-url
+   */
+  @Get('link-url')
+  getLinkUrl(@CurrentUser() user: Account) {
+    return this.lineAuthService.generateAuthUrl(user.id);
+  }
+
+  /**
+   * Unlink LINE account from current authenticated user
+   * POST /auth/line/unlink
+   */
+  @Post('unlink')
+  async unlinkLine(@CurrentUser() user: Account) {
+    await this.db.unlinkLineAccount(user.id);
+    return { ok: true };
   }
 
   /**

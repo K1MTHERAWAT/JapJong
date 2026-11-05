@@ -9,6 +9,11 @@ import { roleHomePath } from '@/components/shell';
 import { Icon } from '@/components/icons';
 import { Chip } from '@/components/ui';
 import { api, setStoredAuth } from '@/lib/api';
+import {
+  buildGovCenterLineAuthorizeUrl,
+  loginGovCenterWithPassword,
+  logGovSsoDiagnostic,
+} from '@/lib/sso-config';
 
 const DEFAULT_DEMO_ACCOUNTS: DemoAccountSummary[] = [
   { id: 'u-somchai', name: 'สมชาย ใจดี', role: 'USER', position: 'ประชาชน', department: 'กลุ่มแม่บ้านบ้านหนองบัว', initial: 'ส', nickname: 'สมชาย' },
@@ -27,6 +32,17 @@ function LineIcon({ className = 'w-5 h-5' }: { className?: string }) {
   );
 }
 
+function GovIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M3 21h18" />
+      <path d="M5 21V10l7-5 7 5v11" />
+      <path d="M9 21v-4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4" />
+      <line x1="10" y1="10" x2="14" y2="10" />
+    </svg>
+  );
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { loginWithCredentials, loginWithDemo, refreshMe } = useAuth();
@@ -38,10 +54,19 @@ export default function LoginPage() {
   const [demoAccounts, setDemoAccounts] = useState<DemoAccountSummary[]>(DEFAULT_DEMO_ACCOUNTS);
   const [loadingDemo, setLoadingDemo] = useState(false);
   const [unlinkedNotice, setUnlinkedNotice] = useState<{ show: boolean; displayName?: string }>({ show: false });
+
+  // สถานะสำหรับ Gov Center (SSO) Modal
+  const [showGovModal, setShowGovModal] = useState(false);
+  const [govEmail, setGovEmail] = useState('');
+  const [govPassword, setGovPassword] = useState('');
+  const [govError, setGovError] = useState('');
+  const [govSubmitting, setGovSubmitting] = useState(false);
+
   const isDemo = process.env.NEXT_PUBLIC_DEMO === 'true';
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    logGovSsoDiagnostic('LoginPage โหลดสำเร็จ');
 
     const params = new URLSearchParams(window.location.search);
     const lineToken = params.get('line_token');
@@ -96,7 +121,8 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim() || !password.trim()) {
+    const trimmedUser = username.trim();
+    if (!trimmedUser || !password.trim()) {
       setError('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน');
       return;
     }
@@ -107,10 +133,28 @@ export default function LoginPage() {
     setError('');
     setSubmitting(true);
     try {
-      const acc = await loginWithCredentials(username.trim(), password);
+      const acc = await loginWithCredentials(trimmedUser, password);
       router.push(roleHomePath(acc.role));
-    } catch (err) {
-      setError((err as Error).message || 'เข้าสู่ระบบไม่สำเร็จ');
+    } catch (localErr) {
+      // หากกรอกเป็นอีเมล ให้ลองตรวจสอบกับ Gov Center SSO โดยอัตโนมัติ
+      if (trimmedUser.includes('@')) {
+        try {
+          const ssoResult = await loginGovCenterWithPassword(trimmedUser, password);
+          const token = ssoResult.token;
+          const accountId = ssoResult.account?.id || ssoResult.user?.id;
+          if (!token || !accountId) {
+            throw new Error('ไม่ได้รับข้อมูลเซสชันจากระบบ');
+          }
+          setStoredAuth(token, accountId);
+          await refreshMe();
+          const role = (ssoResult.account?.role || ssoResult.user?.role || 'USER') as any;
+          router.push(roleHomePath(role));
+          return;
+        } catch {
+          // ใช้ข้อความจาก localErr ด้านล่าง
+        }
+      }
+      setError((localErr as Error).message || 'เข้าสู่ระบบไม่สำเร็จ');
     } finally {
       setSubmitting(false);
     }
@@ -129,6 +173,70 @@ export default function LoginPage() {
     }
   };
 
+  const handleOpenGovSso = () => {
+    if (!pdpa) {
+      setError('กรุณายินยอมนโยบายคุ้มครองข้อมูลส่วนบุคคล (PDPA) ก่อนเข้าสู่ระบบ');
+      return;
+    }
+    setError('');
+    setGovError('');
+    setShowGovModal(true);
+  };
+
+  const handleGovCenterLineRedirect = () => {
+    setGovError('');
+    setGovSubmitting(true);
+    const diag = logGovSsoDiagnostic('ผู้ใช้กดปุ่ม "เข้าสู่ระบบ Gov Center ด้วย LINE" (Direct Flow)');
+    const { authorizeUrl, callbackWithState, lineRedirectUri } = buildGovCenterLineAuthorizeUrl();
+    console.info('[GovSSO Trace] 🚀 กำลัง Redirect ไปยัง LINE OAuth ของ Gov Center:', {
+      authorizeUrl,
+      lineRedirectUri,
+      callbackWithState,
+    });
+    try {
+      localStorage.setItem(
+        'japjong_sso_last_attempt',
+        JSON.stringify({
+          timestamp: new Date().toISOString(),
+          origin: window.location.origin,
+          mode: 'gov_line_direct',
+          authorizeUrl,
+          callbackWithState,
+          diagnostic: diag,
+        }),
+      );
+    } catch {
+      // ignore storage quota
+    }
+    window.location.assign(authorizeUrl);
+  };
+
+  const handleGovCenterPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!govEmail.trim() || !govPassword) {
+      setGovError('กรุณากรอกอีเมลและรหัสผ่านของบัญชี Gov Center');
+      return;
+    }
+    setGovError('');
+    setGovSubmitting(true);
+    try {
+      const result = await loginGovCenterWithPassword(govEmail.trim(), govPassword);
+      const token = result.token;
+      const accountId = result.account?.id || result.user?.id;
+      if (!token || !accountId) {
+        throw new Error('ระบบไม่ได้ส่ง Token หรือรหัสบัญชีกลับมา');
+      }
+      setStoredAuth(token, accountId);
+      await refreshMe();
+      const role = (result.account?.role || result.user?.role || 'USER') as any;
+      setShowGovModal(false);
+      router.push(roleHomePath(role));
+    } catch (err) {
+      setGovError((err as Error).message || 'เข้าสู่ระบบด้วยบัญชี Gov Center ไม่สำเร็จ');
+      setGovSubmitting(false);
+    }
+  };
+
   const handleLineLogin = () => {
     if (!pdpa) {
       setError('กรุณายินยอมนโยบายคุ้มครองข้อมูลส่วนบุคคล (PDPA) ก่อนเข้าสู่ระบบ');
@@ -136,7 +244,7 @@ export default function LoginPage() {
     }
     setError('');
     setSubmitting(true);
-    // Direct browser redirect to backend LINE login endpoint
+    // Direct browser redirect to backend LINE login endpoint (ไม่กระทบระบบเดิม)
     window.location.href = '/api/auth/line';
   };
 
@@ -178,16 +286,28 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* ปุ่ม LINE Login */}
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={handleLineLogin}
-            className="h-[52px] rounded-full bg-[#06C755] hover:bg-[#05b34c] active:scale-[0.99] text-white font-semibold text-[16px] flex items-center justify-center gap-2.5 shadow-low transition disabled:opacity-50 cursor-pointer"
-          >
-            <LineIcon className="w-6 h-6" />
-            <span>เข้าสู่ระบบด้วย LINE</span>
-          </button>
+          {/* ปุ่ม Single Sign-On (Gov Center & LINE) */}
+          <div className="flex flex-col gap-2.5">
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={handleOpenGovSso}
+              className="h-[52px] w-full rounded-full bg-[#0F766E] hover:bg-[#0D6860] active:scale-[0.99] text-white font-semibold text-[15px] sm:text-[16px] flex items-center justify-center gap-2.5 shadow-low transition disabled:opacity-50 cursor-pointer"
+            >
+              <GovIcon className="w-5 h-5 text-teal-100" />
+              <span>เข้าสู่ระบบด้วย Gov Center (SSO)</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={handleLineLogin}
+              className="h-[52px] rounded-full bg-[#06C755] hover:bg-[#05b34c] active:scale-[0.99] text-white font-semibold text-[15px] sm:text-[16px] flex items-center justify-center gap-2.5 shadow-low transition disabled:opacity-50 cursor-pointer"
+            >
+              <LineIcon className="w-6 h-6" />
+              <span>เข้าสู่ระบบด้วย LINE</span>
+            </button>
+          </div>
 
           <div className="flex items-center gap-3 text-[12px] text-ink-mute">
             <span className="flex-1 h-px bg-line" />
@@ -306,6 +426,109 @@ export default function LoginPage() {
           </div>
         )}
       </div>
+
+      {/* หน้าต่างเข้าสู่ระบบด้วย Gov Center (SSO) แบบ Direct Flow (มาตรฐานเดียวกับ TownTrack) */}
+      {showGovModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4"
+          onClick={() => !govSubmitting && setShowGovModal(false)}
+        >
+          <div
+            className="w-full max-w-[440px] bg-white rounded-[24px] p-6 sm:p-7 shadow-xl border border-line flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-[#0F766E]/10 text-[#0F766E] flex items-center justify-center shrink-0">
+                  <GovIcon className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-[18px] font-bold text-ink">เข้าสู่ระบบด้วย Gov Center</h2>
+                  <p className="text-[12.5px] text-ink-mute">
+                    ระบบยืนยันตัวตนกลางภาครัฐท้องถิ่น (IAM-GOV SSO)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={govSubmitting}
+                onClick={() => setShowGovModal(false)}
+                className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-ink-mute cursor-pointer"
+                aria-label="ปิดหน้าต่าง"
+              >
+                <Icon name="x" className="w-4 h-4" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              disabled={govSubmitting}
+              onClick={handleGovCenterLineRedirect}
+              className="h-[50px] w-full rounded-full bg-[#06C755] hover:bg-[#05b34c] active:scale-[0.99] text-white font-semibold text-[15px] flex items-center justify-center gap-2.5 shadow-low transition disabled:opacity-50 cursor-pointer"
+            >
+              <LineIcon className="w-5 h-5" />
+              <span>ดำเนินการต่อด้วย LINE (Gov Center)</span>
+            </button>
+
+            <div className="flex items-center gap-3 text-[12px] text-ink-mute">
+              <span className="flex-1 h-px bg-line" />
+              <span>หรือใช้อีเมลและรหัสผ่าน Gov Center</span>
+              <span className="flex-1 h-px bg-line" />
+            </div>
+
+            <form onSubmit={handleGovCenterPasswordSubmit} className="flex flex-col gap-3.5">
+              <div>
+                <label className="jw-lbl">อีเมลบัญชี Gov Center</label>
+                <input
+                  type="email"
+                  value={govEmail}
+                  onChange={(e) => setGovEmail(e.target.value)}
+                  placeholder="เช่น citizen@govcenter.co"
+                  className="jw-in"
+                  autoComplete="email"
+                />
+              </div>
+
+              <div>
+                <label className="jw-lbl">รหัสผ่าน Gov Center</label>
+                <input
+                  type="password"
+                  value={govPassword}
+                  onChange={(e) => setGovPassword(e.target.value)}
+                  placeholder="กรอกรหัสผ่าน Gov Center"
+                  className="jw-in"
+                  autoComplete="current-password"
+                />
+              </div>
+
+              {govError && (
+                <div className="rounded-2xl bg-[#FDE8E8] border border-[#f9b4b4] px-3.5 py-2.5 text-[13px] text-[#7a1010] flex items-center gap-2">
+                  <Icon name="x" className="w-4 h-4 text-status-crit shrink-0" />
+                  <span>{govError}</span>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2.5 pt-1">
+                <button
+                  type="button"
+                  disabled={govSubmitting}
+                  onClick={() => setShowGovModal(false)}
+                  className="h-[46px] px-4 rounded-full border border-line text-[14px] font-medium text-ink hover:bg-gray-50 transition cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={govSubmitting}
+                  className="h-[46px] flex-1 rounded-full bg-[#0F766E] hover:bg-[#0D6860] text-white font-semibold text-[14.5px] transition disabled:opacity-50 cursor-pointer"
+                >
+                  {govSubmitting ? 'กำลังยืนยันตัวตน...' : 'เข้าสู่ระบบ Gov Center'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

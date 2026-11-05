@@ -8,6 +8,7 @@ import { EmailService } from './auth/email.service';
 import { DbModule } from './db/db.module';
 import { DocumentsModule } from './documents/documents.module';
 import { LineAuthModule } from './auth/line/line-auth.module';
+import { GovSsoModule } from './auth/gov-sso/gov-sso.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { UsersModule } from './users/users.module';
 import { RequestsController } from './requests/requests.controller';
@@ -20,6 +21,7 @@ import { HealthController } from './health/health.controller';
     NotificationsModule,
     DocumentsModule,
     LineAuthModule,
+    GovSsoModule,
     UsersModule,
     ThrottlerModule.forRoot([
       {

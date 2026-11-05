@@ -107,6 +107,8 @@ export const api = {
     request<LoginResponse>('/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
   logout: () => request<{ ok: boolean }>('/auth/logout', { method: 'POST', body: JSON.stringify({}) }),
   getLineAuthUrl: () => request<LineAuthUrlResponse>('/auth/line?redirect=false'),
+  getLineLinkUrl: () => request<LineAuthUrlResponse>('/auth/line/link-url'),
+  unlinkLine: () => request<{ ok: boolean }>('/auth/line/unlink', { method: 'POST', body: JSON.stringify({}) }),
   getLineStatus: () => request<LineAuthStatusResponse>('/auth/line/status'),
   authLiff: (idToken: string) =>
     request<{

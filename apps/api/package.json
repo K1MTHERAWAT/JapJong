@@ -7,6 +7,7 @@
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "node --max-old-space-size=384 dist/main.js",
+    "test": "tsx --test test/gov-sso.spec.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "tsx prisma/migrate-supabase.ts",

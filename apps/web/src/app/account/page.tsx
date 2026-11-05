@@ -13,6 +13,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import {
+  LineAuthStatusResponse,
   ROLE_LABEL,
   ROLE_TONE,
 } from '@japjong/shared';
@@ -31,6 +32,14 @@ import {
 import { api, formatThaiDate } from '@/lib/api';
 
 type AccountTab = 'profile' | 'password' | 'signature';
+
+function LineIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M19.365 9.863c.349.002.63.285.63.631 0 .348-.281.63-.63.63h-2.12v1.341h2.12c.349 0 .63.283.63.631 0 .348-.281.63-.63.63h-2.752a.63.63 0 0 1-.63-.63V7.868c0-.348.281-.63.63-.63h2.752c.349 0 .63.282.63.63 0 .348-.281.63-.63.63h-2.12v1.365h2.12zm-4.704 3.232c0 .348-.282.63-.63.63a.628.628 0 0 1-.504-.254l-2.023-2.775v2.4c0 .347-.282.629-.63.629a.63.63 0 0 1-.631-.63V7.868c0-.348.282-.63.631-.63a.63.63 0 0 1 .504.254l2.023 2.776V7.868c0-.348.281-.63.63-.63.348 0 .63.282.63.63v5.227zm-5.864 0c0 .348-.282.63-.63.63a.63.63 0 0 1-.631-.63V7.868c0-.348.282-.63.631-.63.348 0 .63.282.63.63v5.227zM6.55 10.494h-2.12v2.601c0 .348-.282.63-.63.63a.63.63 0 0 1-.63-.63V7.868c0-.348.281-.63.63-.63.348 0 .63.282.63.63v2.626h2.12c.349 0 .63.282.63.63 0 .348-.281.63-.63.63zM12 2C6.477 2 2 5.925 2 10.767c0 4.398 3.668 8.082 8.618 8.683.336.073.792.222.908.51.104.258.068.663.033.924l-.145.875c-.044.267-.206 1.043.914.569 1.12-.474 6.046-3.56 8.249-6.096C21.65 14.07 22 12.482 22 10.767 22 5.925 17.523 2 12 2z" />
+    </svg>
+  );
+}
 
 export default function AccountPage() {
   const { account, refreshMe } = useAuth();
@@ -65,6 +74,60 @@ export default function AccountPage() {
   const [savingSig, setSavingSig] = useState(false);
   const [sigMsg, setSigMsg] = useState('');
   const [sigErr, setSigErr] = useState('');
+
+  // LINE link state
+  const [lineStatus, setLineStatus] = useState<LineAuthStatusResponse | null>(null);
+  const [linkingLine, setLinkingLine] = useState(false);
+
+  useEffect(() => {
+    api.getLineStatus().then(setLineStatus).catch(() => {});
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get('line_linked') === '1') {
+        setProfileMsg('เชื่อมต่อบัญชี LINE เรียบร้อยแล้ว');
+        refreshMe();
+        window.history.replaceState({}, '', '/account');
+      } else if (sp.get('line_error')) {
+        setProfileErr(decodeURIComponent(sp.get('line_error') || 'เชื่อมต่อ LINE ไม่สำเร็จ'));
+        window.history.replaceState({}, '', '/account');
+      }
+    }
+  }, [refreshMe]);
+
+  const handleLinkLine = async () => {
+    setLinkingLine(true);
+    setProfileErr('');
+    try {
+      const res = await api.getLineLinkUrl();
+      if (res.url) {
+        window.location.href = res.url;
+        return;
+      }
+    } catch {
+      if (account?.id) {
+        window.location.href = `/api/auth/line?linkUserId=${encodeURIComponent(account.id)}`;
+        return;
+      }
+    }
+    setLinkingLine(false);
+  };
+
+  const handleUnlinkLine = async () => {
+    setLinkingLine(true);
+    setProfileErr('');
+    try {
+      await api.unlinkLine();
+      const updated = await api.getLineStatus().catch(() => ({ isLinked: false, lineAccount: null }));
+      setLineStatus(updated);
+      await refreshMe();
+      setProfileMsg('ยกเลิกการเชื่อมต่อบัญชี LINE เรียบร้อยแล้ว');
+      setTimeout(() => setProfileMsg(''), 3500);
+    } catch (err) {
+      setProfileErr((err as Error).message || 'ไม่สามารถยกเลิกการเชื่อมต่อ LINE ได้');
+    } finally {
+      setLinkingLine(false);
+    }
+  };
 
   useEffect(() => {
     if (account) {
@@ -380,19 +443,51 @@ export default function AccountPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 pt-1 sm:grid-cols-2 sm:gap-5">
-                  <Input
-                    label="ชื่อผู้ใช้งาน (Username)"
-                    value={account.username}
-                    disabled
-                    helperText="ใช้สำหรับเข้าสู่ระบบ (ไม่สามารถเปลี่ยนได้)"
-                  />
-                  <Input
-                    label="บทบาทในระบบ (Role)"
-                    value={ROLE_LABEL[account.role]}
-                    disabled
-                    helperText="กำหนดโดยผู้ดูแลระบบ (แอดมิน)"
-                  />
+                <div className="pt-2 border-t border-line-soft flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-surface-muted p-4 border border-line">
+                  <div className="flex items-center gap-3">
+                    <div className="size-11 rounded-2xl bg-[#06C755]/15 text-[#06C755] flex items-center justify-center shrink-0">
+                      <LineIcon className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <b className="text-body font-bold text-ink block">การเชื่อมต่อบัญชี LINE (Link LINE)</b>
+                      {lineStatus?.isLinked && lineStatus.lineAccount ? (
+                        <span className="text-caption text-emerald-700 font-semibold">
+                          เชื่อมต่อแล้วกับ: {lineStatus.lineAccount.displayName}
+                        </span>
+                      ) : (
+                        <span className="text-caption text-muted">
+                          เชื่อมต่อบัญชี LINE เพื่อเข้าสู่ระบบสะดวกรวดเร็วและรับแจ้งเตือนสถานะคำขอ
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      disabled={linkingLine}
+                      onClick={handleLinkLine}
+                      className="h-10 px-4 rounded-xl bg-[#06C755] hover:bg-[#05b34c] text-white font-semibold text-[13.5px] inline-flex items-center justify-center gap-2 transition disabled:opacity-50"
+                    >
+                      <LineIcon className="w-4 h-4" />
+                      <span>
+                        {linkingLine
+                          ? 'กำลังเชื่อมต่อ...'
+                          : lineStatus?.isLinked
+                          ? 'เปลี่ยนบัญชี LINE'
+                          : 'Link LINE (เชื่อมต่อบัญชี LINE)'}
+                      </span>
+                    </button>
+                    {lineStatus?.isLinked && (
+                      <button
+                        type="button"
+                        disabled={linkingLine}
+                        onClick={handleUnlinkLine}
+                        className="h-10 px-3.5 rounded-xl border border-line bg-white hover:bg-soft text-ink-mute text-[13px] font-semibold transition disabled:opacity-50"
+                      >
+                        ยกเลิกเชื่อมต่อ
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {profileErr && (

@@ -38,9 +38,16 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
   app.setGlobalPrefix('api');
 
-  // รองรับทั้ง /auth/line, /line/webhook (ตาม LINE Developer Console) และ /api/*
+  // รองรับทั้ง /auth/line, /line/webhook, /auth/sso-* (ตาม GOV SSO Spec) และ /api/*
   app.use((req: express.Request, _res: express.Response, next: express.NextFunction) => {
-    if (req.url.startsWith('/auth/line') || req.url.startsWith('/line/webhook')) {
+    if (
+      req.url.startsWith('/auth/line') ||
+      req.url.startsWith('/line/webhook') ||
+      req.url.startsWith('/auth/sso-callback') ||
+      req.url.startsWith('/auth/sso-login') ||
+      req.url.startsWith('/auth/sso-session') ||
+      req.url.startsWith('/auth/me')
+    ) {
       req.url = '/api' + req.url;
     }
     next();
