@@ -225,8 +225,9 @@ export const api = {
     }),
   checkEquipmentAvailability: (params: {
     items: { equipmentId: string; qty: number }[];
-    pickupDate: string;
-    returnDate: string;
+    pickupDate?: string;
+    returnDate?: string;
+    periods?: Period[];
     month?: string;
     excludeRequestId?: string;
   }) =>

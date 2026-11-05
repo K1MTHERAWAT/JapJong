@@ -284,7 +284,49 @@ export default function BookingWizardPage() {
     }
   }, [selectedVenues, earliestBookableDate]);
 
-  // การจัดการจำนวนอุปกรณ์เสริม
+  // การจัดการจำนวนอุปกรณ์เสริม และตรวจสอบสต๊อกความพร้อมใช้งานตามช่วงวัน-เวลาที่เลือก
+  const [equipmentStockSummary, setEquipmentStockSummary] = useState<
+    Record<string, { availableQty: number; reservedQty: number; totalStock: number }>
+  >({});
+  const [checkingEquipmentStock, setCheckingEquipmentStock] = useState(false);
+
+  useEffect(() => {
+    if (!periods.length || equipmentList.length === 0) return;
+    const sortedStarts = periods.map((p) => p.start.slice(0, 10)).filter(Boolean).sort();
+    const sortedEnds = periods.map((p) => p.end.slice(0, 10)).filter(Boolean).sort();
+    if (!sortedStarts.length || !sortedEnds.length) return;
+
+    setCheckingEquipmentStock(true);
+    api
+      .checkEquipmentAvailability({
+        items: equipmentList.map((eq) => ({
+          equipmentId: eq.id,
+          qty: equipmentQuantities[eq.id] ?? 0,
+        })),
+        pickupDate: sortedStarts[0],
+        returnDate: sortedEnds[sortedEnds.length - 1],
+        periods,
+        month,
+      })
+      .then((res) => {
+        const map: Record<string, { availableQty: number; reservedQty: number; totalStock: number }> = {};
+        for (const item of res.summary) {
+          map[item.equipmentId] = {
+            availableQty: item.minAvailableInPeriod,
+            reservedQty: item.maxReservedInPeriod,
+            totalStock: item.totalStock,
+          };
+        }
+        setEquipmentStockSummary(map);
+      })
+      .catch(() => {
+        // กรณีเชื่อมต่อไม่ได้ ให้คงค่าสต๊อกเดิม
+      })
+      .finally(() => {
+        setCheckingEquipmentStock(false);
+      });
+  }, [periods, equipmentList, month]);
+
   const setEquipmentQty = (id: string, max: number, next: number) => {
     const clamped = Math.max(0, Math.min(max, next));
     setEquipmentQuantities((prev) => ({ ...prev, [id]: clamped }));
@@ -293,6 +335,12 @@ export default function BookingWizardPage() {
   const selectedExtraItems = equipmentList
     .map((eq) => ({ eq, qty: equipmentQuantities[eq.id] ?? 0 }))
     .filter((x) => x.qty > 0);
+
+  const hasEquipmentShortage = selectedExtraItems.some((s) => {
+    const info = equipmentStockSummary[s.eq.id];
+    const available = info ? info.availableQty : s.eq.stock;
+    return s.qty > available;
+  });
 
   const filteredEquipment = equipmentList.filter((e) => {
     if (equipmentCat !== 'all' && e.category !== equipmentCat) return false;
@@ -468,11 +516,12 @@ export default function BookingWizardPage() {
             </button>
             <button
               type="button"
+              disabled={hasEquipmentShortage}
               onClick={() => {
                 syncFormPurposeItems(selectedVenues, selectedExtraItems);
                 setStep(4);
               }}
-              className="jw-btn flex-[1.5] sm:w-56"
+              className="jw-btn flex-[1.5] sm:w-56 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {selectedExtraItems.length > 0
                 ? `ถัดไป · กรอกคำขอ (${selectedExtraItems.length} รายการ)`
@@ -1025,67 +1074,108 @@ export default function BookingWizardPage() {
               filteredEquipment.map((eq) => {
                 const qty = equipmentQuantities[eq.id] ?? 0;
                 const isSelected = qty > 0;
+                const stockInfo = equipmentStockSummary[eq.id];
+                const maxAvailable = stockInfo ? stockInfo.availableQty : eq.stock;
+                const reservedCount = stockInfo ? stockInfo.reservedQty : 0;
+                const isOutOfStock = maxAvailable <= 0;
+                const isOverStock = qty > maxAvailable;
+
                 return (
                   <div
                     key={eq.id}
-                    className={`jw-card p-3.5 sm:p-4 flex items-center gap-3.5 transition ${
+                    className={`jw-card p-3.5 sm:p-4 flex flex-col gap-2 transition ${
                       isSelected ? 'ring-2 ring-brand bg-brand-mint/10' : ''
-                    }`}
+                    } ${isOutOfStock ? 'opacity-85' : ''}`}
                   >
-                    <div
-                      className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden ${
-                        isSelected ? 'bg-brand text-white' : 'bg-brand-mint text-brand'
-                      }`}
-                    >
-                      {eq.images?.[0] ? (
-                        <img src={eq.images[0]} alt={eq.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <Icon name={equipmentIconName(eq.category)} className="w-6 h-6" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <b className="block text-[15px] text-ink truncate">{eq.name}</b>
-                      <span className="text-[12.5px] text-ink-mute">
-                        {EQUIPMENT_CATEGORY_LABEL[eq.category]} · พร้อมให้บริการ {eq.stock} รายการ
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        disabled={qty <= 0}
-                        onClick={() => setEquipmentQty(eq.id, eq.stock, qty - 1)}
-                        className="w-[34px] h-[34px] rounded-full border-[1.5px] border-line hover:border-ink flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none transition"
-                      >
-                        <Icon name="minus" className="w-4 h-4" />
-                      </button>
-                      <input
-                        type="number"
-                        min={0}
-                        max={eq.stock}
-                        value={qty}
-                        onChange={(e) => {
-                          const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
-                          setEquipmentQty(eq.id, eq.stock, Number.isNaN(val) ? 0 : val);
-                        }}
-                        onFocus={(e) => e.target.select()}
-                        className={`w-12 h-9 text-center text-[15px] font-bold rounded-xl border border-line bg-white text-ink focus:border-brand focus:ring-1 focus:ring-brand focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                          isSelected ? 'text-brand border-brand/60' : ''
+                    <div className="flex items-center gap-3.5">
+                      <div
+                        className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden ${
+                          isSelected ? 'bg-brand text-white' : 'bg-brand-mint text-brand'
                         }`}
-                      />
-                      <button
-                        type="button"
-                        disabled={qty >= eq.stock}
-                        onClick={() => setEquipmentQty(eq.id, eq.stock, qty + 1)}
-                        className="w-[34px] h-[34px] rounded-full bg-brand text-white flex items-center justify-center hover:bg-brand-deep disabled:opacity-30 disabled:pointer-events-none transition"
                       >
-                        <Icon name="plus" className="w-4 h-4" />
-                      </button>
+                        {eq.images?.[0] ? (
+                          <img src={eq.images[0]} alt={eq.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <Icon name={equipmentIconName(eq.category)} className="w-6 h-6" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <b className="block text-[15px] text-ink truncate">{eq.name}</b>
+                        <div className="flex flex-wrap items-center gap-1.5 text-[12.5px] mt-0.5">
+                          <span className="text-ink-mute">{EQUIPMENT_CATEGORY_LABEL[eq.category]}</span>
+                          <span className="text-ink-mute">·</span>
+                          {isOutOfStock ? (
+                            <span className="text-red-700 font-semibold flex items-center gap-1">
+                              <Icon name="alert-triangle" className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                              <span>ของหมดในช่วงวัน-เวลาที่เลือก (ติดจอง {reservedCount} ชิ้น)</span>
+                            </span>
+                          ) : reservedCount > 0 ? (
+                            <span className="text-amber-800 font-medium">
+                              คงเหลือว่าง <b className="text-brand font-bold">{maxAvailable}</b> / {eq.stock} ชิ้น{' '}
+                              <span className="text-ink-mute">(ติดจอง {reservedCount})</span>
+                            </span>
+                          ) : (
+                            <span className="text-ink-mute">
+                              พร้อมให้บริการ <b className="text-ink font-semibold">{maxAvailable}</b> ชิ้น
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          disabled={qty <= 0}
+                          onClick={() => setEquipmentQty(eq.id, maxAvailable, qty - 1)}
+                          className="w-[34px] h-[34px] rounded-full border-[1.5px] border-line hover:border-ink flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none transition"
+                        >
+                          <Icon name="minus" className="w-4 h-4" />
+                        </button>
+                        <input
+                          type="number"
+                          min={0}
+                          max={maxAvailable}
+                          disabled={isOutOfStock}
+                          value={qty}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
+                            setEquipmentQty(eq.id, maxAvailable, Number.isNaN(val) ? 0 : val);
+                          }}
+                          onFocus={(e) => e.target.select()}
+                          className={`w-12 h-9 text-center text-[15px] font-bold rounded-xl border border-line bg-white text-ink focus:border-brand focus:ring-1 focus:ring-brand focus:outline-none disabled:bg-line/20 disabled:text-ink-mute [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                            isSelected ? 'text-brand border-brand/60' : ''
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          disabled={qty >= maxAvailable}
+                          onClick={() => setEquipmentQty(eq.id, maxAvailable, qty + 1)}
+                          className="w-[34px] h-[34px] rounded-full bg-brand text-white flex items-center justify-center hover:bg-brand-deep disabled:opacity-30 disabled:pointer-events-none transition"
+                        >
+                          <Icon name="plus" className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
+                    {isOverStock && (
+                      <div className="text-[12px] font-semibold text-red-700 flex items-center gap-1.5 pl-1">
+                        <Icon name="alert-triangle" className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                        <span>จำนวนที่เลือกเกินสต๊อกที่ว่างในช่วงเวลานี้ (ว่างเพียง {maxAvailable} ชิ้น)</span>
+                      </div>
+                    )}
                   </div>
                 );
               })
             )}
           </div>
+
+          {/* แจ้งเตือนเมื่อมีอุปกรณ์เสริมเกินสต๊อกที่ว่าง */}
+          {hasEquipmentShortage && (
+            <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-2.5 text-[13px] text-red-800">
+              <Icon name="alert-triangle" className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+              <span>
+                <b>ไม่สามารถดำเนินการต่อได้:</b> อุปกรณ์เสริมบางรายการติดจองจนไม่พอตามจำนวนที่เลือก กรุณาลดจำนวนอุปกรณ์ที่ต้องการ
+              </span>
+            </div>
+          )}
 
           {/* สรุปรายการอุปกรณ์ที่เลือก (ถ้ามี) */}
           {selectedExtraItems.length > 0 && (

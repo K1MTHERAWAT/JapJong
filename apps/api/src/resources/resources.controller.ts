@@ -276,22 +276,31 @@ export class ResourcesController {
     return { conflicts };
   }
 
-  /** ตรวจสอบความพร้อมใช้งานและจำนวนติดจองของอุปกรณ์ */
+  /** ตรวจสอบความพร้อมใช้งานและจำนวนติดจองของอุปกรณ์ (รองรับทั้งยืมอุปกรณ์และการใช้อุปกรณ์เสริมในสถานที่) */
   @Public()
   @Post('check-equipment-availability')
   checkEquipmentAvailability(
     @Body()
     body: {
       items: { equipmentId: string; qty: number }[];
-      pickupDate: string;
-      returnDate: string;
+      pickupDate?: string;
+      returnDate?: string;
+      periods?: { start: string; end: string }[];
       month?: string;
       excludeRequestId?: string;
     },
   ) {
     const items = Array.isArray(body.items) ? body.items : [];
-    const pickupDate = String(body.pickupDate || '').slice(0, 10);
-    const returnDate = String(body.returnDate || '').slice(0, 10);
+    let pickupDate = String(body.pickupDate || '').slice(0, 10);
+    let returnDate = String(body.returnDate || '').slice(0, 10);
+
+    if ((!pickupDate || !returnDate) && body.periods && body.periods.length > 0) {
+      const starts = body.periods.map((p) => p.start.slice(0, 10)).filter(Boolean).sort();
+      const ends = body.periods.map((p) => p.end.slice(0, 10)).filter(Boolean).sort();
+      if (starts.length > 0) pickupDate = starts[0];
+      if (ends.length > 0) returnDate = ends[ends.length - 1];
+    }
+
     const targetMonth =
       body.month && /^\d{4}-\d{2}$/.test(body.month)
         ? body.month
@@ -302,9 +311,17 @@ export class ResourcesController {
     const [y, m] = targetMonth.split('-').map(Number);
     const daysInMonth = new Date(y, m, 0).getDate();
 
+    // กรองเฉพาะคำขอจริงจากฐานข้อมูล (ไม่นำ mock/demo requests มารบกวนสต๊อกจริง)
+    const isRealRequest = (r: { id: string }) =>
+      !(r as any).isDemo &&
+      !r.id.startsWith('r-br-00') &&
+      !r.id.startsWith('r-bk-01') &&
+      !r.id.startsWith('r-rp-00');
+
     const activeBorrows = this.db.requests.filter(
       (r): r is BorrowRequest =>
         r.type === 'borrow' &&
+        isRealRequest(r) &&
         ['pending_staff', 'pending_l2', 'pending_l1', 'approved', 'borrowing', 'return_inspect'].includes(r.status) &&
         r.id !== body.excludeRequestId,
     );
@@ -312,6 +329,7 @@ export class ResourcesController {
     const activeBookingsWithItems = this.db.requests.filter(
       (r): r is BookingRequest =>
         r.type === 'booking' &&
+        isRealRequest(r) &&
         ACTIVE_BOOKING_STATUSES.includes(r.status) &&
         r.id !== body.excludeRequestId &&
         Boolean(r.extraItems && r.extraItems.length > 0),
