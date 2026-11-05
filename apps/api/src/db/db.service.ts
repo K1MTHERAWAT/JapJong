@@ -40,17 +40,23 @@ import { hashSecret } from '../auth/secret';
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
 function resolveDatabaseUrl(): string | undefined {
-  const raw = process.env.DATABASE_URL;
-  if (!raw) return undefined;
+  let url = process.env.DATABASE_URL?.trim();
+  if (!url) return undefined;
   // แปลง Supabase Direct Host (db.<ref>.supabase.co ซึ่งเป็น IPv6-only)
   // ให้เป็น Supabase Session Pooler (IPv4) อัตโนมัติ เพื่อให้ Railway / Cloud ที่ไม่มี IPv6 เชื่อมต่อฐานข้อมูลจริงได้
-  const m = /^(postgresql:\/\/)postgres:([^@]+)@db\.([a-z0-9]+)\.supabase\.co:5432\/(.*)$/i.exec(raw.trim());
+  const m = /^(postgresql:\/\/)postgres:([^@]+)@db\.([a-z0-9]+)\.supabase\.co:5432\/(.*)$/i.exec(url);
   if (m) {
     const [, proto, pass, projectRef, rest] = m;
     const region = process.env.SUPABASE_POOLER_REGION || 'ap-northeast-1';
-    return `${proto}postgres.${projectRef}:${pass}@aws-0-${region}.pooler.supabase.com:5432/${rest}`;
+    url = `${proto}postgres.${projectRef}:${pass}@aws-0-${region}.pooler.supabase.com:5432/${rest}`;
   }
-  return raw;
+
+  // ป้องกัน Prisma เปิด connection ค้างเกินขีดจำกัดของ Supabase Pooler (EMAXCONNSESSION pool_size: 15)
+  if (!url.includes('connection_limit=')) {
+    const separator = url.includes('?') ? '&' : '?';
+    url = `${url}${separator}connection_limit=5`;
+  }
+  return url;
 }
 
 /**
