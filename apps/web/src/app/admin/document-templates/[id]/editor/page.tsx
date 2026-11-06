@@ -95,6 +95,7 @@ export default function DocumentEditorWorkspacePage() {
   // Drag & Drop reorder states
   const [draggedSlotIdx, setDraggedSlotIdx] = useState<number | null>(null);
   const [dragOverSlotIdx, setDragOverSlotIdx] = useState<number | null>(null);
+  const [isAddSlotPickerOpen, setIsAddSlotPickerOpen] = useState(false);
 
   const logoInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -191,11 +192,11 @@ export default function DocumentEditorWorkspacePage() {
   };
 
   // Add Data Slot
-  const handleAddDataSlot = (presetBinding?: string, label?: string) => {
+  const handleAddDataSlot = (presetBinding?: string, label?: string, defaultWidth = 200) => {
     const newSlot: DocumentDataSlot = {
       id: `slot-${Date.now()}`,
       label: label || 'ช่องข้อมูลใหม่',
-      width: 200,
+      width: defaultWidth,
       binding: presetBinding || 'manual.blank',
     };
     updateDoc({
@@ -204,6 +205,7 @@ export default function DocumentEditorWorkspacePage() {
     });
     setSelectedType('slot');
     setSelectedSlotId(newSlot.id);
+    setIsAddSlotPickerOpen(false);
   };
 
   // Resize Slot
@@ -400,8 +402,9 @@ export default function DocumentEditorWorkspacePage() {
           {/* + เพิ่มช่องการดึงข้อมูล Button */}
           <button
             type="button"
-            onClick={() => handleAddDataSlot()}
+            onClick={() => setIsAddSlotPickerOpen(true)}
             className="px-2.5 py-1 rounded-lg bg-white border border-brand text-brand hover:bg-brand hover:text-white text-xs font-semibold transition flex items-center gap-1 shadow-xs"
+            title="เลือกประเภทช่องการดึงข้อมูลเพื่อแทรกลงในเอกสาร"
           >
             <Icon name="plus" className="w-3.5 h-3.5" />
             <span>+ เพิ่มช่องการดึงข้อมูล</span>
@@ -1213,6 +1216,125 @@ export default function DocumentEditorWorkspacePage() {
           </aside>
         )}
       </div>
+
+      {/* Modal: เลือกประเภทช่องการดึงข้อมูล */}
+      {isAddSlotPickerOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="jw-card max-w-lg w-full p-6 space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-line shrink-0">
+              <div>
+                <b className="text-base font-bold text-ink block">เลือกประเภทช่องการดึงข้อมูล</b>
+                <span className="text-xs text-ink-mute">
+                  เลือกตัวแปรข้อมูลที่ต้องการดึงจากระบบ หรือช่องว่างเขียนมือเพื่อแทรกลงในเอกสาร
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddSlotPickerOpen(false)}
+                className="w-7 h-7 rounded-full hover:bg-soft flex items-center justify-center text-ink-mute hover:text-ink"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="overflow-y-auto space-y-4 pr-1 flex-1 text-left">
+              {/* หมวด: ข้อมูลผู้ยื่นคำขอ */}
+              <div>
+                <span className="text-xs font-bold text-brand uppercase tracking-wider block mb-2">
+                  ข้อมูลผู้ยื่นคำขอ
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { key: 'requester.name', label: 'ชื่อ-นามสกุลผู้ขอ', width: 240 },
+                    { key: 'requester.position', label: 'ตำแหน่ง', width: 180 },
+                    { key: 'requester.phone', label: 'เบอร์โทรศัพท์', width: 140 },
+                    { key: 'requester.citizenId', label: 'เลขประจำตัวประชาชน', width: 160 },
+                    { key: 'requester.organization', label: 'หน่วยงาน / สังกัด', width: 200 },
+                    { key: 'requester.address', label: 'ที่อยู่ / บ้านเลขที่', width: 140 },
+                  ].map((it) => (
+                    <button
+                      key={it.key}
+                      type="button"
+                      onClick={() => handleAddDataSlot(it.key, it.label, it.width)}
+                      className="p-2.5 rounded-xl border border-line hover:border-brand hover:bg-brand-mint/40 text-left text-xs transition"
+                    >
+                      <b className="block text-ink">{it.label}</b>
+                      <span className="text-[11px] text-ink-mute font-mono">{it.key}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* หมวด: ข้อมูลคำขอและสถานที่ */}
+              <div>
+                <span className="text-xs font-bold text-brand uppercase tracking-wider block mb-2">
+                  ข้อมูลคำขอและสถานที่
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { key: 'booking.location', label: 'สถานที่ที่ขอใช้', width: 260 },
+                    { key: 'booking.purpose', label: 'วัตถุประสงค์', width: 280 },
+                    { key: 'booking.startDate', label: 'วันที่ขอใช้', width: 130 },
+                    { key: 'document.writtenAt', label: 'สถานที่เขียนเอกสาร', width: 200 },
+                    { key: 'document.number', label: 'เลขที่เอกสารคำขอ', width: 150 },
+                  ].map((it) => (
+                    <button
+                      key={it.key}
+                      type="button"
+                      onClick={() => handleAddDataSlot(it.key, it.label, it.width)}
+                      className="p-2.5 rounded-xl border border-line hover:border-brand hover:bg-brand-mint/40 text-left text-xs transition"
+                    >
+                      <b className="block text-ink">{it.label}</b>
+                      <span className="text-[11px] text-ink-mute font-mono">{it.key}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* หมวด: ข้อมูลครุภัณฑ์ / อุปกรณ์ */}
+              <div>
+                <span className="text-xs font-bold text-brand uppercase tracking-wider block mb-2">
+                  ข้อมูลครุภัณฑ์ / อุปกรณ์
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { key: 'equipment.name', label: 'ชื่อครุภัณฑ์/อุปกรณ์', width: 240 },
+                    { key: 'equipment.assetCode', label: 'รหัสครุภัณฑ์', width: 160 },
+                    { key: 'equipment.quantity', label: 'จำนวนที่ขอ', width: 90 },
+                  ].map((it) => (
+                    <button
+                      key={it.key}
+                      type="button"
+                      onClick={() => handleAddDataSlot(it.key, it.label, it.width)}
+                      className="p-2.5 rounded-xl border border-line hover:border-brand hover:bg-brand-mint/40 text-left text-xs transition"
+                    >
+                      <b className="block text-ink">{it.label}</b>
+                      <span className="text-[11px] text-ink-mute font-mono">{it.key}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* หมวด: ช่องว่างสำหรับเขียนมือ */}
+              <div>
+                <span className="text-xs font-bold text-brand uppercase tracking-wider block mb-2">
+                  ช่องว่างสำหรับเขียนมือ (ไม่ผูกข้อมูล)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleAddDataSlot('manual.blank', 'ช่องว่างเขียนมือ', 160)}
+                  className="w-full p-2.5 rounded-xl border border-line hover:border-brand hover:bg-brand-mint/40 text-left text-xs transition"
+                >
+                  <b className="block text-ink">ช่องว่างสำหรับกรอกด้วยมือ (เส้นประเปล่า)</b>
+                  <span className="text-[11px] text-ink-mute font-mono">
+                    manual.blank (ปรับขนาดย่อขยาย px และลากตำแหน่งได้อย่างอิสระ)
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

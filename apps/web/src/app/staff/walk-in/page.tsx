@@ -102,6 +102,11 @@ export default function StaffWalkInPage() {
       const reqUserId = foundUser?.id ?? 'u-somchai';
       if (serviceType === 'booking') {
         const [st, et] = timeSlot.split('–');
+        if (st && et && st >= et) {
+          alert('เวลาเริ่มต้นต้องก่อนเวลาสิ้นสุด (เวลาเริ่มไม่สามารถเท่ากับหรือหลังเวลาสิ้นสุดได้)');
+          setSubmitting(false);
+          return;
+        }
         const created = await api.createBooking({
           venueIds: [venueId],
           periods: [{ start: `${date}T${st}:00+07:00`, end: `${date}T${et}:00+07:00` }],
@@ -143,6 +148,9 @@ export default function StaffWalkInPage() {
         });
         router.push(`/requests/${created.id}`);
       }
+    } catch (err: any) {
+      const errorMsg = err?.message || 'เกิดข้อผิดพลาดในการส่งคำขอ กรุณาตรวจสอบข้อมูล';
+      alert(`ไม่สามารถส่งคำขอได้:\n${errorMsg}`);
     } finally {
       setSubmitting(false);
     }

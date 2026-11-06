@@ -17,9 +17,11 @@
 * **LINE Login & Onboarding (Phase 2)**: เข้าสู่ระบบและเชื่อมต่อบัญชีด้วย LINE พร้อมระบบลงทะเบียนผู้ใช้ใหม่และบันทึกความยินยอม **PDPA Consent**
 * **Document Security**: ระบบตรวจสอบเอกสารดิจิทัล QR Code (`qrcode`, `html5-qrcode`), รหัสยืนยันสุ่ม 32-byte, SHA-256 Document Hashing และบันทึกประวัติการสแกน
 * **Shared Package**: `@japjong/shared` (TypeScript Types, Labels, RBAC Logic, Date Helpers, Period Conflict Checks)
-* **Testing & CI/CD**: Vitest (Unit Tests 361 ข้อ ครอบคลุม 26 Test Files ใน Monorepo) + GitHub Actions CI Pipeline + Multi-stage Dockerfile
+* **Testing & CI/CD**: Vitest (Unit & Integration Tests 403 ข้อ ครอบคลุม 30 Test Files ใน Monorepo 100% Pass) + GitHub Actions CI Pipeline + Multi-stage Dockerfile
 * **LINE Webhook & LIFF Integration (Phase 4)**: รองรับการเข้าสู่ระบบอัตโนมัติผ่าน **LINE Front-end Framework (LIFF SDK)**, Direct Routing ถอดรหัส `liff.state`, ป้องกัน Open Redirect และระบบตรวจสอบ Webhook Signature (HMAC-SHA256) ป้องกัน Replay Attack
 * **LINE Rich Menu & Flex Message Engine (Phase 5)**: ระบบ Rich Menu อัจฉริยะแบบแยกบทบาท (Citizen, Staff, Admin, Guest) สลับเมนูอัตโนมัติตาม Role ของผู้ใช้งาน พร้อมระบบสร้างภาพกราฟิกด้วย Pure Node.js (2500x1686, RGB PNG, zlib deflate) และหน้าจอแอดมินบริหารจัดการครบวงจร (`/admin/line`)
+* **Dynamic Sidebar Navigation & Service Management (`/admin/services`)**: ระบบจัดการบริการและเมนู Sidebar จากฐานข้อมูล (Database-driven) จัดหมวดหมู่บริการ กำหนดสิทธิ์ตามบทบาท จัดเรียงลำดับเมนูด้วย Drag & Drop พร้อมหน้าจอ Interactive Preview และการตรวจสอบสิทธิ์ความปลอดภัยที่ Backend ทุก API
+* **Role-Based Access Control & User Role Management (`/admin/permissions`)**: ระบบบริหารจัดการบทบาทผู้ใช้งาน (RBAC) และกำหนดบทบาทผู้ใช้แบบรายบุคคลหรือแบบกลุ่ม (Bulk Role Assignment) สไตล์ Minimal Clean & Responsive เชื่อมโยงการแสดงผลเมนูกับ Sidebar โดยอัตโนมัติ
 
 ---
 
@@ -57,7 +59,7 @@ BookingV1/
 │   │       ├── resources/        # Venues, Equipment, Monthly Availability, Conflict & Stock Check
 │   │       ├── requests/         # Booking, Borrow, Repair, 3-Level Sign, Handover, Reschedule
 │   │       ├── documents/        # QR Code Verification, Document Hashing, Public & Staff Verify API
-│   │       ├── admin/            # Users & Permissions, LINE & Rich Menu Manager, Overview, Activity Logs
+│   │       ├── admin/            # Role Management, Sidebar Services, LINE & Rich Menu Manager, Overview
 │   │       └── db/               # Prisma Database Service (Persistent DB Sessions & Sequences)
 │   └── web/                    # @japjong/web — Next.js 15 (App Router) + Tailwind CSS (:3000)
 │       ├── public/               # Static Assets (โลโก้, ไอคอน)
@@ -76,9 +78,9 @@ BookingV1/
 │           │   ├── staff/        # เจ้าหน้าที่ (ตรวจคำขอ, รับมอบ–รับคืน, กรอกแทน, ตรวจสอบ QR Code /staff/verify)
 │           │   ├── verify/       # ตรวจสอบเอกสารดิจิทัลสาธารณะสำหรับประชาชน (/verify/[token])
 │           │   ├── approver/     # ปลัด อบต. / นายก อบต. (คิวลงนามอนุมัติด้วย PIN 6 หลัก, ใบอนุญาต PDF)
-│           │   └── admin/        # แอดมิน (ภาพรวม, จัดการทรัพยากร/แบบฟอร์ม, ผู้ใช้ & สิทธิ์, จัดการ LINE & Rich Menu /admin/line)
-│           ├── components/       # AppShell, Sidebar (Badge แจ้งเตือน), UI Primitives, DatePicker & OfficialGovFormDocument
-│           └── lib/api.ts        # Client API SDK (Notifications, Preferences, LINE Status, Admin Retry)
+│           │   └── admin/        # แอดมิน (ภาพรวม, จัดการทรัพยากร, จัดการบริการ /admin/services, จัดการบทบาทผู้ใช้ /admin/permissions, จัดการ LINE /admin/line)
+│           ├── components/       # AppShell, Sidebar (Badge แจ้งเตือน + Dynamic Services), UI Primitives, DatePicker & OfficialGovFormDocument
+│           └── lib/api.ts        # Client API SDK (Notifications, Preferences, LINE Status, Services & Roles API)
 ├── package.json
 └── pnpm-workspace.yaml
 ```
@@ -239,6 +241,26 @@ pnpm dev
     - **Dynamic Role Switching:** เมื่อเจ้าหน้าที่หรือผู้ใช้เข้าสู่ระบบ ระบบจะสลับ Rich Menu บน LINE ให้ตรงตามบทบาทของตนเองอัตโนมัติแบบเรียลไทม์
     - **Pure Node.js Canvas & PNG Generator:** สถาปัตยกรรมการสร้างภาพเมนูขนาดมาตรฐาน LINE (2500 x 1686 พิกเซล, RGB PNG, zlib deflate, CRC-32) ด้วย Node.js ในตัว ไม่ต้องติดตั้ง Library ภายนอกหรือ C++ native dependencies
     - **Custom Flex Message Template Overrides:** ผู้ดูแลระบบสามารถปรับแต่ง Headline, สีหัวการ์ด (Header Color), ปุ่ม Action, และ Footer Note ของข้อความ Flex Message แจ้งเตือนได้ผ่านหน้า `/admin/line`
+11. **ระบบบริหารจัดการบริการและเมนูแถบข้าง (Dynamic Sidebar Services Manager `/admin/services`):**
+    - **Database-Driven Navigation:** รายการบริการและเมนูทั้งหมดถูกจัดเก็บในฐานข้อมูล (`sidebar_services`) ไม่ Hardcode ในหน้าเว็บ ช่วยให้ผู้ดูแลระบบเพิ่ม แก้ไข จัดหมวดหมู่ และเปิด-ปิดบริการได้ทันที
+    - **Drag & Drop Reordering:** จัดเรียงลำดับการแสดงผลเมนูบน Sidebar ได้อย่างสะดวกด้วยการลากและวาง (Drag & Drop) หรือปุ่มเลื่อนขึ้น-ลง พร้อมบันทึกแบบเรียลไทม์
+    - **Role-Based Visibility:** กำหนดได้ว่าแต่ละบทบาท (`ADMIN`, `STAFF`, `APPROVER_L2`, `APPROVER_L1`, `USER`) จะเห็นบริการใดบ้าง
+    - **Interactive Sidebar Preview:** แอดมินสามารถดูตัวอย่างจำลองหน้าตาของแถบ Sidebar เมนูแยกตามแต่ละบทบาทได้ทันทีก่อนการบันทึก
+    - **Enterprise Safety Locks & Relations Check:** ป้องกันไม่ให้ปิดการใช้งานหรือลบเมนูระบบหลักของผู้ดูแลระบบ (`ADMIN`) และมีระบบตรวจสอบความสัมพันธ์กับคำขอหรือทรัพยากรที่เกี่ยวข้องก่อนการลบ เพื่อป้องกันข้อมูลเสียหาย
+12. **ระบบจัดการบทบาทผู้ใช้งานและการกำหนดสิทธิ์ (Rebuilt Role Management `/admin/permissions`):**
+    - **Role Management Tab (จัดการบทบาทในระบบ):**
+      - แสดงรายการบทบาททั้งหมด พร้อมตัวนับจำนวนผู้ใช้งานที่ผูกอยู่จริงในแต่ละบทบาท
+      - สร้างบทบาทใหม่ในระบบ กำหนดรหัสบทบาท (Role Code), ชื่อบทบาทภาษาไทย, คำอธิบายขอบเขตงาน, โทนสี Badge และสถานะเปิด/ปิด
+      - แก้ไขชื่อ คำอธิบาย โทนสี หรือเปิด-ปิดการใช้งานบทบาท
+      - ลบบทบาทที่ไม่ได้ใช้งาน พร้อมระบบตรวจสอบความสัมพันธ์ (ป้องกันการลบบทบาทของระบบ และป้องกันการลบบทบาทที่มีผู้ใช้งานผูกอยู่)
+      - ป้องกันความปลอดภัย: ห้ามปิดการใช้งานหรือลบบทบาทผู้ดูแลระบบ (`ADMIN`)
+    - **User Role Assignment Tab (กำหนดบทบาทผู้ใช้งาน):**
+      - ค้นหาผู้ใช้งานสะดวกรวดเร็วตามชื่อ เบอร์โทร หน่วยงาน หรือชื่อบัญชี
+      - สลับหรือกำหนดบทบาทให้ผู้ใช้รายบุคคลได้ทันทีผ่าน Inline Dropdown
+      - รองรับการกำหนดบทบาทให้ผู้ใช้งานพร้อมกันหลายคน (Bulk Role Assignment) ด้วย Toolbar การเลือกผู้ใช้
+      - สลับสถานะเปิดใช้งานหรือระงับบัญชี (Active/Suspended)
+      - ป้องกันไม่ให้ผู้ดูแลระบบลดระดับบทบาทหรือระงับบัญชีของตนเอง
+    - **Real-Time Sidebar Synchronization:** ระบบเชื่อมต่อแบบ Reactive เมื่อมีการเปลี่ยนบทบาท จะส่ง Event ปลุกให้ Sidebar Navigation โหลดเมนูสิทธิ์ใหม่จากฐานข้อมูลทันทีโดยไม่ต้องโหลดหน้าเว็บใหม่
 
 
 ---
@@ -636,4 +658,81 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
     }
+
+    sidebar_services {
+        string id PK
+        string label
+        string href UK
+        string icon
+        string category
+        int sort_order
+        boolean enabled
+        boolean is_system
+        json roles
+        json allowed_user_ids
+        json denied_user_ids
+        json permissions
+        boolean exact
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    role_definitions {
+        string id PK
+        string key UK
+        string name
+        string description
+        string tone
+        boolean enabled
+        boolean is_system
+        timestamptz created_at
+        timestamptz updated_at
+    }
 ```
+
+---
+
+## สรุปรายการเส้นทาง API หลัก (Core RESTful API Endpoints)
+
+### 1. ระบบจัดการบริการและแถบนำทาง (Sidebar & Services API)
+| Method | Path | สิทธิ์การเข้าถึง | คำอธิบาย |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/navigation` | Public / ทุกบทบาท | ดึงรายการเมนู Sidebar ตามสิทธิ์ของผู้ใช้ปัจจุบัน |
+| `GET` | `/api/admin/services` | `ADMIN` | ดึงรายการบริการทั้งหมดในระบบ พร้อมสิทธิ์และสถานะ |
+| `POST` | `/api/admin/services` | `ADMIN` | สร้างบริการหรือเมนูใหม่ใน Sidebar |
+| `PUT` | `/api/admin/services/:id` | `ADMIN` | แก้ไขข้อมูลบริการ (ชื่อ, URL, ไอคอน, หมวดหมู่, สิทธิ์ Role) |
+| `PATCH` | `/api/admin/services/:id/toggle` | `ADMIN` | สลับสถานะเปิด/ปิดการแสดงผลบริการ |
+| `PATCH` | `/api/admin/services/reorder` | `ADMIN` | บันทึกการจัดเรียงลำดับเมนู (Sort Order) ทั้งหมด |
+| `GET` | `/api/admin/services/:id/check-delete` | `ADMIN` | ตรวจสอบความสัมพันธ์ก่อนลบบริการ |
+| `DELETE` | `/api/admin/services/:id` | `ADMIN` | ลบบริการที่ไม่ใช้งานออกจากระบบ |
+| `GET` | `/api/admin/services/preview` | `ADMIN` | จำลองการแสดงผล Sidebar Navigation แยกตาม Role |
+
+### 2. ระบบจัดการบทบาทผู้ใช้งาน (Role Management API)
+| Method | Path | สิทธิ์การเข้าถึง | คำอธิบาย |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/admin/roles` | `manageUsers` | ดึงรายการบทบาททั้งหมด พร้อมจำนวนผู้ใช้ในแต่ละบทบาท |
+| `POST` | `/api/admin/roles` | `ADMIN` | สร้างบทบาทใหม่ในระบบ |
+| `PUT` | `/api/admin/roles/:id` | `ADMIN` | แก้ไขข้อมูลบทบาท (ชื่อ, คำอธิบาย, โทนสี, สถานะ) |
+| `PATCH` | `/api/admin/roles/:id/toggle` | `ADMIN` | สลับสถานะเปิด/ปิดบทบาท (ล็อกความปลอดภัยสำหรับ `ADMIN`) |
+| `DELETE` | `/api/admin/roles/:id` | `ADMIN` | ลบบทบาท (ต้องไม่ใช่บทบาทระบบและไม่มีผู้ใช้ผูกอยู่) |
+| `POST` | `/api/admin/roles/bulk-assign` | `ADMIN` | กำหนดบทบาทให้ผู้ใช้งานพร้อมกันหลายคน (Bulk Assignment) |
+
+### 3. ระบบยืนยันตัวตนและบัญชีผู้ใช้ (Auth & Account API)
+| Method | Path | สิทธิ์การเข้าถึง | คำอธิบาย |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/auth/login` | Public | เข้าสู่ระบบด้วยชื่อผู้ใช้/เบอร์โทรศัพท์ และรหัสผ่าน |
+| `POST` | `/api/auth/demo-login` | Public (Demo Mode) | เข้าสู่ระบบ 1-Click สำหรับการทดสอบ |
+| `POST` | `/api/auth/logout` | Authenticated | ออกจากระบบและเพิกถอน Token ในฐานข้อมูล |
+| `GET` | `/api/auth/me` | Authenticated | ดึงข้อมูลโปรไฟล์ผู้ใช้งานปัจจุบัน |
+| `PATCH` | `/api/auth/profile` | Authenticated | ปรับปรุงข้อมูลส่วนตัวและที่อยู่ |
+| `POST` | `/api/auth/pin` | Authenticated | ตั้งค่าหรือเปลี่ยนรหัส PIN 6 หลักสำหรับการลงนาม |
+
+---
+
+## มาตรฐานการทดสอบและการรับประกันคุณภาพ (Quality Assurance)
+
+* **Vitest Suite**: รันแบบคู่ขนานผ่าน `pnpm test` ครอบคลุม **30 Test Files** รวม **403 ข้อทดสอบ (100% Pass)**
+* **TypeScript Strictness**: ตรวจสอบ Types ทุกโปรเจกต์ (`@japjong/shared`, `@japjong/api`, `@japjong/web`) ไร้ข้อผิดพลาด
+* **Production Build Validation**: Next.js App Router คอมไพล์และสร้าง Static/Dynamic Pages สำเร็จครบทุกเส้นทาง
+* **Discipline**: มีการจัดเก็บบันทึกประวัติและโครงสร้างข้อมูลอย่างเป็นระบบ ปลอดภัยตามมาตรฐานสถาปัตยกรรมภาครัฐ
+

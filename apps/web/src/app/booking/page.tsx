@@ -37,6 +37,82 @@ import { HourlyBookingSection } from '@/components/hourly-booking-section';
 
 const STEPS = ['เลือกสถานที่', 'วัน-เวลา', 'อุปกรณ์เสริม', 'กรอกคำขอ', 'ลงนามและส่ง'];
 
+function validateBookingPeriods(periods: Period[], venues: Venue[], attendeesCount?: number): string[] {
+  const errors: string[] = [];
+  if (!periods || periods.length === 0) {
+    errors.push('กรุณาระบุช่วงวันและเวลาที่ต้องการใช้งาน');
+    return errors;
+  }
+
+  const now = new Date();
+  const bkkNow = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  const todayBkkMidnight = Date.UTC(bkkNow.getUTCFullYear(), bkkNow.getUTCMonth(), bkkNow.getUTCDate());
+
+  for (let i = 0; i < periods.length; i++) {
+    const p = periods[i];
+    const s = new Date(p.start).getTime();
+    const e = new Date(p.end).getTime();
+
+    if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) {
+      errors.push(
+        `ช่วงที่ ${i + 1}: เวลาเริ่มต้นต้องก่อนเวลาสิ้นสุด (เวลาเริ่มไม่สามารถเท่ากับหรือหลังเวลาสิ้นสุดได้)`,
+      );
+      continue;
+    }
+
+    const startBkk = new Date(s + 7 * 60 * 60 * 1000);
+    const endBkk = new Date(e + 7 * 60 * 60 * 1000);
+    const startDayBkk = Date.UTC(startBkk.getUTCFullYear(), startBkk.getUTCMonth(), startBkk.getUTCDate());
+    const dayDiff = Math.floor((startDayBkk - todayBkkMidnight) / (24 * 60 * 60 * 1000));
+    const dayOfWeek = startBkk.getUTCDay();
+
+    const startH = String(startBkk.getUTCHours()).padStart(2, '0');
+    const startM = String(startBkk.getUTCMinutes()).padStart(2, '0');
+    const endH = String(endBkk.getUTCHours()).padStart(2, '0');
+    const endM = String(endBkk.getUTCMinutes()).padStart(2, '0');
+    const startTimeStr = `${startH}:${startM}`;
+    const endTimeStr = `${endH}:${endM}`;
+
+    for (const v of venues) {
+      // 1. ตรวจสอบการจองล่วงหน้า (advanceDays)
+      if (v.advanceDays > 0 && dayDiff < v.advanceDays) {
+        errors.push(
+          `ช่วงที่ ${i + 1}: สถานที่ "${v.name}" ต้องจองล่วงหน้าอย่างน้อย ${v.advanceDays} วัน (วันที่เลือกเร็วเกินไป)`,
+        );
+      }
+
+      // 2. ตรวจสอบวันเปิดทำการ (openDays)
+      if (v.openDays && v.openDays.length > 0 && !v.openDays.includes(dayOfWeek)) {
+        const thaiDayNames = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+        errors.push(
+          `ช่วงที่ ${i + 1}: สถานที่ "${v.name}" ไม่เปิดให้บริการในวัน${thaiDayNames[dayOfWeek]}`,
+        );
+      }
+
+      // 3. ตรวจสอบเวลาเปิด-ปิด (openTime / closeTime)
+      if (v.openTime && startTimeStr < v.openTime) {
+        errors.push(
+          `ช่วงที่ ${i + 1}: เวลาเริ่มต้น (${startTimeStr} น.) เร็วกว่าเวลาเปิดทำการของ "${v.name}" (${v.openTime} น.)`,
+        );
+      }
+      if (v.closeTime && endTimeStr > v.closeTime) {
+        errors.push(
+          `ช่วงที่ ${i + 1}: เวลาสิ้นสุด (${endTimeStr} น.) เกินเวลาปิดทำการของ "${v.name}" (${v.closeTime} น.)`,
+        );
+      }
+
+      // 4. ตรวจสอบความจุสถานที่ (หากระบุ)
+      if (attendeesCount && v.capacity > 0 && attendeesCount > v.capacity) {
+        errors.push(
+          `จำนวนผู้เข้าร่วม (${attendeesCount} คน) เกินความจุของสถานที่ "${v.name}" (รองรับได้สูงสุด ${v.capacity} คน)`,
+        );
+      }
+    }
+  }
+
+  return errors;
+}
+
 export default function BookingWizardPage() {
   const router = useRouter();
   const { account, accounts } = useAuth();
@@ -104,7 +180,6 @@ export default function BookingWizardPage() {
   const [organization, setOrganization] = useState(
     account?.department || '',
   );
-  const [attendees, setAttendees] = useState(30);
   const [activity, setActivity] = useState('');
   const [purpose, setPurpose] = useState('');
   const [purposeItems, setPurposeItems] = useState<OfficialFormPurposeItem[]>([
@@ -136,7 +211,6 @@ export default function BookingWizardPage() {
     ]
       .filter(([, value]) => !String(value).trim())
       .map(([label]) => label),
-    ...(attendees < 1 ? ['จำนวนผู้เข้าร่วม'] : []),
     ...(attachmentFiles.length === 0 ? ['สำเนาบัตรประชาชนหรือเอกสารประกอบคำขอ'] : []),
     ...purposeItems.flatMap((item, index) => [
       ...(!item.item.trim() ? [`รายการที่ ${index + 1}`] : []),
@@ -149,6 +223,7 @@ export default function BookingWizardPage() {
   const [staffSignature, setStaffSignature] = useState('');
   const [draftSaved, setDraftSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const applyAccountFields = (acc: PublicAccount | null) => {
     const { title, name } = parseTitleAndName(acc?.name);
@@ -283,6 +358,11 @@ export default function BookingWizardPage() {
       }
     }
   }, [selectedVenues, earliestBookableDate]);
+
+  // ตรวจสอบเงื่อนไขวันและเวลา (Real-time Validation)
+  const periodValidationErrors = React.useMemo(() => {
+    return validateBookingPeriods(periods, selectedVenues);
+  }, [periods, selectedVenues]);
 
   // การจัดการจำนวนอุปกรณ์เสริม และตรวจสอบสต๊อกความพร้อมใช้งานตามช่วงวัน-เวลาที่เลือก
   const [equipmentStockSummary, setEquipmentStockSummary] = useState<
@@ -433,12 +513,22 @@ export default function BookingWizardPage() {
   };
 
   const handleSubmit = async () => {
+    // ตรวจสอบเงื่อนไขวันและเวลาการจอง (Pre-validation)
+    const periodErrors = validateBookingPeriods(periods, selectedVenues);
+    if (periodErrors.length > 0) {
+      const msg = periodErrors.join('\n');
+      setSubmitError(msg);
+      alert(`ไม่สามารถส่งคำขอได้:\n${msg}`);
+      return;
+    }
+
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const created = await api.createBooking({
         venueIds: selectedIds,
         periods,
-        attendees,
+        attendees: undefined, // ตัดจำนวนผู้เข้าร่วมออกตามข้อกำหนด
         activity: purposeItems[0]?.forWhat || activity,
         purpose,
         organization,
@@ -459,6 +549,14 @@ export default function BookingWizardPage() {
         purposeItems: purposeItems.filter((pi) => pi.item.trim() || pi.forWhat.trim()),
       });
       router.push(`/requests/${created.id}`);
+    } catch (err: any) {
+      const errorMsg =
+        err?.message || 'เกิดข้อผิดพลาดในการส่งคำขอ กรุณาตรวจสอบข้อมูลและลองใหม่อีกครั้ง';
+      setSubmitError(errorMsg);
+      alert(`เกิดข้อผิดพลาดในการส่งคำขอ:\n${errorMsg}`);
+      setTimeout(() => {
+        document.getElementById('booking-submit-error')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
     } finally {
       setSubmitting(false);
     }
@@ -503,7 +601,14 @@ export default function BookingWizardPage() {
                 periods.length === 0 ||
                 periods.some((p) => !p?.start || !p?.end)
               }
-              onClick={() => setStep(3)}
+              onClick={() => {
+                if (periodValidationErrors.length > 0) {
+                  const msg = periodValidationErrors.join('\n');
+                  alert(`ไม่สามารถดำเนินการต่อได้:\n${msg}`);
+                  return;
+                }
+                setStep(3);
+              }}
               className="jw-btn flex-[1.5] sm:w-56"
             >
               ถัดไป · เลือกอุปกรณ์เสริม
@@ -801,19 +906,33 @@ export default function BookingWizardPage() {
 
       {/* ================= STEP 2: เลือกวัน-เวลา ================= */}
       {step === 2 && (
-        bookingMode === 'hourly' ? (
-          <HourlyBookingSection
-            selectedVenues={selectedVenues}
-            availability={availability}
-            month={month}
-            onMonthChange={setMonth}
-            periods={periods}
-            onSelectPeriods={setPeriods}
-            onSwitchToDaily={() => setBookingMode('daily')}
-            bookingMode={bookingMode}
-          />
-        ) : (
-          <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
+          {periodValidationErrors.length > 0 && (
+            <div className="rounded-2xl bg-[#FDE8E8] border-2 border-[#f9b4b4] p-4 flex items-start gap-3 text-[13px] text-[#7a1010] shadow-sm animate-fadeIn">
+              <Icon name="alert-triangle" className="w-5 h-5 text-status-crit shrink-0 mt-0.5" />
+              <div>
+                <b className="block font-bold text-[14px]">เงื่อนไขวันและเวลาไม่ถูกต้อง ({periodValidationErrors.length} รายการ):</b>
+                <ul className="list-disc pl-4 mt-1.5 space-y-1">
+                  {periodValidationErrors.map((err, i) => (
+                    <li key={i}>{err}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+          {bookingMode === 'hourly' ? (
+            <HourlyBookingSection
+              selectedVenues={selectedVenues}
+              availability={availability}
+              month={month}
+              onMonthChange={setMonth}
+              periods={periods}
+              onSelectPeriods={setPeriods}
+              onSwitchToDaily={() => setBookingMode('daily')}
+              bookingMode={bookingMode}
+            />
+          ) : (
+            <div className="flex flex-col gap-4">
             {/* ส่วนหัวสลับโหมดในหน้าจองรายวัน */}
             <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-2xl border border-line shadow-card">
               <div className="flex items-center gap-2">
@@ -968,6 +1087,20 @@ export default function BookingWizardPage() {
                   <Icon name="plus" className="w-4 h-4" /> เพิ่มช่วงเวลา
                 </button>
 
+                {periodValidationErrors.length > 0 && (
+                  <div className="rounded-2xl bg-[#FDE8E8] border-2 border-[#f9b4b4] p-3.5 flex items-start gap-2.5 text-[13px] text-[#7a1010] shadow-sm animate-fadeIn">
+                    <Icon name="alert-triangle" className="w-5 h-5 text-status-crit shrink-0 mt-0.5" />
+                    <div>
+                      <b className="block font-bold">เงื่อนไขวันและเวลาไม่ถูกต้อง:</b>
+                      <ul className="list-disc pl-4 mt-1 space-y-1">
+                        {periodValidationErrors.map((err, i) => (
+                          <li key={i}>{err}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
                 {effectiveConflicts.length > 0 ? (
                   <div className="rounded-2xl bg-[#FDE8E8] border border-[#f9b4b4] p-3.5 flex items-start gap-2.5 text-[13px] text-[#7a1010]">
                     <Icon name="x" className="w-5 h-5 text-status-crit shrink-0 mt-0.5" />
@@ -994,7 +1127,8 @@ export default function BookingWizardPage() {
               </div>
             </div>
           </div>
-        )
+        )}
+      </div>
       )}
 
       {/* ================= STEP 3: เลือกอุปกรณ์เสริม ================= */}
@@ -1409,29 +1543,16 @@ export default function BookingWizardPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="jw-lbl">หน่วยงาน / ชุมชน<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
-              <input
-                type="text"
-                value={organization}
-                onChange={(e) => setOrganization(e.target.value)}
-                className="jw-in"
-                placeholder="ระบุหน่วยงานหรือกลุ่มชุมชน"
-                required
-              />
-            </div>
-            <div>
-              <label className="jw-lbl">จำนวนผู้เข้าร่วม (คน)<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
-              <input
-                type="number"
-                value={attendees}
-                onChange={(e) => setAttendees(Number(e.target.value))}
-                className="jw-in"
-                min={1}
-                required
-              />
-            </div>
+          <div>
+            <label className="jw-lbl">หน่วยงาน / ชุมชน<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
+            <input
+              type="text"
+              value={organization}
+              onChange={(e) => setOrganization(e.target.value)}
+              className="jw-in"
+              placeholder="ระบุหน่วยงานหรือกลุ่มชุมชน"
+              required
+            />
           </div>
 
           {/* มีความประสงค์ขอใช้สถานที่ราชการ ดังนี้ (ล็อกรายการตามที่เลือกไว้) */}
@@ -1591,6 +1712,27 @@ export default function BookingWizardPage() {
       {/* ================= STEP 5: ลงนามและส่ง ================= */}
       {step === 5 && (
         <div className="max-w-[960px] mx-auto flex flex-col gap-4">
+          {submitError && (
+            <div
+              id="booking-submit-error"
+              className="rounded-2xl bg-[#FDE8E8] border-2 border-[#f9b4b4] p-4 flex items-start gap-3 text-[14px] text-[#7a1010] shadow-md animate-fadeIn"
+            >
+              <Icon name="alert-triangle" className="w-5 h-5 text-status-crit shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <b className="block text-[15px] font-bold">ไม่สามารถส่งคำขอได้</b>
+                <p className="mt-1 leading-relaxed whitespace-pre-line">{submitError}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSubmitError(null)}
+                className="text-[#7a1010] hover:text-black p-1"
+                title="ปิดการแจ้งเตือน"
+              >
+                <Icon name="x" className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           {/* แสดงเอกสารจริงตามแบบขอใช้สถานที่ราชการ */}
           <OfficialGovFormDocument
             customFields={{

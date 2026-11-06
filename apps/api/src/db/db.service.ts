@@ -283,6 +283,22 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
            "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
            "updated_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
          )`,
+        `CREATE TABLE IF NOT EXISTS "document_templates" (
+           "id" TEXT PRIMARY KEY,
+           "name" TEXT NOT NULL,
+           "description" TEXT DEFAULT '',
+           "category" TEXT NOT NULL DEFAULT 'venue',
+           "status" TEXT NOT NULL DEFAULT 'draft',
+           "current_version" INTEGER NOT NULL DEFAULT 1,
+           "structure" JSONB NOT NULL DEFAULT '{}'::jsonb,
+           "settings" JSONB NOT NULL DEFAULT '{}'::jsonb,
+           "created_by" TEXT,
+           "updated_by" TEXT,
+           "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+           "updated_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+         )`,
+        `CREATE INDEX IF NOT EXISTS "document_templates_cat_idx" ON "document_templates"("category")`,
+        `CREATE INDEX IF NOT EXISTS "document_templates_status_idx" ON "document_templates"("status")`,
       ];
       for (const stmt of initStatements) {
         await this.prisma.$executeRawUnsafe(stmt).catch((err: any) => {
@@ -2809,6 +2825,54 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
+    try {
+      const docTplRows = (await this.prisma.$queryRawUnsafe(
+        `SELECT * FROM "document_templates" ORDER BY "updated_at" DESC`,
+      )) as any[];
+      if (Array.isArray(docTplRows) && docTplRows.length > 0) {
+        this.documentTemplates = docTplRows.map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          description: r.description ?? '',
+          category: r.category || 'venue',
+          status: r.status || 'draft',
+          currentVersion: Number(r.current_version ?? 1),
+          structure: typeof r.structure === 'string' ? JSON.parse(r.structure) : (r.structure || {}),
+          settings: typeof r.settings === 'string' ? JSON.parse(r.settings) : (r.settings || {}),
+          createdBy: r.created_by || 'ADMIN',
+          updatedBy: r.updated_by || 'ADMIN',
+          createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+          updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : new Date().toISOString(),
+        }));
+      } else {
+        this.initDefaultDocumentTemplates();
+        for (const t of this.documentTemplates) {
+          await this.prisma
+            .$executeRawUnsafe(
+              `INSERT INTO "document_templates" ("id", "name", "description", "category", "status", "current_version", "structure", "settings", "created_by", "updated_by", "created_at", "updated_at")
+               VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+               ON CONFLICT ("id") DO NOTHING`,
+              t.id,
+              t.name,
+              t.description || '',
+              t.category,
+              t.status,
+              t.currentVersion,
+              JSON.stringify(t.structure),
+              JSON.stringify(t.settings),
+              t.createdBy || 'ADMIN',
+              t.updatedBy || 'ADMIN',
+            )
+            .catch(() => {});
+        }
+      }
+    } catch (err) {
+      this.logger.warn('Could not load document_templates from DB, using fallback mock:', err);
+      if (this.documentTemplates.length === 0) {
+        this.initDefaultDocumentTemplates();
+      }
+    }
+
     await this.syncSequences();
     await this.cleanExpiredSessions();
   }
@@ -3663,6 +3727,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     };
 
     this.documentTemplates.unshift(newTemplate);
+    this.persistDocumentTemplate(newTemplate).catch(() => {});
     return clone(newTemplate);
   }
 
@@ -3687,6 +3752,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       updatedAt: new Date().toISOString(),
     };
     this.documentTemplates[idx] = updated;
+    this.persistDocumentTemplate(updated).catch(() => {});
     return clone(updated);
   }
 
@@ -3706,6 +3772,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       updatedAt: now,
     };
     this.documentTemplates.unshift(dup);
+    this.persistDocumentTemplate(dup).catch(() => {});
     return clone(dup);
   }
 
@@ -3726,6 +3793,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       updatedAt: now,
     };
     this.documentTemplates[idx] = updated;
+    this.persistDocumentTemplate(updated).catch(() => {});
 
     // Archive old snapshot into DocumentTemplateVersion
     const versionItem: DocumentTemplateVersionItem = {
@@ -3760,7 +3828,50 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     }
     this.documentTemplates.splice(idx, 1);
     this.documentTemplateVersions = this.documentTemplateVersions.filter((v) => v.templateId !== id);
+    this.persistDeleteDocumentTemplate(id).catch(() => {});
     return { success: true, id };
+  }
+
+  async persistDocumentTemplate(t: DocumentTemplateItem) {
+    if (!this.dbAvailable) return;
+    try {
+      await this.prisma.$executeRawUnsafe(
+        `INSERT INTO "document_templates" ("id", "name", "description", "category", "status", "current_version", "structure", "settings", "created_by", "updated_by", "created_at", "updated_at")
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11::timestamptz, CURRENT_TIMESTAMP)
+         ON CONFLICT ("id") DO UPDATE SET
+           "name" = EXCLUDED."name",
+           "description" = EXCLUDED."description",
+           "category" = EXCLUDED."category",
+           "status" = EXCLUDED."status",
+           "current_version" = EXCLUDED."current_version",
+           "structure" = EXCLUDED."structure",
+           "settings" = EXCLUDED."settings",
+           "updated_by" = EXCLUDED."updated_by",
+           "updated_at" = CURRENT_TIMESTAMP`,
+        t.id,
+        t.name,
+        t.description || '',
+        t.category,
+        t.status,
+        t.currentVersion,
+        JSON.stringify(t.structure),
+        JSON.stringify(t.settings),
+        t.createdBy || 'ADMIN',
+        t.updatedBy || 'ADMIN',
+        t.createdAt,
+      );
+    } catch (err) {
+      this.logger.debug('Failed to persist document template: ' + err);
+    }
+  }
+
+  async persistDeleteDocumentTemplate(id: string) {
+    if (!this.dbAvailable) return;
+    try {
+      await this.prisma.$executeRawUnsafe(`DELETE FROM "document_templates" WHERE "id" = $1`, id);
+    } catch (err) {
+      this.logger.debug('Failed to delete document template: ' + err);
+    }
   }
 
   listTemplateVersions(templateId: string): DocumentTemplateVersionItem[] {

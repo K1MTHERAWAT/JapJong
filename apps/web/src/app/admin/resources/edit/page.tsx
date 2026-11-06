@@ -15,7 +15,13 @@ import { Icon } from '@/components/icons';
 import { Chip, Stepper, Tabs, Toggle } from '@/components/ui';
 import { OfficialDocumentEditor } from '@/components/official-document-editor';
 import { api, readAndCompressImages } from '@/lib/api';
-import { FormTemplateItem, getFormTemplates, saveNewFormTemplate } from '@/lib/forms-store';
+import {
+  FormTemplateItem,
+  getFormTemplates,
+  getFormTemplate,
+  saveNewFormTemplate,
+  saveFormTemplateConfig,
+} from '@/lib/forms-store';
 
 type Kind = 'venue' | 'equipment';
 const DAYS_TH = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
@@ -717,14 +723,18 @@ function EditResourceContent() {
               ? 'แบบขอใช้สถานที่ราชการ (แบบใหม่)'
               : formName
           }
+          initialConfig={getFormTemplate(formName)?.config}
           isBorrowMode={formName.includes('ครุภัณฑ์') || formName.includes('อุปกรณ์')}
           onClose={() => setShowDocEditor(false)}
-          onSave={({ formTitle }) => {
+          onSave={({ formTitle, config }) => {
             const trimmed = formTitle.trim();
             if (isCreatingNewForm && trimmed) {
-              saveNewFormTemplate(trimmed);
-              setAvailableForms(getFormTemplates());
+              saveNewFormTemplate(trimmed, undefined, config);
+            } else if (config) {
+              saveFormTemplateConfig(trimmed, config);
             }
+            const updated = getFormTemplates();
+            setAvailableForms(updated);
             setFormName(trimmed);
             setShowDocEditor(false);
           }}

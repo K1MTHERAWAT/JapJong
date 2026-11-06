@@ -192,6 +192,8 @@ export default function RepairPage() {
       setActiveId(created.id);
       setTrackFilter('all');
       setMode('track');
+    } catch (err: any) {
+      alert(err?.message || 'เกิดข้อผิดพลาดในการส่งคำขอแจ้งซ่อม');
     } finally {
       setSubmitting(false);
     }

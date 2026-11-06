@@ -355,6 +355,8 @@ export default function BorrowWizardPage() {
         attachments: attachmentFiles.map((file) => file.name),
       });
       router.push(`/requests/${created.id}`);
+    } catch (err: any) {
+      alert(err?.message || 'เกิดข้อผิดพลาดในการส่งคำขอยืมอุปกรณ์');
     } finally {
       setSubmitting(false);
     }
