@@ -501,7 +501,7 @@ export default function BookingWizardPage() {
               disabled={
                 effectiveConflicts.length > 0 ||
                 periods.length === 0 ||
-                (bookingMode === 'hourly' && (!periods[0]?.start || !periods[0]?.end))
+                periods.some((p) => !p?.start || !p?.end)
               }
               onClick={() => setStep(3)}
               className="jw-btn flex-[1.5] sm:w-56"
@@ -807,11 +807,8 @@ export default function BookingWizardPage() {
             availability={availability}
             month={month}
             onMonthChange={setMonth}
-            period={periods[0] || null}
-            onSelectPeriod={(p) => {
-              if (p) setPeriods([p]);
-              else setPeriods([]);
-            }}
+            periods={periods}
+            onSelectPeriods={setPeriods}
             onSwitchToDaily={() => setBookingMode('daily')}
             bookingMode={bookingMode}
           />

@@ -19,8 +19,10 @@ export interface HourlyBookingSectionProps {
   availability: DayAvailability[];
   month: string;
   onMonthChange: (ym: string) => void;
-  period: Period | null;
-  onSelectPeriod: (period: Period | null) => void;
+  period?: Period | null;
+  periods?: Period[];
+  onSelectPeriod?: (period: Period | null) => void;
+  onSelectPeriods?: (periods: Period[]) => void;
   onSwitchToDaily: () => void;
   bookingMode: 'hourly' | 'daily';
 }
@@ -31,11 +33,29 @@ export function HourlyBookingSection({
   month,
   onMonthChange,
   period,
+  periods,
   onSelectPeriod,
+  onSelectPeriods,
   onSwitchToDaily,
   bookingMode,
 }: HourlyBookingSectionProps) {
   const todayBkk = useMemo(() => getTodayBkk(), []);
+
+  // รองรับทั้ง periods (หลายช่วงเวลา) และ period (ช่วงเวลาเดียว สำหรับ backward compatibility)
+  const effectivePeriods: Period[] = useMemo(() => {
+    if (periods && periods.length > 0) return periods;
+    if (period) return [period];
+    return [];
+  }, [periods, period]);
+
+  const updatePeriods = (nextPeriods: Period[]) => {
+    if (onSelectPeriods) {
+      onSelectPeriods(nextPeriods);
+    }
+    if (onSelectPeriod) {
+      onSelectPeriod(nextPeriods[0] || null);
+    }
+  };
 
   // 1. เงื่อนไขวันจองล่วงหน้าขั้นต่ำตามที่สถานที่กำหนด (Dynamic minAdvanceDays)
   const minAdvanceDays = useMemo(() => {
@@ -71,11 +91,13 @@ export function HourlyBookingSection({
     );
   }, [selectedVenues]);
 
-  // วันที่เลือกปัจจุบัน
+  // วันที่เลือกปัจจุบัน (internalDate หรือ วันที่ของช่วงเวลาแรกที่เลือก)
+  const [internalDate, setInternalDate] = useState<string>('');
   const selectedDate = useMemo(() => {
-    if (!period) return '';
-    return period.start.slice(0, 10);
-  }, [period]);
+    if (internalDate) return internalDate;
+    if (effectivePeriods.length > 0) return effectivePeriods[0].start.slice(0, 10);
+    return '';
+  }, [internalDate, effectivePeriods]);
 
   // รอบเวลา 1 ชั่วโมงทั้งหมดในวันเปิดทำการ
   const oneHourSlots = useMemo(() => {
@@ -92,6 +114,16 @@ export function HourlyBookingSection({
     }
     return slots;
   }, [effectiveOpenTime, effectiveCloseTime]);
+
+  // ฟังก์ชันตรวจสอบว่า slot นั้นถูกเลือกอยู่ในช่วงเวลาใดๆ ของ selectedDate หรือไม่
+  const isSlotSelected = (slot: { startM: number; endM: number }) => {
+    return effectivePeriods.some((p) => {
+      if (p.start.slice(0, 10) !== selectedDate) return false;
+      const pStartM = timeToMinutes(p.start.slice(11, 16));
+      const pEndM = timeToMinutes(p.end.slice(11, 16));
+      return slot.startM >= pStartM && slot.endM <= pEndM;
+    });
+  };
 
   // ตรวจสอบรอบเวลา 1 ชั่วโมงที่ถูกจองแล้วในวันที่เลือก
   const [bookedSlotIndices, setBookedSlotIndices] = useState<number[]>([]);
@@ -130,13 +162,11 @@ export function HourlyBookingSection({
   const [customError, setCustomError] = useState<string | null>(null);
   const [customChecking, setCustomChecking] = useState(false);
 
-  // คำนวณช่วงเวลาที่เลือกอยู่ปัจจุบัน (Start Time, End Time, Duration)
-  const currentStartTime = period ? period.start.slice(11, 16) : '';
-  const currentEndTime = period ? period.end.slice(11, 16) : '';
-  const currentDurationMinutes = useMemo(() => {
-    if (!currentStartTime || !currentEndTime) return 0;
-    return timeToMinutes(currentEndTime) - timeToMinutes(currentStartTime);
-  }, [currentStartTime, currentEndTime]);
+  // คำนวณช่วงเวลาในวันที่เลือกปัจจุบัน
+  const periodsOnSelectedDate = useMemo(() => {
+    if (!selectedDate) return [];
+    return effectivePeriods.filter((p) => p.start.slice(0, 10) === selectedDate);
+  }, [effectivePeriods, selectedDate]);
 
   // ฟังก์ชันตรวจสอบสถานะของวันแต่ละวันในปฏิทิน
   const getDateStatus = (dateStr: string) => {
@@ -166,18 +196,22 @@ export function HourlyBookingSection({
   const handleSelectDate = (dateStr: string) => {
     const status = getDateStatus(dateStr);
     if (status.disabled) return;
+    setInternalDate(dateStr);
 
-    // ถ้าย้ายวัน ให้คงเวลาเดิมไว้ถ้ามีอยู่แล้ว หากยังไม่มี ให้ตั้งค่าเป็นรอบแรกที่ว่าง
-    const defaultStart = currentStartTime || effectiveOpenTime;
-    const defaultEnd = currentEndTime || minutesToTime(timeToMinutes(defaultStart) + 60);
-
-    onSelectPeriod({
-      start: `${dateStr}T${defaultStart}:00+07:00`,
-      end: `${dateStr}T${defaultEnd}:00+07:00`,
-    });
+    // หากยังไม่มีช่วงเวลาที่เลือกเลย ให้เลือกช่วงเวลาเริ่มต้นที่เปิดทำการ
+    if (effectivePeriods.length === 0) {
+      const defaultStart = effectiveOpenTime;
+      const defaultEnd = minutesToTime(timeToMinutes(defaultStart) + 60);
+      updatePeriods([
+        {
+          start: `${dateStr}T${defaultStart}:00+07:00`,
+          end: `${dateStr}T${defaultEnd}:00+07:00`,
+        },
+      ]);
+    }
   };
 
-  // เมื่อผู้ใช้คลิกเลือก Slot 1 ชั่วโมง
+  // เมื่อผู้ใช้คลิกเลือก Slot 1 ชั่วโมง (รองรับการเลือกข้ามช่วง และหลายช่วงเวลาได้อย่างอิสระ)
   const handleSlotClick = (slotIndex: number) => {
     if (bookedSlotIndices.includes(slotIndex)) return;
     if (!selectedDate) return;
@@ -185,44 +219,52 @@ export function HourlyBookingSection({
     const clickedSlot = oneHourSlots[slotIndex];
     if (!clickedSlot) return;
 
-    const clickedStartM = clickedSlot.startM;
-    const clickedEndM = clickedSlot.endM;
+    // หา slot indices ที่ถูกเลือกอยู่ในวันที่เลือกปัจจุบัน
+    const currentlySelectedIndices = oneHourSlots
+      .map((s, idx) => (isSlotSelected(s) ? idx : -1))
+      .filter((idx) => idx !== -1);
 
-    // ถ้ายังไม่มีช่วงเวลาที่เลือก หรือเลือกคนละวัน หรือปัจจุบันเป็น Custom Time
-    if (!currentStartTime || !currentEndTime || currentDurationMinutes % 60 !== 0) {
-      onSelectPeriod({
-        start: `${selectedDate}T${clickedSlot.start}:00+07:00`,
-        end: `${selectedDate}T${clickedSlot.end}:00+07:00`,
-      });
-      return;
+    const isAlreadySelected = currentlySelectedIndices.includes(slotIndex);
+
+    let nextIndices: number[];
+    if (isAlreadySelected) {
+      // แตะซ้ำที่ช่องเดิมเพื่อยกเลิกการเลือก (Deselect)
+      nextIndices = currentlySelectedIndices.filter((idx) => idx !== slotIndex);
+    } else {
+      // แตะเพื่อเลือกช่องนี้ (ข้ามช่วงได้ เช่น เช้า 09:00-12:00 และ บ่าย 13:00-16:00 ข้ามช่วงเที่ยง)
+      nextIndices = [...currentlySelectedIndices, slotIndex].sort((a, b) => a - b);
     }
 
-    const curStartM = timeToMinutes(currentStartTime);
-    const curEndM = timeToMinutes(currentEndTime);
+    // จัดกลุ่มช่องที่ต่อเนื่องกันเป็นช่วงเวลา (Period)
+    // ช่องที่อยู่ติดกันจะรวมเป็นช่วงเวลาเดียว ส่วนช่องที่เว้นระยะจะแยกเป็นช่วงใหม่ (ข้ามช่วงได้)
+    const blocks: { startM: number; endM: number }[] = [];
+    let currentBlock: { startM: number; endM: number } | null = null;
 
-    // กรณีคลิกช่องที่ติดกับขอบท้าย (ขยายเวลาไปข้างหน้า)
-    if (clickedStartM === curEndM) {
-      onSelectPeriod({
-        start: `${selectedDate}T${currentStartTime}:00+07:00`,
-        end: `${selectedDate}T${clickedSlot.end}:00+07:00`,
-      });
-      return;
+    for (const idx of nextIndices) {
+      const s = oneHourSlots[idx];
+      if (!currentBlock) {
+        currentBlock = { startM: s.startM, endM: s.endM };
+      } else if (s.startM === currentBlock.endM) {
+        currentBlock.endM = s.endM;
+      } else {
+        blocks.push(currentBlock);
+        currentBlock = { startM: s.startM, endM: s.endM };
+      }
+    }
+    if (currentBlock) {
+      blocks.push(currentBlock);
     }
 
-    // กรณีคลิกช่องที่ติดกับขอบหน้า (ขยายเวลาไปข้างหลัง)
-    if (clickedEndM === curStartM) {
-      onSelectPeriod({
-        start: `${selectedDate}T${clickedSlot.start}:00+07:00`,
-        end: `${selectedDate}T${currentEndTime}:00+07:00`,
-      });
-      return;
-    }
+    const newDatePeriods: Period[] = blocks.map((b) => ({
+      start: `${selectedDate}T${minutesToTime(b.startM)}:00+07:00`,
+      end: `${selectedDate}T${minutesToTime(b.endM)}:00+07:00`,
+    }));
 
-    // กรณีคลิกช่องเดี่ยวๆ ที่ไม่ติดกัน ให้เลือกช่องนั้นเป็นรอบใหม่
-    onSelectPeriod({
-      start: `${selectedDate}T${clickedSlot.start}:00+07:00`,
-      end: `${selectedDate}T${clickedSlot.end}:00+07:00`,
-    });
+    // รวมกับช่วงเวลาของวันอื่นๆ (ถ้ามี)
+    const otherDatePeriods = effectivePeriods.filter((p) => p.start.slice(0, 10) !== selectedDate);
+    const finalPeriods = [...otherDatePeriods, ...newDatePeriods].sort((a, b) => a.start.localeCompare(b.start));
+
+    updatePeriods(finalPeriods);
   };
 
   // ตรวจสอบและบันทึกเวลาที่กำหนดเอง (Custom Time)
@@ -274,8 +316,12 @@ export function HourlyBookingSection({
         return;
       }
 
-      // ใช้งานช่วงเวลาที่กำหนดเอง
-      onSelectPeriod(testPeriod);
+      // ใช้งานช่วงเวลาที่กำหนดเอง (กรองช่วงเวลาที่ซ้อนทับออก แล้วรวมเข้ากับช่วงเวลาเดิม ทำให้เลือกข้ามช่วงได้)
+      const nonOverlapping = effectivePeriods.filter(
+        (p) => !(p.start < testPeriod.end && p.end > testPeriod.start),
+      );
+      const nextPeriods = [...nonOverlapping, testPeriod].sort((a, b) => a.start.localeCompare(b.start));
+      updatePeriods(nextPeriods);
       setIsCustomModalOpen(false);
     } catch {
       setCustomError('เกิดข้อผิดพลาดในการตรวจสอบเวลาว่าง กรุณาลองใหม่อีกครั้ง');
@@ -368,7 +414,7 @@ export function HourlyBookingSection({
             month={month}
             onMonthChange={onMonthChange}
             availability={availability}
-            periods={period ? [period] : []}
+            periods={effectivePeriods}
             conflictPeriodIndexes={[]}
             onPickDate={handleSelectDate}
             minAdvanceDays={minAdvanceDays}
@@ -401,10 +447,8 @@ export function HourlyBookingSection({
               type="button"
               disabled={!selectedDate}
               onClick={() => {
-                setCustomStartTime(currentStartTime || effectiveOpenTime);
-                setCustomEndTime(
-                  currentEndTime || minutesToTime(timeToMinutes(currentStartTime || effectiveOpenTime) + 90),
-                );
+                setCustomStartTime(effectiveOpenTime);
+                setCustomEndTime(minutesToTime(timeToMinutes(effectiveOpenTime) + 90));
                 setIsCustomModalOpen(true);
               }}
               className="text-[12px] font-semibold text-brand hover:text-brand-dark flex items-center gap-1 px-2.5 py-1 rounded-lg border border-brand/30 hover:bg-brand-mint transition disabled:opacity-40 disabled:cursor-not-allowed"
@@ -440,10 +484,7 @@ export function HourlyBookingSection({
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                 {oneHourSlots.map((slot, idx) => {
                   const isBooked = bookedSlotIndices.includes(idx);
-                  const curStartM = currentStartTime ? timeToMinutes(currentStartTime) : -1;
-                  const curEndM = currentEndTime ? timeToMinutes(currentEndTime) : -1;
-                  const isSelected =
-                    curStartM >= 0 && curEndM >= 0 && slot.startM >= curStartM && slot.endM <= curEndM;
+                  const isSelected = isSlotSelected(slot);
 
                   return (
                     <button
@@ -485,54 +526,99 @@ export function HourlyBookingSection({
               </div>
 
               <div className="text-[11px] text-ink-mute flex items-center justify-between pt-1">
-                <span>* แตะรอบที่ติดกันเพื่อเลือกหลายชั่วโมงต่อเนื่อง</span>
+                <span>* แตะเลือกรอบเวลาที่ต้องการ (สามารถแตะเลือกหลายช่วง ข้ามช่วงเวลาพัก หรือข้ามช่วงที่ติดจองได้)</span>
                 <span className="text-brand">เปิดบริการ {effectiveOpenTime} - {effectiveCloseTime} น.</span>
               </div>
             </div>
           )}
 
           {/* ================= Step 4: สรุปการจอง (Booking Summary) ================= */}
-          {selectedDate && currentStartTime && currentEndTime && (
+          {effectivePeriods.length > 0 && (
             <div className="jw-card p-4 sm:p-5 flex flex-col gap-3 bg-brand-mint/30 border border-brand/20">
               <div className="flex items-center justify-between">
                 <b className="text-[14px] text-ink flex items-center gap-1.5">
                   <Icon name="check" className="w-4 h-4 text-brand" strokeWidth={3} /> สรุปช่วงเวลาที่เลือก
+                  <span className="text-[12px] font-normal text-ink-mute">
+                    ({effectivePeriods.length} ช่วงเวลา)
+                  </span>
                 </b>
                 <Chip tone="green">พร้อมใช้งาน</Chip>
               </div>
 
-              <div className="space-y-1.5 text-[13px]">
+              <div className="space-y-2 text-[13px]">
                 <div className="flex justify-between">
                   <span className="text-ink-mute">สถานที่:</span>
-                  <span className="font-semibold text-ink text-right">{selectedVenues.map((v) => v.name).join(', ')}</span>
+                  <span className="font-semibold text-ink text-right">
+                    {selectedVenues.map((v) => v.name).join(', ')}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-ink-mute">วันที่:</span>
-                  <span className="font-semibold text-ink">{formatThaiDate(selectedDate, true)}</span>
+                  <span className="font-semibold text-ink">
+                    {Array.from(new Set(effectivePeriods.map((p) => p.start.slice(0, 10))))
+                      .map((d) => formatThaiDate(d, true))
+                      .join(', ')}
+                  </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-ink-mute">เวลา:</span>
-                  <b className="text-brand font-bold">
-                    {currentStartTime} - {currentEndTime} น.
-                  </b>
+
+                {/* รายการแต่ละช่วงเวลา (ข้ามช่วงได้) */}
+                <div className="flex flex-col gap-1.5 pt-1">
+                  <span className="text-ink-mute text-[12px] font-medium">รอบเวลาที่เลือก:</span>
+                  <div className="flex flex-col gap-1 pl-2 border-l-2 border-brand/40">
+                    {effectivePeriods.map((p, idx) => {
+                      const durM = timeToMinutes(p.end.slice(11, 16)) - timeToMinutes(p.start.slice(11, 16));
+                      return (
+                        <div key={idx} className="flex items-center justify-between text-[13px] py-0.5">
+                          <span className="font-semibold text-ink">
+                            ช่วงที่ {idx + 1}: {p.start.slice(11, 16)} - {p.end.slice(11, 16)} น.
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-brand text-[12px] font-medium">
+                              ({formatDurationThai(durM)})
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = effectivePeriods.filter((_, i) => i !== idx);
+                                updatePeriods(next);
+                              }}
+                              className="text-ink-mute hover:text-status-crit transition p-0.5"
+                              title="ลบช่วงเวลานี้"
+                            >
+                              <Icon name="x" className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="flex justify-between">
+
+                <div className="flex justify-between pt-1 border-t border-brand/10">
                   <span className="text-ink-mute">ระยะเวลารวม:</span>
-                  <span className="font-bold text-ink">{formatDurationThai(currentDurationMinutes)}</span>
+                  <span className="font-bold text-ink">
+                    {formatDurationThai(
+                      effectivePeriods.reduce((sum, p) => {
+                        return sum + (timeToMinutes(p.end.slice(11, 16)) - timeToMinutes(p.start.slice(11, 16)));
+                      }, 0),
+                    )}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-ink-mute">รูปแบบ:</span>
-                  <span className="text-ink">จองรายชั่วโมง</span>
+                  <span className="text-ink">
+                    จองรายชั่วโมง {effectivePeriods.length > 1 ? '(หลายช่วงเวลา / ข้ามช่วง)' : ''}
+                  </span>
                 </div>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-1 border-t border-brand/10">
                 <button
                   type="button"
-                  onClick={() => onSelectPeriod(null)}
+                  onClick={() => updatePeriods([])}
                   className="text-[12px] text-ink-mute hover:text-status-crit transition"
                 >
-                  เลือกเวลาใหม่
+                  ล้างเวลาที่เลือกทั้งหมด
                 </button>
               </div>
             </div>
