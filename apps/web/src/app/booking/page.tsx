@@ -153,6 +153,7 @@ export default function BookingWizardPage() {
   const [equipmentQuantities, setEquipmentQuantities] = useState<Record<string, number>>({});
   const [equipmentCat, setEquipmentCat] = useState<'all' | EquipmentCategory>('all');
   const [equipmentSearch, setEquipmentSearch] = useState('');
+  const [onlyAvailableEquipment, setOnlyAvailableEquipment] = useState(false);
 
   // Step 4 state (ตามแบบขอใช้สถานที่ราชการ)
   const parseTitleAndName = (rawName?: string) => {
@@ -426,6 +427,11 @@ export default function BookingWizardPage() {
   const filteredEquipment = equipmentList.filter((e) => {
     if (equipmentCat !== 'all' && e.category !== equipmentCat) return false;
     if (equipmentSearch.trim() && !e.name.toLowerCase().includes(equipmentSearch.toLowerCase())) return false;
+    if (onlyAvailableEquipment) {
+      const stockInfo = equipmentStockSummary[e.id];
+      const maxAvailable = stockInfo ? stockInfo.availableQty : e.stock;
+      if (!e.enabled || maxAvailable <= 0) return false;
+    }
     return true;
   });
 
@@ -688,98 +694,35 @@ export default function BookingWizardPage() {
 
       {/* ================= STEP 1: เลือกสถานที่ ================= */}
       {step === 1 && (
-        <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] 2xl:grid-cols-[240px_minmax(0,1fr)_320px] gap-4 lg:gap-5 items-start">
-          {/* ตัวกรองด้านซ้าย (Desktop) */}
-          <aside className="hidden lg:flex jw-card p-5 flex-col gap-4">
-            <b className="text-[16px] flex items-center gap-2">
-              <Icon name="filter" className="w-4 h-4 text-brand" /> ตัวกรอง
-            </b>
-            <div>
-              <label className="jw-lbl">ประเภท</label>
-              <div className="flex flex-col gap-2 text-[14px]">
-                {(
-                  [
-                    ['all', 'ทั้งหมด'],
-                    ['meeting', 'ห้องประชุม'],
-                    ['pavilion', 'ศาลา'],
-                    ['field', 'สนามกีฬา'],
-                    ['yard', 'ลานกิจกรรม'],
-                  ] as const
-                ).map(([val, label]) => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => setCatFilter(val)}
-                    className="flex items-center gap-2.5 text-left"
-                  >
-                    <i
-                      className={`w-[18px] h-[18px] rounded-[5px] border-[1.5px] flex items-center justify-center ${
-                        catFilter === val ? 'bg-brand border-brand text-white' : 'border-line bg-white'
-                      }`}
-                    >
-                      {catFilter === val && <Icon name="check" className="w-3 h-3" strokeWidth={3} />}
-                    </i>
-                    <span>{label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+        <div className="flex flex-col gap-3.5">
+          {/* แถวค้นหา */}
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-ph">
+              <Icon name="search" className="w-5 h-5" />
+            </span>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ค้นหาสถานที่..."
+              className="jw-in rounded-full pl-11 h-[42px]"
+            />
+          </div>
 
-            <div>
-              <label className="jw-lbl">อาคาร</label>
-              <select
-                value={buildingFilter}
-                onChange={(e) => setBuildingFilter(e.target.value)}
-                className="jw-in"
-              >
-                <option value="all">ทั้งหมด</option>
-                {buildings.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setOnlyAvailable((v) => !v)}
-              className="flex items-center gap-2.5 text-[14px]"
-            >
-              <i
-                className={`w-[18px] h-[18px] rounded-[5px] border-[1.5px] flex items-center justify-center ${
-                  onlyAvailable ? 'bg-brand border-brand text-white' : 'border-line bg-white'
-                }`}
-              >
-                {onlyAvailable && <Icon name="check" className="w-3 h-3" strokeWidth={3} />}
-              </i>
-              <span>เฉพาะที่พร้อมใช้งาน</span>
-            </button>
-          </aside>
-
-          {/* กลาง: ค้นหา + หมวดหมู่ + การ์ดสถานที่ */}
-          <div className="flex flex-col gap-3.5">
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-ph">
-                <Icon name="search" className="w-5 h-5" />
+          {/* แถวตัวกรองสถานที่ (แนวนอนขนานกัน ทั้งหมดอยู่เหนือรายการที่เลือก) */}
+          <div className="jw-card p-3 sm:p-3.5 flex flex-wrap items-center justify-between gap-3">
+            {/* ซ้าย: ประเภทสถานที่ (Pills แนวนอน) */}
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <span className="text-[13px] font-bold text-ink shrink-0 mr-1 flex items-center gap-1.5">
+                <Icon name="filter" className="w-3.5 h-3.5 text-brand" />
+                <span>ประเภท:</span>
               </span>
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="ค้นหาสถานที่"
-                className="jw-in rounded-full pl-11 h-[42px]"
-              />
-            </div>
-
-            {/* ปุ่มหมวดหมู่ (Mobile/Tablet) */}
-            <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden">
               {(
                 [
                   ['all', 'ทั้งหมด'],
                   ['meeting', 'ห้องประชุม'],
                   ['pavilion', 'ศาลา'],
-                  ['field', 'สนาม'],
+                  ['field', 'สนามกีฬา'],
                   ['yard', 'ลานกิจกรรม'],
                 ] as const
               ).map(([val, label]) => (
@@ -787,8 +730,10 @@ export default function BookingWizardPage() {
                   key={val}
                   type="button"
                   onClick={() => setCatFilter(val)}
-                  className={`shrink-0 rounded-full border px-3.5 py-2 text-[12px] font-semibold transition ${
-                    catFilter === val ? 'border-brand bg-brand text-white' : 'border-line bg-white text-ink-soft hover:bg-hover'
+                  className={`h-8 sm:h-9 px-3 sm:px-3.5 rounded-full border text-[12px] sm:text-[13px] font-semibold transition ${
+                    catFilter === val
+                      ? 'border-brand bg-brand text-white shadow-xs'
+                      : 'border-line bg-white text-ink-soft hover:bg-hover'
                   }`}
                 >
                   {label}
@@ -796,38 +741,100 @@ export default function BookingWizardPage() {
               ))}
             </div>
 
-            <details className="lg:hidden jw-card p-3.5">
-              <summary className="cursor-pointer text-[13px] font-semibold text-ink">ตัวกรองเพิ่มเติม</summary>
-              <div className="mt-3 flex flex-col gap-3">
-                <label className="text-caption font-semibold text-ink-soft" htmlFor="mobile-building-filter">อาคาร</label>
+            {/* ขวา: ตัวกรองอาคาร + เฉพาะที่พร้อมใช้งาน */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[12.5px] font-semibold text-ink-mute shrink-0">อาคาร:</span>
                 <select
-                  id="mobile-building-filter"
                   value={buildingFilter}
                   onChange={(e) => setBuildingFilter(e.target.value)}
-                  className="jw-in"
+                  className="jw-in h-8 sm:h-9 text-[12.5px] sm:text-[13px] py-1 px-2.5 rounded-xl min-w-[110px]"
                 >
                   <option value="all">ทั้งหมด</option>
-                  {buildings.map((b) => <option key={b} value={b}>{b}</option>)}
+                  {buildings.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
                 </select>
-                <button
-                  type="button"
-                  onClick={() => setOnlyAvailable((v) => !v)}
-                  className="flex min-h-11 items-center gap-2.5 text-left text-[14px]"
-                >
-                  <i className={`w-[18px] h-[18px] rounded-[5px] border-[1.5px] flex items-center justify-center ${onlyAvailable ? 'bg-brand border-brand text-white' : 'border-line bg-white'}`}>
-                    {onlyAvailable && <Icon name="check" className="w-3 h-3" strokeWidth={3} />}
-                  </i>
-                  <span>เฉพาะที่พร้อมใช้งาน</span>
-                </button>
               </div>
-            </details>
+
+              <button
+                type="button"
+                onClick={() => setOnlyAvailable((v) => !v)}
+                className={`h-8 sm:h-9 px-3 rounded-xl border text-[12.5px] font-semibold transition flex items-center gap-1.5 ${
+                  onlyAvailable
+                    ? 'border-brand bg-brand-mint text-brand'
+                    : 'border-line bg-white text-ink-soft hover:bg-hover'
+                }`}
+              >
+                <i
+                  className={`w-3.5 h-3.5 rounded-[4px] border flex items-center justify-center ${
+                    onlyAvailable ? 'bg-brand border-brand text-white' : 'border-line bg-white'
+                  }`}
+                >
+                  {onlyAvailable && <Icon name="check" className="w-2.5 h-2.5" strokeWidth={3} />}
+                </i>
+                <span>เฉพาะที่พร้อมใช้งาน</span>
+              </button>
+            </div>
+          </div>
+
+          {/* รายการที่เลือก (ใต้แถวตัวกรอง จัดวางในแถวเดียวกัน Wrap ได้) */}
+            <div className="jw-card p-3 sm:p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2 shrink-0">
+                <Icon name="check" className="w-4 h-4 text-brand" />
+                <span className="text-[13.5px] font-bold text-ink">รายการที่เลือก</span>
+                <span className="text-[12px] font-semibold text-brand bg-brand-mint px-2 py-0.5 rounded-full">
+                  {selectedVenues.length} แห่ง
+                </span>
+              </div>
+
+              <div className="flex flex-1 flex-wrap items-center gap-1.5 min-w-0">
+                {selectedVenues.length === 0 ? (
+                  <span className="text-[12.5px] text-ink-mute">ยังไม่ได้เลือกสถานที่ (แตะเลือกสถานที่ด้านล่าง)</span>
+                ) : (
+                  selectedVenues.map((v) => (
+                    <span
+                      key={v.id}
+                      className="inline-flex items-center gap-1.5 bg-brand-mint/50 border border-brand/20 text-ink text-[12.5px] font-medium pl-2.5 pr-1.5 py-1 rounded-full animate-fadeIn"
+                    >
+                      <span className="truncate max-w-[130px] sm:max-w-[180px]">{v.name}</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleVenue(v);
+                        }}
+                        className="w-4 h-4 rounded-full hover:bg-brand/10 flex items-center justify-center text-ink-mute hover:text-ink transition"
+                        title="นำออก"
+                      >
+                        <Icon name="x" className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))
+                )}
+              </div>
+
+              {selectedVenues.length > 0 && (
+                <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIds([])}
+                    className="text-[12px] font-semibold text-ink-mute hover:text-status-crit transition px-2 py-1 rounded-lg hover:bg-soft"
+                  >
+                    ล้างทั้งหมด
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div className="flex items-center justify-between">
               <b className="text-[16px] sm:text-[18px]">สถานที่ทั้งหมด</b>
               <span className="text-[13px] text-ink-mute">{filteredVenues.length} แห่ง</span>
             </div>
 
-            <div className="grid grid-cols-1 min-[420px]:grid-cols-2 2xl:grid-cols-3 gap-3 sm:gap-3.5">
+            <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-3.5">
               {filteredVenues.map((v) => {
                 const isSelected = selectedIds.includes(v.id);
                 const disabled = v.status !== 'available' || !v.enabled;
@@ -871,35 +878,6 @@ export default function BookingWizardPage() {
               })}
             </div>
           </div>
-
-          {/* ขวา: รายการที่เลือก (Desktop) */}
-          <aside className="jw-card p-4 sm:p-5 flex flex-col gap-3.5 lg:col-span-2 2xl:col-span-1">
-            <b className="text-[17px]">รายการที่เลือก ({selectedVenues.length})</b>
-            {selectedVenues.length === 0 ? (
-              <div className="text-[13px] text-ink-mute py-4">กรุณาแตะเลือกสถานที่อย่างน้อย 1 แห่ง</div>
-            ) : (
-              selectedVenues.map((v) => (
-                <div key={v.id} className="border border-line rounded-2xl p-3 flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-brand-mint text-brand flex items-center justify-center shrink-0 overflow-hidden">
-                    <ThumbnailImage
-                      src={v.images?.[0]}
-                      alt={v.name}
-                      iconName={venueIconName(v.type)}
-                      fallbackClassName="w-6 h-6"
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <b className="block text-[14px] truncate">{v.name}</b>
-                    <span className="text-[12px] text-ink-mute">
-                      {v.building} {v.floor !== '-' ? v.floor : ''} · {v.capacity} คน
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
-            <span className="text-[12px] text-ink-mute">เลือกได้หลายรายการต่อหนึ่งคำขอ</span>
-          </aside>
-        </div>
       )}
 
       {/* ================= STEP 2: เลือกวัน-เวลา ================= */}
@@ -1168,13 +1146,13 @@ export default function BookingWizardPage() {
               placeholder="ค้นหาอุปกรณ์เสริม..."
               className="jw-in flex-1"
             />
-            <div className="flex flex-wrap gap-1.5 shrink-0">
+            <div className="flex flex-wrap items-center gap-1.5 shrink-0">
               {(
                 [
                   ['all', 'ทั้งหมด'],
                   ['audio', 'เครื่องเสียง'],
-                  ['tent', 'เต็นท์ / โต๊ะ-เก้าอี้'],
-                  ['it', 'อุปกรณ์ IT'],
+                  ['tent', 'เต็นท์ / โต๊ะ / เก้าอี้'],
+                  ['it', 'IT / โสตทัศนูปกรณ์'],
                 ] as const
               ).map(([val, label]) => (
                 <button
@@ -1190,7 +1168,79 @@ export default function BookingWizardPage() {
                   {label}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => setOnlyAvailableEquipment((v) => !v)}
+                className={`h-[38px] px-3.5 rounded-full border-[1.5px] text-[13px] font-semibold transition flex items-center gap-1.5 ${
+                  onlyAvailableEquipment
+                    ? 'bg-brand border-brand text-white'
+                    : 'bg-white border-line text-ink hover:border-brand'
+                }`}
+              >
+                <i className={`w-3.5 h-3.5 rounded-[4px] border flex items-center justify-center ${onlyAvailableEquipment ? 'bg-white text-brand border-white' : 'border-line bg-white'}`}>
+                  {onlyAvailableEquipment && <Icon name="check" className="w-2.5 h-2.5" strokeWidth={3} />}
+                </i>
+                <span>เฉพาะที่พร้อมใช้งาน</span>
+              </button>
             </div>
+          </div>
+
+          {/* รายการที่เลือก (อุปกรณ์เสริม ใต้แถวตัวกรอง จัดวางในแถวเดียวกัน Wrap ได้) */}
+          <div className="jw-card p-3 sm:p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2 shrink-0">
+              <Icon name="check" className="w-4 h-4 text-brand" />
+              <span className="text-[13.5px] font-bold text-ink">รายการที่เลือก</span>
+              <span className="text-[12px] font-semibold text-brand bg-brand-mint px-2 py-0.5 rounded-full">
+                {selectedExtraItems.length} รายการ
+              </span>
+              {selectedExtraItems.length > 0 && (
+                <span className="text-[12px] text-ink-mute hidden sm:inline">
+                  (รวม {selectedExtraItems.reduce((acc, x) => acc + x.qty, 0)} ชิ้น)
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-1 flex-wrap items-center gap-1.5 min-w-0">
+              {selectedExtraItems.length === 0 ? (
+                <span className="text-[12.5px] text-ink-mute">ยังไม่ได้เลือกอุปกรณ์เสริม (เลือกเพิ่มได้ตามต้องการ)</span>
+              ) : (
+                selectedExtraItems.map(({ eq, qty }) => (
+                  <span
+                    key={eq.id}
+                    className="inline-flex items-center gap-1.5 bg-brand-mint/50 border border-brand/20 text-ink text-[12.5px] font-medium pl-2.5 pr-1.5 py-1 rounded-full animate-fadeIn"
+                  >
+                    <span className="truncate max-w-[120px] sm:max-w-[160px]">{eq.name}</span>
+                    <span className="text-[11px] font-bold text-brand bg-white/80 px-1.5 py-0.5 rounded-full border border-brand/20">
+                      {qty} ชิ้น
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setEquipmentQuantities((prev) => {
+                        const next = { ...prev };
+                        delete next[eq.id];
+                        return next;
+                      })}
+                      className="w-4 h-4 rounded-full hover:bg-red-100 flex items-center justify-center text-ink-mute hover:text-status-crit transition ml-0.5"
+                      title="นำออก"
+                    >
+                      <Icon name="x" className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))
+              )}
+            </div>
+
+            {selectedExtraItems.length > 0 && (
+              <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                <button
+                  type="button"
+                  onClick={() => setEquipmentQuantities({})}
+                  className="text-[12px] font-semibold text-ink-mute hover:text-status-crit transition px-2 py-1 rounded-lg hover:bg-soft"
+                >
+                  ล้างทั้งหมด
+                </button>
+              </div>
+            )}
           </div>
 
           {/* รายการอุปกรณ์ */}
