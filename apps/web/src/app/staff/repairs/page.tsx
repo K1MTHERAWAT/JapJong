@@ -11,12 +11,13 @@ import {
   PinKeypad,
   StatusChip,
 } from '@/components/ui';
-import { api, formatThaiDate, formatThaiDateTime, readAndCompressImages } from '@/lib/api';
+import { api, formatThaiDateTime, readAndCompressImages } from '@/lib/api';
 
 export default function StaffRepairsPage() {
   const { account } = useAuth();
   const [queue, setQueue] = useState<(RequestWithTimeline & RepairRequest)[]>([]);
-  const [index, setIndex] = useState(0);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [resolution, setResolution] = useState('');
   const [afterPhotos, setAfterPhotos] = useState<string[]>([]);
   const [confirmed, setConfirmed] = useState(true);
@@ -30,6 +31,7 @@ export default function StaffRepairsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback((preferId?: string | null) => {
+    setLoading(true);
     api
       .listRequests({ queue: 'staff', type: 'repair' })
       .then(async (list) => {
@@ -46,13 +48,12 @@ export default function StaffRepairsPage() {
         }
         setQueue(combined);
         if (preferId) {
-          const foundIdx = combined.findIndex((r) => r.id === preferId || r.code === preferId);
-          setIndex(foundIdx >= 0 ? foundIdx : 0);
-        } else {
-          setIndex(0);
+          const found = combined.find((r) => r.id === preferId || r.code === preferId);
+          setSelectedId(found ? found.id : null);
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -60,13 +61,27 @@ export default function StaffRepairsPage() {
     load(sp?.get('id'));
   }, [load]);
 
-  const current = queue[index];
+  const current = selectedId ? queue.find((r) => r.id === selectedId || r.code === selectedId) ?? null : null;
 
   useEffect(() => {
     setErrorMsg('');
     setResolution(current?.resolution || '');
     setAfterPhotos(current?.afterPhotos || []);
   }, [current?.id, current?.resolution, current?.afterPhotos]);
+
+  const handleBackToList = () => {
+    setErrorMsg('');
+    setSelectedId(null);
+    if (typeof window !== 'undefined' && window.location.search) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  };
+
+  const handleSelectRepair = (reqId: string) => {
+    setLastCompleted(null);
+    setErrorMsg('');
+    setSelectedId(reqId);
+  };
 
   const handleSelectPhotos = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const remaining = Math.max(0, 3 - afterPhotos.length);
@@ -123,6 +138,10 @@ export default function StaffRepairsPage() {
       setShowPinModal(false);
       setPin('');
       setLastCompleted(updated);
+      setSelectedId(null);
+      if (typeof window !== 'undefined' && window.location.search) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
       load();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการบันทึกงานซ่อม';
@@ -164,8 +183,9 @@ export default function StaffRepairsPage() {
     <AppShell
       title="จัดการงานซ่อมและปัญหา"
       backHref="/staff"
+      onBack={current ? handleBackToList : undefined}
       rightLabel={account?.nickname || 'เจ้าหน้าที่'}
-      maxWidth="max-w-[1440px]"
+      maxWidth={current ? 'max-w-[1440px]' : 'max-w-[1100px]'}
       footer={
         current ? (
           <div className="flex w-full sm:w-auto gap-2.5">
@@ -218,10 +238,10 @@ export default function StaffRepairsPage() {
               {lastCompleted.status === 'repair_in_progress'
                 ? 'รับเรื่องเรียบร้อย สถานะเปลี่ยนเป็น "กำลังดำเนินการ"'
                 : lastCompleted.status === 'repair_awaiting_acceptance'
-                ? 'บันทึกผลการซ่อมเรียบร้อย ส่งเรื่องให้ผู้แจ้งเข้าตรวจรับงานแล้ว'
-                : lastCompleted.status === 'rejected'
-                ? 'ส่งกลับ / ไม่รับเรื่องซ่อมเรียบร้อยแล้ว'
-                : 'อัปเดตสถานะเรียบร้อย'}
+                  ? 'บันทึกผลการซ่อมเรียบร้อย ส่งเรื่องให้ผู้แจ้งเข้าตรวจรับงานแล้ว'
+                  : lastCompleted.status === 'rejected'
+                    ? 'ส่งกลับ / ไม่รับเรื่องซ่อมเรียบร้อยแล้ว'
+                    : 'อัปเดตสถานะเรียบร้อย'}
             </span>
           </div>
           <div className="flex gap-2 shrink-0">
@@ -242,40 +262,77 @@ export default function StaffRepairsPage() {
         </div>
       )}
 
-      {queue.length === 0 ? (
-        <div className="jw-card p-12 text-center flex flex-col items-center justify-center gap-3">
-          <div className="w-16 h-16 rounded-full bg-brand-mint text-brand flex items-center justify-center">
-            <Icon name="check" className="w-8 h-8" strokeWidth={2.5} />
+      {!current ? (
+        /* ===================== หน้ารายการงานซ่อม (List View) ===================== */
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <b className="text-[17px] sm:text-[19px] text-ink">รายการงานซ่อมรอจัดการ</b>
+              <Chip tone="amber">รอจัดการ {queue.length} รายการ</Chip>
+            </div>
+            <Link
+              href="/history"
+              className="text-[13px] font-semibold text-ink inline-flex items-center gap-1 hover:underline"
+            >
+              ดูประวัติทั้งหมด <Icon name="chevron-right" className="w-4 h-4" />
+            </Link>
           </div>
-          <b className="text-[17px] text-ink">ไม่มีงานแจ้งซ่อมรอจัดการในขณะนี้</b>
-          <p className="text-[13px] text-ink-mute max-w-md">
-            เมื่อมีประชาชนหรือเจ้าหน้าที่แจ้งอุปกรณ์ชำรุดหรือปัญหาอาคารสถานที่ รายการจะปรากฏที่นี่
-          </p>
+
+          {loading ? (
+            <div className="jw-card p-10 text-center text-[14px] text-ink-mute">
+              กำลังโหลดรายการงานซ่อม...
+            </div>
+          ) : queue.length === 0 ? (
+            <div className="jw-card p-12 text-center flex flex-col items-center justify-center gap-3">
+              <div className="w-16 h-16 rounded-full bg-brand-mint text-brand flex items-center justify-center">
+                <Icon name="check" className="w-8 h-8" strokeWidth={2.5} />
+              </div>
+              <b className="text-[17px] text-ink">ไม่มีงานแจ้งซ่อมรอจัดการในขณะนี้</b>
+              <p className="text-[13px] text-ink-mute max-w-md">
+                เมื่อมีประชาชนหรือเจ้าหน้าที่แจ้งอุปกรณ์ชำรุดหรือปัญหาอาคารสถานที่ รายการจะปรากฏที่นี่
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {queue.map((r) => (
+                <div
+                  key={r.id}
+                  onClick={() => handleSelectRepair(r.id)}
+                  className="jw-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:ring-1 hover:ring-brand transition"
+                >
+                  <div className="min-w-0 flex flex-col gap-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <b className="text-[16px] text-ink">{r.code}</b>
+                      <Chip tone="orange">{r.category || 'แจ้งซ่อม'}</Chip>
+                      <StatusChip status={r.status} />
+                    </div>
+                    <span className="text-[14px] font-semibold text-ink truncate">
+                      {r.building} · {r.floor} · {r.location} — {r.title}
+                    </span>
+                    <span className="text-[12.5px] text-ink-mute">
+                      ผู้แจ้ง: {r.requesterName} · {r.organization} · แจ้งเมื่อ {formatThaiDateTime(r.createdAt)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[13px] font-semibold text-brand shrink-0">
+                    <span>{r.status === 'repair_in_progress' ? 'บันทึกผลการซ่อม' : 'จัดการงานซ่อม'}</span>
+                    <Icon name="chevron-right" className="w-4 h-4" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      ) : current ? (
+      ) : (
+        /* ===================== หน้ารายละเอียดงานซ่อม (Detail View) ===================== */
         <div className="flex flex-col gap-4 sm:gap-5">
           <div className="flex items-center justify-between">
-            <Chip tone="amber">
-              งานซ่อมรอจัดการ {queue.length} · รายการที่ {index + 1}
-            </Chip>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={index <= 0}
-                onClick={() => setIndex((i) => Math.max(0, i - 1))}
-                className="w-8 h-8 rounded-full border-[1.5px] border-ink flex items-center justify-center disabled:opacity-40"
-              >
-                <Icon name="chevron-left" className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                disabled={index >= queue.length - 1}
-                onClick={() => setIndex((i) => Math.min(queue.length - 1, i + 1))}
-                className="w-8 h-8 rounded-full border-[1.5px] border-ink flex items-center justify-center disabled:opacity-40"
-              >
-                <Icon name="chevron-right" className="w-4 h-4" />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleBackToList}
+              className="text-[13px] font-semibold text-brand hover:underline inline-flex items-center gap-1"
+            >
+              ← กลับไปหน้ารายการงานซ่อม ({queue.length})
+            </button>
           </div>
 
           <div className="flex items-center justify-between">
@@ -350,16 +407,16 @@ export default function StaffRepairsPage() {
                       {current.finishedAt
                         ? `เสร็จ: ${formatThaiDateTime(current.finishedAt)}`
                         : current.acceptedAt
-                        ? `รับเรื่อง: ${formatThaiDateTime(current.acceptedAt)}`
-                        : 'รอดำเนินการ'}
+                          ? `รับเรื่อง: ${formatThaiDateTime(current.acceptedAt)}`
+                          : 'รอดำเนินการ'}
                     </span>
                     <span
                       className={`inline-flex items-center gap-1 text-[12px] font-medium mt-1 ${
                         current.finishedAt
                           ? 'text-brand'
                           : current.acceptedAt
-                          ? 'text-amber-600'
-                          : 'text-ink-mute'
+                            ? 'text-amber-600'
+                            : 'text-ink-mute'
                       }`}
                     >
                       {current.finishedAt ? '✓ ซ่อมเสร็จแล้ว' : current.acceptedAt ? '⟳ กำลังดำเนินการ' : '○ รอช่างรับเรื่อง'}
@@ -376,15 +433,15 @@ export default function StaffRepairsPage() {
                         current.status === 'repair_done'
                           ? 'text-brand'
                           : current.status === 'repair_awaiting_acceptance'
-                          ? 'text-amber-600'
-                          : 'text-ink-mute'
+                            ? 'text-amber-600'
+                            : 'text-ink-mute'
                       }`}
                     >
                       {current.status === 'repair_done'
                         ? '✓ ตรวจรับเรียบร้อย'
                         : current.status === 'repair_awaiting_acceptance'
-                        ? '⟳ รอคุณตรวจรับ'
-                        : '○ รอซ่อมเสร็จ'}
+                          ? '⟳ รอคุณตรวจรับ'
+                          : '○ รอซ่อมเสร็จ'}
                     </span>
                   </div>
                 </div>
@@ -561,7 +618,7 @@ export default function StaffRepairsPage() {
             </div>
           </div>
         </div>
-      ) : null}
+      )}
 
       {/* Modal ยืนยัน PIN สำหรับเจ้าหน้าที่ */}
       {showPinModal && (
@@ -580,8 +637,8 @@ export default function StaffRepairsPage() {
                 {pendingAction === 'accept'
                   ? 'รับเรื่องซ่อม'
                   : pendingAction === 'finish'
-                  ? 'บันทึกซ่อมเสร็จ'
-                  : 'ปฏิเสธ/ส่งกลับ'}
+                    ? 'บันทึกซ่อมเสร็จ'
+                    : 'ปฏิเสธ/ส่งกลับ'}
               </span>
             </div>
             <PinKeypad

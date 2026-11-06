@@ -22,7 +22,8 @@ type ReviewRequest = (BookingRequest | BorrowRequest) & RequestWithTimeline;
 export default function StaffReviewPage() {
   const { account } = useAuth();
   const [queue, setQueue] = useState<ReviewRequest[]>([]);
-  const [index, setIndex] = useState(0);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [showOfficialForm, setShowOfficialForm] = useState(true);
   const [note, setNote] = useState('');
   const [staffSignature, setStaffSignature] = useState('');
@@ -38,6 +39,7 @@ export default function StaffReviewPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback((preferId?: string | null) => {
+    setLoading(true);
     api
       .listRequests({ queue: 'staff' })
       .then(async (list) => {
@@ -55,13 +57,12 @@ export default function StaffReviewPage() {
         }
         setQueue(combined);
         if (preferId) {
-          const foundIdx = combined.findIndex((r) => r.id === preferId || r.code === preferId);
-          setIndex(foundIdx >= 0 ? foundIdx : 0);
-        } else {
-          setIndex(0);
+          const found = combined.find((r) => r.id === preferId || r.code === preferId);
+          setSelectedId(found ? found.id : null);
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -77,13 +78,28 @@ export default function StaffReviewPage() {
       .catch(() => {});
   }, []);
 
-  const current = queue[index];
+  const current = selectedId ? queue.find((r) => r.id === selectedId || r.code === selectedId) ?? null : null;
 
   useEffect(() => {
     setStaffSignature(account?.signature || '');
     setOtpStep(false);
     setErrorMsg('');
   }, [account?.id, account?.signature, current?.id]);
+
+  const handleBackToList = () => {
+    setOtpStep(false);
+    setErrorMsg('');
+    setSelectedId(null);
+    if (typeof window !== 'undefined' && window.location.search) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  };
+
+  const handleSelectRequest = (reqId: string) => {
+    setLastCompleted(null);
+    setErrorMsg('');
+    setSelectedId(reqId);
+  };
 
   const handleDecision = async (decision: 'approve' | 'reject', enteredPin?: string) => {
     if (!current || !staffSignature.trim()) return;
@@ -101,6 +117,10 @@ export default function StaffReviewPage() {
       setOtpStep(false);
       setShowPinModal(false);
       setLastCompleted(updated);
+      setSelectedId(null);
+      if (typeof window !== 'undefined' && window.location.search) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
       load();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการลงนาม';
@@ -138,9 +158,9 @@ export default function StaffReviewPage() {
     <AppShell
       title={otpStep ? 'ยืนยัน OTP ก่อนลงนาม' : 'ตรวจคำขอ (สถานที่/อุปกรณ์)'}
       backHref="/staff"
-      onBack={otpStep ? () => setOtpStep(false) : undefined}
+      onBack={otpStep ? () => setOtpStep(false) : current ? handleBackToList : undefined}
       rightLabel={account?.nickname || 'สุดา'}
-      maxWidth="max-w-[1440px]"
+      maxWidth={current ? 'max-w-[1440px]' : 'max-w-[1100px]'}
       footer={
         current && !otpStep ? (
           <div className="flex w-full sm:w-auto gap-2.5">
@@ -200,10 +220,18 @@ export default function StaffReviewPage() {
         <div className="mb-4 jw-card p-4 bg-brand-mint border border-brand flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <b className="text-[14px] text-ink block">
-              ดำเนินการ {lastCompleted.code} เรียบร้อยแล้ว ({lastCompleted.status === 'pending_l2' ? 'ส่งต่อปลัด อบต. ระดับ 2' : 'อัปเดตสถานะแล้ว'})
+              ดำเนินการ {lastCompleted.code} เรียบร้อยแล้ว (
+              {lastCompleted.status === 'pending_l2'
+                ? 'ส่งต่อปลัด อบต. ระดับ 2'
+                : lastCompleted.status === 'rejected'
+                  ? 'ลงนามไม่ผ่าน'
+                  : 'อัปเดตสถานะแล้ว'}
+              )
             </b>
             <span className="text-[12px] text-ink-mute">
-              ลงนามระดับที่ 1 (เจ้าหน้าที่) สำเร็จ เอกสารถูกส่งต่อไปยังคิวของปลัด อบต. (ระดับ 2) แล้ว
+              {lastCompleted.status === 'pending_l2'
+                ? 'ลงนามระดับที่ 1 (เจ้าหน้าที่) สำเร็จ เอกสารถูกส่งต่อไปยังคิวของปลัด อบต. (ระดับ 2) แล้ว'
+                : 'บันทึกผลการพิจารณาคำขอเรียบร้อยแล้ว'}
             </span>
           </div>
           <div className="flex gap-2 shrink-0">
@@ -220,7 +248,7 @@ export default function StaffReviewPage() {
 
       {/* Alert ข้อความแจ้งเตือนข้อผิดพลาด (ถ้ามี) */}
       {errorMsg && !otpStep && (
-        <div className="jw-card bg-red-50 border border-red-200 p-4 flex items-center justify-between gap-3 text-red-700 text-[13px] rounded-2xl animate-fade-in">
+        <div className="mb-4 jw-card bg-red-50 border border-red-200 p-4 flex items-center justify-between gap-3 text-red-700 text-[13px] rounded-2xl animate-fade-in">
           <div className="flex items-center gap-2.5">
             <Icon name="alert-triangle" className="w-5 h-5 text-red-600 shrink-0" />
             <span>{errorMsg}</span>
@@ -236,7 +264,7 @@ export default function StaffReviewPage() {
       )}
 
       {/* เมื่ออยู่ในขั้นตอนยืนยัน Email OTP */}
-      {otpStep ? (
+      {otpStep && current ? (
         <div className="flex flex-col gap-4 max-w-xl mx-auto">
           <div className="flex items-center justify-between">
             <button
@@ -268,51 +296,91 @@ export default function StaffReviewPage() {
             </div>
           )}
         </div>
-      ) : queue.length === 0 ? (
-        <div className="jw-card p-12 text-center flex flex-col items-center justify-center gap-3">
-          <div className="w-16 h-16 rounded-full bg-brand-mint text-brand flex items-center justify-center">
-            <Icon name="check" className="w-8 h-8" strokeWidth={2.5} />
+      ) : !current ? (
+        /* ===================== หน้ารายการ (List View) ===================== */
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <b className="text-[17px] sm:text-[19px] text-ink">รายการคำขอรอตรวจสอบ</b>
+              <Chip tone="amber">รอตรวจ {queue.length} รายการ</Chip>
+            </div>
+            <Link
+              href="/history"
+              className="text-[13px] font-semibold text-ink inline-flex items-center gap-1 hover:underline"
+            >
+              ดูประวัติทั้งหมด <Icon name="chevron-right" className="w-4 h-4" />
+            </Link>
           </div>
-          <b className="text-[17px] text-ink">ไม่มีคำขอรอตรวจในขณะนี้</b>
-          <p className="text-[13px] text-ink-mute max-w-md">
-            คำขอขอใช้สถานที่และยืมอุปกรณ์ราชการที่รอการตรวจสอบระดับเจ้าหน้าที่จะปรากฏที่นี่
-          </p>
+
+          {loading ? (
+            <div className="jw-card p-10 text-center text-[14px] text-ink-mute">
+              กำลังโหลดรายการคำขอ...
+            </div>
+          ) : queue.length === 0 ? (
+            <div className="jw-card p-12 text-center flex flex-col items-center justify-center gap-3">
+              <div className="w-16 h-16 rounded-full bg-brand-mint text-brand flex items-center justify-center">
+                <Icon name="check" className="w-8 h-8" strokeWidth={2.5} />
+              </div>
+              <b className="text-[17px] text-ink">ไม่มีคำขอรอตรวจในขณะนี้</b>
+              <p className="text-[13px] text-ink-mute max-w-md">
+                คำขอขอใช้สถานที่และยืมอุปกรณ์ราชการที่รอการตรวจสอบระดับเจ้าหน้าที่จะปรากฏที่นี่
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {queue.map((r) => {
+                const dateInfo =
+                  r.type === 'booking'
+                    ? r.periods.map((p) => formatPeriodRange(p)).join(', ')
+                    : `${formatThaiDate(r.pickupDate, false)}–${formatThaiDate(r.returnDate, true)}`;
+                return (
+                  <div
+                    key={r.id}
+                    onClick={() => handleSelectRequest(r.id)}
+                    className="jw-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:ring-1 hover:ring-brand transition"
+                  >
+                    <div className="min-w-0 flex flex-col gap-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <b className="text-[16px] text-ink">{r.code}</b>
+                        <Chip tone={r.type === 'booking' ? 'blue' : 'teal'}>
+                          {r.type === 'booking' ? 'ขอใช้สถานที่' : 'ยืมอุปกรณ์'}
+                        </Chip>
+                        <StatusChip status={r.status} />
+                      </div>
+                      <span className="text-[14px] font-semibold text-ink truncate">
+                        {r.title} {r.subtitle ? `(${r.subtitle})` : ''}
+                      </span>
+                      <span className="text-[12.5px] text-ink-mute">
+                        ผู้ขอ: {r.requesterName} · {r.organization} · วัน-เวลา: {dateInfo}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[13px] font-semibold text-brand shrink-0">
+                      <span>ตรวจคำขอ</span>
+                      <Icon name="chevron-right" className="w-4 h-4" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
-      ) : current ? (
+      ) : (
+        /* ===================== หน้ารายละเอียดคำขอ (Detail View) ===================== */
         <div className="flex flex-col gap-4 sm:gap-5">
           <div className="flex items-center justify-between">
-            <Chip tone="amber">
-              รอตรวจ {queue.length} · รายการที่ {index + 1}
-            </Chip>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={index <= 0}
-                onClick={() => setIndex((i) => Math.max(0, i - 1))}
-                className="w-8 h-8 rounded-full border-[1.5px] border-ink flex items-center justify-center disabled:opacity-40"
-              >
-                <Icon name="chevron-left" className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                disabled={index >= queue.length - 1}
-                onClick={() => setIndex((i) => Math.min(queue.length - 1, i + 1))}
-                className="w-8 h-8 rounded-full border-[1.5px] border-ink flex items-center justify-center disabled:opacity-40"
-              >
-                <Icon name="chevron-right" className="w-4 h-4" />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleBackToList}
+              className="text-[13px] font-semibold text-brand hover:underline inline-flex items-center gap-1"
+            >
+              ← กลับไปหน้ารายการคำขอ ({queue.length})
+            </button>
           </div>
 
           <div className="flex items-center justify-between">
             <h1 className="text-[22px] font-bold text-ink">{current.code}</h1>
             <StatusChip status={current.status} />
           </div>
-
-          <SignOtpVerifier
-            initialEmail={account?.email}
-            onVerified={() => setIsSessionVerified(true)}
-          />
 
           <div className="jw-card p-4 sm:p-5 flex flex-col gap-3 text-[14px]">
             <div className="flex items-start gap-2">
@@ -470,7 +538,7 @@ export default function StaffReviewPage() {
             </div>
           </div>
         </div>
-      ) : null}
+      )}
 
       {showPinModal && current && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
