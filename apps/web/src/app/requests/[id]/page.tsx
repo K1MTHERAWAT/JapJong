@@ -40,7 +40,10 @@ export default function RequestDetailPage() {
   }
 
   const isFullyApproved = req.status === 'approved' || req.status === 'borrowing' || req.status === 'returned';
-  const canStaffReview = account?.role === 'STAFF' && req.status === 'pending_staff';
+  const canStaffReview =
+    account?.role === 'STAFF' &&
+    (req.status === 'pending_staff' ||
+      (req.type === 'repair' && (req.status === 'repair_submitted' || req.status === 'repair_in_progress')));
   const canApproverSign =
     (account?.role === 'APPROVER_L2' && req.status === 'pending_l2') ||
     (account?.role === 'APPROVER_L1' && req.status === 'pending_l1');
@@ -56,8 +59,11 @@ export default function RequestDetailPage() {
       maxWidth="max-w-[1080px]"
       footer={
         canStaffReview ? (
-          <Link href={`/staff/review?id=${req.id}`} className="jw-btn w-full sm:w-64">
-            ไปหน้าตรวจและลงนามคำขอนี้ →
+          <Link
+            href={req.type === 'repair' ? `/staff/repairs?id=${req.id}` : `/staff/review?id=${req.id}`}
+            className="jw-btn w-full sm:w-64"
+          >
+            {req.type === 'repair' ? 'ไปหน้าจัดการงานซ่อมนี้ →' : 'ไปหน้าตรวจและลงนามคำขอนี้ →'}
           </Link>
         ) : canApproverSign ? (
           <Link href={`/approver/sign/${req.id}`} className="jw-btn w-full sm:w-64">
