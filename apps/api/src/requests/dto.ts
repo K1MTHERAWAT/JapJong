@@ -283,14 +283,18 @@ export class HandoverDto {
 }
 
 export class RepairStatusDto {
-  @IsIn(['accept', 'finish', 'confirm', 'reopen'], {
-    message: 'action ต้องเป็น accept, finish, confirm หรือ reopen',
+  @IsIn(['accept', 'finish', 'confirm', 'reopen', 'reject'], {
+    message: 'action ต้องเป็น accept, finish, confirm, reopen หรือ reject',
   })
-  action!: 'accept' | 'finish' | 'confirm' | 'reopen';
+  action!: 'accept' | 'finish' | 'confirm' | 'reopen' | 'reject';
 
   @IsOptional()
   @IsString()
   resolution?: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
 
   @IsOptional()
   @IsString()

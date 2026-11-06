@@ -116,7 +116,7 @@ export default function StaffRepairsPage() {
         });
       } else {
         updated = await api.updateRepairStatus(current.id, {
-          action: 'reopen',
+          action: 'reject',
           pin: enteredPin,
         });
       }
@@ -219,6 +219,8 @@ export default function StaffRepairsPage() {
                 ? 'รับเรื่องเรียบร้อย สถานะเปลี่ยนเป็น "กำลังดำเนินการ"'
                 : lastCompleted.status === 'repair_awaiting_acceptance'
                 ? 'บันทึกผลการซ่อมเรียบร้อย ส่งเรื่องให้ผู้แจ้งเข้าตรวจรับงานแล้ว'
+                : lastCompleted.status === 'rejected'
+                ? 'ส่งกลับ / ไม่รับเรื่องซ่อมเรียบร้อยแล้ว'
                 : 'อัปเดตสถานะเรียบร้อย'}
             </span>
           </div>

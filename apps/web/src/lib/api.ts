@@ -374,8 +374,9 @@ export const api = {
   updateRepairStatus: (
     id: string,
     payload: {
-      action: 'accept' | 'finish' | 'confirm' | 'reopen';
+      action: 'accept' | 'finish' | 'confirm' | 'reopen' | 'reject';
       resolution?: string;
+      reason?: string;
       signature?: string;
       pin?: string;
       afterPhotos?: string[];

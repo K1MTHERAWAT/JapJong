@@ -214,7 +214,7 @@ export class NotificationEventsService {
 
   async onRepairStatusUpdated(
     req: RepairRequest,
-    action: 'accept' | 'finish' | 'confirm' | 'reopen',
+    action: 'accept' | 'finish' | 'confirm' | 'reopen' | 'reject',
   ) {
     try {
       if (action === 'accept') {
@@ -226,6 +226,17 @@ export class NotificationEventsService {
           requestCode: req.code,
           location: req.location,
           eventKey: `repair_accept:${req.id}:${req.acceptedAt || Date.now()}`,
+        });
+      } else if (action === 'reject') {
+        await this.notifications.dispatchToUser({
+          userId: req.requesterId,
+          event: 'REPAIR_REJECTED',
+          recipientRole: 'CITIZEN',
+          requestId: req.id,
+          requestCode: req.code,
+          location: req.location,
+          reason: req.rejectReason || 'เจ้าหน้าที่ส่งกลับ / ไม่รับเรื่องซ่อม',
+          eventKey: `repair_reject:${req.id}:${req.updatedAt || Date.now()}`,
         });
       } else if (action === 'finish') {
         await this.notifications.dispatchToUser({

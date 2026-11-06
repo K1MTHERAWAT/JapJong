@@ -244,9 +244,8 @@ export default function AdminServicesPage() {
       return;
     }
 
-    // Safety rule: if editing an admin system menu, ADMIN must remain in roles
+    // Safety rule: if editing an admin management menu (/admin or /admin/*), ADMIN must remain in roles
     const isAdminMenu =
-      editingService?.isSystem ||
       formHref === '/admin' ||
       formHref.startsWith('/admin/');
     if (isAdminMenu && !formRoles.includes('ADMIN')) {

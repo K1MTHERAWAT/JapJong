@@ -2987,8 +2987,8 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     const item = this.sidebarServices.find((s) => s.id === id);
     if (!item) throw new NotFoundException('ไม่พบบริการหรือเมนูที่ระบุ');
 
-    // ตรวจสอบความปลอดภัย: ป้องกันไม่ให้แอดมินปิดหรือลบสิทธิ์ Admin ในเมนูระบบที่จำเป็น
-    const isAdminSystemMenu = item.isSystem || item.href === '/admin' || item.href.startsWith('/admin/');
+    // ตรวจสอบความปลอดภัย: ป้องกันไม่ให้แอดมินปิดหรือลบสิทธิ์ Admin ในเมนูผู้ดูแลระบบ (/admin, /admin/*)
+    const isAdminSystemMenu = item.href === '/admin' || item.href.startsWith('/admin/');
     if (isAdminSystemMenu) {
       if (dto.roles && !dto.roles.includes('ADMIN')) {
         throw new ForbiddenException('ไม่สามารถยกเลิกสิทธิ์ของผู้ดูแลระบบ (ADMIN) ในเมนูระบบหลักได้');

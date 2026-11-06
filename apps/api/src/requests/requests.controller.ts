@@ -997,11 +997,11 @@ export class RequestsController {
     const req = this.db.requests.find((r): r is RepairRequest => (r.id === id || r.code === id) && r.type === 'repair');
     if (!req) throw new NotFoundException('ไม่พบรายการแจ้งซ่อม');
 
-    if (body.action === 'accept' || body.action === 'finish') {
+    if (body.action === 'accept' || body.action === 'finish' || body.action === 'reject') {
       if (!hasPermission(user, 'review')) {
-        throw new ForbiddenException('เฉพาะเจ้าหน้าที่ผู้รับผิดชอบเท่านั้นที่สามารถรับเรื่องหรือบันทึกซ่อมเสร็จได้');
+        throw new ForbiddenException('เฉพาะเจ้าหน้าที่ผู้รับผิดชอบเท่านั้นที่สามารถรับเรื่อง ปฏิเสธ หรือบันทึกซ่อมเสร็จได้');
       }
-      // Security Policy: เจ้าหน้าที่ที่มี PIN ต้องยืนยัน PIN เสมอเมื่อรับเรื่องหรือบันทึกซ่อมเสร็จ
+      // Security Policy: เจ้าหน้าที่ที่มี PIN ต้องยืนยัน PIN เสมอเมื่อรับเรื่อง ปฏิเสธ หรือบันทึกซ่อมเสร็จ
       if (user.pin) {
         if (!body.pin) {
           throw new BadRequestException('กรุณาระบุรหัส PIN 6 หลักเพื่อยืนยันการดำเนินการ');
@@ -1025,6 +1025,7 @@ export class RequestsController {
 
     const expected: Record<typeof body.action, RepairRequest['status'][]> = {
       accept: ['repair_submitted'],
+      reject: ['repair_submitted', 'repair_in_progress'],
       finish: ['repair_in_progress'],
       confirm: ['repair_awaiting_acceptance'],
       reopen: ['repair_awaiting_acceptance'],
@@ -1039,6 +1040,20 @@ export class RequestsController {
       req.acceptedAt = now;
       req.staffSignature = body.signature ? requireDrawnSignature(body.signature, 'เจ้าหน้าที่ผู้รับเรื่อง') : undefined;
       req.staffSignerName = user.name;
+    } else if (body.action === 'reject') {
+      req.status = 'rejected';
+      req.rejectReason =
+        String(body.reason || body.resolution || '').trim().slice(0, 1000) ||
+        'เจ้าหน้าที่ส่งกลับ / ไม่รับเรื่องซ่อม';
+      req.staffSignerName = user.name;
+      if (!this.notificationEvents) {
+        this.db.notify(
+          req.requesterId,
+          `รายการแจ้งซ่อม ${req.code} ถูกส่งกลับ`,
+          req.rejectReason,
+          `/repair?mode=track&id=${req.id}`,
+        );
+      }
     } else if (body.action === 'finish') {
       const sig = body.signature ? requireDrawnSignature(body.signature, 'เจ้าหน้าที่ผู้ซ่อม') : undefined;
       req.status = 'repair_awaiting_acceptance';

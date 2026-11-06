@@ -83,6 +83,18 @@ function approvalTimeline(req: Extract<AnyRequest, { signatures: unknown }>): Ti
 
 export function computeTimeline(req: AnyRequest): TimelineStep[] {
   if (req.type === 'repair') {
+    if (req.status === 'rejected' || req.status === 'cancelled') {
+      return [
+        { key: 'submit', label: 'ส่งแจ้งปัญหา', at: req.createdAt, state: 'done' },
+        {
+          key: 'accept',
+          label: req.status === 'rejected' ? 'ส่งกลับ / ไม่รับเรื่อง' : 'ยกเลิกการแจ้งซ่อม',
+          at: req.updatedAt,
+          state: 'rejected',
+          note: req.rejectReason || (req.status === 'rejected' ? 'เจ้าหน้าที่ส่งกลับ / ไม่รับเรื่อง' : 'ยกเลิกคำขอ'),
+        },
+      ];
+    }
     const order = ['repair_submitted', 'repair_in_progress', 'repair_awaiting_acceptance', 'repair_done'];
     const idx = order.indexOf(req.status);
     return [
