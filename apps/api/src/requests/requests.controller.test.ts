@@ -641,4 +641,117 @@ describe('RequestsController Unit Tests', () => {
       expect(req.timeline).toBeDefined();
     });
   });
+
+  describe('Equipment Receive, Return and Inspection Lifecycle', () => {
+    it('confirms receipt of equipment and transitions status to borrowing', async () => {
+      const now = new Date().toISOString();
+      const borrowReq = {
+        id: 'r-br-receive',
+        code: 'BR-2569-0090',
+        type: 'borrow' as const,
+        status: 'approved' as const,
+        requesterId: citizen.id,
+        requesterName: citizen.name,
+        items: [{ equipmentId: 'e-01', qty: 2 }],
+        pickupDate: '2026-11-20',
+        returnDate: '2026-11-25',
+        purpose: 'จัดงานอบรม',
+        attachments: [],
+        signatures: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+      mockDb.requests.push(borrowReq);
+
+      const updated = await controller.receiveEquipment(citizen, 'r-br-receive', {
+        photos: ['data:image/jpeg;base64,mock1'],
+        note: 'อุปกรณ์ครบถ้วน ใช้งานได้ปกติ',
+      });
+
+      expect(updated.status).toBe('borrowing');
+      expect((updated as any).receivedAt).toBeDefined();
+      expect((updated as any).receivePhotos).toHaveLength(1);
+      expect((updated as any).receiveNote).toBe('อุปกรณ์ครบถ้วน ใช้งานได้ปกติ');
+      expect(mockDb.notifyRole).toHaveBeenCalledWith(
+        'STAFF',
+        expect.stringContaining('ผู้ยืมยืนยันรับมอบอุปกรณ์แล้ว'),
+        expect.any(String),
+        '/borrow/my',
+      );
+    });
+
+    it('submits return of equipment and transitions status to return_inspect', async () => {
+      const now = new Date().toISOString();
+      const borrowReq = {
+        id: 'r-br-return',
+        code: 'BR-2569-0091',
+        type: 'borrow' as const,
+        status: 'borrowing' as const,
+        requesterId: citizen.id,
+        requesterName: citizen.name,
+        items: [{ equipmentId: 'e-01', qty: 2 }],
+        pickupDate: '2026-11-20',
+        returnDate: '2026-11-25',
+        purpose: 'จัดงานอบรม',
+        attachments: [],
+        signatures: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+      mockDb.requests.push(borrowReq);
+
+      const updated = await controller.submitReturn(citizen, 'r-br-return', {
+        photos: ['data:image/jpeg;base64,mock-return'],
+        note: 'นำอุปกรณ์มาส่งคืนครบถ้วน สภาพดี',
+      });
+
+      expect(updated.status).toBe('return_inspect');
+      expect((updated as any).returnSubmittedAt).toBeDefined();
+      expect((updated as any).returnPhotos).toHaveLength(1);
+      expect(mockDb.notifyRole).toHaveBeenCalledWith(
+        'STAFF',
+        expect.stringContaining('ผู้ยืมส่งคืนอุปกรณ์แล้ว รอตรวจสภาพ'),
+        expect.any(String),
+        '/borrow/my',
+      );
+    });
+
+    it('staff inspects returned equipment and transitions status to returned', async () => {
+      const now = new Date().toISOString();
+      const borrowReq = {
+        id: 'r-br-inspect',
+        code: 'BR-2569-0092',
+        type: 'borrow' as const,
+        status: 'return_inspect' as const,
+        requesterId: citizen.id,
+        requesterName: citizen.name,
+        items: [{ equipmentId: 'e-01', qty: 2 }],
+        pickupDate: '2026-11-20',
+        returnDate: '2026-11-25',
+        purpose: 'จัดงานอบรม',
+        attachments: [],
+        signatures: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+      mockDb.requests.push(borrowReq);
+
+      const updated = await controller.inspectReturn(staff, 'r-br-inspect', {
+        result: 'normal',
+        note: 'ตรวจรับคืนเรียบร้อย ไม่พบความเสียหาย',
+        photos: ['data:image/jpeg;base64,mock-staff-inspect'],
+      });
+
+      expect(updated.status).toBe('returned');
+      expect((updated as any).inspectedAt).toBeDefined();
+      expect((updated as any).inspectorName).toBe(staff.name);
+      expect((updated as any).inspectResult).toBe('normal');
+      expect(mockDb.notify).toHaveBeenCalledWith(
+        citizen.id,
+        expect.stringContaining('ตรวจสอบการส่งคืนอุปกรณ์เรียบร้อยแล้ว'),
+        expect.stringContaining('สภาพปกติ'),
+        '/borrow/my',
+      );
+    });
+  });
 });

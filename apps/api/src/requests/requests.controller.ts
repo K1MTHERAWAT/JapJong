@@ -47,8 +47,11 @@ import {
   CreateBorrowDto,
   CreateRepairDto,
   HandoverDto,
+  InspectReturnDto,
+  ReceiveEquipmentDto,
   RepairStatusDto,
   RescheduleDto,
+  ReturnEquipmentDto,
   SignDto,
 } from './dto';
 
@@ -804,6 +807,111 @@ export class RequestsController {
     } else {
       this.db.notifyRole('STAFF', `แจ้งคืนอุปกรณ์ ${req.code}`, req.requesterName, `/staff/handover?id=${req.id}`);
     }
+    return this.enrich(req);
+  }
+
+  /** ผู้ยืมยืนยันรับมอบอุปกรณ์ (พร้อมรูปภาพและรายละเอียด) */
+  @Post(':id/receive')
+  async receiveEquipment(
+    @CurrentUser() user: Account,
+    @Param('id') id: string,
+    @Body() body: ReceiveEquipmentDto,
+  ) {
+    const req = this.db.requests.find((r): r is BorrowRequest => (r.id === id || r.code === id) && r.type === 'borrow');
+    if (!req) throw new NotFoundException('ไม่พบรายการยืม');
+    if (req.requesterId !== user.id && user.role !== 'STAFF' && user.role !== 'ADMIN') {
+      throw new ForbiddenException('เฉพาะผู้ยืมหรือเจ้าหน้าที่เท่านั้นที่สามารถยืนยันรับมอบอุปกรณ์ได้');
+    }
+    if (req.status !== 'approved') {
+      throw new BadRequestException('คำขอยืมต้องผ่านการอนุมัติครบและอยู่ในสถานะอนุมัติแล้วเท่านั้นจึงจะรับมอบได้');
+    }
+    const now = new Date().toISOString();
+    req.status = 'borrowing';
+    req.receivedAt = now;
+    req.receivePhotos = Array.isArray(body.photos) ? body.photos.slice(0, 10) : [];
+    req.receiveNote = String(body.note ?? '').slice(0, 1000);
+    req.updatedAt = now;
+    await this.db.persistRequest(req);
+
+    this.db.notifyRole(
+      'STAFF',
+      `ผู้ยืมยืนยันรับมอบอุปกรณ์แล้ว (${req.code})`,
+      `${req.requesterName} ได้ยืนยันรับมอบอุปกรณ์เรียบร้อยแล้ว`,
+      `/borrow/my`,
+    );
+
+    return this.enrich(req);
+  }
+
+  /** ผู้ยืมยืนยันส่งคืนอุปกรณ์ (พร้อมรูปภาพและรายละเอียด) */
+  @Post(':id/return-submit')
+  async submitReturn(
+    @CurrentUser() user: Account,
+    @Param('id') id: string,
+    @Body() body: ReturnEquipmentDto,
+  ) {
+    const req = this.db.requests.find((r): r is BorrowRequest => (r.id === id || r.code === id) && r.type === 'borrow');
+    if (!req) throw new NotFoundException('ไม่พบรายการยืม');
+    if (req.requesterId !== user.id && user.role !== 'STAFF' && user.role !== 'ADMIN') {
+      throw new ForbiddenException('เฉพาะผู้ยืมหรือเจ้าหน้าที่เท่านั้นที่สามารถยืนยันส่งคืนอุปกรณ์ได้');
+    }
+    if (req.status !== 'borrowing') {
+      throw new BadRequestException('รายการต้องอยู่ในสถานะกำลังใช้งานจึงจะส่งคืนได้');
+    }
+    const now = new Date().toISOString();
+    req.status = 'return_inspect';
+    req.returnSubmittedAt = now;
+    req.returnRequestedAt = now;
+    req.returnPhotos = Array.isArray(body.photos) ? body.photos.slice(0, 10) : [];
+    req.returnNote = String(body.note ?? '').slice(0, 1000);
+    req.updatedAt = now;
+    await this.db.persistRequest(req);
+
+    this.db.notifyRole(
+      'STAFF',
+      `ผู้ยืมส่งคืนอุปกรณ์แล้ว รอตรวจสภาพ (${req.code})`,
+      `${req.requesterName} ส่งคืนอุปกรณ์แล้ว กรุณาเข้าตรวจสอบสภาพอุปกรณ์`,
+      `/borrow/my`,
+    );
+
+    return this.enrich(req);
+  }
+
+  /** เจ้าหน้าที่ตรวจสอบสภาพอุปกรณ์และยืนยันรับคืน */
+  @Post(':id/inspect-return')
+  async inspectReturn(
+    @CurrentUser() user: Account,
+    @Param('id') id: string,
+    @Body() body: InspectReturnDto,
+  ) {
+    const req = this.db.requests.find((r): r is BorrowRequest => (r.id === id || r.code === id) && r.type === 'borrow');
+    if (!req) throw new NotFoundException('ไม่พบรายการยืม');
+    if (!hasPermission(user, 'review') && !hasPermission(user, 'handover') && user.role !== 'STAFF' && user.role !== 'ADMIN') {
+      throw new ForbiddenException('เฉพาะเจ้าหน้าที่ผู้มีสิทธิ์ตรวจสอบเท่านั้นที่สามารถตรวจรับคืนอุปกรณ์ได้');
+    }
+    if (req.status !== 'return_inspect') {
+      throw new BadRequestException('คำขอนี้ไม่ได้อยู่ในสถานะรอตรวจสภาพ');
+    }
+    const now = new Date().toISOString();
+    req.status = 'returned';
+    req.returnedAt = now;
+    req.inspectedAt = now;
+    req.inspectorId = user.id;
+    req.inspectorName = user.name;
+    req.inspectResult = body.result || 'normal';
+    req.inspectNote = String(body.note ?? '').slice(0, 1000);
+    req.inspectPhotos = Array.isArray(body.photos) ? body.photos.slice(0, 10) : [];
+    req.updatedAt = now;
+    await this.db.persistRequest(req);
+
+    const resultLabel = body.result === 'normal' ? 'สภาพปกติ' : body.result === 'damaged' ? 'ชำรุดเสียหาย' : 'อุปกรณ์ไม่ครบถ้วน';
+    await this.db.notify(
+      req.requesterId,
+      `ตรวจสอบการส่งคืนอุปกรณ์เรียบร้อยแล้ว (${req.code})`,
+      `เจ้าหน้าที่ (${user.name}) ตรวจสอบเรียบร้อยแล้ว ผลการตรวจ: ${resultLabel}`,
+      `/borrow/my`,
+    );
+
     return this.enrich(req);
   }
 

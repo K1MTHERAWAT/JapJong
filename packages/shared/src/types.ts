@@ -199,6 +199,30 @@ export interface BorrowRequest extends BaseRequest {
   signatures: SignatureRecord[];
   returnRequestedAt?: string;
   returnedAt?: string;
+  /** วันที่และเวลารับมอบอุปกรณ์ */
+  receivedAt?: string;
+  /** รูปภาพสภาพอุปกรณ์ก่อนรับมอบ */
+  receivePhotos?: string[];
+  /** รายละเอียดจากผู้ยืมตอนรับมอบ */
+  receiveNote?: string;
+  /** วันที่และเวลาที่ผู้ยืมกดยืนยันส่งคืน */
+  returnSubmittedAt?: string;
+  /** รูปภาพสภาพอุปกรณ์ก่อนส่งคืน */
+  returnPhotos?: string[];
+  /** รายละเอียดจากผู้ยืมตอนส่งคืน (สภาพ, ตำหนิ/ความเสียหาย, รายละเอียดเพิ่มเติม) */
+  returnNote?: string;
+  /** วันที่และเวลาที่เจ้าหน้าที่ตรวจสอบรับคืน */
+  inspectedAt?: string;
+  /** รหัสเจ้าหน้าที่ผู้ตรวจรับคืน */
+  inspectorId?: string;
+  /** ชื่อเจ้าหน้าที่ผู้ตรวจรับคืน */
+  inspectorName?: string;
+  /** ผลการตรวจสภาพรับคืนอุปกรณ์ */
+  inspectResult?: 'normal' | 'damaged' | 'incomplete';
+  /** หมายเหตุหรือบันทึกตำหนิ/ความเสียหายจากเจ้าหน้าที่ */
+  inspectNote?: string;
+  /** รูปภาพประกอบการตรวจสอบสภาพอุปกรณ์จากเจ้าหน้าที่ */
+  inspectPhotos?: string[];
 }
 
 export interface RepairRequest extends BaseRequest {

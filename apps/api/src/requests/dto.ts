@@ -300,3 +300,39 @@ export class RepairStatusDto {
   @IsString()
   pin?: string;
 }
+
+export class ReceiveEquipmentDto {
+  @IsOptional()
+  @IsArray()
+  photos?: string[];
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
+
+export class ReturnEquipmentDto {
+  @IsOptional()
+  @IsArray()
+  photos?: string[];
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
+
+export class InspectReturnDto {
+  @IsIn(['normal', 'damaged', 'incomplete'], {
+    message: 'ผลการตรวจรับต้องเป็น normal, damaged หรือ incomplete',
+  })
+  result!: 'normal' | 'damaged' | 'incomplete';
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @IsOptional()
+  @IsArray()
+  photos?: string[];
+}
+

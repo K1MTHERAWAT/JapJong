@@ -341,6 +341,15 @@ export const api = {
     request<RequestWithTimeline>(`/requests/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) }),
   returnRequest: (id: string) =>
     request<RequestWithTimeline>(`/requests/${id}/return-request`, { method: 'POST', body: JSON.stringify({}) }),
+  receiveEquipment: (id: string, payload: { photos?: string[]; note?: string }) =>
+    request<RequestWithTimeline>(`/requests/${id}/receive`, { method: 'POST', body: JSON.stringify(payload) }),
+  submitReturnEquipment: (id: string, payload: { photos?: string[]; note?: string }) =>
+    request<RequestWithTimeline>(`/requests/${id}/return-submit`, { method: 'POST', body: JSON.stringify(payload) }),
+  inspectReturnEquipment: (
+    id: string,
+    payload: { result: 'normal' | 'damaged' | 'incomplete'; note?: string; photos?: string[] },
+  ) =>
+    request<RequestWithTimeline>(`/requests/${id}/inspect-return`, { method: 'POST', body: JSON.stringify(payload) }),
   handover: (
     id: string,
     payload: {
