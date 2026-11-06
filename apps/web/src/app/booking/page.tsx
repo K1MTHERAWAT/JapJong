@@ -28,6 +28,7 @@ import {
   OfficialGovFormDocument,
   SignatureBox,
   Stepper,
+  ThumbnailImage,
   TimePickerField,
   equipmentIconName,
   venueIconName,
@@ -846,15 +847,11 @@ export default function BookingWizardPage() {
                       </div>
                     )}
                     <div className="h-28 sm:h-36 bg-brand-mint text-brand flex items-center justify-center overflow-hidden">
-                      {v.images?.[0] ? (
-                        <img
-                          src={v.images[0]}
-                          alt={v.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Icon name={venueIconName(v.type)} className="w-8 h-8 sm:w-10 sm:h-10" strokeWidth={1.6} />
-                      )}
+                      <ThumbnailImage
+                        src={v.images?.[0]}
+                        alt={v.name}
+                        iconName={venueIconName(v.type)}
+                      />
                     </div>
                     <div className="p-3 flex flex-col gap-1">
                       <b className="text-[14px] sm:text-[15px] text-ink truncate">{v.name}</b>
@@ -884,11 +881,12 @@ export default function BookingWizardPage() {
               selectedVenues.map((v) => (
                 <div key={v.id} className="border border-line rounded-2xl p-3 flex items-center gap-3">
                   <div className="w-12 h-12 rounded-2xl bg-brand-mint text-brand flex items-center justify-center shrink-0 overflow-hidden">
-                    {v.images?.[0] ? (
-                      <img src={v.images[0]} alt={v.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <Icon name={venueIconName(v.type)} className="w-6 h-6" />
-                    )}
+                    <ThumbnailImage
+                      src={v.images?.[0]}
+                      alt={v.name}
+                      iconName={venueIconName(v.type)}
+                      fallbackClassName="w-6 h-6"
+                    />
                   </div>
                   <div className="min-w-0 flex-1">
                     <b className="block text-[14px] truncate">{v.name}</b>
@@ -1224,11 +1222,12 @@ export default function BookingWizardPage() {
                           isSelected ? 'bg-brand text-white' : 'bg-brand-mint text-brand'
                         }`}
                       >
-                        {eq.images?.[0] ? (
-                          <img src={eq.images[0]} alt={eq.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <Icon name={equipmentIconName(eq.category)} className="w-6 h-6" />
-                        )}
+                        <ThumbnailImage
+                          src={eq.images?.[0]}
+                          alt={eq.name}
+                          iconName={equipmentIconName(eq.category)}
+                          fallbackClassName="w-6 h-6"
+                        />
                       </div>
                       <div className="flex-1 min-w-0">
                         <b className="block text-[15px] text-ink truncate">{eq.name}</b>

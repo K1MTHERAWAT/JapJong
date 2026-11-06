@@ -1393,3 +1393,37 @@ export function OfficialGovFormDocument({
     </div>
   );
 }
+
+export function ThumbnailImage({
+  src,
+  alt,
+  iconName,
+  className = 'w-full h-full object-cover',
+  fallbackClassName = 'w-8 h-8 sm:w-10 sm:h-10',
+}: {
+  src?: string | null;
+  alt: string;
+  iconName: IconName;
+  className?: string;
+  fallbackClassName?: string;
+}) {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [src]);
+
+  if (!src || hasError) {
+    return <Icon name={iconName} className={fallbackClassName} strokeWidth={1.6} />;
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      onError={() => setHasError(true)}
+    />
+  );
+}
+

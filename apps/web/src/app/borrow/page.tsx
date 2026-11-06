@@ -20,6 +20,7 @@ import {
   OfficialGovFormDocument,
   SignatureBox,
   Stepper,
+  ThumbnailImage,
   equipmentIconName,
 } from '@/components/ui';
 import { api, formatThaiDate } from '@/lib/api';
@@ -623,11 +624,11 @@ export default function BorrowWizardPage() {
 
                     <div>
                       <div className="h-28 sm:h-36 bg-brand-mint text-brand flex items-center justify-center overflow-hidden">
-                        {eq.images?.[0] ? (
-                          <img src={eq.images[0]} alt={eq.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <Icon name={equipmentIconName(eq.category)} className="w-8 h-8 sm:w-10 sm:h-10" strokeWidth={1.6} />
-                        )}
+                        <ThumbnailImage
+                          src={eq.images?.[0]}
+                          alt={eq.name}
+                          iconName={equipmentIconName(eq.category)}
+                        />
                       </div>
 
                       <div className="p-3 flex flex-col gap-1">
@@ -702,11 +703,12 @@ export default function BorrowWizardPage() {
                 {selectedItems.map(({ eq, qty }) => (
                   <div key={eq.id} className="border border-line rounded-2xl p-3 flex items-center gap-3 bg-white">
                     <div className="w-12 h-12 rounded-2xl bg-brand-mint text-brand flex items-center justify-center shrink-0 overflow-hidden">
-                      {eq.images?.[0] ? (
-                        <img src={eq.images[0]} alt={eq.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <Icon name={equipmentIconName(eq.category)} className="w-6 h-6" />
-                      )}
+                      <ThumbnailImage
+                        src={eq.images?.[0]}
+                        alt={eq.name}
+                        iconName={equipmentIconName(eq.category)}
+                        fallbackClassName="w-6 h-6"
+                      />
                     </div>
                     <div className="min-w-0 flex-1">
                       <b className="block text-[14px] truncate" title={eq.name}>{eq.name}</b>

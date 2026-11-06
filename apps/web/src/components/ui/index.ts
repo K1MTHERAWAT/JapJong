@@ -19,6 +19,7 @@ export {
   SignaturePreviewCard,
   PinKeypad,
   OfficialGovFormDocument,
+  ThumbnailImage,
 } from '../ui-widgets';
 
 export { DatePickerField, TimePickerField } from '../date-time-picker';
