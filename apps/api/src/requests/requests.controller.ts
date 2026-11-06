@@ -382,13 +382,14 @@ export class RequestsController {
       // ตรวจสอบความซ้ำซ้อนอีกครั้งก่อนบันทึกแบบ atomic
       this.validatePeriodsAndVenues(venueIds, periods);
 
+      const walkInRequesterId = `u-walkin-${code.toLowerCase()}`;
       const req: BookingRequest = {
         id: `r-${code.toLowerCase()}`,
         code,
         type: 'booking',
         status: 'pending_staff',
         approvalRound: 1,
-        requesterId: isWalkIn ? body.requesterId ?? user.id : user.id,
+        requesterId: isWalkIn ? body.requesterId || walkInRequesterId : user.id,
         requesterName: body.requesterName?.trim() || user.name,
         requesterPhone: body.requesterPhone ? String(body.requesterPhone).trim().slice(0, 40) : (isWalkIn ? undefined : user.phone),
         requesterSignature: requesterSig,
@@ -465,13 +466,14 @@ export class RequestsController {
       // ตรวจสอบสต็อกซ้ำอีกครั้งก่อนบันทึกแบบ atomic
       this.validateBorrowInventory(items, pickupDate, returnDate);
 
+      const walkInRequesterId = `u-walkin-${code.toLowerCase()}`;
       const req: BorrowRequest = {
         id: `r-${code.toLowerCase()}`,
         code,
         type: 'borrow',
         status: 'pending_staff',
         approvalRound: 1,
-        requesterId: isWalkIn ? body.requesterId ?? user.id : user.id,
+        requesterId: isWalkIn ? body.requesterId || walkInRequesterId : user.id,
         requesterName: body.requesterName?.trim() || user.name,
         requesterPhone: body.requesterPhone ? String(body.requesterPhone).trim().slice(0, 40) : (isWalkIn ? undefined : user.phone),
         requesterSignature: requesterSig,
@@ -545,13 +547,14 @@ export class RequestsController {
       attachments.length > 0
         ? attachments.length
         : Math.max(0, Math.min(3, Math.floor(Number(body.photos ?? 0)) || 0));
+    const walkInRequesterId = `u-walkin-${code.toLowerCase()}`;
     const req: RepairRequest = {
       id: `r-${code.toLowerCase()}`,
       code,
       type: 'repair',
       status: 'repair_submitted',
       approvalRound: 1,
-      requesterId: isWalkIn ? body.requesterId ?? user.id : user.id,
+      requesterId: isWalkIn ? body.requesterId || walkInRequesterId : user.id,
       requesterName: (isWalkIn ? body.requesterName?.trim() : body.requesterName?.trim()) || user.name,
       requesterPhone: body.requesterPhone ? String(body.requesterPhone).trim().slice(0, 40) : (isWalkIn ? undefined : user.phone),
       requesterSignature: requesterSig,
@@ -600,8 +603,11 @@ export class RequestsController {
       throw new ForbiddenException(check.reason || 'ไม่มีสิทธิ์ลงนามคำขอนี้ในระดับปัจจุบัน');
     }
 
-    // Separation of Duties (SoD): ห้ามตนเองอนุมัติคำขอของตนเอง
-    if (req.requesterId === user.id) {
+    // Separation of Duties (SoD): ห้ามตนเองอนุมัติคำขอของตนเอง (ยกเว้นคำขอ Walk-in ที่เจ้าหน้าที่กรอกแทนผู้มาติดต่อ โดยผู้ขอจริงไม่ใช่ตนเอง)
+    const isOwnRequest =
+      req.requesterId === user.id &&
+      (!req.createdByStaffId || (req.requesterName && user.name && req.requesterName.trim() === user.name.trim()));
+    if (isOwnRequest) {
       throw new ForbiddenException('ไม่สามารถลงนามอนุมัติคำขอของตนเองได้ (หลักการ Separation of Duties)');
     }
     // Separation of Duties (SoD): ห้ามบุคคลเดิมลงนามซ้ำข้ามระดับในคำขอเดียวกัน

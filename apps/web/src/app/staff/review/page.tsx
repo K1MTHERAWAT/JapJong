@@ -114,7 +114,8 @@ export default function StaffReviewPage() {
         setErrorMsg(msg);
       } else {
         setErrorMsg(msg);
-        setShowPinModal(false);
+        setPinError(msg);
+        setPin('');
       }
     } finally {
       setSubmitting(false);
@@ -214,6 +215,23 @@ export default function StaffReviewPage() {
               ปิด
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Alert ข้อความแจ้งเตือนข้อผิดพลาด (ถ้ามี) */}
+      {errorMsg && !otpStep && (
+        <div className="jw-card bg-red-50 border border-red-200 p-4 flex items-center justify-between gap-3 text-red-700 text-[13px] rounded-2xl animate-fade-in">
+          <div className="flex items-center gap-2.5">
+            <Icon name="alert-triangle" className="w-5 h-5 text-red-600 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setErrorMsg('')}
+            className="text-red-500 hover:text-red-800 text-caption font-semibold"
+          >
+            ปิด
+          </button>
         </div>
       )}
 

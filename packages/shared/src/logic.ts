@@ -159,14 +159,24 @@ export interface SignAccessCheck {
 }
 
 export function canSignRequest(
-  account: (Pick<Account, 'role' | 'permissions'> & { id?: string }) | null | undefined,
-  req: Pick<AnyRequest, 'type' | 'status'> & { requesterId?: string; signatures?: { signerId: string; decision: string }[] },
+  account: (Pick<Account, 'role' | 'permissions'> & { id?: string; name?: string }) | null | undefined,
+  req: Pick<AnyRequest, 'type' | 'status'> & {
+    requesterId?: string;
+    requesterName?: string;
+    createdByStaffId?: string;
+    signatures?: { signerId: string; decision: string }[];
+  },
 ): SignAccessCheck {
   if (!account) {
     return { allowed: false, reason: 'กรุณาเข้าสู่ระบบก่อนลงนาม' };
   }
-  // Separation of Duties: ห้ามตนเองอนุมัติคำขอตนเอง
-  if (account.id && req.requesterId && account.id === req.requesterId) {
+  // Separation of Duties: ห้ามตนเองอนุมัติคำขอตนเอง (ยกเว้นคำขอ Walk-in ที่เจ้าหน้าที่กรอกแทนผู้มาติดต่อ โดยผู้ขอจริงไม่ใช่เจ้าหน้าที่)
+  const isOwnRequest =
+    account.id &&
+    req.requesterId &&
+    account.id === req.requesterId &&
+    (!req.createdByStaffId || (req.requesterName && account.name && req.requesterName.trim() === account.name.trim()));
+  if (isOwnRequest) {
     return {
       allowed: false,
       reason: 'ไม่สามารถลงนามอนุมัติคำขอของตนเองได้ (Separation of Duties)',
