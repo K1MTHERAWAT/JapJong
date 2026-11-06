@@ -90,7 +90,6 @@ describe('Navigation Menu Access Control (getVisibleNav)', () => {
 
     // Citizens cannot see staff or approver menus
     expect(visible.some((i) => i.href === '/staff/review')).toBe(false);
-    expect(visible.some((i) => i.href === '/staff/handover')).toBe(false);
     expect(visible.some((i) => i.href === '/approver')).toBe(false);
     expect(visible.some((i) => i.href === '/admin')).toBe(false);
     expect(visible.some((i) => i.href === '/admin/line')).toBe(false);
@@ -130,6 +129,5 @@ describe('Navigation Menu Access Control (getVisibleNav)', () => {
     expect(visible.some((i) => i.href === '/borrow')).toBe(false);
     expect(visible.some((i) => i.href === '/repair')).toBe(false);
     expect(visible.some((i) => i.href === '/staff/review')).toBe(false);
-    expect(visible.some((i) => i.href === '/staff/handover')).toBe(false);
   });
 });

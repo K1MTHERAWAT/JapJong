@@ -120,7 +120,6 @@ export const ROLE_META: Record<Role, RoleMetaInfo> = {
 
 export const PERMISSION_KEYS: PermissionKey[] = [
   'review',
-  'handover',
   'walkIn',
   'manageResources',
   'sign',

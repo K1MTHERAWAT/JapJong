@@ -110,18 +110,7 @@ export function computeTimeline(req: AnyRequest): TimelineStep[] {
       },
     ];
   }
-  const steps = approvalTimeline(req);
-  if (req.type === 'borrow' && ['borrowing', 'return_inspect', 'returned'].includes(req.status)) {
-    steps.push({ key: 'pickup', label: 'รับอุปกรณ์', at: `${req.pickupDate}T09:00:00+07:00`, state: 'done' });
-    steps.push({
-      key: 'return',
-      label: 'แจ้งคืน / ตรวจสภาพ',
-      at: req.returnRequestedAt,
-      state: req.status === 'returned' ? 'done' : req.status === 'return_inspect' ? 'current' : 'todo',
-      note: req.status === 'return_inspect' ? 'รอเจ้าหน้าที่ตรวจสภาพ' : undefined,
-    });
-  }
-  return steps;
+  return approvalTimeline(req);
 }
 
 export function describeRequest(
@@ -322,21 +311,7 @@ export function canAccessRoute(
     };
   }
 
-  // 5. หน้ารับมอบ-คืนอุปกรณ์ (/staff/handover)
-  if (pathname.startsWith('/staff/handover')) {
-    const ok = (account.role === 'STAFF' || account.role === 'ADMIN') && hasPermission(account, 'handover');
-    return {
-      allowed: ok,
-      title: 'เช็คลิสต์รับมอบ–รับคืนอุปกรณ์',
-      requiredRoles: ['STAFF', 'ADMIN'],
-      requiredPermission: 'handover',
-      reason: ok
-        ? undefined
-        : `ต้องมีบทบาทเจ้าหน้าที่/แอดมิน และเปิดสิทธิ์ "${PERMISSION_LABEL.handover}"`,
-    };
-  }
-
-  // 6. หน้ากรอกคำขอแทนผู้มาติดต่อ (/staff/walk-in)
+  // 5. หน้ากรอกคำขอแทนผู้มาติดต่อ (/staff/walk-in)
   if (pathname.startsWith('/staff/walk-in')) {
     const ok = (account.role === 'STAFF' || account.role === 'ADMIN') && hasPermission(account, 'walkIn');
     return {

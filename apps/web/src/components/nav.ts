@@ -97,7 +97,6 @@ export function getVisibleNav(account: PublicAccount | null): NavItem[] {
         '/notifications',
         '/account',
         '/staff/review',
-        '/staff/handover',
         '/staff/walk-in',
         '/staff/verify',
       ].includes(item.href);

@@ -257,7 +257,7 @@ export default function AdminPermissionsPage() {
                             <div>
                               <div className="flex items-center justify-between mb-1">
                                 <label className="jw-lbl mb-0">
-                                  2. กำหนดสิทธิ์ย่อยรายเมนูและ API (Permissions 6 รายการ)
+                                  2. กำหนดสิทธิ์ย่อยรายเมนูและ API (Permissions {PERMISSION_KEYS.length} รายการ)
                                 </label>
                                 <button
                                   type="button"
@@ -469,7 +469,7 @@ export default function AdminPermissionsPage() {
                     ลงนาม &ldquo;อนุมัติ&rdquo; ขั้นสุดท้ายด้วยลายเซ็นดิจิทัล + PIN 6 หลัก และออกใบอนุญาต PDF อัตโนมัติ
                   </span>
                   <span className="text-[11.5px] text-ink-mute mt-1">
-                    สถานะคำขอ: <code>pending_l1</code> → <code>approved / borrowing</code>
+                    สถานะคำขอ: <code>pending_l1</code> → <code>approved</code>
                   </span>
                 </div>
               </div>

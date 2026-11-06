@@ -309,52 +309,6 @@ export default function RequestDetailPage() {
               </div>
             </div>
           )}
-
-          {req.type !== 'repair' && (req.handoverBefore || req.handoverAfter) && (
-            <div className="pt-2 border-t border-line flex flex-col gap-2">
-              <span className="text-[12px] font-semibold text-ink-mute">
-                ลายมือชื่อการส่งมอบและตรวจรับคืน (2 ฝ่าย)
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {req.handoverBefore && (
-                  <>
-                    <SignaturePreviewCard
-                      roleLabel="รับมอบก่อนใช้ · 1. ผู้รับมอบ"
-                      signerName={req.requesterName}
-                      signature={req.handoverBefore.citizenSignature}
-                      signedAt={formatThaiDateTime(req.handoverBefore.at)}
-                      status="signed"
-                    />
-                    <SignaturePreviewCard
-                      roleLabel="รับมอบก่อนใช้ · 2. เจ้าหน้าที่ผู้ส่งมอบ"
-                      signerName={req.handoverBefore.staffName || 'นางสาวสุดา รอบคอบ'}
-                      signature={req.handoverBefore.staffSignature}
-                      signedAt={formatThaiDateTime(req.handoverBefore.at)}
-                      status="signed"
-                    />
-                  </>
-                )}
-                {req.handoverAfter && (
-                  <>
-                    <SignaturePreviewCard
-                      roleLabel="ตรวจรับคืน · 1. ผู้ส่งคืน"
-                      signerName={req.requesterName}
-                      signature={req.handoverAfter.citizenSignature}
-                      signedAt={formatThaiDateTime(req.handoverAfter.at)}
-                      status="signed"
-                    />
-                    <SignaturePreviewCard
-                      roleLabel="ตรวจรับคืน · 2. เจ้าหน้าที่ผู้ตรวจรับคืน"
-                      signerName={req.handoverAfter.staffName || 'นางสาวสุดา รอบคอบ'}
-                      signature={req.handoverAfter.staffSignature}
-                      signedAt={formatThaiDateTime(req.handoverAfter.at)}
-                      status="signed"
-                    />
-                  </>
-                )}
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="jw-card p-5 flex flex-col gap-3">

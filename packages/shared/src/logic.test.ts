@@ -359,11 +359,6 @@ describe('Logic & Permissions Unit Tests', () => {
       expect(canAccessRoute(dummyCitizen, '/staff/review').allowed).toBe(false);
     });
 
-    it('checks /staff/handover access', () => {
-      expect(canAccessRoute(dummyStaff, '/staff/handover').allowed).toBe(true);
-      expect(canAccessRoute(dummyCitizen, '/staff/handover').allowed).toBe(false);
-    });
-
     it('checks /staff/walk-in access', () => {
       expect(canAccessRoute(dummyStaff, '/staff/walk-in').allowed).toBe(true);
       expect(canAccessRoute(dummyCitizen, '/staff/walk-in').allowed).toBe(false);
@@ -505,11 +500,10 @@ describe('Logic & Permissions Unit Tests', () => {
       expect(lastStep.state).toBe('rejected');
     });
 
-    it('computes timeline for borrow request with pickup and return steps', () => {
+    it('computes timeline for borrow request ending at issue step', () => {
       const timeline = computeTimeline(borrowReq);
       const keys = timeline.map((t) => t.key);
-      expect(keys).toContain('pickup');
-      expect(keys).toContain('return');
+      expect(keys).toEqual(['submit', 'staff', 'l2', 'l1', 'issue']);
     });
 
     it('computes timeline for repair request with repair steps', () => {
