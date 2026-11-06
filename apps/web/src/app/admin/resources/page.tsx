@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   EQUIPMENT_CATEGORY_LABEL,
   Equipment,
@@ -12,23 +13,44 @@ import { roleHomePath, useAuth } from '@/components/auth-context';
 import { Icon } from '@/components/icons';
 import { AppShell } from '@/components/shell';
 import { OfficialGovFormDocument, Tabs, Toggle } from '@/components/ui';
+import { OfficialDocumentEditor } from '@/components/official-document-editor';
 import { api } from '@/lib/api';
+import {
+  FormTemplateItem,
+  deleteCustomFormTemplate,
+  getFormTemplates,
+  saveNewFormTemplate,
+} from '@/lib/forms-store';
 
 type ResourceTab = 'venues' | 'equipment' | 'vehicles' | 'forms';
 
-export default function ManageResourcesPage() {
+function ManageResourcesContent() {
   const { account } = useAuth();
-  const [tab, setTab] = useState<ResourceTab>('venues');
+  const searchParams = useSearchParams();
+  const initialTab = (searchParams.get('tab') as ResourceTab) || 'venues';
+
+  const [tab, setTab] = useState<ResourceTab>(initialTab);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
-  const [selectedForm, setSelectedForm] = useState<'venue' | 'borrow' | 'repair'>('venue');
+
+  // Forms management
+  const [formsList, setFormsList] = useState<FormTemplateItem[]>([]);
+  const [selectedFormKey, setSelectedFormKey] = useState<string>('venue');
   const [formPreviewMode, setFormPreviewMode] = useState<'sample' | 'blank'>('sample');
+  const [showDocEditor, setShowDocEditor] = useState(false);
+  const [isCreatingNewForm, setIsCreatingNewForm] = useState(false);
   const [previewImg, setPreviewImg] = useState<string | null>(null);
 
-  const load = useCallback(() => {
-    api.venues().then(setVenues).catch(() => { });
-    api.equipment().then(setEquipment).catch(() => { });
+  const loadForms = useCallback(() => {
+    const list = getFormTemplates();
+    setFormsList(list);
   }, []);
+
+  const load = useCallback(() => {
+    api.venues().then(setVenues).catch(() => {});
+    api.equipment().then(setEquipment).catch(() => {});
+    loadForms();
+  }, [loadForms]);
 
   useEffect(() => {
     load();
@@ -44,6 +66,18 @@ export default function ManageResourcesPage() {
     load();
   };
 
+  const handleDeleteForm = (id: string, title: string) => {
+    if (window.confirm(`คุณต้องการลบแบบฟอร์ม "${title}" ออกจากระบบใช่หรือไม่?`)) {
+      deleteCustomFormTemplate(id);
+      loadForms();
+      if (selectedFormKey === id) {
+        setSelectedFormKey('venue');
+      }
+    }
+  };
+
+  const currentSelectedForm = formsList.find((f) => f.id === selectedFormKey) || formsList[0];
+
   return (
     <AppShell
       title="ทรัพยากรและแบบฟอร์ม"
@@ -51,9 +85,22 @@ export default function ManageResourcesPage() {
       rightLabel={account?.nickname || 'สุดา'}
       maxWidth="max-w-[960px]"
       footer={
-        <Link href="/admin/resources/new" className="jw-btn w-full sm:w-56">
-          + เพิ่มรายการ
-        </Link>
+        tab === 'forms' ? (
+          <button
+            type="button"
+            onClick={() => {
+              setIsCreatingNewForm(true);
+              setShowDocEditor(true);
+            }}
+            className="jw-btn w-full sm:w-56 shadow-sm"
+          >
+            + เพิ่มแบบฟอร์มใหม่
+          </button>
+        ) : (
+          <Link href="/admin/resources/new" className="jw-btn w-full sm:w-56">
+            + เพิ่มรายการ
+          </Link>
+        )
       }
     >
       <div className="flex flex-col gap-3.5">
@@ -78,8 +125,9 @@ export default function ManageResourcesPage() {
               venues.map((v, i) => (
                 <div
                   key={v.id}
-                  className={`p-4 rounded-2xl border bg-white flex flex-col gap-2.5 ${i === 0 ? 'border-ink bg-brand-mint/40' : 'border-line'
-                    }`}
+                  className={`p-4 rounded-2xl border bg-white flex flex-col gap-2.5 ${
+                    i === 0 ? 'border-ink bg-brand-mint/40' : 'border-line'
+                  }`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
@@ -89,6 +137,7 @@ export default function ManageResourcesPage() {
                           onClick={() => setPreviewImg(v.images![0])}
                           className="w-12 h-12 rounded-xl overflow-hidden border border-line shrink-0"
                         >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={v.images[0]} alt={v.name} className="w-full h-full object-cover" />
                         </button>
                       )}
@@ -100,32 +149,16 @@ export default function ManageResourcesPage() {
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2.5 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0">
                       <Link
                         href={`/admin/resources/edit?id=${v.id}&kind=venue`}
-                        className="h-8 px-2.5 rounded-full border border-line bg-white hover:border-brand hover:text-brand text-ink text-[12px] font-semibold inline-flex items-center gap-1 transition"
-                        title="แก้ไขสถานที่"
+                        className="px-3 py-1.5 rounded-xl border border-line text-[12px] font-semibold text-ink hover:bg-soft transition"
                       >
-                        <Icon name="edit" className="w-3.5 h-3.5" />
-                        <span>แก้ไข</span>
+                        แก้ไข
                       </Link>
-                      <Toggle checked={v.enabled} onChange={(next) => toggleVenue(v, next)} />
+                      <Toggle checked={v.enabled} onChange={(val) => toggleVenue(v, val)} />
                     </div>
                   </div>
-                  {v.images && v.images.length > 1 && (
-                    <div className="flex gap-2">
-                      {v.images.map((src, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => setPreviewImg(src)}
-                          className="w-14 h-14 rounded-xl overflow-hidden border border-line hover:ring-2 hover:ring-brand transition"
-                        >
-                          <img src={src} alt={`${v.name} ${idx + 1}`} className="w-full h-full object-cover" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
               ))
             )}
@@ -136,55 +169,42 @@ export default function ManageResourcesPage() {
           <div className="flex flex-col gap-2.5">
             {equipment.length === 0 ? (
               <div className="jw-card p-6 text-center text-[14px] text-ink-mute">
-                ยังไม่มีรายการอุปกรณ์ / ครุภัณฑ์ สามารถกด <b>+ เพิ่มรายการ</b> ด้านล่างเพื่อเพิ่มอุปกรณ์ใหม่
+                ยังไม่มีรายการอุปกรณ์ สามารถกด <b>+ เพิ่มรายการ</b> ด้านล่างเพื่อเพิ่มอุปกรณ์ใหม่
               </div>
             ) : (
               equipment.map((e) => (
-                <div key={e.id} className="p-4 rounded-2xl border border-line bg-white flex flex-col gap-2.5">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {e.images?.[0] && (
-                        <button
-                          type="button"
-                          onClick={() => setPreviewImg(e.images![0])}
-                          className="w-12 h-12 rounded-xl overflow-hidden border border-line shrink-0"
-                        >
-                          <img src={e.images[0]} alt={e.name} className="w-full h-full object-cover" />
-                        </button>
-                      )}
-                      <div className="min-w-0">
-                        <b className="text-[15px] text-ink block truncate">{e.name}</b>
-                        <span className="text-[13px] text-ink-mute block">
-                          {EQUIPMENT_CATEGORY_LABEL[e.category]} · คงเหลือ {e.stock} รายการ
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2.5 shrink-0">
-                      <Link
-                        href={`/admin/resources/edit?id=${e.id}&kind=equipment`}
-                        className="h-8 px-2.5 rounded-full border border-line bg-white hover:border-brand hover:text-brand text-ink text-[12px] font-semibold inline-flex items-center gap-1 transition"
-                        title="แก้ไขอุปกรณ์"
+                <div
+                  key={e.id}
+                  className="p-4 rounded-2xl border border-line bg-white flex items-center justify-between gap-3"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    {e.images?.[0] && (
+                      <button
+                        type="button"
+                        onClick={() => setPreviewImg(e.images![0])}
+                        className="w-12 h-12 rounded-xl overflow-hidden border border-line shrink-0"
                       >
-                        <Icon name="edit" className="w-3.5 h-3.5" />
-                        <span>แก้ไข</span>
-                      </Link>
-                      <Toggle checked={e.enabled} onChange={(next) => toggleEquipment(e, next)} />
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={e.images[0]} alt={e.name} className="w-full h-full object-cover" />
+                      </button>
+                    )}
+                    <div className="min-w-0">
+                      <b className="text-[15px] text-ink block truncate">{e.name}</b>
+                      <span className="text-[13px] text-ink-mute block">
+                        หมวด: {EQUIPMENT_CATEGORY_LABEL[e.category]} · คงเหลือ {e.stock} ชิ้น
+                        {!e.enabled ? ' · ปิดให้ยืมชั่วคราว' : ''}
+                      </span>
                     </div>
                   </div>
-                  {e.images && e.images.length > 1 && (
-                    <div className="flex gap-2">
-                      {e.images.map((src, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => setPreviewImg(src)}
-                          className="w-14 h-14 rounded-xl overflow-hidden border border-line hover:ring-2 hover:ring-brand transition"
-                        >
-                          <img src={src} alt={`${e.name} ${idx + 1}`} className="w-full h-full object-cover" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Link
+                      href={`/admin/resources/edit?id=${e.id}&kind=equipment`}
+                      className="px-3 py-1.5 rounded-xl border border-line text-[12px] font-semibold text-ink hover:bg-soft transition"
+                    >
+                      แก้ไข
+                    </Link>
+                    <Toggle checked={e.enabled} onChange={(val) => toggleEquipment(e, val)} />
+                  </div>
                 </div>
               ))
             )}
@@ -192,81 +212,136 @@ export default function ManageResourcesPage() {
         )}
 
         {tab === 'vehicles' && (
-          <div className="jw-card p-6 text-center text-[14px] text-ink-mute">
-            ยังไม่มีรายการยานพาหนะ สามารถกด <b>+ เพิ่มรายการ</b> ด้านล่างเพื่อเพิ่มทรัพยากรใหม่
+          <div className="jw-card p-8 text-center flex flex-col items-center gap-3">
+            <span className="text-3xl">🚐</span>
+            <b className="text-[16px] text-ink">ระบบจองยานพาหนะส่วนกลาง</b>
+            <p className="text-[13px] text-ink-mute max-w-md">
+              สามารถเปิดใช้งานแบบฟอร์มขอใช้ยานพาหนะและกำหนดสายอนุมัติสำหรับรถตู้ รถกระบะ และรถบรรทุกน้ำของทางราชการได้
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setIsCreatingNewForm(true);
+                setShowDocEditor(true);
+              }}
+              className="mt-2 jw-btn px-4 py-2 text-xs"
+            >
+              + สร้างแบบฟอร์มขอใช้ยานพาหนะ
+            </button>
           </div>
         )}
 
+        {/* ================= TAB === 'forms' ================= */}
         {tab === 'forms' && (
           <div className="flex flex-col gap-4">
+            {/* Header + Add Form Button */}
+            <div className="flex items-center justify-between pb-1">
+              <div>
+                <b className="text-[16px] text-ink block">รายการแบบฟอร์มในระบบ ({formsList.length})</b>
+                <span className="text-[12px] text-ink-mute">
+                  สามารถเลือกดูตัวอย่าง หรือกดเพิ่มแบบฟอร์มราชการใหม่ได้
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreatingNewForm(true);
+                  setShowDocEditor(true);
+                }}
+                className="px-3.5 py-1.5 rounded-xl border border-brand bg-brand-mint text-brand text-[12.5px] font-semibold hover:bg-brand hover:text-white transition flex items-center gap-1.5 shadow-xs"
+              >
+                <Icon name="plus" className="w-3.5 h-3.5" />
+                <span>+ เพิ่มแบบฟอร์มใหม่</span>
+              </button>
+            </div>
+
+            {/* List of Forms */}
             <div className="flex flex-col gap-2.5">
-              {(
-                [
-                  {
-                    key: 'venue',
-                    title: 'แบบขอใช้สถานที่ราชการ',
-                    sub: 'เรื่อง ขออนุญาตใช้สถานที่ราชการ · อนุมัติ 3 ระดับ',
-                  },
-                  {
-                    key: 'borrow',
-                    title: 'แบบคำขอใช้อุปกรณ์ราชการ',
-                    sub: 'เรื่อง ขออนุญาตใช้อุปกรณ์ของทางราชการ · อนุมัติ 3 ระดับ · สร้าง PDF อัตโนมัติ',
-                  },
-                  {
-                    key: 'repair',
-                    title: 'แบบแจ้งปัญหา / ซ่อมบำรุงสาธารณูปโภค',
-                    sub: 'แจ้งปัญหาพร้อมรูปประกอบ · เส้นเวลาติดตาม 4 ขั้นตอน',
-                  },
-                ] as const
-              ).map((f) => {
-                const active = selectedForm === f.key;
+              {formsList.map((f) => {
+                const active = selectedFormKey === f.id;
                 return (
-                  <button
-                    key={f.key}
-                    type="button"
-                    onClick={() => setSelectedForm(f.key)}
-                    className={`p-4 rounded-2xl border text-left transition flex items-center justify-between ${active
+                  <div
+                    key={f.id}
+                    onClick={() => setSelectedFormKey(f.id)}
+                    className={`p-4 rounded-2xl border text-left transition flex items-center justify-between cursor-pointer ${
+                      active
                         ? 'border-brand ring-2 ring-brand bg-brand-mint/40'
                         : 'border-line bg-white hover:bg-soft/40'
-                      }`}
+                    }`}
                   >
-                    <div>
-                      <b className="block text-[15px] text-ink">{f.title}</b>
-                      <span className="text-[12px] text-ink-mute">{f.sub}</span>
+                    <div className="min-w-0 pr-3">
+                      <div className="flex items-center gap-2">
+                        <b className="text-[15px] text-ink truncate">{f.title}</b>
+                        {f.isCustom && (
+                          <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-brand text-white shrink-0">
+                            สร้างขึ้นใหม่
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[12px] text-ink-mute block truncate">{f.sub}</span>
                     </div>
-                    <span className="text-[12px] font-semibold text-brand shrink-0">
-                      {active ? 'กำลังแสดงตัวอย่าง' : 'แตะเพื่อดูแบบฟอร์ม'}
-                    </span>
-                  </button>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[12px] font-semibold text-brand">
+                        {active ? 'กำลังแสดงตัวอย่าง' : 'แตะเพื่อดู'}
+                      </span>
+                      {f.isCustom && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteForm(f.id, f.title);
+                          }}
+                          className="w-7 h-7 rounded-lg hover:bg-red-50 text-red-500 flex items-center justify-center transition"
+                          title="ลบแบบฟอร์มนี้"
+                        >
+                          <Icon name="trash" className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
             </div>
 
-            {selectedForm !== 'repair' && (
+            {/* Document Preview & Editor Trigger */}
+            {selectedFormKey !== 'repair' && (
               <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <b className="text-[15px] text-ink">
-                    ตัวอย่างหน้ากระดาษราชการ (
-                    {selectedForm === 'venue' ? 'แบบขอใช้สถานที่ราชการ.doc' : 'แบบคำขอยืมครุภัณฑ์ราชการ'})
-                  </b>
-                  <div className="flex gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <b className="text-[15px] text-ink">
+                      ตัวอย่างหน้ากระดาษราชการ ({currentSelectedForm?.title || 'แบบฟอร์มราชการ'})
+                    </b>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setShowDocEditor(true)}
+                      className="px-3.5 py-1.5 rounded-full text-[12px] font-semibold bg-brand text-white hover:bg-brand/90 transition flex items-center gap-1.5 shadow-sm"
+                      title="เปิดตัวแก้ไขแบบฟอร์มเชิงโต้ตอบ (WYSIWYG Interactive Editor)"
+                    >
+                      <Icon name="edit" className="w-3.5 h-3.5" />
+                      <span>ปรับแต่ง / แก้ไขแบบฟอร์มนี้</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => setFormPreviewMode('sample')}
-                      className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition ${formPreviewMode === 'sample'
-                          ? 'bg-brand text-white'
-                          : 'bg-brand-mint text-brand hover:bg-brand hover:text-white'
-                        }`}
+                      className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition ${
+                        formPreviewMode === 'sample'
+                          ? 'bg-ink text-white'
+                          : 'bg-soft text-ink hover:bg-ink hover:text-white'
+                      }`}
                     >
-                      -ตัวอย่าง- (นายสุข แสนสบาย)
+                      -ตัวอย่าง-
                     </button>
                     <button
                       type="button"
                       onClick={() => setFormPreviewMode('blank')}
-                      className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition ${formPreviewMode === 'blank'
-                          ? 'bg-brand text-white'
-                          : 'bg-brand-mint text-brand hover:bg-brand hover:text-white'
-                        }`}
+                      className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition ${
+                        formPreviewMode === 'blank'
+                          ? 'bg-ink text-white'
+                          : 'bg-soft text-ink hover:bg-ink hover:text-white'
+                      }`}
                     >
                       แบบฟอร์มเปล่า
                     </button>
@@ -276,28 +351,16 @@ export default function ManageResourcesPage() {
                 <OfficialGovFormDocument
                   blankMode={formPreviewMode === 'blank'}
                   sampleDocMode={formPreviewMode === 'sample'}
-                  customFields={
-                    selectedForm === 'borrow'
-                      ? {
-                        formTitle: 'แบบคำขอยืมครุภัณฑ์ราชการ',
-                        subject: 'ขออนุญาตยืมครุภัณฑ์ของทางราชการ',
-                        desireLabel: 'มีความประสงค์ขอยืมครุภัณฑ์ราชการ ดังนี้',
-                        requesterRoleCaption: 'ผู้ขออนุญาตยืมครุภัณฑ์ราชการ',
-                        purposeItems:
-                          formPreviewMode === 'blank'
-                            ? [
-                              { item: '', forWhat: '' },
-                              { item: '', forWhat: '' },
-                              { item: '', forWhat: '' },
-                            ]
-                            : [
-                              { item: 'เต็นท์ทรงโค้งขาว 4 หลัง', forWhat: 'จัดงานบุญประจำปีหมู่บ้าน' },
-                              { item: 'ชุดเครื่องเสียงเคลื่อนที่ 1 ชุด', forWhat: 'ใช้ประชาสัมพันธ์ภายในงาน' },
-                              { item: 'เก้าอี้พลาสติก 100 ตัว', forWhat: 'รองรับผู้เข้าร่วมกิจกรรม' },
-                            ],
-                      }
-                      : undefined
-                  }
+                  customFields={{
+                    formTitle: currentSelectedForm?.title || 'แบบขอใช้สถานที่ราชการ',
+                    subject: currentSelectedForm?.sub || 'ขออนุญาตใช้สถานที่ราชการ',
+                    desireLabel: currentSelectedForm?.title?.includes('ครุภัณฑ์')
+                      ? 'มีความประสงค์ขอยืมครุภัณฑ์ราชการ ดังนี้'
+                      : 'มีความประสงค์ขอใช้สถานที่ราชการ ดังนี้',
+                    requesterRoleCaption: currentSelectedForm?.title?.includes('ครุภัณฑ์')
+                      ? 'ผู้ขออนุญาตยืมครุภัณฑ์ราชการ'
+                      : 'ผู้ขออนุญาตใช้สถานที่ราชการ',
+                  }}
                 />
               </div>
             )}
@@ -315,6 +378,7 @@ export default function ManageResourcesPage() {
           onClick={() => setPreviewImg(null)}
         >
           <div className="relative max-w-[90vw] max-h-[85vh]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={previewImg} alt="ตัวอย่างรูปภาพ" className="max-w-full max-h-[85vh] rounded-2xl object-contain" />
             <button
               type="button"
@@ -326,6 +390,47 @@ export default function ManageResourcesPage() {
           </div>
         </div>
       )}
+
+      {/* Modal ตัวจัดการและแก้ไขแบบฟอร์มกระดาษราชการ WYSIWYG */}
+      {showDocEditor && (
+        <OfficialDocumentEditor
+          isModal={true}
+          initialFormTitle={
+            isCreatingNewForm
+              ? 'แบบขอใช้สถานที่ราชการ (แบบใหม่)'
+              : currentSelectedForm?.title || 'แบบขอใช้สถานที่ราชการ'
+          }
+          isBorrowMode={currentSelectedForm?.title?.includes('ครุภัณฑ์') || currentSelectedForm?.title?.includes('อุปกรณ์')}
+          onClose={() => {
+            setShowDocEditor(false);
+            setIsCreatingNewForm(false);
+          }}
+          onSave={({ formTitle }) => {
+            const trimmed = formTitle.trim();
+            if (isCreatingNewForm && trimmed) {
+              const saved = saveNewFormTemplate(trimmed);
+              loadForms();
+              setSelectedFormKey(saved.id);
+            }
+            setShowDocEditor(false);
+            setIsCreatingNewForm(false);
+          }}
+        />
+      )}
     </AppShell>
+  );
+}
+
+export default function ManageResourcesPage() {
+  return (
+    <Suspense
+      fallback={
+        <AppShell title="ทรัพยากรและแบบฟอร์ม" rightLabel="แอดมิน">
+          <div className="jw-card p-12 text-center text-ink-mute">กำลังโหลด...</div>
+        </AppShell>
+      }
+    >
+      <ManageResourcesContent />
+    </Suspense>
   );
 }

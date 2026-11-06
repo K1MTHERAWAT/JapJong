@@ -8,11 +8,11 @@ export class StorageController {
   constructor(private readonly storageService: StorageService) {}
 
   @Public()
-  @Get('files/*')
+  @Get('files/*path')
   async serveFile(@Req() req: Request, @Res() res: Response) {
     // Extract key after /api/storage/files/ or /storage/files/
     const prefix = req.baseUrl ? `${req.baseUrl}/files/` : '/storage/files/';
-    let key = req.originalUrl.split(prefix)[1] || req.path.replace(/^\/files\//, '');
+    let key = (req.params as any)?.path || req.originalUrl.split(prefix)[1] || req.path.replace(/^\/files\//, '');
     key = decodeURIComponent(key.split('?')[0]);
 
     const { stream, contentType, contentLength } = await this.storageService.getFile(key);

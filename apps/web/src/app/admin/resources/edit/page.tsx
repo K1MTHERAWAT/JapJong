@@ -13,7 +13,9 @@ import {
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
 import { Chip, Stepper, Tabs, Toggle } from '@/components/ui';
+import { OfficialDocumentEditor } from '@/components/official-document-editor';
 import { api, readAndCompressImages } from '@/lib/api';
+import { FormTemplateItem, getFormTemplates, saveNewFormTemplate } from '@/lib/forms-store';
 
 type Kind = 'venue' | 'equipment';
 const DAYS_TH = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
@@ -45,7 +47,14 @@ function EditResourceContent() {
   const [openDays, setOpenDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [advanceDays, setAdvanceDays] = useState(3);
   const [formName, setFormName] = useState('แบบคำขอใช้สถานที่');
+  const [availableForms, setAvailableForms] = useState<FormTemplateItem[]>([]);
+  const [showDocEditor, setShowDocEditor] = useState(false);
+  const [isCreatingNewForm, setIsCreatingNewForm] = useState(false);
   const [enabled, setEnabled] = useState(true);
+
+  useEffect(() => {
+    setAvailableForms(getFormTemplates());
+  }, []);
   const [approvalOrder, setApprovalOrder] = useState<string[]>([
     'เจ้าหน้าที่ตรวจสอบ',
     'ผู้อนุมัติระดับ 2 (ปลัด อบต.)',
@@ -623,11 +632,44 @@ function EditResourceContent() {
           </div>
 
           <div>
-            <label className="jw-lbl">แบบฟอร์มที่ใช้</label>
-            <select value={formName} onChange={(e) => setFormName(e.target.value)} className="jw-in">
-              <option>แบบคำขอใช้สถานที่</option>
-              <option>แบบคำขอยืมครุภัณฑ์</option>
-            </select>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="jw-lbl mb-0">แบบฟอร์มที่ใช้</label>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreatingNewForm(true);
+                  setShowDocEditor(true);
+                }}
+                className="text-[12px] font-semibold text-brand flex items-center gap-1 hover:underline"
+              >
+                <Icon name="plus" className="w-3.5 h-3.5" />
+                <span>+ เพิ่มแบบฟอร์มใหม่</span>
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <select value={formName} onChange={(e) => setFormName(e.target.value)} className="jw-in flex-1">
+                {availableForms.map((f) => (
+                  <option key={f.id} value={f.title}>
+                    {f.title}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreatingNewForm(false);
+                  setShowDocEditor(true);
+                }}
+                className="px-3.5 py-2 rounded-xl border border-brand bg-brand-mint text-brand text-[13px] font-semibold hover:bg-brand hover:text-white transition flex items-center gap-1.5 shrink-0"
+                title="เปิดตัวจัดการและแก้ไขแบบฟอร์ม"
+              >
+                <Icon name="file-text" className="w-4 h-4" />
+                <span>เปิดตัวจัดการแบบฟอร์ม</span>
+              </button>
+            </div>
+            <p className="text-[12px] text-ink-mute mt-1.5">
+              กด <b>+ เพิ่มแบบฟอร์มใหม่</b> หรือ <b>เปิดตัวจัดการแบบฟอร์ม</b> เพื่อแก้ไขและปรับแต่งเนื้อหากระดาษราชการ
+            </p>
           </div>
 
           <div className="border border-line rounded-2xl p-3.5 flex items-center justify-between bg-white">
@@ -664,6 +706,29 @@ function EditResourceContent() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Modal ตัวจัดการและแก้ไขแบบฟอร์มกระดาษราชการ */}
+      {showDocEditor && (
+        <OfficialDocumentEditor
+          isModal={true}
+          initialFormTitle={
+            isCreatingNewForm
+              ? 'แบบขอใช้สถานที่ราชการ (แบบใหม่)'
+              : formName
+          }
+          isBorrowMode={formName.includes('ครุภัณฑ์') || formName.includes('อุปกรณ์')}
+          onClose={() => setShowDocEditor(false)}
+          onSave={({ formTitle }) => {
+            const trimmed = formTitle.trim();
+            if (isCreatingNewForm && trimmed) {
+              saveNewFormTemplate(trimmed);
+              setAvailableForms(getFormTemplates());
+            }
+            setFormName(trimmed);
+            setShowDocEditor(false);
+          }}
+        />
       )}
 
       {/* Modal ยืนยันการลบรายการ */}

@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { EquipmentCategory, FACILITIES, VENUE_TYPE_LABEL, VenueType } from '@japjong/shared';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
-import { Chip, Stepper, Tabs, Toggle } from '@/components/ui';
+import { Stepper, Tabs, Toggle } from '@/components/ui';
+import { OfficialDocumentEditor } from '@/components/official-document-editor';
 import { api, readAndCompressImages } from '@/lib/api';
+import { FormTemplateItem, getFormTemplates, saveNewFormTemplate } from '@/lib/forms-store';
 
 type Kind = 'venue' | 'equipment';
 const DAYS_TH = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
@@ -17,11 +19,18 @@ export default function AddResourcePage() {
   const [kind, setKind] = useState<Kind>('venue');
   const [mobileStep, setMobileStep] = useState(1);
 
+  // Available forms in system
+  const [availableForms, setAvailableForms] = useState<FormTemplateItem[]>([]);
+
+  useEffect(() => {
+    setAvailableForms(getFormTemplates());
+  }, []);
+
   // รูปภาพจริง (สูงสุด 3 รูป)
   const [images, setImages] = useState<string[]>([]);
   const [previewImg, setPreviewImg] = useState<string | null>(null);
 
-  // Venue / Equipment fields (เริ่มต้นเป็นค่าว่าง ไม่ใช้ Mock)
+  // Venue / Equipment fields (เริ่มต้นเป็นค่าว่าง)
   const [name, setName] = useState('');
   const [venueType, setVenueType] = useState<VenueType>('meeting');
   const [building, setBuilding] = useState('');
@@ -33,6 +42,8 @@ export default function AddResourcePage() {
   const [openDays, setOpenDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [advanceDays, setAdvanceDays] = useState(3);
   const [formName, setFormName] = useState('แบบคำขอใช้สถานที่');
+  const [showDocEditor, setShowDocEditor] = useState(false);
+  const [isCreatingNewForm, setIsCreatingNewForm] = useState(false);
   const [enabled, setEnabled] = useState(true);
   const [approvalOrder, setApprovalOrder] = useState<string[]>([
     'เจ้าหน้าที่ตรวจสอบ',
@@ -181,7 +192,7 @@ export default function AddResourcePage() {
         </div>
       }
     >
-      {/* Header + Tabs สถานที่ / อุปกรณ์ */}
+      {/* Header + Tabs สถานที่ / อุปกรณ์ แบบเดิม */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         <div>
           <h1 className="text-[22px] font-bold text-ink">เพิ่มรายการ</h1>
@@ -226,6 +237,41 @@ export default function AddResourcePage() {
         >
           <div>
             <label className="jw-lbl">รูปภาพ (ไม่เกิน 3 รูป)</label>
+            <p className="text-[12px] text-ink-mute mb-2">แนะนำขนาด 4:3 แนวนอน (สูงสุด 3 รูป)</p>
+            <div className="flex flex-wrap gap-2.5">
+              {images.map((src, i) => (
+                <div
+                  key={i}
+                  className="relative w-24 h-24 rounded-2xl overflow-hidden border border-line group"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={src}
+                    alt={`รูปที่ ${i + 1}`}
+                    className="w-full h-full object-cover cursor-pointer"
+                    onClick={() => setPreviewImg(src)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(i)}
+                    className="w-6 h-6 rounded-full bg-black/70 text-white absolute top-1 right-1 flex items-center justify-center text-[12px] opacity-0 group-hover:opacity-100 transition"
+                  >
+                    <Icon name="x" className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+
+              {images.length < 3 && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-24 h-24 rounded-2xl border-2 border-dashed border-line hover:border-brand flex flex-col items-center justify-center gap-1 text-[12px] text-ink-mute hover:text-brand transition bg-soft/40"
+                >
+                  <Icon name="upload" className="w-5 h-5" />
+                  <span>เพิ่มรูป</span>
+                </button>
+              )}
+            </div>
             <input
               ref={fileInputRef}
               type="file"
@@ -234,53 +280,22 @@ export default function AddResourcePage() {
               onChange={handleSelectFiles}
               className="hidden"
             />
-            <div className="flex flex-wrap gap-3">
-              {images.map((src, idx) => (
-                <div
-                  key={idx}
-                  className="w-20 h-20 rounded-2xl border border-line bg-surface overflow-hidden relative group"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={src}
-                    alt={`รูปที่ ${idx + 1}`}
-                    onClick={() => setPreviewImg(src)}
-                    className="w-full h-full object-cover cursor-pointer"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeImage(idx)}
-                    className="w-5 h-5 rounded-full bg-ink text-white absolute top-1 right-1 flex items-center justify-center shadow"
-                    title="ลบรูปภาพ"
-                  >
-                    <Icon name="x" className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-              {images.length < 3 && (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-20 h-20 rounded-2xl bg-white border-[1.5px] border-dashed border-[#7A7A7A] text-ink-mute text-[12px] flex flex-col items-center justify-center gap-1 hover:border-brand hover:text-brand transition cursor-pointer"
-                >
-                  <Icon name="upload" className="w-5 h-5" />
-                  <span>เพิ่มรูป</span>
-                </button>
-              )}
-            </div>
           </div>
 
           <div>
-            <label className="jw-lbl">{kind === 'venue' ? 'ชื่อสถานที่' : 'ชื่ออุปกรณ์ / ครุภัณฑ์'}</label>
+            <label className="jw-lbl">
+              {kind === 'venue' ? 'ชื่อสถานที่' : 'ชื่ออุปกรณ์ / ครุภัณฑ์'}{' '}
+              <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
               placeholder={
                 kind === 'venue'
                   ? 'เช่น ห้องประชุมใหญ่ อบต. หรือ ศาลาประชาคม'
                   : 'เช่น ชุดเครื่องเสียงเคลื่อนที่ หรือ เต็นท์โค้งขาว'
               }
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               className="jw-in"
             />
           </div>
@@ -307,14 +322,14 @@ export default function AddResourcePage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="jw-lbl">อาคาร</label>
                   <input
                     type="text"
+                    placeholder="เช่น อาคารสำนักงาน"
                     value={building}
                     onChange={(e) => setBuilding(e.target.value)}
-                    placeholder="เช่น อาคารสำนักงาน"
                     className="jw-in"
                   />
                 </div>
@@ -322,32 +337,39 @@ export default function AddResourcePage() {
                   <label className="jw-lbl">ชั้น</label>
                   <input
                     type="text"
+                    placeholder="เช่น ชั้น 1"
                     value={floor}
                     onChange={(e) => setFloor(e.target.value)}
-                    placeholder="เช่น ชั้น 1"
                     className="jw-in"
                   />
                 </div>
-                <div>
-                  <label className="jw-lbl">ความจุ (คน)</label>
-                  <div className="jw-in flex items-center justify-between px-2.5">
-                    <span className="font-semibold text-[13px]">{capacity} คน</span>
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setCapacity((c) => Math.max(10, c - 10))}
-                        className="w-6 h-6 rounded-full border border-ink flex items-center justify-center"
-                      >
-                        <Icon name="minus" className="w-3 h-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCapacity((c) => c + 10)}
-                        className="w-6 h-6 rounded-full bg-ink text-white flex items-center justify-center"
-                      >
-                        <Icon name="plus" className="w-3 h-3" />
-                      </button>
-                    </div>
+              </div>
+
+              <div>
+                <label className="jw-lbl">ความจุ (คน)</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min={1}
+                    value={capacity}
+                    onChange={(e) => setCapacity(Math.max(1, Number(e.target.value) || 1))}
+                    className="jw-in flex-1"
+                  />
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setCapacity((c) => Math.max(1, c - 10))}
+                      className="w-10 h-10 rounded-xl border border-line flex items-center justify-center text-ink font-bold hover:bg-soft"
+                    >
+                      -
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCapacity((c) => c + 10)}
+                      className="w-10 h-10 rounded-xl bg-ink text-white flex items-center justify-center font-bold hover:bg-ink-dark"
+                    >
+                      +
+                    </button>
                   </div>
                 </div>
               </div>
@@ -376,7 +398,7 @@ export default function AddResourcePage() {
               </div>
             </>
           ) : (
-            <div className="grid grid-cols-2 gap-4">
+            <>
               <div>
                 <label className="jw-lbl">หมวดหมู่อุปกรณ์</label>
                 <select
@@ -384,106 +406,117 @@ export default function AddResourcePage() {
                   onChange={(e) => setEqCategory(e.target.value as EquipmentCategory)}
                   className="jw-in"
                 >
-                  <option value="audio">เครื่องเสียง</option>
-                  <option value="tent">เต็นท์ / เก้าอี้</option>
-                  <option value="it">IT</option>
+                  <option value="audio">เครื่องเสียง / ไมโครโฟน</option>
+                  <option value="tent">เต็นท์ / โต๊ะ / เก้าอี้</option>
+                  <option value="it">โปรเจกเตอร์ / จอภาพ</option>
                 </select>
               </div>
+
               <div>
-                <label className="jw-lbl">จำนวนคงเหลือ</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={stock}
-                  onChange={(e) => setStock(Math.max(0, Number(e.target.value)))}
-                  className="jw-in"
-                />
+                <label className="jw-lbl">จำนวนที่มีให้ยืม (ชิ้น/ชุด)</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min={1}
+                    value={stock}
+                    onChange={(e) => setStock(Math.max(1, Number(e.target.value) || 1))}
+                    className="jw-in flex-1"
+                  />
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setStock((s) => Math.max(1, s - 1))}
+                      className="w-10 h-10 rounded-xl border border-line flex items-center justify-center text-ink font-bold hover:bg-soft"
+                    >
+                      -
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStock((s) => s + 1)}
+                      className="w-10 h-10 rounded-xl bg-ink text-white flex items-center justify-center font-bold hover:bg-ink-dark"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
+            </>
           )}
         </div>
 
-        {/* คอลัมน์ที่ 2: เงื่อนไขและการอนุมัติ */}
+        {/* คอลัมน์ที่ 2: เงื่อนไขและอนุมัติ */}
         <div
           className={`jw-card p-5 sm:p-6 flex flex-col gap-4 ${
             mobileStep === 1 ? 'hidden lg:flex' : 'flex'
           }`}
         >
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="jw-lbl">เปิด</label>
-              <input
-                type="time"
-                value={openTime}
-                onChange={(e) => setOpenTime(e.target.value)}
-                className="jw-in"
-              />
-            </div>
-            <div>
-              <label className="jw-lbl">ปิด</label>
-              <input
-                type="time"
-                value={closeTime}
-                onChange={(e) => setCloseTime(e.target.value)}
-                className="jw-in"
-              />
-            </div>
-            <div>
-              <label className="jw-lbl">ขอล่วงหน้า</label>
-              <div className="jw-in flex items-center justify-between px-2.5">
-                <span className="font-semibold text-[13px]">{advanceDays} วัน</span>
-                <div className="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setAdvanceDays((d) => Math.max(0, d - 1))}
-                    className="w-6 h-6 rounded-full border border-ink flex items-center justify-center"
-                  >
-                    <Icon name="minus" className="w-3 h-3" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAdvanceDays((d) => d + 1)}
-                    className="w-6 h-6 rounded-full bg-ink text-white flex items-center justify-center"
-                  >
-                    <Icon name="plus" className="w-3 h-3" />
-                  </button>
+          {kind === 'venue' && (
+            <>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="jw-lbl">เปิด</label>
+                  <input
+                    type="time"
+                    value={openTime}
+                    onChange={(e) => setOpenTime(e.target.value)}
+                    className="jw-in"
+                  />
+                </div>
+                <div>
+                  <label className="jw-lbl">ปิด</label>
+                  <input
+                    type="time"
+                    value={closeTime}
+                    onChange={(e) => setCloseTime(e.target.value)}
+                    className="jw-in"
+                  />
+                </div>
+                <div>
+                  <label className="jw-lbl">ขอล่วงหน้า</label>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={0}
+                      value={advanceDays}
+                      onChange={(e) => setAdvanceDays(Math.max(0, Number(e.target.value) || 0))}
+                      className="jw-in text-center flex-1"
+                    />
+                    <span className="text-[12px] text-ink-mute shrink-0">วัน</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+
+              <div>
+                <label className="jw-lbl">วันที่เปิดให้จอง</label>
+                <div className="flex gap-1.5">
+                  {DAYS_TH.map((d, i) => {
+                    const active = openDays.includes(i);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => toggleDay(i)}
+                        className={`flex-1 h-9 rounded-full text-[12px] font-semibold transition ${
+                          active
+                            ? 'bg-brand text-white shadow-xs'
+                            : 'bg-soft text-ink-mute hover:bg-brand-mint'
+                        }`}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
 
           <div>
-            <label className="jw-lbl">วันที่เปิดให้จอง</label>
-            <div className="flex gap-1.5">
-              {DAYS_TH.map((label, idx) => {
-                const on = openDays.includes(idx);
-                return (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => toggleDay(idx)}
-                    className={`flex-1 h-[38px] rounded-full border-[1.5px] text-[13px] font-semibold transition ${
-                      on
-                        ? 'bg-brand border-brand text-white'
-                        : 'bg-white border-line text-ink hover:border-brand'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="border border-line rounded-2xl px-4 py-2 bg-white">
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <b className="text-[14px] block">ลำดับการอนุมัติ (ลากเรียงลำดับได้)</b>
-                <span className="text-[11.5px] text-ink-mute">ลากวางหรือกดลูกศรเพื่อสลับลำดับสายอนุมัติ</span>
-              </div>
-              <Chip tone="green">
-                <Icon name="shield-check" className="w-3.5 h-3.5" /> 3 ระดับ
-              </Chip>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="jw-lbl mb-0">ลำดับการอนุมัติ (ลากเรียงลำดับได้)</label>
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-brand-mint text-brand font-semibold">
+                {approvalOrder.length} ระดับ
+              </span>
             </div>
             {approvalOrder.map((label, idx) => (
               <div
@@ -492,8 +525,10 @@ export default function AddResourcePage() {
                 onDragStart={() => setDragIdx(idx)}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => {
-                  if (dragIdx !== null) moveApprovalStep(dragIdx, idx);
-                  setDragIdx(null);
+                  if (dragIdx !== null) {
+                    moveApprovalStep(dragIdx, idx);
+                    setDragIdx(null);
+                  }
                 }}
                 className="flex items-center gap-2.5 py-2.5 border-t border-line text-[14px] cursor-grab active:cursor-grabbing"
               >
@@ -526,12 +561,50 @@ export default function AddResourcePage() {
             ))}
           </div>
 
+          {/* แบบฟอร์มที่ใช้: แบบเดิม + ปุ่มเพิ่มแบบฟอร์มใหม่เด้งไปตัวจัดการแบบฟอร์ม */}
           <div>
-            <label className="jw-lbl">แบบฟอร์มที่ใช้</label>
-            <select value={formName} onChange={(e) => setFormName(e.target.value)} className="jw-in">
-              <option>แบบคำขอใช้สถานที่</option>
-              <option>แบบคำขอยืมครุภัณฑ์</option>
-            </select>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="jw-lbl mb-0">แบบฟอร์มที่ใช้</label>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreatingNewForm(true);
+                  setShowDocEditor(true);
+                }}
+                className="text-[12px] font-semibold text-brand flex items-center gap-1 hover:underline"
+              >
+                <Icon name="plus" className="w-3.5 h-3.5" />
+                <span>+ เพิ่มแบบฟอร์มใหม่</span>
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <select
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                className="jw-in flex-1"
+              >
+                {availableForms.map((f) => (
+                  <option key={f.id} value={f.title}>
+                    {f.title}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreatingNewForm(false);
+                  setShowDocEditor(true);
+                }}
+                className="px-3.5 py-2 rounded-xl border border-brand bg-brand-mint text-brand text-[13px] font-semibold hover:bg-brand hover:text-white transition flex items-center gap-1.5 shrink-0"
+                title="เปิดตัวจัดการและแก้ไขแบบฟอร์ม"
+              >
+                <Icon name="file-text" className="w-4 h-4" />
+                <span>เปิดตัวจัดการแบบฟอร์ม</span>
+              </button>
+            </div>
+            <p className="text-[12px] text-ink-mute mt-1.5">
+              กด <b>+ เพิ่มแบบฟอร์มใหม่</b> หรือ <b>เปิดตัวจัดการแบบฟอร์ม</b> เพื่อแก้ไขและปรับแต่งเนื้อหากระดาษราชการ
+            </p>
           </div>
 
           <div className="border border-line rounded-2xl p-3.5 flex items-center justify-between bg-white">
@@ -568,6 +641,29 @@ export default function AddResourcePage() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Modal ตัวจัดการและแก้ไขแบบฟอร์มกระดาษราชการ */}
+      {showDocEditor && (
+        <OfficialDocumentEditor
+          isModal={true}
+          initialFormTitle={
+            isCreatingNewForm
+              ? 'แบบขอใช้สถานที่ราชการ (แบบใหม่)'
+              : formName
+          }
+          isBorrowMode={formName.includes('ครุภัณฑ์') || formName.includes('อุปกรณ์')}
+          onClose={() => setShowDocEditor(false)}
+          onSave={({ formTitle }) => {
+            const trimmed = formTitle.trim();
+            if (isCreatingNewForm && trimmed) {
+              saveNewFormTemplate(trimmed);
+              setAvailableForms(getFormTemplates());
+            }
+            setFormName(trimmed);
+            setShowDocEditor(false);
+          }}
+        />
       )}
     </AppShell>
   );
