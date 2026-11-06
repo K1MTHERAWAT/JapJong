@@ -6,7 +6,7 @@
     "prebuild": "pnpm --filter @japjong/shared build",
     "build": "nest build",
     "dev": "nest start --watch",
-    "start": "node --max-old-space-size=384 dist/main.js",
+    "start": "node dist/main.js",
     "test": "tsx --test test/gov-sso.spec.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prisma:generate": "prisma generate",
