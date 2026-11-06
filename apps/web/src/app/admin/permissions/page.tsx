@@ -1,16 +1,13 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  DEFAULT_PERMISSIONS,
-  PERMISSION_KEYS,
-  PERMISSION_META,
-  PermissionKey,
+  CreateRoleDto,
   PublicAccount,
-  ROLE_LABEL,
-  ROLE_META,
-  ROLE_TONE,
   Role,
+  RoleItem,
+  Tone,
+  UpdateRoleDto,
 } from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
@@ -18,538 +15,836 @@ import { Icon } from '@/components/icons';
 import { Chip, Tabs, Toggle } from '@/components/ui';
 import { api } from '@/lib/api';
 
-type ViewMode = 'users' | 'matrix';
-type RoleTab = 'all' | 'USER' | 'STAFF' | 'APPROVER' | 'ADMIN';
+type MainTab = 'roles' | 'assignment';
 
-const ROLES: Role[] = ['USER', 'STAFF', 'APPROVER_L2', 'APPROVER_L1', 'ADMIN'];
+const AVAILABLE_TONES: { tone: Tone; label: string; colorClass: string }[] = [
+  { tone: 'green', label: 'เขียว', colorClass: 'bg-emerald-500' },
+  { tone: 'blue', label: 'น้ำเงิน', colorClass: 'bg-blue-500' },
+  { tone: 'amber', label: 'ส้มเหลือง', colorClass: 'bg-amber-500' },
+  { tone: 'purple', label: 'ม่วง', colorClass: 'bg-purple-500' },
+  { tone: 'teal', label: 'ฟ้าเขียว', colorClass: 'bg-teal-500' },
+  { tone: 'red', label: 'แดง', colorClass: 'bg-rose-500' },
+  { tone: 'gray', label: 'เทา', colorClass: 'bg-slate-500' },
+  { tone: 'orange', label: 'ส้ม', colorClass: 'bg-orange-500' },
+];
 
 export default function AdminPermissionsPage() {
-  const { refreshMe } = useAuth();
-  const [viewMode, setViewMode] = useState<ViewMode>('users');
+  const { account: currentAccount, refreshMe } = useAuth();
+  const [mainTab, setMainTab] = useState<MainTab>('roles');
+
+  // Roles state
+  const [roles, setRoles] = useState<RoleItem[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(true);
+  const [editingRole, setEditingRole] = useState<RoleItem | null>(null);
+  const [isAddRoleModalOpen, setIsAddRoleModalOpen] = useState(false);
+  const [roleFormKey, setRoleFormKey] = useState('');
+  const [roleFormName, setRoleFormName] = useState('');
+  const [roleFormDesc, setRoleFormDesc] = useState('');
+  const [roleFormTone, setRoleFormTone] = useState<Tone>('blue');
+  const [roleFormEnabled, setRoleFormEnabled] = useState(true);
+  const [roleModalError, setRoleModalError] = useState('');
+  const [roleModalSaving, setRoleModalSaving] = useState(false);
+  const [deletingRole, setDeletingRole] = useState<RoleItem | null>(null);
+
+  // Users state
   const [users, setUsers] = useState<PublicAccount[]>([]);
-  const [tab, setTab] = useState<RoleTab>('all');
-  const [search, setSearch] = useState('');
-  const [selectedId, setSelectedId] = useState('s-suda');
-  const [userDetailTab, setUserDetailTab] = useState<'permissions' | 'account'>('permissions');
-  const [roleDraft, setRoleDraft] = useState<Role>('STAFF');
-  const [activeDraft, setActiveDraft] = useState<boolean>(true);
-  const [permDraft, setPermDraft] = useState<Record<PermissionKey, boolean>>({
-    ...DEFAULT_PERMISSIONS.STAFF,
-  });
-  const [nameDraft, setNameDraft] = useState('');
-  const [nicknameDraft, setNicknameDraft] = useState('');
-  const [departmentDraft, setDepartmentDraft] = useState('');
-  const [phoneDraft, setPhoneDraft] = useState('');
-  const [newPasswordDraft, setNewPasswordDraft] = useState('');
-  const [savedMsg, setSavedMsg] = useState('');
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [userSearch, setUserSearch] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState<string>('all');
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [bulkTargetRole, setBulkTargetRole] = useState<string>('');
+  const [isBulkAssigning, setIsBulkAssigning] = useState(false);
+
+  // Notifications / Feedback
+  const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const load = useCallback(() => {
-    api.users().then((list) => {
-      setUsers(list);
-      const current = list.find((u) => u.id === selectedId) ?? list[0];
-      if (current) {
-        setSelectedId(current.id);
-        setRoleDraft(current.role);
-        setActiveDraft(current.active !== false);
-        setPermDraft({ ...DEFAULT_PERMISSIONS[current.role], ...current.permissions });
-        setNameDraft(current.name || '');
-        setNicknameDraft(current.nickname || '');
-        setDepartmentDraft(current.department || '');
-        setPhoneDraft(current.phone || '');
-        setNewPasswordDraft('');
-      }
-    });
-  }, [selectedId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const selectUser = (u: PublicAccount) => {
-    setSelectedId(u.id);
-    setRoleDraft(u.role);
-    setActiveDraft(u.active !== false);
-    setPermDraft({ ...DEFAULT_PERMISSIONS[u.role], ...u.permissions });
-    setNameDraft(u.name || '');
-    setNicknameDraft(u.nickname || '');
-    setDepartmentDraft(u.department || '');
-    setPhoneDraft(u.phone || '');
-    setNewPasswordDraft('');
+  const showSuccess = (msg: string) => {
+    setSuccessMsg(msg);
     setErrorMsg('');
+    setTimeout(() => setSuccessMsg(''), 4000);
   };
 
-  const handleRolePick = (r: Role) => {
-    setRoleDraft(r);
-    setPermDraft({ ...DEFAULT_PERMISSIONS[r] });
+  const showError = (msg: string) => {
+    setErrorMsg(msg);
+    setSuccessMsg('');
+    setTimeout(() => setErrorMsg(''), 5000);
   };
 
-  const handleSave = async () => {
-    setErrorMsg('');
+  // Load roles
+  const loadRoles = useCallback(async () => {
     try {
-      await api.updatePermissions(selectedId, {
-        role: roleDraft,
-        permissions: permDraft,
-        active: activeDraft,
-        name: nameDraft.trim(),
-        nickname: nicknameDraft.trim(),
-        department: departmentDraft.trim(),
-        phone: phoneDraft.trim(),
-        newPassword: newPasswordDraft.trim() ? newPasswordDraft.trim() : undefined,
-      });
-      await refreshMe();
-      load();
-      setSavedMsg('บันทึกข้อมูลบัญชี บทบาท และสิทธิ์การใช้งานเรียบร้อยแล้ว (มีผลทันทีทั้งหน้าเว็บและ API)');
-      setTimeout(() => setSavedMsg(''), 3000);
-    } catch (err) {
-      setErrorMsg((err as Error).message || 'ไม่สามารถบันทึกข้อมูลได้');
+      setRolesLoading(true);
+      const list = await api.getRoles();
+      setRoles(list);
+    } catch (err: any) {
+      showError(err.message || 'ไม่สามารถโหลดรายการบทบาทได้');
+    } finally {
+      setRolesLoading(false);
+    }
+  }, []);
+
+  // Load users
+  const loadUsers = useCallback(async () => {
+    try {
+      setUsersLoading(true);
+      const list = await api.users();
+      setUsers(list);
+    } catch (err: any) {
+      showError(err.message || 'ไม่สามารถโหลดรายชื่อผู้ใช้งานได้');
+    } finally {
+      setUsersLoading(false);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    loadRoles();
+    loadUsers();
+  }, [loadRoles, loadUsers]);
+
+  // Sync navigation after changes
+  const notifyNavigationChange = () => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('japjong-navigation-refresh'));
+    }
+    refreshMe();
+  };
+
+  // Open Add Modal
+  const openAddModal = () => {
+    setEditingRole(null);
+    setRoleFormKey('');
+    setRoleFormName('');
+    setRoleFormDesc('');
+    setRoleFormTone('blue');
+    setRoleFormEnabled(true);
+    setRoleModalError('');
+    setIsAddRoleModalOpen(true);
+  };
+
+  // Open Edit Modal
+  const openEditModal = (role: RoleItem) => {
+    setEditingRole(role);
+    setRoleFormKey(role.key);
+    setRoleFormName(role.name);
+    setRoleFormDesc(role.description || '');
+    setRoleFormTone(role.tone || 'blue');
+    setRoleFormEnabled(role.enabled);
+    setRoleModalError('');
+    setIsAddRoleModalOpen(true);
+  };
+
+  // Save Role (Add or Edit)
+  const handleSaveRole = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!roleFormName.trim()) {
+      setRoleModalError('กรุณากรอกชื่อบทบาท');
+      return;
+    }
+
+    try {
+      setRoleModalSaving(true);
+      setRoleModalError('');
+
+      if (editingRole) {
+        const dto: UpdateRoleDto = {
+          name: roleFormName.trim(),
+          description: roleFormDesc.trim(),
+          tone: roleFormTone,
+          enabled: roleFormEnabled,
+        };
+        await api.updateRole(editingRole.id, dto);
+        showSuccess(`แก้ไขข้อมูลบทบาท "${roleFormName.trim()}" สำเร็จ`);
+      } else {
+        const dto: CreateRoleDto = {
+          key: roleFormKey.trim() ? roleFormKey.trim().toUpperCase() : undefined,
+          name: roleFormName.trim(),
+          description: roleFormDesc.trim(),
+          tone: roleFormTone,
+          enabled: roleFormEnabled,
+        };
+        await api.createRole(dto);
+        showSuccess(`เพิ่มบทบาทใหม่ "${roleFormName.trim()}" สำเร็จ`);
+      }
+
+      setIsAddRoleModalOpen(false);
+      await loadRoles();
+      notifyNavigationChange();
+    } catch (err: any) {
+      setRoleModalError(err.message || 'บันทึกบทบาทไม่สำเร็จ');
+    } finally {
+      setRoleModalSaving(false);
     }
   };
 
-  const filtered = users.filter((u) => {
-    if (tab === 'USER' && u.role !== 'USER') return false;
-    if (tab === 'STAFF' && u.role !== 'STAFF') return false;
-    if (tab === 'APPROVER' && u.role !== 'APPROVER_L2' && u.role !== 'APPROVER_L1') return false;
-    if (tab === 'ADMIN' && u.role !== 'ADMIN') return false;
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      return (
-        u.name.toLowerCase().includes(q) ||
-        u.phone.includes(q) ||
-        u.username.toLowerCase().includes(q) ||
-        u.department.toLowerCase().includes(q)
-      );
+  // Toggle Role Status
+  const handleToggleRole = async (role: RoleItem) => {
+    if (role.key === 'ADMIN') {
+      showError('ไม่สามารถปิดการใช้งานบทบาทผู้ดูแลระบบ (ADMIN) ได้');
+      return;
     }
-    return true;
-  });
+    try {
+      await api.toggleRole(role.id);
+      showSuccess(`${role.enabled ? 'ปิด' : 'เปิด'}การใช้งานบทบาท "${role.name}" แล้ว`);
+      await loadRoles();
+      notifyNavigationChange();
+    } catch (err: any) {
+      showError(err.message || 'ไม่สามารถเปลี่ยนสถานะบทบาทได้');
+    }
+  };
+
+  // Delete Role
+  const handleDeleteRole = async () => {
+    if (!deletingRole) return;
+    try {
+      await api.deleteRole(deletingRole.id);
+      showSuccess(`ลบบทบาท "${deletingRole.name}" ออกจากระบบแล้ว`);
+      setDeletingRole(null);
+      await loadRoles();
+      notifyNavigationChange();
+    } catch (err: any) {
+      showError(err.message || 'ไม่สามารถลบบทบาทได้');
+    }
+  };
+
+  // Single User Role Assignment
+  const handleAssignSingleUserRole = async (user: PublicAccount, newRole: Role) => {
+    if (user.role === newRole) return;
+    if (user.id === currentAccount?.id && currentAccount?.role === 'ADMIN' && newRole !== 'ADMIN') {
+      showError('ไม่สามารถลดระดับบทบาทของตนเองได้');
+      return;
+    }
+
+    try {
+      await api.updatePermissions(user.id, { role: newRole });
+      showSuccess(`เปลี่ยนบทบาทของ ${user.name} เป็น ${newRole} สำเร็จ`);
+      await loadUsers();
+      await loadRoles();
+      notifyNavigationChange();
+    } catch (err: any) {
+      showError(err.message || 'ไม่สามารถเปลี่ยนบทบาทได้');
+    }
+  };
+
+  // Single User Active Toggle
+  const handleToggleUserActive = async (user: PublicAccount) => {
+    if (user.id === currentAccount?.id) {
+      showError('ไม่สามารถระงับการใช้งานบัญชีของตนเองได้');
+      return;
+    }
+    const nextActive = user.active === false;
+    try {
+      await api.updatePermissions(user.id, { active: nextActive });
+      showSuccess(`${nextActive ? 'เปิด' : 'ระงับ'}การใช้งานบัญชี ${user.name} แล้ว`);
+      await loadUsers();
+    } catch (err: any) {
+      showError(err.message || 'ไม่สามารถเปลี่ยนสถานะบัญชีได้');
+    }
+  };
+
+  // Bulk Role Assignment
+  const handleBulkAssign = async () => {
+    if (selectedUserIds.length === 0) {
+      showError('กรุณาเลือกผู้ใช้งานที่ต้องการเปลี่ยนบทบาทอย่างน้อย 1 คน');
+      return;
+    }
+    if (!bulkTargetRole) {
+      showError('กรุณาเลือกบทบาทเป้าหมายที่ต้องการกำหนด');
+      return;
+    }
+
+    try {
+      setIsBulkAssigning(true);
+      const res = await api.bulkAssignRole(selectedUserIds, bulkTargetRole as Role);
+      if (res.errors && res.errors.length > 0) {
+        showError(`เปลี่ยนบทบาทสำเร็จ ${res.updatedCount} คน (มีข้อผิดพลาด: ${res.errors.join(', ')})`);
+      } else {
+        showSuccess(`เปลี่ยนบทบาทให้ผู้ใช้งาน ${res.updatedCount} คนเป็น "${bulkTargetRole}" เรียบร้อยแล้ว`);
+      }
+      setSelectedUserIds([]);
+      setBulkTargetRole('');
+      await loadUsers();
+      await loadRoles();
+      notifyNavigationChange();
+    } catch (err: any) {
+      showError(err.message || 'ไม่สามารถกำหนดบทบาทกลุ่มได้');
+    } finally {
+      setIsBulkAssigning(false);
+    }
+  };
+
+  // Multi-select helpers
+  const handleToggleSelectUser = (id: string) => {
+    setSelectedUserIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
+
+  const filteredUsers = useMemo(() => {
+    return users.filter((u) => {
+      if (userRoleFilter !== 'all' && u.role !== userRoleFilter) return false;
+      if (userSearch.trim()) {
+        const q = userSearch.toLowerCase();
+        return (
+          u.name.toLowerCase().includes(q) ||
+          u.phone.includes(q) ||
+          u.username.toLowerCase().includes(q) ||
+          (u.department && u.department.toLowerCase().includes(q)) ||
+          (u.nickname && u.nickname.toLowerCase().includes(q))
+        );
+      }
+      return true;
+    });
+  }, [users, userRoleFilter, userSearch]);
+
+  const handleSelectAllFiltered = () => {
+    const allFilteredIds = filteredUsers.map((u) => u.id);
+    const allSelected = allFilteredIds.every((id) => selectedUserIds.includes(id));
+    if (allSelected) {
+      setSelectedUserIds((prev) => prev.filter((id) => !allFilteredIds.includes(id)));
+    } else {
+      setSelectedUserIds((prev) => Array.from(new Set([...prev, ...allFilteredIds])));
+    }
+  };
+
+  const isAllFilteredSelected =
+    filteredUsers.length > 0 &&
+    filteredUsers.every((u) => selectedUserIds.includes(u.id));
 
   return (
     <AppShell
-      title="จัดการสิทธิ์และบทบาท"
+      title="จัดการบทบาทผู้ใช้งาน (Role Management)"
       backHref="/admin"
       rightLabel="แอดมิน"
       maxWidth="max-w-[1120px]"
-      footer={
-        viewMode === 'users' ? (
-          <div className="flex w-full sm:w-auto gap-2.5">
-            <button type="button" onClick={load} className="jw-btn-sec flex-1 sm:w-36">
-              ยกเลิก
-            </button>
-            <button type="button" onClick={handleSave} className="jw-btn flex-[1.5] sm:w-52">
-              บันทึกการเปลี่ยนแปลง
-            </button>
-          </div>
-        ) : undefined
-      }
     >
-      <div className="flex flex-col gap-4">
-        {/* สลับมุมมอง: กำหนดสิทธิ์รายบัญชี vs ตารางโครงสร้างสิทธิ์ 5 บทบาท */}
-        <Tabs<ViewMode>
-          value={viewMode}
-          onChange={setViewMode}
+      <div className="flex flex-col gap-5">
+        {/* Header Intro Banner */}
+        <div className="jw-card p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-l-4 border-l-brand">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 rounded-lg bg-brand-mint text-brand">
+                <Icon name="shield-check" className="w-5 h-5" />
+              </span>
+              <h2 className="text-[17px] font-bold text-ink">ระบบจัดการบทบาทและสิทธิ์การเข้าถึง (RBAC)</h2>
+            </div>
+            <p className="text-[13px] text-ink-mute mt-1 leading-relaxed">
+              สิทธิ์การเข้าถึงบริการและเมนูต่างๆ ใน Sidebar จะถูกควบคุมตามบทบาท (Role) ของผู้ใช้งานโดยอัตโนมัติ
+              พร้อมการตรวจสอบสิทธิ์ความปลอดภัยที่ Backend ทุก API
+            </p>
+          </div>
+          {mainTab === 'roles' && (
+            <button
+              type="button"
+              onClick={openAddModal}
+              className="jw-btn flex items-center gap-1.5 whitespace-nowrap self-stretch sm:self-auto justify-center"
+            >
+              <Icon name="plus" className="w-4 h-4" />
+              <span>เพิ่มบทบาทใหม่</span>
+            </button>
+          )}
+        </div>
+
+        {/* Feedback Messages */}
+        {successMsg && (
+          <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[14px] flex items-center gap-2.5 animate-fadeIn">
+            <Icon name="check" className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span>{successMsg}</span>
+          </div>
+        )}
+        {errorMsg && (
+          <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-[14px] flex items-center gap-2.5 animate-fadeIn">
+            <Icon name="alert-triangle" className="w-5 h-5 text-rose-600 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
+        {/* Main Tabs */}
+        <Tabs<MainTab>
+          value={mainTab}
+          onChange={setMainTab}
           options={[
-            { value: 'users', label: 'กำหนดสิทธิ์รายผู้ใช้ (6 บัญชี)' },
-            { value: 'matrix', label: 'ตารางโครงสร้างสิทธิ์ 5 บทบาท & การลงนาม 3 ระดับ' },
+            {
+              value: 'roles',
+              label: `บทบาทในระบบ (${roles.length})`,
+            },
+            {
+              value: 'assignment',
+              label: `กำหนดบทบาทผู้ใช้งาน (${users.length})`,
+            },
           ]}
         />
 
-        {viewMode === 'users' ? (
-          <>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-ph">
-                <Icon name="search" className="w-5 h-5" />
+        {/* ==================== TAB 1: ROLES MANAGEMENT ==================== */}
+        {mainTab === 'roles' && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <span className="text-[13px] text-ink-mute">
+                แสดงบทบาททั้งหมด {roles.length} บทบาท · กำหนดกลุ่มผู้ใช้งานและบริการที่สามารถเข้าถึงได้
               </span>
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="ค้นหาชื่อ / เบอร์โทร / หน่วยงาน"
-                className="jw-in rounded-full pl-11 h-[42px]"
-              />
             </div>
 
-            <Tabs<RoleTab>
-              value={tab}
-              onChange={setTab}
-              options={[
-                { value: 'all', label: 'ทั้งหมด' },
-                { value: 'USER', label: 'ประชาชน' },
-                { value: 'STAFF', label: 'เจ้าหน้าที่' },
-                { value: 'APPROVER', label: 'ผู้อนุมัติ (L2/L1)' },
-                { value: 'ADMIN', label: 'แอดมิน' },
-              ]}
-            />
-
-            <div className="flex flex-col gap-2.5">
-              {filtered.map((u) => {
-                const active = u.id === selectedId;
-                return (
-                  <React.Fragment key={u.id}>
+            {rolesLoading ? (
+              <div className="p-12 text-center text-ink-mute text-[14px]">กำลังโหลดรายการบทบาท...</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {roles.map((role) => {
+                  const canDelete = !role.isSystem && role.userCount === 0;
+                  return (
                     <div
-                      onClick={() => selectUser(u)}
-                      className={`p-3.5 rounded-2xl border cursor-pointer transition ${
-                        active ? 'border-ink bg-brand-mint' : 'border-line bg-white hover:border-brand'
+                      key={role.id}
+                      className={`jw-card p-5 flex flex-col justify-between gap-4 transition border ${
+                        role.enabled ? 'border-line hover:border-brand/40 bg-white' : 'border-line/60 bg-gray-50/60 opacity-80'
                       }`}
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <b className="text-[15px] text-ink">{u.name}</b>
-                          <span className="text-[12px] text-ink-mute ml-2">
-                            ({u.position} · {u.department} · {u.phone})
-                          </span>
+                      <div>
+                        {/* Card Header */}
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Chip tone={role.tone || 'blue'}>{role.key}</Chip>
+                            {role.isSystem && (
+                              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
+                                บทบาทระบบ
+                              </span>
+                            )}
+                            {!role.enabled && (
+                              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200">
+                                ปิดใช้งาน
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Toggle Active Switch */}
+                          <div className="flex items-center gap-2">
+                            <span className="text-[12px] text-ink-mute">
+                              {role.enabled ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
+                            </span>
+                            <Toggle
+                              checked={role.enabled}
+                              onChange={() => handleToggleRole(role)}
+                              disabled={role.key === 'ADMIN'}
+                            />
+                          </div>
                         </div>
+
+                        {/* Role Name & Description */}
+                        <h3 className="text-[16px] font-bold text-ink">{role.name}</h3>
+                        <p className="text-[13px] text-ink-mute mt-1 min-h-[38px] line-clamp-2">
+                          {role.description || 'ไม่มีคำอธิบายบทบาท'}
+                        </p>
+                      </div>
+
+                      {/* Card Footer: User Count & Actions */}
+                      <div className="pt-3 border-t border-line flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-1.5 text-[13px] text-ink-mute">
+                          <Icon name="users" className="w-4 h-4 text-brand" />
+                          <span className="font-semibold text-ink">{role.userCount}</span>
+                          <span>ผู้ใช้งาน</span>
+                        </div>
+
                         <div className="flex items-center gap-1.5">
-                          {u.active === false && <Chip tone="red">ระงับบัญชี</Chip>}
-                          <Chip tone={ROLE_TONE[u.role]}>{ROLE_LABEL[u.role]}</Chip>
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(role)}
+                            className="px-3 py-1.5 rounded-xl border border-line text-[12.5px] font-semibold text-ink hover:bg-soft transition flex items-center gap-1"
+                          >
+                            <Icon name="edit" className="w-3.5 h-3.5" />
+                            <span>แก้ไข</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setDeletingRole(role)}
+                            disabled={!canDelete}
+                            title={
+                              role.isSystem
+                                ? 'ไม่สามารถลบบทบาทของระบบได้'
+                                : role.userCount > 0
+                                ? `มีผู้ใช้งาน ${role.userCount} คนผูกอยู่ ต้องย้ายผู้ใช้ก่อนจึงจะลบได้`
+                                : 'ลบบทบาทนี้'
+                            }
+                            className={`px-3 py-1.5 rounded-xl border text-[12.5px] font-semibold transition flex items-center gap-1 ${
+                              canDelete
+                                ? 'border-rose-200 text-rose-600 hover:bg-rose-50'
+                                : 'border-line text-ink-ph opacity-40 cursor-not-allowed'
+                            }`}
+                          >
+                            <Icon name="trash" className="w-3.5 h-3.5" />
+                            <span>ลบ</span>
+                          </button>
                         </div>
                       </div>
                     </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
-                    {active && (
-                      <div className="jw-card p-4 sm:p-5 flex flex-col gap-4 border-brand">
-                        <Tabs<'permissions' | 'account'>
-                          value={userDetailTab}
-                          onChange={setUserDetailTab}
-                          options={[
-                            { value: 'permissions', label: 'บทบาท & สิทธิ์การใช้งาน' },
-                            { value: 'account', label: 'บัญชี (แก้ไขชื่อ · หน่วยงาน · รหัสผ่าน)' },
-                          ]}
+        {/* ==================== TAB 2: USER ROLE ASSIGNMENT ==================== */}
+        {mainTab === 'assignment' && (
+          <div className="flex flex-col gap-4">
+            {/* Search and Filters */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-ph">
+                  <Icon name="search" className="w-5 h-5" />
+                </span>
+                <input
+                  type="text"
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  placeholder="ค้นหาชื่อผู้ใช้งาน / เบอร์โทร / หน่วยงาน / ชื่อผู้ใช้"
+                  className="jw-in rounded-full pl-11 h-[42px] w-full"
+                />
+              </div>
+
+              {/* Quick Role Filter Dropdown */}
+              <div className="flex items-center gap-2">
+                <select
+                  value={userRoleFilter}
+                  onChange={(e) => setUserRoleFilter(e.target.value)}
+                  className="jw-in h-[42px] rounded-full px-4 text-[13px] font-medium border-line"
+                >
+                  <option value="all">บทบาททั้งหมด ({users.length})</option>
+                  {roles.map((r) => (
+                    <option key={r.key} value={r.key}>
+                      {r.name} ({r.userCount})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Bulk Actions Toolbar (Visible when users selected) */}
+            {selectedUserIds.length > 0 && (
+              <div className="p-3.5 rounded-2xl bg-brand-mint border border-brand/40 flex flex-wrap items-center justify-between gap-3 animate-fadeIn">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-brand text-white flex items-center justify-center text-[12px] font-bold">
+                    {selectedUserIds.length}
+                  </span>
+                  <span className="text-[13.5px] font-semibold text-ink">
+                    เลือกผู้ใช้งานแล้ว {selectedUserIds.length} คน
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <select
+                    value={bulkTargetRole}
+                    onChange={(e) => setBulkTargetRole(e.target.value)}
+                    className="jw-in h-[36px] rounded-xl text-[13px] bg-white border-line py-0"
+                  >
+                    <option value="">-- เลือกบทบาทใหม่ --</option>
+                    {roles
+                      .filter((r) => r.enabled)
+                      .map((r) => (
+                        <option key={r.key} value={r.key}>
+                          {r.name} ({r.key})
+                        </option>
+                      ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={handleBulkAssign}
+                    disabled={isBulkAssigning || !bulkTargetRole}
+                    className="jw-btn h-[36px] px-3.5 text-[13px] flex items-center gap-1.5"
+                  >
+                    {isBulkAssigning ? 'กำลังบันทึก...' : 'เปลี่ยนบทบาทที่เลือก'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUserIds([])}
+                    className="jw-btn-sec h-[36px] px-3 text-[13px]"
+                  >
+                    ยกเลิก
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Select All Checkbox Header */}
+            <div className="flex items-center justify-between px-2 text-[13px] text-ink-mute">
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isAllFilteredSelected}
+                  onChange={handleSelectAllFiltered}
+                  className="w-4 h-4 rounded text-brand border-line focus:ring-brand"
+                />
+                <span className="font-semibold text-ink">
+                  เลือกทั้งหมดในรายการ ({filteredUsers.length} คน)
+                </span>
+              </label>
+              <span>เปลี่ยนบทบาทได้ทันทีจากเมนูในแต่ละแถว</span>
+            </div>
+
+            {/* Users List */}
+            {usersLoading ? (
+              <div className="p-12 text-center text-ink-mute text-[14px]">กำลังโหลดรายชื่อผู้ใช้งาน...</div>
+            ) : filteredUsers.length === 0 ? (
+              <div className="p-12 text-center text-ink-mute text-[14px] jw-card">
+                ไม่พบผู้ใช้งานที่ตรงกับเงื่อนไขการค้นหา
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {filteredUsers.map((user) => {
+                  const isSelected = selectedUserIds.includes(user.id);
+                  const isSelf = user.id === currentAccount?.id;
+                  const roleObj = roles.find((r) => r.key === user.role);
+
+                  return (
+                    <div
+                      key={user.id}
+                      className={`jw-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition border ${
+                        isSelected
+                          ? 'border-brand bg-brand-mint/20'
+                          : user.active === false
+                          ? 'border-line/60 bg-gray-50/60 opacity-75'
+                          : 'border-line hover:border-brand/40 bg-white'
+                      }`}
+                    >
+                      {/* Left: Checkbox & User Info */}
+                      <div className="flex items-start sm:items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleSelectUser(user.id)}
+                          className="w-4 h-4 rounded text-brand border-line focus:ring-brand mt-1 sm:mt-0"
                         />
 
-                        {userDetailTab === 'permissions' ? (
-                          <>
-                            <div className="border border-line rounded-2xl p-3.5 bg-white flex items-center justify-between gap-3">
-                              <div>
-                                <b className="block text-[14px] text-ink">สถานะการเปิด/ปิดการใช้งานบัญชี</b>
-                                <span className="text-[12px] text-ink-mute">
-                                  {activeDraft
-                                    ? 'เปิดใช้งานปกติ (สามารถเข้าสู่ระบบและดำเนินการตามสิทธิ์ได้)'
-                                    : 'ปิด/ระงับการใช้งานชั่วคราว (ไม่สามารถเข้าสู่ระบบได้)'}
-                                </span>
-                              </div>
-                              <Toggle checked={activeDraft} onChange={setActiveDraft} />
-                            </div>
+                        {/* Avatar Initial */}
+                        <div className="w-10 h-10 rounded-full bg-soft text-brand font-bold text-[15px] flex items-center justify-center shrink-0 border border-line">
+                          {user.initial || user.name.charAt(0) || 'ผ'}
+                        </div>
 
-                            <div>
-                              <label className="jw-lbl">1. เลือกบทบาทหลัก (Role)</label>
-                              <div className="flex flex-wrap gap-2">
-                                {ROLES.map((r) => (
-                                  <button
-                                    key={r}
-                                    type="button"
-                                    onClick={() => handleRolePick(r)}
-                                    className={`h-[38px] px-3.5 rounded-full border-[1.5px] text-[13px] font-semibold transition ${
-                                      roleDraft === r
-                                        ? 'bg-brand border-brand text-white'
-                                        : 'bg-white border-line text-ink hover:border-brand'
-                                    }`}
-                                  >
-                                    {ROLE_META[r].shortLabel}
-                                  </button>
-                                ))}
-                              </div>
-                              <div className="mt-2.5 rounded-2xl bg-soft border border-line p-3 text-[13px]">
-                                <b className="text-ink block">{ROLE_META[roleDraft].label}</b>
-                                <span className="text-ink-mute">{ROLE_META[roleDraft].summary}</span>
-                              </div>
-                            </div>
-
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="jw-lbl mb-0">
-                                  2. กำหนดสิทธิ์ย่อยรายเมนูและ API (Permissions {PERMISSION_KEYS.length} รายการ)
-                                </label>
-                                <button
-                                  type="button"
-                                  onClick={() => setPermDraft({ ...DEFAULT_PERMISSIONS[roleDraft] })}
-                                  className="text-[12px] text-brand font-semibold hover:underline"
-                                >
-                                  คืนค่ามาตรฐานของบทบาทนี้
-                                </button>
-                              </div>
-                              <div className="divide-y divide-line border border-line rounded-2xl px-3.5 bg-white">
-                                {PERMISSION_KEYS.map((key) => {
-                                  const meta = PERMISSION_META[key];
-                                  const checked = !!permDraft[key];
-                                  return (
-                                    <div key={key} className="py-3 flex items-start justify-between gap-3">
-                                      <div className="flex flex-col gap-0.5">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          <span className="text-[14px] font-semibold text-ink">
-                                            {meta.label}
-                                          </span>
-                                          {meta.routes.map((rt) => (
-                                            <code
-                                              key={rt}
-                                              className="text-[11px] px-1.5 py-0.5 rounded bg-soft border border-line text-ink-mute"
-                                            >
-                                              {rt}
-                                            </code>
-                                          ))}
-                                        </div>
-                                        <span className="text-[12.5px] text-ink-mute">{meta.description}</span>
-                                      </div>
-                                      <Toggle
-                                        checked={checked}
-                                        onChange={(val) => setPermDraft((p) => ({ ...p, [key]: val }))}
-                                      />
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="flex flex-col gap-3.5">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                              <div>
-                                <label className="jw-lbl">ชื่อ-นามสกุล</label>
-                                <input
-                                  type="text"
-                                  value={nameDraft}
-                                  onChange={(e) => setNameDraft(e.target.value)}
-                                  placeholder="ชื่อ-นามสกุล"
-                                  className="jw-in"
-                                />
-                              </div>
-                              <div>
-                                <label className="jw-lbl">ชื่อเล่น / ชื่อเรียก</label>
-                                <input
-                                  type="text"
-                                  value={nicknameDraft}
-                                  onChange={(e) => setNicknameDraft(e.target.value)}
-                                  placeholder="ชื่อเล่น"
-                                  className="jw-in"
-                                />
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                              <div>
-                                <label className="jw-lbl">หน่วยงาน / ชุมชน / สังกัด</label>
-                                <input
-                                  type="text"
-                                  value={departmentDraft}
-                                  onChange={(e) => setDepartmentDraft(e.target.value)}
-                                  placeholder="เช่น สำนักปลัด อบต., กองสวัสดิการสังคม"
-                                  className="jw-in"
-                                />
-                              </div>
-                              <div>
-                                <label className="jw-lbl">เบอร์โทรศัพท์</label>
-                                <input
-                                  type="text"
-                                  value={phoneDraft}
-                                  onChange={(e) => setPhoneDraft(e.target.value)}
-                                  placeholder="เช่น 081-234-5678"
-                                  className="jw-in"
-                                />
-                              </div>
-                            </div>
-
-                            <div className="border-t border-line pt-3">
-                              <label className="jw-lbl">
-                                ตั้งรหัสผ่านใหม่ (Password) ·{' '}
-                                <span className="font-normal text-ink-mute">
-                                  เว้นว่างไว้หากไม่ต้องการเปลี่ยนรหัสผ่านของบัญชีนี้
-                                </span>
-                              </label>
-                              <input
-                                type="password"
-                                value={newPasswordDraft}
-                                onChange={(e) => setNewPasswordDraft(e.target.value)}
-                                placeholder="กรอกรหัสผ่านใหม่สำหรับบัญชีนี้ (อย่างน้อย 4 ตัวอักษร)"
-                                className="jw-in"
-                              />
-                            </div>
+                        {/* Info details */}
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <b className="text-[15px] text-ink">{user.name}</b>
+                            {user.nickname && (
+                              <span className="text-[12px] text-ink-mute">({user.nickname})</span>
+                            )}
+                            {isSelf && (
+                              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-brand-mint text-brand border border-brand/30">
+                                บัญชีของคุณ
+                              </span>
+                            )}
+                            {user.active === false && (
+                              <Chip tone="red">ระงับบัญชี</Chip>
+                            )}
                           </div>
-                        )}
+                          <div className="text-[12.5px] text-ink-mute flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                            <span>{user.position || 'ตำแหน่งไม่ระบุ'}</span>
+                            <span>•</span>
+                            <span>{user.department || 'หน่วยงานไม่ระบุ'}</span>
+                            <span>•</span>
+                            <span>{user.phone || '-'}</span>
+                            <span className="text-ink-ph">(@{user.username})</span>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </div>
 
-            {errorMsg && (
-              <div className="rounded-2xl bg-[#FDE8E8] border border-[#f9b4b4] px-4 py-2.5 text-[14px] text-[#7a1010] font-semibold">
-                {errorMsg}
-              </div>
-            )}
+                      {/* Right: Inline Role Selector & Status Toggle */}
+                      <div className="flex items-center justify-end gap-3 self-end sm:self-center pl-7 sm:pl-0">
+                        {/* Quick Role Change Dropdown */}
+                        <div className="flex items-center gap-1.5">
+                          <label className="text-[12px] text-ink-mute whitespace-nowrap">บทบาท:</label>
+                          <select
+                            value={user.role}
+                            onChange={(e) => handleAssignSingleUserRole(user, e.target.value as Role)}
+                            disabled={isSelf && user.role === 'ADMIN'}
+                            className="jw-in h-[36px] rounded-xl text-[13px] font-medium border-line py-0 pl-3 pr-7 bg-white"
+                          >
+                            {roles.map((r) => (
+                              <option key={r.key} value={r.key} disabled={!r.enabled && user.role !== r.key}>
+                                {r.name} {!r.enabled && '(ปิดใช้งาน)'}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
-            {savedMsg && (
-              <div className="rounded-2xl bg-brand-mint border border-brand px-4 py-2.5 text-[14px] text-brand font-semibold">
-                {savedMsg}
-              </div>
-            )}
-
-            {/* กำหนดผู้อนุมัติในแต่ละลำดับของสายอนุมัติ (6.3.2) */}
-            <div className="jw-card p-5 flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <b className="text-[16px] text-ink block">สายอนุมัติ 3 ลำดับ (ผู้รับผิดชอบปัจจุบัน)</b>
-                  <span className="text-[12.5px] text-ink-mute">
-                    กำหนดโดยการเลือกบทบาทของบัญชีด้านบนให้เป็น เจ้าหน้าที่ตรวจสอบ, ปลัดองค์การบริหารส่วนตำบล หรือ นายกองค์การบริหารส่วนตำบล
-                  </span>
-                </div>
-                <Chip tone="green">3 ลำดับ</Chip>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[13px]">
-                <div className="border border-line rounded-2xl p-3 bg-white">
-                  <span className="text-[11px] font-bold text-brand block">ลำดับที่ 1 · เจ้าหน้าที่ตรวจสอบ</span>
-                  <b className="text-[14px] text-ink block mt-0.5">
-                    {users.filter((u) => u.role === 'STAFF' && u.active !== false).map((u) => u.name).join(', ') || '-'}
-                  </b>
-                  <span className="text-[12px] text-ink-mute">ตรวจเอกสาร + ลงนามระดับ 1</span>
-                </div>
-                <div className="border border-line rounded-2xl p-3 bg-white">
-                  <span className="text-[11px] font-bold text-brand block">ลำดับที่ 2 · ปลัดองค์การบริหารส่วนตำบล</span>
-                  <b className="text-[14px] text-ink block mt-0.5">
-                    {users.filter((u) => u.role === 'APPROVER_L2' && u.active !== false).map((u) => u.name).join(', ') || '-'}
-                  </b>
-                  <span className="text-[12px] text-ink-mute">กลั่นกรองเห็นชอบ + ยืนยัน PIN 6 หลัก</span>
-                </div>
-                <div className="border border-line rounded-2xl p-3 bg-white">
-                  <span className="text-[11px] font-bold text-brand block">ลำดับที่ 3 · นายกองค์การบริหารส่วนตำบล</span>
-                  <b className="text-[14px] text-ink block mt-0.5">
-                    {users.filter((u) => u.role === 'APPROVER_L1' && u.active !== false).map((u) => u.name).join(', ') || '-'}
-                  </b>
-                  <span className="text-[12px] text-ink-mute">อนุมัติขั้นสุดท้าย + ออกใบอนุญาต PDF</span>
-                </div>
-              </div>
-            </div>
-          </>
-        ) : (
-          /* มุมมองที่ 2: ตารางโครงสร้างสิทธิ์ 5 บทบาท & ลำดับการลงนาม 3 ระดับ */
-          <div className="flex flex-col gap-5">
-            {/* ลำดับอำนาจการลงนาม 3 ระดับ */}
-            <div className="jw-card p-5 flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <b className="text-[16px] text-ink">
-                  ลำดับอำนาจการตรวจสอบและลงนามอนุมัติ 3 ระดับ (สำหรับจองสถานที่ & ยืมครุภัณฑ์)
-                </b>
-                <Chip tone="green">Workflow มาตรฐาน อบต.</Chip>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[13px]">
-                <div className="rounded-2xl border border-line bg-soft p-3.5 flex flex-col gap-1">
-                  <div className="flex items-center justify-between">
-                    <b className="text-brand">ระดับที่ 1 · เจ้าหน้าที่ตรวจสอบ</b>
-                    <Chip tone="blue">STAFF</Chip>
-                  </div>
-                  <span className="text-ink font-semibold">สุดา มีสุข (เจ้าหน้าที่ธุรการ)</span>
-                  <span className="text-ink-mute">
-                    ตรวจสอบเอกสารแนบ/วันว่าง ลงนามระดับเจ้าหน้าที่เพื่อสร้างเอกสารส่งต่อ หรือส่งคืนให้แก้ไข
-                  </span>
-                  <span className="text-[11.5px] text-ink-mute mt-1">
-                    สถานะคำขอ: <code>pending_staff</code> → <code>pending_l2</code>
-                  </span>
-                </div>
-
-                <div className="rounded-2xl border border-line bg-soft p-3.5 flex flex-col gap-1">
-                  <div className="flex items-center justify-between">
-                    <b className="text-brand">ระดับที่ 2 · เห็นชอบ</b>
-                    <Chip tone="amber">APPROVER_L2</Chip>
-                  </div>
-                  <span className="text-ink font-semibold">วิชัย รักถิ่น (ปลัด อบต.)</span>
-                  <span className="text-ink-mute">
-                    กลั่นกรองและลงนาม &ldquo;เห็นชอบ&rdquo; ด้วยลายเซ็นดิจิทัล + ยืนยันรหัส PIN 6 หลัก
-                  </span>
-                  <span className="text-[11.5px] text-ink-mute mt-1">
-                    สถานะคำขอ: <code>pending_l2</code> → <code>pending_l1</code>
-                  </span>
-                </div>
-
-                <div className="rounded-2xl border border-line bg-soft p-3.5 flex flex-col gap-1">
-                  <div className="flex items-center justify-between">
-                    <b className="text-brand">ระดับที่ 3 · อนุมัติขั้นสุดท้าย</b>
-                    <Chip tone="amber">APPROVER_L1</Chip>
-                  </div>
-                  <span className="text-ink font-semibold">ประเสริฐ ศรีสุข (นายก อบต.)</span>
-                  <span className="text-ink-mute">
-                    ลงนาม &ldquo;อนุมัติ&rdquo; ขั้นสุดท้ายด้วยลายเซ็นดิจิทัล + PIN 6 หลัก และออกใบอนุญาต PDF อัตโนมัติ
-                  </span>
-                  <span className="text-[11.5px] text-ink-mute mt-1">
-                    สถานะคำขอ: <code>pending_l1</code> → <code>approved</code>
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* ตารางเปรียบเทียบสิทธิ์ 5 บทบาท */}
-            <div className="jw-card p-5 overflow-x-auto">
-              <b className="text-[16px] text-ink block mb-3">
-                ตารางเปรียบเทียบสิทธิ์มาตรฐานทั้ง 5 บทบาท (Role & Permission Matrix)
-              </b>
-              <table className="w-full text-[13px] border-collapse min-w-[640px]">
-                <thead>
-                  <tr className="border-b border-line text-left bg-soft">
-                    <th className="p-2.5 font-bold text-ink">สิทธิ์การใช้งาน / เมนู</th>
-                    {ROLES.map((r) => (
-                      <th key={r} className="p-2.5 text-center font-bold">
-                        <Chip tone={ROLE_TONE[r]}>{ROLE_META[r].shortLabel}</Chip>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  <tr>
-                    <td className="p-2.5">
-                      <b className="block">ยื่นคำขอจอง / ยืม–คืน / แจ้งซ่อม / ติดตามผล</b>
-                      <span className="text-[11.5px] text-ink-mute">/, /booking, /borrow, /repair</span>
-                    </td>
-                    {ROLES.map((r) => (
-                      <td key={r} className="p-2.5 text-center text-brand font-bold">
-                        ✓
-                      </td>
-                    ))}
-                  </tr>
-                  {PERMISSION_KEYS.map((perm) => {
-                    const meta = PERMISSION_META[perm];
-                    return (
-                      <tr key={perm}>
-                        <td className="p-2.5">
-                          <b className="block">{meta.label}</b>
-                          <span className="text-[11.5px] text-ink-mute">{meta.routes.join(', ')}</span>
-                        </td>
-                        {ROLES.map((r) => {
-                          const has = DEFAULT_PERMISSIONS[r][perm];
-                          return (
-                            <td
-                              key={r}
-                              className={`p-2.5 text-center font-bold ${
-                                has ? 'text-brand' : 'text-ink-ph'
-                              }`}
-                            >
-                              {has ? '✓' : '—'}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* รายละเอียดขอบเขตหน้าที่ของแต่ละบทบาท */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-              {ROLES.map((r) => {
-                const info = ROLE_META[r];
-                return (
-                  <div key={r} className="jw-card p-4 flex flex-col gap-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <b className="text-[15px] text-ink">{info.label}</b>
-                      <Chip tone={info.tone}>{info.shortLabel}</Chip>
+                        {/* Active status toggle */}
+                        <div className="flex items-center gap-1.5 pl-2 border-l border-line">
+                          <Toggle
+                            checked={user.active !== false}
+                            onChange={() => handleToggleUserActive(user)}
+                            disabled={isSelf}
+                            title={isSelf ? 'ไม่สามารถระงับบัญชีตนเองได้' : undefined}
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-[12.5px] text-ink-mute">{info.summary}</p>
-                    <ul className="text-[12.5px] text-ink space-y-1 pl-4 list-disc">
-                      {info.capabilities.map((cap) => (
-                        <li key={cap}>{cap}</li>
-                      ))}
-                    </ul>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ==================== ADD / EDIT ROLE MODAL ==================== */}
+        {isAddRoleModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
+            <div className="jw-card w-full max-w-lg p-5 sm:p-6 bg-white shadow-xl flex flex-col gap-4">
+              <div className="flex items-center justify-between pb-3 border-b border-line">
+                <h3 className="text-[17px] font-bold text-ink">
+                  {editingRole ? 'แก้ไขข้อมูลบทบาท' : 'เพิ่มบทบาทใหม่'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsAddRoleModalOpen(false)}
+                  className="p-1 rounded-lg text-ink-ph hover:text-ink hover:bg-soft transition"
+                >
+                  <Icon name="x" className="w-5 h-5" />
+                </button>
+              </div>
+
+              {roleModalError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-[13px]">
+                  {roleModalError}
+                </div>
+              )}
+
+              <form onSubmit={handleSaveRole} className="flex flex-col gap-4">
+                {/* Role Code / Key */}
+                <div>
+                  <label className="jw-lbl">
+                    รหัสบทบาท (Role Code){' '}
+                    <span className="text-ink-ph font-normal">
+                      {editingRole ? '(ไม่สามารถแก้ไขรหัสได้)' : '(ภาษาอังกฤษตัวพิมพ์ใหญ่ เช่น STAFF_PR)'}
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    value={roleFormKey}
+                    onChange={(e) => setRoleFormKey(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ''))}
+                    placeholder="เช่น STAFF_FINANCE, OPERATOR (เว้นว่างเพื่อสร้างอัตโนมัติ)"
+                    disabled={!!editingRole}
+                    className="jw-in uppercase"
+                  />
+                </div>
+
+                {/* Role Name */}
+                <div>
+                  <label className="jw-lbl">ชื่อบทบาทภาษาไทย *</label>
+                  <input
+                    type="text"
+                    value={roleFormName}
+                    onChange={(e) => setRoleFormName(e.target.value)}
+                    placeholder="เช่น เจ้าหน้าที่ประชาสัมพันธ์, เจ้าหน้าที่การเงิน"
+                    required
+                    className="jw-in"
+                  />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="jw-lbl">คำอธิบายหน้าที่ / ขอบเขตงาน</label>
+                  <textarea
+                    value={roleFormDesc}
+                    onChange={(e) => setRoleFormDesc(e.target.value)}
+                    placeholder="อธิบายหน้าที่ของบทบาทนี้ เพื่อให้ผู้ดูแลระบบคนอื่นเข้าใจได้ง่าย"
+                    rows={3}
+                    className="jw-in py-2.5 resize-none"
+                  />
+                </div>
+
+                {/* Tone Color Picker */}
+                <div>
+                  <label className="jw-lbl">โทนสีป้ายบทบาท (Badge Tone)</label>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {AVAILABLE_TONES.map((t) => (
+                      <button
+                        key={t.tone}
+                        type="button"
+                        onClick={() => setRoleFormTone(t.tone)}
+                        className={`h-8 px-3 rounded-full text-[12px] font-semibold border flex items-center gap-1.5 transition ${
+                          roleFormTone === t.tone
+                            ? 'border-brand bg-brand-mint text-brand shadow-sm ring-1 ring-brand'
+                            : 'border-line bg-white text-ink-mute hover:border-brand/40'
+                        }`}
+                      >
+                        <span className={`w-2.5 h-2.5 rounded-full ${t.colorClass}`} />
+                        <span>{t.label}</span>
+                      </button>
+                    ))}
                   </div>
-                );
-              })}
+                </div>
+
+                {/* Enabled Toggle */}
+                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-soft border border-line">
+                  <div>
+                    <b className="text-[14px] text-ink block">สถานะเปิดใช้งานบทบาท</b>
+                    <span className="text-[12px] text-ink-mute">
+                      หากปิดใช้งาน ผู้ใช้งานจะไม่สามารถเลือกบทบาทนี้ได้
+                    </span>
+                  </div>
+                  <Toggle
+                    checked={roleFormEnabled}
+                    onChange={setRoleFormEnabled}
+                    disabled={editingRole?.key === 'ADMIN'}
+                  />
+                </div>
+
+                {/* Modal Buttons */}
+                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-line mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddRoleModalOpen(false)}
+                    className="jw-btn-sec w-24"
+                    disabled={roleModalSaving}
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    className="jw-btn px-6 flex items-center gap-1.5"
+                    disabled={roleModalSaving}
+                  >
+                    {roleModalSaving ? 'กำลังบันทึก...' : editingRole ? 'บันทึกการแก้ไข' : 'สร้างบทบาท'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== DELETE ROLE CONFIRMATION MODAL ==================== */}
+        {deletingRole && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
+            <div className="jw-card w-full max-w-md p-5 sm:p-6 bg-white shadow-xl flex flex-col gap-4">
+              <div className="flex items-center gap-3 text-rose-600">
+                <span className="p-2 rounded-xl bg-rose-100">
+                  <Icon name="trash" className="w-6 h-6" />
+                </span>
+                <h3 className="text-[17px] font-bold text-ink">ยืนยันการลบบทบาท</h3>
+              </div>
+
+              <p className="text-[13.5px] text-ink-mute leading-relaxed">
+                คุณแน่ใจหรือไม่ว่าต้องการลบบทบาท{' '}
+                <strong className="text-ink font-bold">&ldquo;{deletingRole.name}&rdquo; ({deletingRole.key})</strong>{' '}
+                ออกจากระบบ? การกระทำนี้ไม่สามารถย้อนกลับได้
+              </p>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-line">
+                <button
+                  type="button"
+                  onClick={() => setDeletingRole(null)}
+                  className="jw-btn-sec w-24"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteRole}
+                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[13.5px] transition"
+                >
+                  ลบบทบาท
+                </button>
+              </div>
             </div>
           </div>
         )}

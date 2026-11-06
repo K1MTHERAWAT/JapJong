@@ -353,7 +353,7 @@ function ManageResourcesContent() {
                   sampleDocMode={formPreviewMode === 'sample'}
                   customFields={{
                     formTitle: currentSelectedForm?.title || 'แบบขอใช้สถานที่ราชการ',
-                    subject: currentSelectedForm?.sub || 'ขออนุญาตใช้สถานที่ราชการ',
+                    subject: currentSelectedForm?.sub?.replace(/^เรื่อง\s*/, '') || 'ขออนุญาตใช้สถานที่ราชการ',
                     desireLabel: currentSelectedForm?.title?.includes('ครุภัณฑ์')
                       ? 'มีความประสงค์ขอยืมครุภัณฑ์ราชการ ดังนี้'
                       : 'มีความประสงค์ขอใช้สถานที่ราชการ ดังนี้',

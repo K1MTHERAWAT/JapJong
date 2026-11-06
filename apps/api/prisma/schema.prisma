@@ -686,3 +686,107 @@ model FlexMessageTemplate {
   @@index([status])
   @@map("flex_message_templates")
 }
+
+// ===================== Sidebar & Service Management =====================
+
+model SidebarService {
+  id             String   @id @default(cuid())
+  slug           String?  @unique
+  label          String
+  description    String?  @default("")
+  icon           String   @default("FolderTree")
+  href           String   @unique
+  category       String   @default("บริการหลัก")
+  sortOrder      Int      @default(0) @map("sort_order")
+  enabled        Boolean  @default(true)
+  isSystem       Boolean  @default(false) @map("is_system")
+  roles          Role[]   @default([])
+  allowedUserIds String[] @default([]) @map("allowed_user_ids")
+  permissions    Json     @default("{\"view\":true,\"create\":false,\"edit\":false,\"delete\":false,\"approve\":false,\"manage\":false}")
+  exact          Boolean  @default(false)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([category, sortOrder])
+  @@index([enabled])
+  @@map("sidebar_services")
+}
+
+// ===================== Role Management =====================
+
+model RoleDefinition {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  description String?  @default("")
+  tone        String   @default("gray")
+  enabled     Boolean  @default(true)
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("role_definitions")
+}
+
+// ===================== Official Document Templates =====================
+
+model DocumentTemplate {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?  @default("")
+  category       String   @default("venue") // venue | equipment | memo | general
+  status         String   @default("draft") // draft | published | archived
+  currentVersion Int      @default(1) @map("current_version")
+  structure      Json     // DocumentStructure
+  settings       Json     // DocumentTemplateSettings
+  createdBy      String?  @map("created_by")
+  updatedBy      String?  @map("updated_by")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  versions       DocumentTemplateVersion[]
+  generatedDocs  GeneratedDocument[]
+
+  @@index([category])
+  @@index([status])
+  @@map("document_templates")
+}
+
+model DocumentTemplateVersion {
+  id          String   @id @default(cuid())
+  templateId  String   @map("template_id")
+  version     Int
+  structure   Json
+  settings    Json
+  note        String?  @default("")
+  publishedAt DateTime @default(now()) @map("published_at") @db.Timestamptz(3)
+  publishedBy String?  @map("published_by")
+
+  template    DocumentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, version])
+  @@index([templateId])
+  @@map("document_template_versions")
+}
+
+model GeneratedDocument {
+  id                String   @id @default(cuid())
+  templateId        String   @map("template_id")
+  templateVersionId String?  @map("template_version_id")
+  requestId         String   @map("request_id")
+  documentNumber    String   @map("document_number")
+  snapshot          Json
+  renderedFile      String?  @map("rendered_file")
+  status            String   @default("draft")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  template          DocumentTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+
+  @@index([templateId])
+  @@index([requestId])
+  @@map("generated_documents")
+}
+
+
+

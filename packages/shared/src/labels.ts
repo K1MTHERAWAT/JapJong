@@ -7,9 +7,10 @@ import type {
   VenueType,
   VerificationDocumentType,
   VerificationStatus,
+  Tone,
 } from './types';
 
-export type Tone = 'green' | 'amber' | 'blue' | 'red' | 'gray' | 'orange' | 'purple' | 'teal' | 'cyan' | 'indigo' | 'pink';
+export type { Tone };
 
 export const ROLE_LABEL: Record<Role, string> = {
   USER: 'ผู้ใช้งานทั่วไป',
@@ -300,4 +301,25 @@ export const VERIFICATION_DOC_TYPE_LABEL: Record<VerificationDocumentType, strin
   borrow_permit: 'หนังสืออนุมัติยืมอุปกรณ์',
   handover: 'เอกสารส่งมอบและคืนอุปกรณ์',
 };
+
+// ===================== Service Permissions Labels =====================
+
+export const SERVICE_ACTION_LABEL: Record<keyof import('./types').ServicePermissions, string> = {
+  view: 'ดูข้อมูล / เข้าเมนู',
+  create: 'เพิ่มข้อมูล / ยื่นคำขอ',
+  edit: 'แก้ไขข้อมูล',
+  delete: 'ลบข้อมูล',
+  approve: 'พิจารณา / ลงนามอนุมัติ',
+  manage: 'จัดการและตั้งค่าระบบ',
+};
+
+export const DEFAULT_SERVICE_PERMISSIONS: import('./types').ServicePermissions = {
+  view: true,
+  create: false,
+  edit: false,
+  delete: false,
+  approve: false,
+  manage: false,
+};
+
 

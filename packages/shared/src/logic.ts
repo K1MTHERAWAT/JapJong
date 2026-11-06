@@ -293,8 +293,13 @@ export function canAccessRoute(
     };
   }
 
-  // 3. หน้าโฮมแอดมิน (/admin), ระบบแจ้งเตือน (/admin/notifications) และ LINE Rich Menu (/admin/line)
-  if (pathname === '/admin' || pathname.startsWith('/admin/notifications') || pathname.startsWith('/admin/line')) {
+  // 3. หน้าโฮมแอดมิน (/admin), จัดการบริการ (/admin/services), ระบบแจ้งเตือน (/admin/notifications) และ LINE Rich Menu (/admin/line)
+  if (
+    pathname === '/admin' ||
+    pathname.startsWith('/admin/services') ||
+    pathname.startsWith('/admin/notifications') ||
+    pathname.startsWith('/admin/line')
+  ) {
     const ok = account.role === 'ADMIN' || hasPermission(account, 'manageUsers');
     return {
       allowed: ok,
@@ -428,3 +433,61 @@ export function canAccessRoute(
     requiredRoles: ['USER', 'STAFF', 'APPROVER_L2', 'APPROVER_L1', 'ADMIN'],
   };
 }
+
+export function canAccessServiceRoute(
+  account: (Pick<Account, 'role' | 'permissions'> & { id?: string }) | null | undefined,
+  pathname: string,
+  services?: import('./types').SidebarServiceItem[],
+): RouteAccessResult {
+  if (services && services.length > 0) {
+    const matched = services.find((s) => (s.exact || s.href === '/' ? pathname === s.href : pathname.startsWith(s.href)));
+    if (matched) {
+      if (!matched.enabled) {
+        return {
+          allowed: false,
+          title: matched.label,
+          requiredRoles: matched.roles,
+          reason: `บริการ "${matched.label}" ถูกปิดใช้งานชั่วคราวโดยผู้ดูแลระบบ`,
+        };
+      }
+      if (account?.id && matched.deniedUserIds?.includes(account.id)) {
+        return {
+          allowed: false,
+          title: matched.label,
+          requiredRoles: matched.roles,
+          reason: `บัญชีของคุณถูกจำกัดการเข้าถึงบริการ "${matched.label}"`,
+        };
+      }
+      if (account?.id && matched.allowedUserIds?.includes(account.id)) {
+        return {
+          allowed: true,
+          title: matched.label,
+          requiredRoles: matched.roles,
+        };
+      }
+      if (account?.role && matched.roles.includes(account.role)) {
+        return {
+          allowed: true,
+          title: matched.label,
+          requiredRoles: matched.roles,
+        };
+      }
+      if (!account && matched.roles.includes('USER') && ['/', '/booking', '/borrow', '/repair'].includes(matched.href)) {
+        return {
+          allowed: true,
+          title: matched.label,
+          requiredRoles: matched.roles,
+        };
+      }
+      return {
+        allowed: false,
+        title: matched.label,
+        requiredRoles: matched.roles,
+        reason: account ? `คุณไม่มีสิทธิ์เข้าถึงบริการ "${matched.label}"` : 'กรุณาเข้าสู่ระบบก่อนใช้งาน',
+      };
+    }
+  }
+
+  return canAccessRoute(account, pathname);
+}
+

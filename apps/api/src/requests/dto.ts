@@ -299,6 +299,10 @@ export class RepairStatusDto {
   @IsOptional()
   @IsString()
   pin?: string;
+
+  @IsOptional()
+  @IsArray()
+  afterPhotos?: string[];
 }
 
 export class ReceiveEquipmentDto {

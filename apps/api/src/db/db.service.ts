@@ -1,4 +1,12 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import {
@@ -26,6 +34,19 @@ import {
   Role,
   UserNotificationPreference,
   Venue,
+  CreateSidebarServiceDto,
+  ServiceRelationCheckResult,
+  SidebarServiceItem,
+  UpdateSidebarServiceDto,
+  RoleItem,
+  CreateRoleDto,
+  UpdateRoleDto,
+  BulkAssignRoleDto,
+  DocumentTemplateCategory,
+  DocumentTemplateStatus,
+  DocumentTemplateItem,
+  DocumentTemplateVersionItem,
+  GeneratedDocumentItem,
 } from '@japjong/shared';
 import {
   mockAccounts,
@@ -33,6 +54,8 @@ import {
   mockEquipment,
   mockNotifications,
   mockRequests,
+  mockRoles,
+  mockSidebarServices,
   mockVenues,
 } from '../demo-data';
 import { hashSecret } from '../auth/secret';
@@ -125,6 +148,13 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   userNotificationPreferences: UserNotificationPreference[] = [];
   lineNotificationLogs: (LineNotificationLog & { messagePayload?: any; nextRetryAt?: string | null })[] = [];
   lineWebhookEvents: LineWebhookEventRecord[] = [];
+  sidebarServices: SidebarServiceItem[] = [];
+  roles: RoleItem[] = [];
+  documentTemplates: DocumentTemplateItem[] = [];
+  documentTemplateVersions: DocumentTemplateVersionItem[] = [];
+  generatedDocuments: GeneratedDocumentItem[] = [];
+
+
 
   private seq = { BK: 0, BR: 0, RP: 0, n: 0, l: 0, u: 100, v: 100, e: 100 };
   private resetCronTimer?: NodeJS.Timeout;
@@ -221,6 +251,38 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         `CREATE INDEX IF NOT EXISTS "document_scan_logs_scanned_at_idx" ON "document_scan_logs"("scanned_at")`,
         `CREATE INDEX IF NOT EXISTS "sign_otp_codes_account_email_idx" ON "sign_otp_codes"("account_id", "email")`,
         `CREATE INDEX IF NOT EXISTS "sign_verified_sessions_acc_token_idx" ON "sign_verified_sessions"("account_id", "session_token")`,
+        `CREATE TABLE IF NOT EXISTS "sidebar_services" (
+           "id" TEXT PRIMARY KEY,
+           "slug" TEXT UNIQUE,
+           "label" TEXT NOT NULL,
+           "description" TEXT DEFAULT '',
+           "icon" TEXT NOT NULL DEFAULT 'FolderTree',
+           "href" TEXT NOT NULL UNIQUE,
+           "category" TEXT NOT NULL DEFAULT 'บริการหลัก',
+           "sort_order" INTEGER NOT NULL DEFAULT 0,
+           "enabled" BOOLEAN NOT NULL DEFAULT true,
+           "is_system" BOOLEAN NOT NULL DEFAULT false,
+           "roles" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+           "allowed_user_ids" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+           "denied_user_ids" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+           "permissions" JSONB NOT NULL DEFAULT '{"view":true,"create":false,"edit":false,"delete":false,"approve":false,"manage":false}'::jsonb,
+           "exact" BOOLEAN NOT NULL DEFAULT false,
+           "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+           "updated_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+         )`,
+        `CREATE INDEX IF NOT EXISTS "sidebar_services_cat_order_idx" ON "sidebar_services"("category", "sort_order")`,
+        `CREATE INDEX IF NOT EXISTS "sidebar_services_enabled_idx" ON "sidebar_services"("enabled")`,
+        `CREATE TABLE IF NOT EXISTS "role_definitions" (
+           "id" TEXT PRIMARY KEY,
+           "key" TEXT NOT NULL UNIQUE,
+           "name" TEXT NOT NULL,
+           "description" TEXT DEFAULT '',
+           "tone" TEXT NOT NULL DEFAULT 'gray',
+           "enabled" BOOLEAN NOT NULL DEFAULT true,
+           "is_system" BOOLEAN NOT NULL DEFAULT false,
+           "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+           "updated_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+         )`,
       ];
       for (const stmt of initStatements) {
         await this.prisma.$executeRawUnsafe(stmt).catch((err: any) => {
@@ -268,6 +330,13 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       if (this.equipment.length === 0) {
         this.equipment = clone(mockEquipment);
       }
+      if (this.sidebarServices.length === 0) {
+        this.sidebarServices = clone(mockSidebarServices);
+      }
+      if (this.roles.length === 0) {
+        this.roles = clone(mockRoles);
+      }
+      this.initDefaultDocumentTemplates();
       return;
     }
     const hashedAccounts: Account[] = [];
@@ -282,7 +351,10 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     this.requests = clone(mockRequests);
     this.notifications = clone(mockNotifications);
     this.activities = clone(mockActivities);
+    this.sidebarServices = clone(mockSidebarServices);
+    this.roles = clone(mockRoles);
     this.handovers = [];
+    this.initDefaultDocumentTemplates();
     this.syncMemorySequences();
   }
 
@@ -2632,7 +2704,1155 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       this.logger.warn('Could not load verifications from DB, using memory state:', err);
     }
 
+    try {
+      const rows = (await this.prisma.$queryRawUnsafe(
+        `SELECT * FROM "sidebar_services" ORDER BY "sort_order" ASC, "created_at" ASC`,
+      )) as any[];
+      if (Array.isArray(rows) && rows.length > 0) {
+        this.sidebarServices = rows.map((r: any) => ({
+          id: r.id,
+          slug: r.slug ?? undefined,
+          label: r.label,
+          description: r.description ?? '',
+          icon: r.icon || 'FolderTree',
+          href: r.href,
+          category: r.category || 'บริการหลัก',
+          sortOrder: Number(r.sort_order ?? 0),
+          enabled: Boolean(r.enabled),
+          isSystem: Boolean(r.is_system),
+          roles: Array.isArray(r.roles) ? r.roles : [],
+          allowedUserIds: Array.isArray(r.allowed_user_ids) ? r.allowed_user_ids : [],
+          deniedUserIds: Array.isArray(r.denied_user_ids) ? r.denied_user_ids : [],
+          permissions: r.permissions
+            ? typeof r.permissions === 'string'
+              ? JSON.parse(r.permissions)
+              : r.permissions
+            : { view: true, create: false, edit: false, delete: false, approve: false, manage: false },
+          exact: Boolean(r.exact),
+          createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+          updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : new Date().toISOString(),
+        }));
+      } else {
+        this.sidebarServices = clone(mockSidebarServices);
+        for (const s of this.sidebarServices) {
+          await this.prisma
+            .$executeRawUnsafe(
+              `INSERT INTO "sidebar_services" ("id", "slug", "label", "description", "icon", "href", "category", "sort_order", "enabled", "is_system", "roles", "allowed_user_ids", "denied_user_ids", "permissions", "exact", "created_at", "updated_at")
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+               ON CONFLICT ("id") DO NOTHING`,
+              s.id,
+              s.slug || s.id,
+              s.label,
+              s.description || '',
+              s.icon,
+              s.href,
+              s.category,
+              s.sortOrder,
+              s.enabled,
+              s.isSystem ?? false,
+              s.roles,
+              s.allowedUserIds,
+              s.deniedUserIds || [],
+              JSON.stringify(s.permissions),
+              s.exact ?? false,
+            )
+            .catch(() => {});
+        }
+      }
+    } catch (err) {
+      this.logger.warn('Could not load sidebar_services from DB, using fallback mock:', err);
+      if (this.sidebarServices.length === 0) {
+        this.sidebarServices = clone(mockSidebarServices);
+      }
+    }
+
+    try {
+      const roleRows = (await this.prisma.$queryRawUnsafe(
+        `SELECT * FROM "role_definitions" ORDER BY "created_at" ASC`,
+      )) as any[];
+      if (Array.isArray(roleRows) && roleRows.length > 0) {
+        this.roles = roleRows.map((r: any) => ({
+          id: r.id,
+          key: r.key,
+          name: r.name,
+          description: r.description ?? '',
+          tone: r.tone || 'gray',
+          userCount: 0,
+          enabled: Boolean(r.enabled),
+          isSystem: Boolean(r.is_system),
+          createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+          updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : new Date().toISOString(),
+        }));
+      } else {
+        this.roles = clone(mockRoles);
+        for (const role of this.roles) {
+          await this.prisma
+            .$executeRawUnsafe(
+              `INSERT INTO "role_definitions" ("id", "key", "name", "description", "tone", "enabled", "is_system", "created_at", "updated_at")
+               VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+               ON CONFLICT ("id") DO NOTHING`,
+              role.id,
+              role.key,
+              role.name,
+              role.description,
+              role.tone,
+              role.enabled,
+              role.isSystem,
+            )
+            .catch(() => {});
+        }
+      }
+    } catch (err) {
+      this.logger.warn('Could not load role_definitions from DB, using fallback mock:', err);
+      if (this.roles.length === 0) {
+        this.roles = clone(mockRoles);
+      }
+    }
+
     await this.syncSequences();
     await this.cleanExpiredSessions();
+  }
+
+  // ===================== Sidebar & Services Management =====================
+
+  listSidebarServices(): SidebarServiceItem[] {
+    return clone(this.sidebarServices).sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+
+  getSidebarServicesForUser(account: Account | null): SidebarServiceItem[] {
+    return this.sidebarServices
+      .filter((item) => {
+        if (!item.enabled) return false;
+        if (account?.id && item.deniedUserIds?.includes(account.id)) return false;
+        if (account?.id && item.allowedUserIds?.includes(account.id)) return true;
+        if (account) {
+          return item.roles.includes(account.role);
+        } else {
+          return item.roles.includes('USER') && ['/', '/booking', '/borrow', '/repair'].includes(item.href);
+        }
+      })
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+
+  getSidebarServiceById(id: string): SidebarServiceItem | undefined {
+    return this.sidebarServices.find((s) => s.id === id);
+  }
+
+  isServiceRouteEnabled(route: string): boolean {
+    const matched = this.sidebarServices.find((s) =>
+      s.exact || s.href === '/' ? route === s.href : route.startsWith(s.href),
+    );
+    if (!matched) return true;
+    return matched.enabled;
+  }
+
+  async createSidebarService(dto: CreateSidebarServiceDto, actor: Account): Promise<SidebarServiceItem> {
+    const href = dto.href.trim();
+    if (this.sidebarServices.some((s) => s.href === href)) {
+      throw new BadRequestException(`URL หรือ Route "${href}" มีอยู่ในระบบแล้ว`);
+    }
+
+    const id = `nav-${randomBytes(6).toString('hex')}`;
+    const maxOrder = this.sidebarServices.reduce((max, s) => Math.max(max, s.sortOrder), 0);
+    const newItem: SidebarServiceItem = {
+      id,
+      slug: id,
+      label: dto.label.trim(),
+      description: dto.description?.trim() || '',
+      icon: dto.icon || 'FolderTree',
+      href,
+      category: dto.category.trim() || 'บริการทั่วไป',
+      sortOrder: typeof dto.sortOrder === 'number' ? dto.sortOrder : maxOrder + 1,
+      enabled: dto.enabled !== false,
+      isSystem: false,
+      roles: Array.isArray(dto.roles) ? dto.roles : ['ADMIN'],
+      allowedUserIds: Array.isArray(dto.allowedUserIds) ? dto.allowedUserIds : [],
+      deniedUserIds: Array.isArray(dto.deniedUserIds) ? dto.deniedUserIds : [],
+      permissions: {
+        view: true,
+        create: Boolean(dto.permissions?.create),
+        edit: Boolean(dto.permissions?.edit),
+        delete: Boolean(dto.permissions?.delete),
+        approve: Boolean(dto.permissions?.approve),
+        manage: Boolean(dto.permissions?.manage),
+      },
+      exact: Boolean(dto.exact),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.sidebarServices.push(newItem);
+
+    if (this.dbAvailable) {
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `INSERT INTO "sidebar_services" ("id", "slug", "label", "description", "icon", "href", "category", "sort_order", "enabled", "is_system", "roles", "allowed_user_ids", "denied_user_ids", "permissions", "exact", "created_at", "updated_at")
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+          newItem.id,
+          newItem.slug,
+          newItem.label,
+          newItem.description,
+          newItem.icon,
+          newItem.href,
+          newItem.category,
+          newItem.sortOrder,
+          newItem.enabled,
+          newItem.isSystem,
+          newItem.roles,
+          newItem.allowedUserIds,
+          newItem.deniedUserIds,
+          JSON.stringify(newItem.permissions),
+          newItem.exact,
+        );
+      } catch (err: any) {
+        this.logger.error('Failed to insert sidebar_service into PostgreSQL: ' + err?.message);
+      }
+    }
+
+    await this.log(
+      'resource',
+      'เพิ่มบริการ/เมนูใหม่',
+      `เพิ่มบริการ "${newItem.label}" (${newItem.href}) ในหมวดหมู่ "${newItem.category}"`,
+      actor,
+    );
+
+    return newItem;
+  }
+
+  async updateSidebarService(id: string, dto: UpdateSidebarServiceDto, actor: Account): Promise<SidebarServiceItem> {
+    const item = this.sidebarServices.find((s) => s.id === id);
+    if (!item) throw new NotFoundException('ไม่พบบริการหรือเมนูที่ระบุ');
+
+    // ตรวจสอบความปลอดภัย: ป้องกันไม่ให้แอดมินปิดหรือลบสิทธิ์ Admin ในเมนูระบบที่จำเป็น
+    const isAdminSystemMenu = item.isSystem || item.href === '/admin' || item.href.startsWith('/admin/');
+    if (isAdminSystemMenu) {
+      if (dto.roles && !dto.roles.includes('ADMIN')) {
+        throw new ForbiddenException('ไม่สามารถยกเลิกสิทธิ์ของผู้ดูแลระบบ (ADMIN) ในเมนูระบบหลักได้');
+      }
+      if (dto.enabled === false && (item.href === '/admin' || item.href === '/admin/services' || item.href === '/admin/permissions')) {
+        throw new ForbiddenException('ไม่สามารถปิดการใช้งานเมนูหลักของผู้ดูแลระบบได้ เพื่อป้องกันไม่ให้ระบบไม่มีผู้ดูแล');
+      }
+    }
+
+    if (dto.href && dto.href !== item.href) {
+      const nextHref = dto.href.trim();
+      if (this.sidebarServices.some((s) => s.id !== id && s.href === nextHref)) {
+        throw new BadRequestException(`URL หรือ Route "${nextHref}" มีอยู่ในระบบแล้ว`);
+      }
+      item.href = nextHref;
+    }
+
+    if (dto.label !== undefined) item.label = dto.label.trim();
+    if (dto.description !== undefined) item.description = dto.description.trim();
+    if (dto.icon !== undefined) item.icon = dto.icon.trim();
+    if (dto.category !== undefined) item.category = dto.category.trim();
+    if (typeof dto.sortOrder === 'number') item.sortOrder = dto.sortOrder;
+    if (typeof dto.enabled === 'boolean') item.enabled = dto.enabled;
+    if (Array.isArray(dto.roles)) item.roles = dto.roles;
+    if (Array.isArray(dto.allowedUserIds)) item.allowedUserIds = dto.allowedUserIds;
+    if (Array.isArray(dto.deniedUserIds)) item.deniedUserIds = dto.deniedUserIds;
+    if (dto.permissions) {
+      item.permissions = {
+        ...item.permissions,
+        ...dto.permissions,
+      };
+    }
+    if (typeof dto.exact === 'boolean') item.exact = dto.exact;
+    item.updatedAt = new Date().toISOString();
+
+    if (this.dbAvailable) {
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `UPDATE "sidebar_services"
+           SET "label" = $1, "description" = $2, "icon" = $3, "href" = $4, "category" = $5,
+               "sort_order" = $6, "enabled" = $7, "roles" = $8, "allowed_user_ids" = $9,
+               "denied_user_ids" = $10, "permissions" = $11::jsonb, "exact" = $12, "updated_at" = CURRENT_TIMESTAMP
+           WHERE "id" = $13`,
+          item.label,
+          item.description,
+          item.icon,
+          item.href,
+          item.category,
+          item.sortOrder,
+          item.enabled,
+          item.roles,
+          item.allowedUserIds,
+          item.deniedUserIds,
+          JSON.stringify(item.permissions),
+          item.exact,
+          item.id,
+        );
+      } catch (err: any) {
+        this.logger.error('Failed to update sidebar_service in PostgreSQL: ' + err?.message);
+      }
+    }
+
+    await this.log(
+      'resource',
+      'แก้ไขบริการ/เมนู',
+      `แก้ไขบริการ "${item.label}" (${item.href}) สถานะ=${item.enabled ? 'เปิด' : 'ปิด'} สิทธิ์=[${item.roles.join(', ')}]`,
+      actor,
+    );
+
+    return item;
+  }
+
+  async toggleSidebarService(id: string, actor: Account): Promise<SidebarServiceItem> {
+    const item = this.sidebarServices.find((s) => s.id === id);
+    if (!item) throw new NotFoundException('ไม่พบบริการหรือเมนูที่ระบุ');
+
+    if (item.enabled && (item.href === '/admin' || item.href === '/admin/services' || item.href === '/admin/permissions')) {
+      throw new ForbiddenException('ไม่สามารถปิดการใช้งานเมนูผู้ดูแลระบบหลักได้ เพื่อป้องกันไม่ให้ระบบไม่มีผู้ดูแล');
+    }
+
+    item.enabled = !item.enabled;
+    item.updatedAt = new Date().toISOString();
+
+    if (this.dbAvailable) {
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `UPDATE "sidebar_services" SET "enabled" = $1, "updated_at" = CURRENT_TIMESTAMP WHERE "id" = $2`,
+          item.enabled,
+          item.id,
+        );
+      } catch (err: any) {
+        this.logger.error('Failed to toggle sidebar_service in PostgreSQL: ' + err?.message);
+      }
+    }
+
+    await this.log(
+      'resource',
+      item.enabled ? 'เปิดใช้งานบริการ' : 'ปิดใช้งานบริการ',
+      `${item.enabled ? 'เปิด' : 'ปิด'}การแสดงผลบริการ "${item.label}" (${item.href})`,
+      actor,
+    );
+
+    return item;
+  }
+
+  async reorderSidebarServices(orderUpdates: { id: string; sortOrder: number; category?: string }[], actor: Account): Promise<void> {
+    for (const update of orderUpdates) {
+      const item = this.sidebarServices.find((s) => s.id === update.id);
+      if (item) {
+        item.sortOrder = update.sortOrder;
+        if (update.category) item.category = update.category;
+        item.updatedAt = new Date().toISOString();
+        if (this.dbAvailable) {
+          await this.prisma
+            .$executeRawUnsafe(
+              `UPDATE "sidebar_services" SET "sort_order" = $1, "category" = $2, "updated_at" = CURRENT_TIMESTAMP WHERE "id" = $3`,
+              item.sortOrder,
+              item.category,
+              item.id,
+            )
+            .catch(() => {});
+        }
+      }
+    }
+
+    await this.log(
+      'resource',
+      'จัดเรียงลำดับเมนู Sidebar',
+      `อัปเดตการจัดเรียงลำดับและหมวดหมู่เมนูจำนวน ${orderUpdates.length} รายการ`,
+      actor,
+    );
+  }
+
+  async checkServiceRelations(id: string): Promise<ServiceRelationCheckResult> {
+    const item = this.sidebarServices.find((s) => s.id === id);
+    if (!item) throw new NotFoundException('ไม่พบบริการหรือเมนูที่ระบุ');
+
+    const reasons: string[] = [];
+    let canDelete = true;
+    let relatedRequestsCount = 0;
+    let relatedResourcesCount = 0;
+
+    // 1. ตรวจสอบเมนูระบบหลัก
+    if (
+      item.isSystem ||
+      item.href === '/admin' ||
+      item.href === '/admin/services' ||
+      item.href === '/admin/permissions' ||
+      item.href === '/account'
+    ) {
+      canDelete = false;
+      reasons.push('เมนูนี้เป็นบริการหลักของระบบ ไม่สามารถลบได้ เพื่อรักษาเสถียรภาพและความปลอดภัยของระบบ');
+    }
+
+    // 2. ตรวจสอบความสัมพันธ์กับคำขอและทรัพยากร
+    if (item.href.includes('/booking')) {
+      relatedRequestsCount = this.requests.filter((r) => r.type === 'booking').length;
+      relatedResourcesCount = this.venues.length;
+      if (relatedRequestsCount > 0) {
+        canDelete = false;
+        reasons.push(
+          `พบบันทึกคำขอใช้สถานที่ในระบบจำนวน ${relatedRequestsCount} รายการ และสถานที่ ${relatedResourcesCount} แห่ง (แนะนำให้ "ปิดใช้งาน" แทนการลบเพื่อรักษาความสมบูรณ์ของข้อมูล)`,
+        );
+      }
+    } else if (item.href.includes('/borrow')) {
+      relatedRequestsCount = this.requests.filter((r) => r.type === 'borrow').length;
+      relatedResourcesCount = this.equipment.length;
+      if (relatedRequestsCount > 0) {
+        canDelete = false;
+        reasons.push(
+          `พบบันทึกคำขอยืม-คืนอุปกรณ์ในระบบจำนวน ${relatedRequestsCount} รายการ และอุปกรณ์ ${relatedResourcesCount} รายการ (แนะนำให้ "ปิดใช้งาน" แทนการลบเพื่อรักษาความสมบูรณ์ของข้อมูล)`,
+        );
+      }
+    } else if (item.href.includes('/repair')) {
+      relatedRequestsCount = this.requests.filter((r) => r.type === 'repair').length;
+      if (relatedRequestsCount > 0) {
+        canDelete = false;
+        reasons.push(
+          `พบบันทึกแจ้งซ่อมในระบบจำนวน ${relatedRequestsCount} รายการ (แนะนำให้ "ปิดใช้งาน" แทนการลบเพื่อรักษาความสมบูรณ์ของข้อมูล)`,
+        );
+      }
+    }
+
+    return {
+      canDelete,
+      isSystem: Boolean(item.isSystem),
+      reasons,
+      relatedRequestsCount,
+      relatedResourcesCount,
+    };
+  }
+
+  async deleteSidebarService(id: string, actor: Account): Promise<void> {
+    const item = this.sidebarServices.find((s) => s.id === id);
+    if (!item) throw new NotFoundException('ไม่พบบริการหรือเมนูที่ระบุ');
+
+    const check = await this.checkServiceRelations(id);
+    if (!check.canDelete) {
+      throw new BadRequestException(
+        `ไม่สามารถลบบริการ "${item.label}" ได้: ${check.reasons.join(' | ')}`,
+      );
+    }
+
+    this.sidebarServices = this.sidebarServices.filter((s) => s.id !== id);
+
+    if (this.dbAvailable) {
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `DELETE FROM "sidebar_services" WHERE "id" = $1`,
+          id,
+        );
+      } catch (err: any) {
+        this.logger.error('Failed to delete sidebar_service from PostgreSQL: ' + err?.message);
+      }
+    }
+
+    await this.log(
+      'resource',
+      'ลบบริการ/เมนู',
+      `ลบบริการ "${item.label}" (${item.href}) ออกจากระบบ`,
+      actor,
+    );
+  }
+
+  // ==================== Role Management ====================
+
+  listRoles(): RoleItem[] {
+    return this.roles.map((r) => {
+      const count = this.accounts.filter((a) => a.role === r.key).length;
+      return {
+        ...r,
+        userCount: count,
+      };
+    });
+  }
+
+  getRoleById(id: string): RoleItem | null {
+    const role = this.roles.find((r) => r.id === id);
+    if (!role) return null;
+    return {
+      ...role,
+      userCount: this.accounts.filter((a) => a.role === role.key).length,
+    };
+  }
+
+  getRoleByKey(key: string): RoleItem | null {
+    const role = this.roles.find((r) => r.key === key);
+    if (!role) return null;
+    return {
+      ...role,
+      userCount: this.accounts.filter((a) => a.role === role.key).length,
+    };
+  }
+
+  async createRole(dto: CreateRoleDto, actor: Account): Promise<RoleItem> {
+    const name = (dto.name || '').trim();
+    if (!name) {
+      throw new BadRequestException('กรุณาระบุชื่อบทบาท');
+    }
+
+    let key = (dto.key || '').trim().toUpperCase();
+    if (!key) {
+      key = 'ROLE_' + Date.now().toString(36).toUpperCase();
+    } else {
+      key = key.replace(/[^A-Z0-9_]/g, '_');
+      if (this.roles.some((r) => r.key === key)) {
+        throw new BadRequestException(`รหัสบทบาท "${key}" มีอยู่ในระบบแล้ว`);
+      }
+    }
+
+    const now = new Date().toISOString();
+    const newRole: RoleItem = {
+      id: 'role-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+      key,
+      name,
+      description: (dto.description || '').trim(),
+      tone: dto.tone || 'blue',
+      enabled: dto.enabled !== false,
+      isSystem: false,
+      userCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    this.roles.push(newRole);
+
+    if (this.dbAvailable) {
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `INSERT INTO "role_definitions" ("id", "key", "name", "description", "tone", "enabled", "is_system", "created_at", "updated_at")
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          newRole.id,
+          newRole.key,
+          newRole.name,
+          newRole.description,
+          newRole.tone,
+          newRole.enabled,
+          newRole.isSystem,
+          new Date(now),
+          new Date(now),
+        );
+      } catch (err: any) {
+        this.logger.error('Failed to insert role_definitions to PostgreSQL: ' + err?.message);
+      }
+    }
+
+    await this.log(
+      'role',
+      'สร้างบทบาทใหม่',
+      `สร้างบทบาท "${newRole.name}" (${newRole.key})`,
+      actor,
+    );
+
+    return newRole;
+  }
+
+  async updateRole(id: string, dto: UpdateRoleDto, actor: Account): Promise<RoleItem> {
+    const idx = this.roles.findIndex((r) => r.id === id);
+    if (idx === -1) {
+      throw new NotFoundException('ไม่พบบทบาทที่ระบุ');
+    }
+
+    const existing = this.roles[idx];
+
+    if (dto.enabled === false && existing.key === 'ADMIN') {
+      throw new BadRequestException('ไม่สามารถปิดการใช้งานบทบาทผู้ดูแลระบบ (ADMIN) ได้');
+    }
+
+    const now = new Date().toISOString();
+    const updated: RoleItem = {
+      ...existing,
+      name: typeof dto.name === 'string' && dto.name.trim() ? dto.name.trim() : existing.name,
+      description: typeof dto.description === 'string' ? dto.description.trim() : existing.description,
+      tone: dto.tone || existing.tone,
+      enabled: typeof dto.enabled === 'boolean' ? dto.enabled : existing.enabled,
+      updatedAt: now,
+    };
+
+    this.roles[idx] = updated;
+
+    if (this.dbAvailable) {
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `UPDATE "role_definitions"
+           SET "name" = $1, "description" = $2, "tone" = $3, "enabled" = $4, "updated_at" = $5
+           WHERE "id" = $6`,
+          updated.name,
+          updated.description,
+          updated.tone,
+          updated.enabled,
+          new Date(now),
+          id,
+        );
+      } catch (err: any) {
+        this.logger.error('Failed to update role_definitions in PostgreSQL: ' + err?.message);
+      }
+    }
+
+    await this.log(
+      'role',
+      'แก้ไขบทบาท',
+      `แก้ไขข้อมูลบทบาท "${updated.name}" (${updated.key})`,
+      actor,
+    );
+
+    return {
+      ...updated,
+      userCount: this.accounts.filter((a) => a.role === updated.key).length,
+    };
+  }
+
+  async toggleRole(id: string, actor: Account): Promise<RoleItem> {
+    const role = this.roles.find((r) => r.id === id);
+    if (!role) {
+      throw new NotFoundException('ไม่พบบทบาทที่ระบุ');
+    }
+
+    if (role.key === 'ADMIN' && role.enabled) {
+      throw new BadRequestException('ไม่สามารถปิดการใช้งานบทบาทผู้ดูแลระบบ (ADMIN) ได้');
+    }
+
+    return this.updateRole(id, { enabled: !role.enabled }, actor);
+  }
+
+  async deleteRole(id: string, actor: Account): Promise<void> {
+    const role = this.roles.find((r) => r.id === id);
+    if (!role) {
+      throw new NotFoundException('ไม่พบบทบาทที่ระบุ');
+    }
+
+    if (role.isSystem) {
+      throw new BadRequestException('ไม่สามารถลบบทบาทของระบบ (System Role) ได้');
+    }
+
+    const userCount = this.accounts.filter((a) => a.role === role.key).length;
+    if (userCount > 0) {
+      throw new BadRequestException(
+        `ไม่สามารถลบบทบาท "${role.name}" ได้ เนื่องจากมีผู้ใช้งาน ${userCount} คนกำลังใช้บทบาทนี้อยู่ กรุณาย้ายบทบาทของผู้ใช้ก่อนลบ`,
+      );
+    }
+
+    this.roles = this.roles.filter((r) => r.id !== id);
+
+    if (this.dbAvailable) {
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `DELETE FROM "role_definitions" WHERE "id" = $1`,
+          id,
+        );
+      } catch (err: any) {
+        this.logger.error('Failed to delete role_definitions from PostgreSQL: ' + err?.message);
+      }
+    }
+
+    await this.log(
+      'role',
+      'ลบบทบาท',
+      `ลบบทบาท "${role.name}" (${role.key}) ออกจากระบบ`,
+      actor,
+    );
+  }
+
+  async bulkAssignRole(
+    userIds: string[],
+    roleKey: Role,
+    actor: Account,
+  ): Promise<{ updatedCount: number; errors: string[] }> {
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      throw new BadRequestException('กรุณาเลือกผู้ใช้งานอย่างน้อย 1 คน');
+    }
+
+    const roleDef = this.roles.find((r) => r.key === roleKey);
+    if (!roleDef) {
+      throw new BadRequestException(`ไม่พบบทบาท "${roleKey}" ในระบบ`);
+    }
+
+    if (!roleDef.enabled) {
+      throw new BadRequestException(`บทบาท "${roleDef.name}" ถูกปิดการใช้งานอยู่ ไม่สามารถกำหนดให้ผู้ใช้ได้`);
+    }
+
+    let updatedCount = 0;
+    const errors: string[] = [];
+
+    for (const uid of userIds) {
+      const user = this.accounts.find((a) => a.id === uid);
+      if (!user) {
+        errors.push(`ไม่พบผู้ใช้งาน ID ${uid}`);
+        continue;
+      }
+
+      if (user.id === actor.id && user.role === 'ADMIN' && roleKey !== 'ADMIN') {
+        errors.push(`ไม่สามารถลดระดับบทบาทตนเอง (${user.name}) ได้`);
+        continue;
+      }
+
+      const prevRole = user.role;
+      user.role = roleKey;
+      if (DEFAULT_PERMISSIONS[roleKey]) {
+        user.permissions = { ...DEFAULT_PERMISSIONS[roleKey] };
+      }
+
+      await this.persistAccount(user);
+      updatedCount++;
+
+      await this.log(
+        'role',
+        'กำหนดบทบาท',
+        `เปลี่ยนบทบาทของ ${user.name} จาก ${prevRole} เป็น ${roleDef.name} (${roleDef.key})`,
+        actor,
+      );
+    }
+
+    return { updatedCount, errors };
+  }
+
+  // ===================== Document Templates Management =====================
+
+  private initDefaultDocumentTemplates() {
+    if (this.documentTemplates.length > 0) return;
+    const defaultTemplates: DocumentTemplateItem[] = [
+      {
+        id: 'tpl-venue',
+        name: 'แบบขอใช้สถานที่ราชการ',
+        description: 'แบบคำขออนุญาตใช้สถานที่ราชการและสิ่งอำนวยความสะดวก',
+        category: 'venue',
+        status: 'published',
+        currentVersion: 1,
+        structure: {
+          title: 'แบบขอใช้สถานที่ราชการ',
+          writtenAt: 'ที่ทำการองค์การบริหารส่วนตำบล',
+          writtenDate: '',
+          subject: 'ขออนุญาตใช้สถานที่ราชการ',
+          recipient: 'ผู้มีอำนาจอนุมัติ',
+          requesterClause: 'ข้าพเจ้า',
+          requesterSlots: [
+            { id: 'req_name', label: 'ชื่อ-นามสกุลผู้ขอ', width: 220, binding: 'requester.name' },
+            { id: 'req_pos', label: 'ตำแหน่ง', width: 160, binding: 'requester.position' },
+            { id: 'req_org', label: 'หน่วยงาน/สังกัด', width: 180, binding: 'requester.organization' },
+            { id: 'req_phone', label: 'เบอร์โทรศัพท์', width: 140, binding: 'requester.phone' },
+          ],
+          purposeText: 'มีความประสงค์ขอใช้สถานที่ราชการ ดังนี้',
+          purposeItems: [{ id: 'p1', target: '', purpose: '' }],
+          closingText: 'จึงเรียนมาเพื่อโปรดพิจารณาอนุญาต',
+          signatures: [
+            { id: 'sig1', role: 'requester', title: 'ผู้ยื่นคำขอ' },
+            { id: 'sig2', role: 'staff', title: 'เจ้าหน้าที่ผู้ตรวจสอบ' },
+            { id: 'sig3', role: 'approver_l2', title: 'ผู้อนุมัติระดับ 2 (ปลัด อบต.)' },
+            { id: 'sig4', role: 'approver_l1', title: 'ผู้อนุมัติระดับ 1 (นายก อบต.)' },
+          ],
+        },
+        settings: {
+          paperSize: 'A4',
+          orientation: 'portrait',
+          fontFamily: 'TH Sarabun New',
+          fontSize: 16,
+          margins: { top: 25, bottom: 25, left: 25, right: 20 },
+        },
+        createdBy: 'ADMIN',
+        updatedBy: 'ADMIN',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'tpl-equipment',
+        name: 'แบบคำขอยืมครุภัณฑ์ราชการ',
+        description: 'แบบคำขอยืม-คืนอุปกรณ์และครุภัณฑ์ของทางราชการ',
+        category: 'equipment',
+        status: 'published',
+        currentVersion: 1,
+        structure: {
+          title: 'แบบคำขอยืมครุภัณฑ์ราชการ',
+          writtenAt: 'ที่ทำการองค์การบริหารส่วนตำบล',
+          writtenDate: '',
+          subject: 'ขออนุญาตยืมอุปกรณ์และครุภัณฑ์ของทางราชการ',
+          recipient: 'ผู้มีอำนาจอนุมัติ',
+          requesterClause: 'ข้าพเจ้า',
+          requesterSlots: [
+            { id: 'req_name', label: 'ชื่อ-นามสกุลผู้ขอ', width: 220, binding: 'requester.name' },
+            { id: 'req_pos', label: 'ตำแหน่ง', width: 160, binding: 'requester.position' },
+            { id: 'req_org', label: 'หน่วยงาน/สังกัด', width: 180, binding: 'requester.organization' },
+            { id: 'req_phone', label: 'เบอร์โทรศัพท์', width: 140, binding: 'requester.phone' },
+          ],
+          purposeText: 'มีความประสงค์ขอยืมอุปกรณ์และครุภัณฑ์ของทางราชการ ดังต่อไปนี้',
+          purposeItems: [{ id: 'p1', target: '', purpose: '' }],
+          closingText: 'ทั้งนี้ ข้าพเจ้าจะดูแลรักษาครุภัณฑ์ดังกล่าวให้อยู่ในสภาพเรียบร้อย จึงเรียนมาเพื่อโปรดพิจารณาอนุญาต',
+          signatures: [
+            { id: 'sig1', role: 'requester', title: 'ผู้ยื่นคำขอ' },
+            { id: 'sig2', role: 'staff', title: 'เจ้าหน้าที่ผู้ตรวจสอบ' },
+            { id: 'sig3', role: 'approver_l2', title: 'ผู้อนุมัติระดับ 2 (ปลัด อบต.)' },
+            { id: 'sig4', role: 'approver_l1', title: 'ผู้อนุมัติระดับ 1 (นายก อบต.)' },
+          ],
+        },
+        settings: {
+          paperSize: 'A4',
+          orientation: 'portrait',
+          fontFamily: 'TH Sarabun New',
+          fontSize: 16,
+          margins: { top: 25, bottom: 25, left: 25, right: 20 },
+        },
+        createdBy: 'ADMIN',
+        updatedBy: 'ADMIN',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'tpl-memo',
+        name: 'แบบบันทึกข้อความ',
+        description: 'แบบบันทึกข้อความราชการภายใน',
+        category: 'memo',
+        status: 'published',
+        currentVersion: 1,
+        structure: {
+          title: 'บันทึกข้อความ',
+          writtenAt: 'ส่วนราชการ องค์การบริหารส่วนตำบล',
+          writtenDate: '',
+          subject: 'ข้อราชการ',
+          recipient: 'ผู้มีอำนาจอนุมัติ',
+          requesterClause: 'ตามที่',
+          requesterSlots: [
+            { id: 'req_name', label: 'ผู้รายงาน', width: 220, binding: 'requester.name' },
+            { id: 'req_pos', label: 'ตำแหน่ง', width: 160, binding: 'requester.position' },
+          ],
+          purposeText: 'จึงขอนำเรียนรายละเอียดดังต่อไปนี้',
+          purposeItems: [{ id: 'p1', target: '', purpose: '' }],
+          closingText: 'จึงเรียนมาเพื่อโปรดทราบและพิจารณา',
+          signatures: [
+            { id: 'sig1', role: 'requester', title: 'ผู้เสนอ' },
+            { id: 'sig2', role: 'staff', title: 'หัวหน้าสำนักปลัด' },
+            { id: 'sig3', role: 'approver_l2', title: 'ปลัด อบต.' },
+            { id: 'sig4', role: 'approver_l1', title: 'นายก อบต.' },
+          ],
+        },
+        settings: {
+          paperSize: 'A4',
+          orientation: 'portrait',
+          fontFamily: 'TH Sarabun New',
+          fontSize: 16,
+          margins: { top: 25, bottom: 25, left: 25, right: 20 },
+        },
+        createdBy: 'ADMIN',
+        updatedBy: 'ADMIN',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'tpl-general',
+        name: 'แบบฟอร์มเอกสารทั่วไป',
+        description: 'แบบฟอร์มคำร้องและเอกสารทั่วไป',
+        category: 'general',
+        status: 'draft',
+        currentVersion: 1,
+        structure: {
+          title: 'แบบฟอร์มคำร้องทั่วไป',
+          writtenAt: 'ที่ทำการองค์การบริหารส่วนตำบล',
+          writtenDate: '',
+          subject: 'ยื่นคำร้องทั่วไป',
+          recipient: 'ผู้บริหารองค์การบริหารส่วนตำบล',
+          requesterClause: 'ข้าพเจ้า',
+          requesterSlots: [
+            { id: 'req_name', label: 'ชื่อ-นามสกุลผู้ขอ', width: 220, binding: 'requester.name' },
+            { id: 'req_phone', label: 'เบอร์โทรศัพท์', width: 140, binding: 'requester.phone' },
+          ],
+          purposeText: 'มีความประสงค์ขอยื่นคำร้องดังนี้',
+          purposeItems: [{ id: 'p1', target: '', purpose: '' }],
+          closingText: 'จึงเรียนมาเพื่อโปรดพิจารณา',
+          signatures: [
+            { id: 'sig1', role: 'requester', title: 'ผู้ยื่นคำร้อง' },
+            { id: 'sig2', role: 'staff', title: 'เจ้าหน้าที่ผู้รับเรื่อง' },
+          ],
+        },
+        settings: {
+          paperSize: 'A4',
+          orientation: 'portrait',
+          fontFamily: 'TH Sarabun New',
+          fontSize: 16,
+          margins: { top: 25, bottom: 25, left: 25, right: 20 },
+        },
+        createdBy: 'ADMIN',
+        updatedBy: 'ADMIN',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+
+    this.documentTemplates = defaultTemplates;
+    for (const t of defaultTemplates) {
+      if (t.status === 'published') {
+        this.documentTemplateVersions.push({
+          id: `ver-${t.id}-1`,
+          templateId: t.id,
+          version: 1,
+          structure: clone(t.structure),
+          settings: clone(t.settings),
+          note: 'เวอร์ชันแรกเริ่มต้นระบบ',
+          publishedAt: t.createdAt,
+          publishedBy: 'ADMIN',
+        });
+      }
+    }
+  }
+
+  listDocumentTemplates(query?: { category?: string; status?: string; search?: string }): DocumentTemplateItem[] {
+    let list = clone(this.documentTemplates);
+    if (query?.category && query.category !== 'all') {
+      list = list.filter((t: DocumentTemplateItem) => t.category === query.category);
+    }
+    if (query?.status && query.status !== 'all') {
+      list = list.filter((t: DocumentTemplateItem) => t.status === query.status);
+    }
+    if (query?.search) {
+      const q = query.search.trim().toLowerCase();
+      list = list.filter(
+        (t: DocumentTemplateItem) =>
+          t.name.toLowerCase().includes(q) ||
+          (t.description && t.description.toLowerCase().includes(q)),
+      );
+    }
+    return list.sort(
+      (a: DocumentTemplateItem, b: DocumentTemplateItem) =>
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    );
+  }
+
+  getDocumentTemplateById(id: string): DocumentTemplateItem {
+    const t = this.documentTemplates.find((x) => x.id === id);
+    if (!t) {
+      throw new NotFoundException(`ไม่พบแม่แบบเอกสารรหัส ${id}`);
+    }
+    return clone(t);
+  }
+
+  createDocumentTemplate(
+    dto: Partial<DocumentTemplateItem> & { name: string; category?: DocumentTemplateCategory },
+    actor: Account,
+  ): DocumentTemplateItem {
+    const id = `tpl-${Date.now()}`;
+    const now = new Date().toISOString();
+    const newTemplate: DocumentTemplateItem = {
+      id,
+      name: dto.name.trim(),
+      description: dto.description?.trim() || '',
+      category: dto.category || 'venue',
+      status: dto.status || 'draft',
+      currentVersion: 1,
+      structure: dto.structure || {
+        title: dto.name.trim(),
+        writtenAt: 'ที่ทำการองค์การบริหารส่วนตำบล',
+        writtenDate: '',
+        subject: 'ขออนุญาต...',
+        recipient: 'ผู้มีอำนาจอนุมัติ',
+        requesterClause: 'ข้าพเจ้า',
+        requesterSlots: [
+          { id: 's1', label: 'ชื่อ-นามสกุลผู้ขอ', width: 220, binding: 'requester.name' },
+        ],
+        purposeText: 'มีความประสงค์ขออนุญาต ดังนี้',
+        purposeItems: [{ id: 'p1', target: '', purpose: '' }],
+        closingText: 'จึงเรียนมาเพื่อโปรดพิจารณาอนุญาต',
+        signatures: [
+          { id: 'sig1', role: 'requester', title: 'ผู้ยื่นคำขอ' },
+          { id: 'sig2', role: 'staff', title: 'เจ้าหน้าที่ผู้ตรวจสอบ' },
+          { id: 'sig3', role: 'approver_l2', title: 'ผู้อนุมัติระดับ 2 (ปลัด อบต.)' },
+          { id: 'sig4', role: 'approver_l1', title: 'ผู้อนุมัติระดับ 1 (นายก อบต.)' },
+        ],
+      },
+      settings: dto.settings || {
+        paperSize: 'A4',
+        orientation: 'portrait',
+        fontFamily: 'TH Sarabun New',
+        fontSize: 16,
+        margins: { top: 25, bottom: 25, left: 25, right: 20 },
+      },
+      createdBy: actor.name,
+      updatedBy: actor.name,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    this.documentTemplates.unshift(newTemplate);
+    return clone(newTemplate);
+  }
+
+  updateDocumentTemplate(
+    id: string,
+    dto: Partial<DocumentTemplateItem>,
+    actor: Account,
+  ): DocumentTemplateItem {
+    const idx = this.documentTemplates.findIndex((x) => x.id === id);
+    if (idx === -1) {
+      throw new NotFoundException(`ไม่พบแม่แบบเอกสารรหัส ${id}`);
+    }
+    const cur = this.documentTemplates[idx];
+    const updated: DocumentTemplateItem = {
+      ...cur,
+      ...dto,
+      name: dto.name !== undefined ? dto.name.trim() : cur.name,
+      description: dto.description !== undefined ? dto.description : cur.description,
+      structure: dto.structure ? clone(dto.structure) : cur.structure,
+      settings: dto.settings ? clone(dto.settings) : cur.settings,
+      updatedBy: actor.name,
+      updatedAt: new Date().toISOString(),
+    };
+    this.documentTemplates[idx] = updated;
+    return clone(updated);
+  }
+
+  duplicateDocumentTemplate(id: string, actor: Account): DocumentTemplateItem {
+    const orig = this.getDocumentTemplateById(id);
+    const newId = `tpl-${Date.now()}`;
+    const now = new Date().toISOString();
+    const dup: DocumentTemplateItem = {
+      ...clone(orig),
+      id: newId,
+      name: `${orig.name} (สำเนา)`,
+      status: 'draft',
+      currentVersion: 1,
+      createdBy: actor.name,
+      updatedBy: actor.name,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.documentTemplates.unshift(dup);
+    return clone(dup);
+  }
+
+  publishDocumentTemplate(id: string, note: string | undefined, actor: Account): DocumentTemplateItem {
+    const idx = this.documentTemplates.findIndex((x) => x.id === id);
+    if (idx === -1) {
+      throw new NotFoundException(`ไม่พบแม่แบบเอกสารรหัส ${id}`);
+    }
+    const cur = this.documentTemplates[idx];
+    const nextVersion = cur.status === 'published' ? cur.currentVersion + 1 : cur.currentVersion;
+    const now = new Date().toISOString();
+
+    const updated: DocumentTemplateItem = {
+      ...cur,
+      status: 'published',
+      currentVersion: nextVersion,
+      updatedBy: actor.name,
+      updatedAt: now,
+    };
+    this.documentTemplates[idx] = updated;
+
+    // Archive old snapshot into DocumentTemplateVersion
+    const versionItem: DocumentTemplateVersionItem = {
+      id: `ver-${cur.id}-${nextVersion}`,
+      templateId: cur.id,
+      version: nextVersion,
+      structure: clone(cur.structure),
+      settings: clone(cur.settings),
+      note: note?.trim() || `Published version ${nextVersion}`,
+      publishedAt: now,
+      publishedBy: actor.name,
+    };
+    this.documentTemplateVersions.push(versionItem);
+
+    return clone(updated);
+  }
+
+  archiveDocumentTemplate(id: string, actor: Account): DocumentTemplateItem {
+    return this.updateDocumentTemplate(id, { status: 'archived' }, actor);
+  }
+
+  deleteDocumentTemplate(id: string, actor: Account): { success: boolean; id: string } {
+    const idx = this.documentTemplates.findIndex((x) => x.id === id);
+    if (idx === -1) {
+      throw new NotFoundException(`ไม่พบแม่แบบเอกสารรหัส ${id}`);
+    }
+    const t = this.documentTemplates[idx];
+    // Check if this template is in use by generated documents
+    const inUse = this.generatedDocuments.some((g) => g.templateId === id);
+    if (inUse) {
+      throw new BadRequestException('ไม่สามารถลบแม่แบบเอกสารนี้ได้ เนื่องจากถูกนำไปสร้างเอกสารคำขอแล้ว กรุณาเลือกจัดเก็บ (Archive) แทน');
+    }
+    this.documentTemplates.splice(idx, 1);
+    this.documentTemplateVersions = this.documentTemplateVersions.filter((v) => v.templateId !== id);
+    return { success: true, id };
+  }
+
+  listTemplateVersions(templateId: string): DocumentTemplateVersionItem[] {
+    return clone(
+      this.documentTemplateVersions.filter((v) => v.templateId === templateId),
+    ).sort((a: DocumentTemplateVersionItem, b: DocumentTemplateVersionItem) => b.version - a.version);
+  }
+
+  getTemplateVersion(templateId: string, version: number): DocumentTemplateVersionItem {
+    const v = this.documentTemplateVersions.find(
+      (x) => x.templateId === templateId && x.version === version,
+    );
+    if (!v) {
+      throw new NotFoundException(`ไม่พบเวอร์ชัน ${version} ของแม่แบบรหัส ${templateId}`);
+    }
+    return clone(v);
+  }
+
+  rollbackTemplateVersion(templateId: string, version: number, actor: Account): DocumentTemplateItem {
+    const ver = this.getTemplateVersion(templateId, version);
+    const updated = this.updateDocumentTemplate(
+      templateId,
+      {
+        structure: clone(ver.structure),
+        settings: clone(ver.settings),
+      },
+      actor,
+    );
+    return updated;
+  }
+
+  // ===================== Generated Documents Management =====================
+
+  listGeneratedDocuments(query?: { requestId?: string; search?: string }): GeneratedDocumentItem[] {
+    let list = clone(this.generatedDocuments);
+    if (query?.requestId) {
+      list = list.filter((g: GeneratedDocumentItem) => g.requestId === query.requestId);
+    }
+    if (query?.search) {
+      const q = query.search.trim().toLowerCase();
+      list = list.filter(
+        (g: GeneratedDocumentItem) =>
+          g.documentNumber.toLowerCase().includes(q) ||
+          g.snapshot.title.toLowerCase().includes(q),
+      );
+    }
+    return list.sort(
+      (a: GeneratedDocumentItem, b: GeneratedDocumentItem) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  }
+
+  getGeneratedDocumentById(id: string): GeneratedDocumentItem {
+    const doc = this.generatedDocuments.find((x) => x.id === id);
+    if (!doc) {
+      throw new NotFoundException(`ไม่พบเอกสารรหัส ${id}`);
+    }
+    return clone(doc);
+  }
+
+  createGeneratedDocument(
+    dto: {
+      templateId: string;
+      requestId: string;
+      documentNumber?: string;
+    },
+    actor: Account,
+  ): GeneratedDocumentItem {
+    const template = this.getDocumentTemplateById(dto.templateId);
+    const request = this.requests.find((r) => r.id === dto.requestId);
+    if (!request) {
+      throw new NotFoundException(`ไม่พบคำขอรหัส ${dto.requestId}`);
+    }
+
+    const docNum = dto.documentNumber || `DOC-${Date.now()}`;
+    const id = `gdoc-${Date.now()}`;
+    const now = new Date().toISOString();
+
+    // Map snapshot with real booking/request data
+    const snapshot = clone(template.structure);
+    const generated: GeneratedDocumentItem = {
+      id,
+      templateId: template.id,
+      templateVersionId: `ver-${template.id}-${template.currentVersion}`,
+      requestId: request.id,
+      documentNumber: docNum,
+      snapshot,
+      status: 'rendered',
+      createdAt: now,
+    };
+
+    this.generatedDocuments.unshift(generated);
+    return clone(generated);
   }
 }

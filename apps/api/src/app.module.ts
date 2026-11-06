@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AdminController } from './admin/admin.controller';
+import { SidebarServicesController } from './admin/sidebar-services.controller';
 import { AuthController } from './auth/auth.controller';
 import { AuthGuard } from './auth/auth.guard';
 import { EmailService } from './auth/email.service';
@@ -38,7 +39,14 @@ import { HealthController } from './health/health.controller';
       },
     ]),
   ],
-  controllers: [AuthController, ResourcesController, RequestsController, AdminController, HealthController],
+  controllers: [
+    AuthController,
+    ResourcesController,
+    RequestsController,
+    AdminController,
+    SidebarServicesController,
+    HealthController,
+  ],
   providers: [
     EmailService,
     {

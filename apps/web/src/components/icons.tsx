@@ -2,7 +2,10 @@ import React from 'react';
 
 export type IconName =
   | 'alert-triangle'
+  | 'align-left'
+  | 'archive'
   | 'armchair'
+  | 'arrow-left'
   | 'arrow-right'
   | 'backspace'
   | 'ball-football'
@@ -18,9 +21,11 @@ export type IconName =
   | 'chevron-left'
   | 'chevron-right'
   | 'clock'
+  | 'copy'
   | 'device-projector'
   | 'edit'
   | 'eraser'
+  | 'eye'
   | 'file-text'
   | 'filter'
   | 'folder'
@@ -34,8 +39,12 @@ export type IconName =
   | 'menu-2'
   | 'minus'
   | 'package'
+  | 'pencil'
   | 'photo'
   | 'plus'
+  | 'printer'
+  | 'rotate-ccw'
+  | 'rotate-cw'
   | 'search'
   | 'settings'
   | 'shield'
@@ -58,12 +67,33 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M5 19h14a2 2 0 0 0 1.84 -2.75l-7.1 -12.25a2 2 0 0 0 -3.5 0l-7.1 12.25a2 2 0 0 0 1.75 2.75" />
     </>
   ),
+  'align-left': (
+    <>
+      <path d="M4 6l16 0" />
+      <path d="M4 12l10 0" />
+      <path d="M4 18l14 0" />
+    </>
+  ),
+  archive: (
+    <>
+      <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
+      <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+      <path d="M10 12l4 0" />
+    </>
+  ),
   armchair: (
     <>
       <path d="M5 11a2 2 0 0 1 2 2v2h10v-2a2 2 0 1 1 4 0v4a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-4a2 2 0 0 1 2 -2z" />
       <path d="M5 11v-5a3 3 0 0 1 3 -3h8a3 3 0 0 1 3 3v5" />
       <path d="M6 19v2" />
       <path d="M18 19v2" />
+    </>
+  ),
+  'arrow-left': (
+    <>
+      <path d="M5 12l14 0" />
+      <path d="M5 12l6 6" />
+      <path d="M5 12l6 -6" />
     </>
   ),
   'arrow-right': (
@@ -150,6 +180,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M12 7v5l3 3" />
     </>
   ),
+  copy: (
+    <>
+      <path d="M8 8m0 2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z" />
+      <path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2" />
+    </>
+  ),
   'device-projector': (
     <>
       <path d="M8 9a5 5 0 1 0 10 0a5 5 0 0 0 -10 0" />
@@ -169,6 +205,18 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <path d="M19 20h-10.5l-4.21 -4.3a1 1 0 0 1 0 -1.41l10 -10a1 1 0 0 1 1.41 0l5 5a1 1 0 0 1 0 1.41l-9.2 9.3" />
       <path d="M18 13.3l-6.3 -6.3" />
+    </>
+  ),
+  eye: (
+    <>
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6" />
+    </>
+  ),
+  pencil: (
+    <>
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
     </>
   ),
   'file-text': (
@@ -271,6 +319,25 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <path d="M12 5l0 14" />
       <path d="M5 12l14 0" />
+    </>
+  ),
+  printer: (
+    <>
+      <path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2" />
+      <path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4" />
+      <path d="M7 13m0 2a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2z" />
+    </>
+  ),
+  'rotate-ccw': (
+    <>
+      <path d="M10 2l-6 6l6 6" />
+      <path d="M4 8h11a5 5 0 0 1 5 5v1a5 5 0 0 1 -5 5h-7" />
+    </>
+  ),
+  'rotate-cw': (
+    <>
+      <path d="M14 2l6 6l-6 6" />
+      <path d="M20 8h-11a5 5 0 0 0 -5 5v1a5 5 0 0 0 5 5h7" />
     </>
   ),
   search: (

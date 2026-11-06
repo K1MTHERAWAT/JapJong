@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { RepairRequest, RequestWithTimeline } from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
@@ -9,18 +9,16 @@ import { Icon } from '@/components/icons';
 import {
   Chip,
   PinKeypad,
-  SignatureBox,
   StatusChip,
 } from '@/components/ui';
-import { api, formatThaiDate, formatThaiDateTime } from '@/lib/api';
+import { api, formatThaiDate, formatThaiDateTime, readAndCompressImages } from '@/lib/api';
 
 export default function StaffRepairsPage() {
   const { account } = useAuth();
   const [queue, setQueue] = useState<(RequestWithTimeline & RepairRequest)[]>([]);
   const [index, setIndex] = useState(0);
   const [resolution, setResolution] = useState('');
-  const [afterPhotos, setAfterPhotos] = useState(0);
-  const [staffSignature, setStaffSignature] = useState('');
+  const [afterPhotos, setAfterPhotos] = useState<string[]>([]);
   const [confirmed, setConfirmed] = useState(true);
   const [showPinModal, setShowPinModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<'accept' | 'finish' | 'reject'>('accept');
@@ -29,6 +27,7 @@ export default function StaffRepairsPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [lastCompleted, setLastCompleted] = useState<RequestWithTimeline | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback((preferId?: string | null) => {
     api
@@ -64,35 +63,60 @@ export default function StaffRepairsPage() {
   const current = queue[index];
 
   useEffect(() => {
-    setStaffSignature(account?.signature || '');
     setErrorMsg('');
     setResolution(current?.resolution || '');
-  }, [account?.id, account?.signature, current?.id, current?.resolution]);
+    setAfterPhotos(current?.afterPhotos || []);
+  }, [current?.id, current?.resolution, current?.afterPhotos]);
+
+  const handleSelectPhotos = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const remaining = Math.max(0, 3 - afterPhotos.length);
+    if (remaining === 0) return;
+    const newDataUrls = await readAndCompressImages(e.target.files, remaining);
+    if (newDataUrls.length) {
+      setAfterPhotos((prev) => [...prev, ...newDataUrls].slice(0, 3));
+      setErrorMsg('');
+    }
+    e.target.value = '';
+  };
+
+  const removePhoto = (idx: number) => {
+    setAfterPhotos((prev) => prev.filter((_, i) => i !== idx));
+  };
 
   const handleExecuteAction = async (action: 'accept' | 'finish' | 'reject', enteredPin?: string) => {
     if (!current) return;
     setErrorMsg('');
     setPinError('');
+
+    if (action === 'finish') {
+      if (!resolution.trim()) {
+        setErrorMsg('กรุณาระบุข้อมูลใน "บันทึกผลการซ่อม"');
+        return;
+      }
+      if (afterPhotos.length === 0) {
+        setErrorMsg('กรุณาแนบรูปหลังซ่อมอย่างน้อย 1 รูป');
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       let updated: RequestWithTimeline;
       if (action === 'accept') {
         updated = await api.updateRepairStatus(current.id, {
           action: 'accept',
-          signature: staffSignature || undefined,
           pin: enteredPin,
         });
       } else if (action === 'finish') {
         updated = await api.updateRepairStatus(current.id, {
           action: 'finish',
-          resolution: resolution.trim() || 'ดำเนินการซ่อมบำรุงเรียบร้อยแล้ว สภาพพร้อมใช้งาน',
-          signature: staffSignature || undefined,
+          resolution: resolution.trim(),
+          afterPhotos,
           pin: enteredPin,
         });
       } else {
         updated = await api.updateRepairStatus(current.id, {
           action: 'reopen',
-          signature: staffSignature || undefined,
           pin: enteredPin,
         });
       }
@@ -115,6 +139,16 @@ export default function StaffRepairsPage() {
   };
 
   const handleStartAction = (action: 'accept' | 'finish' | 'reject') => {
+    if (action === 'finish') {
+      if (!resolution.trim()) {
+        setErrorMsg('กรุณาระบุข้อมูลใน "บันทึกผลการซ่อม"');
+        return;
+      }
+      if (afterPhotos.length === 0) {
+        setErrorMsg('กรุณาแนบรูปหลังซ่อมอย่างน้อย 1 รูป');
+        return;
+      }
+    }
     setPendingAction(action);
     setErrorMsg('');
     setPinError('');
@@ -157,7 +191,7 @@ export default function StaffRepairsPage() {
             ) : current.status === 'repair_in_progress' ? (
               <button
                 type="button"
-                disabled={submitting || !confirmed || !staffSignature.trim()}
+                disabled={submitting || !confirmed || !resolution.trim() || afterPhotos.length === 0}
                 onClick={() => handleStartAction('finish')}
                 className="jw-btn w-full sm:w-72"
               >
@@ -355,76 +389,173 @@ export default function StaffRepairsPage() {
               </div>
             </div>
 
-            {/* ขวา: ฟอร์มดำเนินการของช่าง / ลายเซ็น */}
+            {/* ขวา: ฟอร์มดำเนินการของช่าง */}
             <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
-              {current.status === 'repair_in_progress' ? (
+              {current.status === 'repair_submitted' ? (
                 <div className="jw-card p-4 sm:p-5 flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <label className="jw-lbl mb-0">เจ้าหน้าที่ผู้รับผิดชอบงาน</label>
+                    <span className="text-[12px] text-ink-mute">{account?.name || 'สุดา มีสุข'}</span>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-canvas border border-line text-[13px] text-ink flex flex-col gap-1.5">
+                    <div className="font-semibold text-ink flex items-center gap-1.5">
+                      <Icon name="user" className="w-4 h-4 text-brand" />
+                      <span>{account?.name || 'เจ้าหน้าที่'} ({account?.role || 'STAFF'})</span>
+                    </div>
+                    <p className="text-[12.5px] text-ink-mute">
+                      ตรวจสอบรายละเอียดปัญหาและกดปุ่ม <b>&quot;รับเรื่องซ่อม (เริ่มดำเนินการ)&quot;</b> ด้านล่างเพื่อเริ่มงาน
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-2 text-[13px] text-ink cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={confirmed}
+                      onChange={(e) => setConfirmed(e.target.checked)}
+                      className="w-4 h-4 rounded text-brand focus:ring-brand"
+                    />
+                    <span>ข้าพเจ้าได้ตรวจสอบรายละเอียดและข้อมูลถูกต้อง</span>
+                  </label>
+                </div>
+              ) : current.status === 'repair_in_progress' ? (
+                <div className="jw-card p-4 sm:p-5 flex flex-col gap-4">
+                  <div className="flex items-center justify-between border-b border-line pb-2.5">
+                    <b className="text-[15px] text-ink">บันทึกผลการซ่อมและส่งตรวจรับ</b>
+                    <span className="text-[12px] text-ink-mute">{account?.name || 'ช่างซ่อมบำรุง'}</span>
+                  </div>
+
                   <div>
-                    <label className="jw-lbl">บันทึกผลการซ่อม (ก่อนส่งให้ผู้แจ้งตรวจรับงาน)</label>
+                    <label className="jw-lbl">
+                      บันทึกผลการซ่อม <span className="text-status-crit font-bold">*</span>
+                      <span className="text-[12px] font-normal text-ink-mute ml-1">(ระบุรายละเอียดการแก้ไข)</span>
+                    </label>
                     <textarea
                       rows={3}
                       value={resolution}
-                      onChange={(e) => setResolution(e.target.value)}
-                      placeholder="ระบุรายละเอียดการแก้ไข เช่น เปลี่ยนหลอดไฟ LED, ซ่อมท่อน้ำรั่วเรียบร้อย"
-                      className="jw-in min-h-20 py-2.5"
+                      onChange={(e) => {
+                        setResolution(e.target.value);
+                        if (errorMsg) setErrorMsg('');
+                      }}
+                      placeholder="ระบุรายละเอียดการแก้ไข เช่น เปลี่ยนหลอดไฟ LED ใหม่ 2 หลอด, ซ่อมท่อน้ำรั่วและทดสอบระบบเรียบร้อย"
+                      className={`jw-in min-h-20 py-2.5 ${!resolution.trim() ? 'border-amber-300' : ''}`}
                     />
+                    {!resolution.trim() && (
+                      <p className="mt-1 text-[12px] text-status-crit">
+                        * จำเป็นต้องระบุข้อมูลในบันทึกผลการซ่อม
+                      </p>
+                    )}
                   </div>
+
                   <div>
-                    <label className="jw-lbl">แนบรูปหลังซ่อม (ไม่เกิน 3 รูป)</label>
-                    <div className="flex gap-3">
-                      {Array.from({ length: afterPhotos }).map((_, idx) => (
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="jw-lbl mb-0">
+                        แนบรูปหลังซ่อม <span className="text-status-crit font-bold">*</span>
+                        <span className="text-[12px] font-normal text-ink-mute ml-1">(ไม่เกิน 3 รูป)</span>
+                      </label>
+                      <span className="text-[12px] text-ink-mute">
+                        {afterPhotos.length === 0 ? (
+                          <span className="text-status-crit font-medium">บังคับแนบรูป</span>
+                        ) : (
+                          `แนบแล้ว ${afterPhotos.length}/3 รูป`
+                        )}
+                      </span>
+                    </div>
+
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleSelectPhotos}
+                      className="hidden"
+                    />
+
+                    <div className="flex flex-wrap gap-2.5">
+                      {afterPhotos.map((src, idx) => (
                         <div
                           key={idx}
-                          className="w-16 h-16 rounded-2xl bg-brand-mint text-brand flex items-center justify-center relative"
+                          className="w-20 h-20 rounded-2xl border border-line bg-brand-mint overflow-hidden relative shadow-sm"
                         >
-                          <Icon name="photo" className="w-6 h-6" strokeWidth={1.6} />
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={src} alt={`รูปหลังซ่อม ${idx + 1}`} className="w-full h-full object-cover" />
                           <button
                             type="button"
-                            onClick={() => setAfterPhotos((p) => Math.max(0, p - 1))}
-                            className="w-5 h-5 rounded-full bg-ink text-white absolute -top-1.5 -right-1.5 flex items-center justify-center"
+                            onClick={() => removePhoto(idx)}
+                            className="w-5 h-5 rounded-full bg-ink text-white absolute top-1 right-1 flex items-center justify-center shadow hover:bg-status-crit transition"
                           >
                             <Icon name="x" className="w-3 h-3" />
                           </button>
                         </div>
                       ))}
-                      {afterPhotos < 3 && (
+                      {afterPhotos.length < 3 && (
                         <button
                           type="button"
-                          onClick={() => setAfterPhotos((p) => Math.min(3, p + 1))}
-                          className="w-16 h-16 rounded-2xl bg-white border-[1.5px] border-dashed border-[#7A7A7A] text-ink-mute text-[12px] flex flex-col items-center justify-center gap-0.5 hover:border-brand"
+                          onClick={() => fileInputRef.current?.click()}
+                          className={`w-20 h-20 rounded-2xl border-[1.5px] border-dashed text-[12px] flex flex-col items-center justify-center gap-1 transition ${
+                            afterPhotos.length === 0
+                              ? 'border-status-crit/70 bg-red-50/40 text-status-crit hover:border-status-crit hover:bg-red-50'
+                              : 'border-[#7A7A7A] bg-white text-ink-mute hover:border-brand hover:text-brand'
+                          }`}
                         >
-                          <Icon name="plus" className="w-4 h-4" />
-                          <span>+ รูป</span>
+                          <Icon name="photo" className="w-5 h-5" />
+                          <span>+ เพิ่มรูป</span>
                         </button>
                       )}
                     </div>
+
+                    {afterPhotos.length === 0 ? (
+                      <p className="mt-1 text-[12px] text-status-crit">
+                        * จำเป็นต้องแนบรูปหลังซ่อมอย่างน้อย 1 รูป
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="pt-2 border-t border-line">
+                    <label className="flex items-center gap-2 text-[13px] text-ink cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={confirmed}
+                        onChange={(e) => setConfirmed(e.target.checked)}
+                        className="w-4 h-4 rounded text-brand focus:ring-brand"
+                      />
+                      <span>ข้าพเจ้าได้ตรวจสอบรายละเอียดและข้อมูลถูกต้อง</span>
+                    </label>
                   </div>
                 </div>
-              ) : null}
-
-              {/* ลายเซ็นเจ้าหน้าที่ผู้รับผิดชอบ */}
-              <div className="jw-card p-4 sm:p-5 flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <label className="jw-lbl mb-0">ลายเซ็นเจ้าหน้าที่ผู้ดำเนินการ</label>
-                  <span className="text-[12px] text-ink-mute">{account?.name || 'สุดา มีสุข'}</span>
+              ) : (
+                <div className="jw-card p-4 sm:p-5 flex flex-col gap-3">
+                  <div className="flex items-center justify-between border-b border-line pb-2">
+                    <b className="text-[14px] text-ink">บันทึกผลการซ่อมบำรุง</b>
+                    <span className="text-[12px] text-ink-mute">{current.staffSignerName || 'ฝ่ายช่างซ่อมบำรุง'}</span>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-canvas border border-line text-[13px] flex flex-col gap-2.5">
+                    <div>
+                      <span className="text-[12px] text-ink-mute block mb-0.5">รายละเอียดผลการซ่อม</span>
+                      <span className="text-ink font-medium whitespace-pre-wrap">{current.resolution || '-'}</span>
+                    </div>
+                    {current.afterPhotos && current.afterPhotos.length > 0 && (
+                      <div>
+                        <span className="text-[12px] text-ink-mute block mb-1.5">
+                          รูปภาพหลังซ่อม ({current.afterPhotos.length} รูป)
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {current.afterPhotos.map((url, i) => (
+                            <a
+                              key={i}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block w-20 h-20 rounded-xl border border-line overflow-hidden hover:opacity-90 transition shadow-sm"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={url} alt={`รูปหลังซ่อมที่ ${i + 1}`} className="w-full h-full object-cover" />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <SignatureBox
-                  value={staffSignature}
-                  onChange={setStaffSignature}
-                  savedSignature={account?.signature}
-                  signerLabel={account?.name || 'เจ้าหน้าที่'}
-                  height={140}
-                />
-                <label className="flex items-center gap-2 text-[13px] text-ink cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={confirmed}
-                    onChange={(e) => setConfirmed(e.target.checked)}
-                    className="w-4 h-4 rounded text-brand focus:ring-brand"
-                  />
-                  <span>ข้าพเจ้าได้ตรวจสอบรายละเอียดและข้อมูลถูกต้อง</span>
-                </label>
-              </div>
+              )}
             </div>
           </div>
         </div>

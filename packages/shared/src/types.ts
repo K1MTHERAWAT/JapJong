@@ -1,6 +1,8 @@
 // ===== Roles & accounts =====
 export type Role = 'USER' | 'STAFF' | 'APPROVER_L2' | 'APPROVER_L1' | 'ADMIN';
 
+export type Tone = 'green' | 'amber' | 'blue' | 'red' | 'gray' | 'orange' | 'purple' | 'teal' | 'cyan' | 'indigo' | 'pink';
+
 export type PermissionKey =
   | 'review'
   | 'handover'
@@ -239,6 +241,8 @@ export interface RepairRequest extends BaseRequest {
   startedAt?: string;
   finishedAt?: string;
   resolution?: string;
+  /** รูปภาพผลการซ่อม/หลังซ่อม (ไม่เกิน 3 รูป) */
+  afterPhotos?: string[];
   /** ลายเซ็นเจ้าหน้าที่ผู้รับเรื่อง/ซ่อมเสร็จ */
   staffSignature?: string;
   staffSignerName?: string;
@@ -564,5 +568,211 @@ export interface LineRegisterPayload {
   phone: string;
   consents: ConsentItemInput[];
 }
+
+// ===================== Sidebar & Services Management =====================
+
+export interface ServicePermissions {
+  view: boolean;
+  create: boolean;
+  edit: boolean;
+  delete: boolean;
+  approve: boolean;
+  manage: boolean;
+}
+
+export interface SidebarServiceItem {
+  id: string;
+  slug?: string;
+  label: string;
+  description?: string;
+  icon: string;
+  href: string;
+  category: string;
+  sortOrder: number;
+  enabled: boolean;
+  isSystem?: boolean;
+  roles: Role[];
+  allowedUserIds: string[];
+  deniedUserIds?: string[];
+  permissions: ServicePermissions;
+  exact?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateSidebarServiceDto {
+  label: string;
+  description?: string;
+  icon: string;
+  href: string;
+  category: string;
+  sortOrder?: number;
+  enabled?: boolean;
+  roles: Role[];
+  allowedUserIds?: string[];
+  deniedUserIds?: string[];
+  permissions?: Partial<ServicePermissions>;
+  exact?: boolean;
+}
+
+export interface UpdateSidebarServiceDto {
+  label?: string;
+  description?: string;
+  icon?: string;
+  href?: string;
+  category?: string;
+  sortOrder?: number;
+  enabled?: boolean;
+  roles?: Role[];
+  allowedUserIds?: string[];
+  deniedUserIds?: string[];
+  permissions?: Partial<ServicePermissions>;
+  exact?: boolean;
+}
+
+export interface ServiceRelationCheckResult {
+  canDelete: boolean;
+  isSystem: boolean;
+  reasons: string[];
+  relatedRequestsCount: number;
+  relatedResourcesCount: number;
+}
+
+// ===================== Role Management =====================
+
+export interface RoleItem {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+  tone: Tone;
+  userCount: number;
+  enabled: boolean;
+  isSystem: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateRoleDto {
+  key?: string;
+  name: string;
+  description?: string;
+  tone?: Tone;
+  enabled?: boolean;
+}
+
+export interface UpdateRoleDto {
+  name?: string;
+  description?: string;
+  tone?: Tone;
+  enabled?: boolean;
+}
+
+export interface BulkAssignRoleDto {
+  userIds: string[];
+  role: Role;
+}
+
+// ===================== Official Document Editor & Templates =====================
+
+export type DocumentTemplateCategory = 'venue' | 'equipment' | 'memo' | 'general';
+export type DocumentTemplateStatus = 'draft' | 'published' | 'archived';
+
+export type DocumentElementType =
+  | 'text'
+  | 'heading'
+  | 'paragraph'
+  | 'slot'
+  | 'table'
+  | 'list'
+  | 'divider'
+  | 'logo'
+  | 'signature';
+
+export interface DocumentDataSlot {
+  id: string;
+  label: string;
+  width: number; // in pixels (40 to 600)
+  binding?: string;
+  fallback?: string;
+}
+
+export interface DocumentStructure {
+  title: string;
+  writtenAt: string;
+  writtenDate: string;
+  subject: string;
+  recipient: string;
+  requesterClause: string;
+  requesterSlots: DocumentDataSlot[];
+  purposeText: string;
+  purposeItems: Array<{ id: string; target: string; purpose: string }>;
+  closingText: string;
+  logoUrl?: string;
+  logoPosition?: 'left' | 'center' | 'right';
+  logoSize?: 'small' | 'medium' | 'large';
+  signatures: Array<{
+    id: string;
+    role: string;
+    title: string;
+    namePlaceholder?: string;
+    positionPlaceholder?: string;
+  }>;
+  customSlots?: DocumentDataSlot[];
+}
+
+export interface DocumentTemplateSettings {
+  paperSize: 'A4';
+  orientation: 'portrait' | 'landscape';
+  fontFamily: 'TH Sarabun New' | 'Sarabun';
+  fontSize: number; // default 16
+  margins: {
+    top: number;
+    bottom: number;
+    left: number;
+    right: number;
+  };
+}
+
+export interface DocumentTemplateItem {
+  id: string;
+  name: string;
+  description?: string;
+  category: DocumentTemplateCategory;
+  status: DocumentTemplateStatus;
+  currentVersion: number;
+  structure: DocumentStructure;
+  settings: DocumentTemplateSettings;
+  createdBy?: string;
+  updatedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DocumentTemplateVersionItem {
+  id: string;
+  templateId: string;
+  version: number;
+  structure: DocumentStructure;
+  settings: DocumentTemplateSettings;
+  note?: string;
+  publishedAt: string;
+  publishedBy?: string;
+}
+
+export interface GeneratedDocumentItem {
+  id: string;
+  templateId: string;
+  templateVersionId?: string;
+  requestId: string;
+  documentNumber: string;
+  snapshot: DocumentStructure;
+  renderedFile?: string;
+  status: 'draft' | 'rendered' | 'verified';
+  createdAt: string;
+}
+
+
+
 
 

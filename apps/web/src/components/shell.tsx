@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -11,12 +11,15 @@ import {
   PERMISSION_LABEL,
   ROLE_LABEL,
   Role,
+  SidebarServiceItem,
   canAccessRoute,
+  canAccessServiceRoute,
 } from '@japjong/shared';
 import { useAuth } from './auth-context';
 import { Sidebar } from './Sidebar';
 import { getVisibleNav } from './nav';
 import { Button, Card } from './ui';
+import { api } from '@/lib/api';
 
 export function roleHomePath(role?: Role): string {
   switch (role) {
@@ -55,8 +58,34 @@ export function AppShell({
     logout,
   } = useAuth();
 
-  const visibleNav = getVisibleNav(account);
-  const access = canAccessRoute(account, pathname);
+  const [dbServices, setDbServices] = useState<SidebarServiceItem[]>([]);
+
+  const fetchNav = useCallback(() => {
+    api
+      .getNavigation()
+      .then((items) => {
+        if (Array.isArray(items)) {
+          setDbServices(items);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetchNav();
+    window.addEventListener('japjong-navigation-refresh', fetchNav);
+    return () => {
+      window.removeEventListener('japjong-navigation-refresh', fetchNav);
+    };
+  }, [account?.id, account?.role, fetchNav]);
+
+  const visibleNav = useMemo(() => {
+    return getVisibleNav(account, dbServices.length > 0 ? dbServices : undefined);
+  }, [account, dbServices]);
+
+  const access = useMemo(() => {
+    return canAccessServiceRoute(account, pathname, dbServices.length > 0 ? dbServices : undefined);
+  }, [account, pathname, dbServices]);
 
   const handleLogoutAndLogin = () => {
     logout();

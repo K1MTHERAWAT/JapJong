@@ -85,6 +85,19 @@ export default function AdminHomePage() {
           <h2 className="text-[16px] sm:text-[18px] font-bold text-ink mb-3">จัดการระบบ</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             <Link
+              href="/admin/services"
+              className="jw-card p-4 flex items-center gap-3 hover:ring-1 hover:ring-brand transition"
+            >
+              <div className="w-11 h-11 rounded-2xl bg-brand-mint text-brand flex items-center justify-center shrink-0">
+                <Icon name="list-details" className="w-6 h-6" />
+              </div>
+              <div>
+                <b className="text-[15px] block text-ink">บริการ & Sidebar</b>
+                <span className="text-[12px] text-ink-mute">จัดการเมนู & สิทธิ์เข้าถึง</span>
+              </div>
+            </Link>
+
+            <Link
               href="/admin/resources"
               className="jw-card p-4 flex items-center gap-3 hover:ring-1 hover:ring-brand transition"
             >
@@ -94,6 +107,19 @@ export default function AdminHomePage() {
               <div>
                 <b className="text-[15px] block text-ink">ทรัพยากร</b>
                 <span className="text-[12px] text-ink-mute">สถานที่ & อุปกรณ์</span>
+              </div>
+            </Link>
+
+            <Link
+              href="/admin/document-templates"
+              className="jw-card p-4 flex items-center gap-3 hover:ring-1 hover:ring-brand transition"
+            >
+              <div className="w-11 h-11 rounded-2xl bg-brand-mint text-brand flex items-center justify-center shrink-0">
+                <Icon name="file-text" className="w-6 h-6" />
+              </div>
+              <div>
+                <b className="text-[15px] block text-ink">แม่แบบเอกสาร</b>
+                <span className="text-[12px] text-ink-mute">ออกแบบ & จัดการแบบฟอร์มราชการ</span>
               </div>
             </Link>
 

@@ -2,25 +2,31 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   NotFoundException,
   Param,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
   Account,
+  BulkAssignRoleDto,
+  CreateRoleDto,
   DEFAULT_PERMISSIONS,
   PERMISSION_KEYS,
   PermissionKey,
   ROLE_LABEL,
   Role,
+  RoleItem,
+  UpdateRoleDto,
 } from '@japjong/shared';
-import { CurrentUser, Permissions } from '../auth/auth.guard';
+import { CurrentUser, Permissions, Roles } from '../auth/auth.guard';
 import { hashSecret } from '../auth/secret';
 import { DbService } from '../db/db.service';
 
@@ -185,6 +191,84 @@ export class AdminController {
     }
     await this.db.persistAccount(target);
     return this.db.toPublic(target);
+  }
+
+  // ==================== Role Management Endpoints ====================
+
+  /**
+   * ดึงรายการบทบาททั้งหมด พร้อมจำนวนผู้ใช้งานในแต่ละบทบาท
+   */
+  @Permissions('manageUsers')
+  @Get('admin/roles')
+  listRoles(): RoleItem[] {
+    return this.db.listRoles();
+  }
+
+  /**
+   * สร้างบทบาทใหม่
+   */
+  @Permissions('manageUsers')
+  @Roles('ADMIN')
+  @Post('admin/roles')
+  async createRole(
+    @Body() body: CreateRoleDto,
+    @CurrentUser() actor: Account,
+  ): Promise<RoleItem> {
+    return this.db.createRole(body, actor);
+  }
+
+  /**
+   * แก้ไขข้อมูลบทบาท
+   */
+  @Permissions('manageUsers')
+  @Roles('ADMIN')
+  @Put('admin/roles/:id')
+  async updateRole(
+    @Param('id') id: string,
+    @Body() body: UpdateRoleDto,
+    @CurrentUser() actor: Account,
+  ): Promise<RoleItem> {
+    return this.db.updateRole(id, body, actor);
+  }
+
+  /**
+   * สลับสถานะเปิด/ปิดบทบาท
+   */
+  @Permissions('manageUsers')
+  @Roles('ADMIN')
+  @Patch('admin/roles/:id/toggle')
+  async toggleRole(
+    @Param('id') id: string,
+    @CurrentUser() actor: Account,
+  ): Promise<RoleItem> {
+    return this.db.toggleRole(id, actor);
+  }
+
+  /**
+   * ลบบทบาท (ต้องไม่มีผู้ใช้งานผูกอยู่ และไม่ใช่ system role)
+   */
+  @Permissions('manageUsers')
+  @Roles('ADMIN')
+  @Delete('admin/roles/:id')
+  async deleteRole(
+    @Param('id') id: string,
+    @CurrentUser() actor: Account,
+  ): Promise<{ ok: boolean }> {
+    await this.db.deleteRole(id, actor);
+    return { ok: true };
+  }
+
+  /**
+   * กำหนดบทบาทให้ผู้ใช้งานทีละหลายคน (Bulk Role Assignment)
+   */
+  @Permissions('manageUsers')
+  @Roles('ADMIN')
+  @Post('admin/roles/bulk-assign')
+  async bulkAssignRole(
+    @Body() body: BulkAssignRoleDto,
+    @CurrentUser() actor: Account,
+  ): Promise<{ updatedCount: number; errors: string[] }> {
+    return this.db.bulkAssignRole(body.userIds, body.role, actor);
   }
 
   @Permissions('manageUsers')

@@ -99,22 +99,14 @@ export function OfficialDocumentEditor({
     width: 65,
   });
 
-  // Subject & Recipient
+  // Subject & Recipient (ข้อความพิมพ์แก้ไขได้โดยตรง ไม่ต้องใช้ช่องดึงข้อมูล)
   const [subjectLabel, setSubjectLabel] = useState('เรื่อง');
-  const [subjectSlot, setSubjectSlot] = useState<FieldSlot>({
-    id: 's_subject',
-    fieldKey: 'subject',
-    label: isBorrowMode ? 'ขออนุญาตยืมครุภัณฑ์ของทางราชการ' : 'ขออนุญาตใช้สถานที่ราชการ',
-    width: 320,
-  });
+  const [subjectText, setSubjectText] = useState(() =>
+    isBorrowMode ? 'ขออนุญาตใช้อุปกรณ์ของทางราชการ' : 'ขออนุญาตใช้สถานที่ราชการ'
+  );
 
   const [recipientLabel, setRecipientLabel] = useState('เรียน');
-  const [recipientSlot, setRecipientSlot] = useState<FieldSlot>({
-    id: 's_recipient',
-    fieldKey: 'recipient',
-    label: 'ผู้มีอำนาจอนุมัติ',
-    width: 240,
-  });
+  const [recipientText, setRecipientText] = useState('ผู้มีอำนาจอนุมัติ');
 
   // Requester Info Line 1: ข้าพเจ้า ..... ตำแหน่ง .....
   const [requesterPrefix, setRequesterPrefix] = useState('ข้าพเจ้า');
@@ -368,12 +360,15 @@ export function OfficialDocumentEditor({
           e.stopPropagation();
           setActiveSlotId(isActive ? null : slot.id);
         }}
-        title="คลิกเพื่อย่อ/ขยายความกว้าง หรือเปลี่ยนการดึงข้อมูล"
+        title="คลิกเพื่อย่อ/ขยายความกว้าง หรือลากขอบขวาเพื่อย่อขยายอย่างอิสระ"
       >
-        <span className="text-[12px] font-medium text-slate-700 truncate block">
-          {slot.fieldKey === 'blank' ? '.........' : `[ ${slot.label.split(' ')[0]} ]`}
+        <span className="flex items-center gap-0.5 truncate pointer-events-none">
+          <span className="text-slate-400 font-mono text-[9px] select-none" title="ลากขยับได้อิสระ">⠿</span>
+          <span className="text-[12px] font-medium text-slate-700 truncate block">
+            {slot.fieldKey === 'blank' ? '.........' : `[ ${slot.label.split(' ')[0]} ]`}
+          </span>
         </span>
-        <span className="text-[10px] text-slate-500 font-mono ml-1 shrink-0">
+        <span className="text-[10px] text-slate-500 font-mono ml-1 shrink-0 pointer-events-none">
           {slot.width}px
         </span>
 
@@ -403,6 +398,31 @@ export function OfficialDocumentEditor({
             +
           </button>
         </span>
+
+        {/* Drag-to-resize handle on the right edge */}
+        <span
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const startX = e.clientX;
+            const startW = slot.width;
+            const onMouseMove = (ev: MouseEvent) => {
+              const diff = ev.clientX - startX;
+              setter((prev) => ({
+                ...prev,
+                width: Math.max(30, Math.min(650, startW + diff)),
+              }));
+            };
+            const onMouseUp = () => {
+              window.removeEventListener('mousemove', onMouseMove);
+              window.removeEventListener('mouseup', onMouseUp);
+            };
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+          }}
+          className="absolute -right-1 top-0 bottom-0 w-2.5 cursor-ew-resize hover:bg-brand/40 rounded-r transition z-10"
+          title="คลิกลากเมาส์ซ้าย-ขวาเพื่อขยายหรือย่อขนาดช่องได้อย่างอิสระ"
+        />
 
         {/* Popover Settings when active */}
         {isActive && (
@@ -590,15 +610,15 @@ export function OfficialDocumentEditor({
               <span className="hidden sm:inline">ตราสัญลักษณ์</span>
             </button>
 
-            {/* Add Row Button */}
+            {/* Add Data Slot Button */}
             <button
               type="button"
               onClick={addPurposeRow}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-brand bg-brand-mint text-brand text-[12px] font-semibold hover:bg-brand hover:text-white transition shadow-xs"
-              title="เพิ่มรายการขอใช้ (ข้อ ..... เพื่อ .....)"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-brand bg-brand-mint text-brand text-[12px] font-semibold hover:bg-brand hover:text-white transition shadow-xs"
+              title="เพิ่มช่องการดึงข้อมูลสำหรับเลือกตัวแปรและปรับขนาดความกว้าง"
             >
               <Icon name="plus" className="w-3.5 h-3.5" />
-              <span>เพิ่มข้อขอใช้</span>
+              <span>เพิ่มช่องการดึงข้อมูล</span>
             </button>
 
             {/* Print / PDF */}
@@ -710,8 +730,8 @@ export function OfficialDocumentEditor({
                 </div>
               </div>
 
-              {/* 4. SUBJECT & RECIPIENT */}
-              <div className="space-y-1 mb-5 text-left">
+              {/* 4. SUBJECT & RECIPIENT (พิมพ์ได้โดยตรง ไม่ต้องใช้ช่องดึงข้อมูล) */}
+              <div className="space-y-1.5 mb-5 text-left">
                 <div className="flex items-center">
                   <input
                     type="text"
@@ -720,7 +740,13 @@ export function OfficialDocumentEditor({
                     className="w-12 font-bold bg-transparent border-0 hover:bg-slate-100 focus:bg-white focus:outline-none rounded"
                   />
                   &nbsp;&nbsp;
-                  {renderSlot(subjectSlot, setSubjectSlot)}
+                  <input
+                    type="text"
+                    value={subjectText}
+                    onChange={(e) => setSubjectText(e.target.value)}
+                    className="flex-1 font-normal text-black bg-transparent border-0 hover:bg-slate-100 focus:bg-white focus:outline-none rounded px-1.5 py-0.5"
+                    title="คลิกเพื่อพิมพ์แก้ไขเรื่อง"
+                  />
                 </div>
                 <div className="flex items-center">
                   <input
@@ -730,7 +756,13 @@ export function OfficialDocumentEditor({
                     className="w-12 font-bold bg-transparent border-0 hover:bg-slate-100 focus:bg-white focus:outline-none rounded"
                   />
                   &nbsp;&nbsp;
-                  {renderSlot(recipientSlot, setRecipientSlot)}
+                  <input
+                    type="text"
+                    value={recipientText}
+                    onChange={(e) => setRecipientText(e.target.value)}
+                    className="flex-1 font-normal text-black bg-transparent border-0 hover:bg-slate-100 focus:bg-white focus:outline-none rounded px-1.5 py-0.5"
+                    title="คลิกเพื่อพิมพ์แก้ไขผู้มีอำนาจอนุมัติ"
+                  />
                 </div>
               </div>
 

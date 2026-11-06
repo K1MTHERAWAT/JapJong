@@ -148,16 +148,32 @@ export function Tabs<T extends string>({
 }
 
 // ===== Toggle Switch =====
-export function Toggle({ checked, onChange }: { checked: boolean; onChange: (next: boolean) => void }) {
+export function Toggle({
+  checked,
+  onChange,
+  disabled,
+  title,
+  className = '',
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  disabled?: boolean;
+  title?: string;
+  className?: string;
+}) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
-      onClick={() => onChange(!checked)}
+      disabled={disabled}
+      title={title}
+      onClick={() => !disabled && onChange(!checked)}
       className={`w-11 h-[26px] rounded-full relative transition shrink-0 ${
+        disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+      } ${
         checked ? 'bg-brand' : 'bg-[#C4C8D6]'
-      }`}
+      } ${className}`}
     >
       <span
         className={`w-5 h-5 rounded-full bg-white absolute top-[3px] transition-all ${

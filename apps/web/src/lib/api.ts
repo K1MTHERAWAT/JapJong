@@ -2,7 +2,10 @@ import type {
   ActivityLog,
   AdminNotificationDashboardSummary,
   AppNotification,
+  BulkAssignRoleDto,
   ConflictInfo,
+  CreateRoleDto,
+  CreateSidebarServiceDto,
   DayAvailability,
   DemoAccountSummary,
   DocumentScanLog,
@@ -28,11 +31,19 @@ import type {
   RequestType,
   RequestWithTimeline,
   Role,
+  RoleItem,
+  ServiceRelationCheckResult,
+  SidebarServiceItem,
   SignSessionStatus,
   StaffVerificationResult,
+  UpdateRoleDto,
+  UpdateSidebarServiceDto,
   UserNotificationPreference,
   Venue,
   VerifySignOtpResponse,
+  DocumentTemplateItem,
+  DocumentTemplateVersionItem,
+  GeneratedDocumentItem,
 } from '@japjong/shared';
 
 const TOKEN_KEY = 'japjong_token';
@@ -367,6 +378,7 @@ export const api = {
       resolution?: string;
       signature?: string;
       pin?: string;
+      afterPhotos?: string[];
     },
   ) => request<RequestWithTimeline>(`/requests/${id}/repair-status`, { method: 'POST', body: JSON.stringify(payload) }),
 
@@ -440,6 +452,45 @@ export const api = {
       method: 'POST',
     }),
   resetDemo: () => request<{ ok: boolean }>('/dev/reset', { method: 'POST', body: '{}' }),
+
+  // Sidebar & Services Management
+  getNavigation: () => request<SidebarServiceItem[]>('/navigation'),
+  adminServices: () => request<SidebarServiceItem[]>('/admin/services'),
+  adminService: (id: string) => request<SidebarServiceItem>(`/admin/services/${id}`),
+  createService: (dto: CreateSidebarServiceDto) =>
+    request<SidebarServiceItem>('/admin/services', { method: 'POST', body: JSON.stringify(dto) }),
+  updateService: (id: string, dto: UpdateSidebarServiceDto) =>
+    request<SidebarServiceItem>(`/admin/services/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+  toggleService: (id: string) =>
+    request<SidebarServiceItem>(`/admin/services/${id}/toggle`, { method: 'PATCH' }),
+  reorderServices: (items: { id: string; sortOrder: number; category?: string }[]) =>
+    request<{ success: boolean; count: number }>('/admin/services/reorder', {
+      method: 'PATCH',
+      body: JSON.stringify({ items }),
+    }),
+  checkDeleteService: (id: string) =>
+    request<ServiceRelationCheckResult>(`/admin/services/${id}/check-delete`),
+  deleteService: (id: string) =>
+    request<{ success: boolean; message: string }>(`/admin/services/${id}`, { method: 'DELETE' }),
+  previewNavigation: (role?: Role) =>
+    request<SidebarServiceItem[]>(`/admin/services/preview${role ? `?role=${role}` : ''}`),
+
+  // Role Management
+  getRoles: () => request<RoleItem[]>('/admin/roles'),
+  createRole: (dto: CreateRoleDto) =>
+    request<RoleItem>('/admin/roles', { method: 'POST', body: JSON.stringify(dto) }),
+  updateRole: (id: string, dto: UpdateRoleDto) =>
+    request<RoleItem>(`/admin/roles/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+  toggleRole: (id: string) =>
+    request<RoleItem>(`/admin/roles/${id}/toggle`, { method: 'PATCH' }),
+  deleteRole: (id: string) =>
+    request<{ ok: boolean }>(`/admin/roles/${id}`, { method: 'DELETE' }),
+  bulkAssignRole: (userIds: string[], role: Role) =>
+    request<{ updatedCount: number; errors: string[] }>('/admin/roles/bulk-assign', {
+      method: 'POST',
+      body: JSON.stringify({ userIds, role }),
+    }),
+
 
   // Document Verification & QR Code
   getVerification: (documentId: string) =>
@@ -535,6 +586,70 @@ export const api = {
     request<any>('/admin/line/flex-templates/preview', {
       method: 'POST',
       body: JSON.stringify({ eventType, sampleData }),
+    }),
+
+  // Document Templates & Editor
+  listDocumentTemplates: (params?: { category?: string; status?: string; search?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.category) q.set('category', params.category);
+    if (params?.status) q.set('status', params.status);
+    if (params?.search) q.set('search', params.search);
+    const qs = q.toString();
+    return request<DocumentTemplateItem[]>(`/document-templates${qs ? `?${qs}` : ''}`);
+  },
+  getDocumentTemplate: (id: string) =>
+    request<DocumentTemplateItem>(`/document-templates/${id}`),
+  createDocumentTemplate: (data: Partial<DocumentTemplateItem> & { name: string }) =>
+    request<DocumentTemplateItem>('/document-templates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateDocumentTemplate: (id: string, data: Partial<DocumentTemplateItem>) =>
+    request<DocumentTemplateItem>(`/document-templates/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteDocumentTemplate: (id: string) =>
+    request<{ success: boolean; id: string }>(`/document-templates/${id}`, {
+      method: 'DELETE',
+    }),
+  duplicateDocumentTemplate: (id: string) =>
+    request<DocumentTemplateItem>(`/document-templates/${id}/duplicate`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+  publishDocumentTemplate: (id: string, note?: string) =>
+    request<DocumentTemplateItem>(`/document-templates/${id}/publish`, {
+      method: 'POST',
+      body: JSON.stringify({ note }),
+    }),
+  archiveDocumentTemplate: (id: string) =>
+    request<DocumentTemplateItem>(`/document-templates/${id}/archive`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+  listTemplateVersions: (id: string) =>
+    request<DocumentTemplateVersionItem[]>(`/document-templates/${id}/versions`),
+  getTemplateVersion: (id: string, version: number) =>
+    request<DocumentTemplateVersionItem>(`/document-templates/${id}/versions/${version}`),
+  rollbackTemplateVersion: (id: string, version: number) =>
+    request<DocumentTemplateItem>(`/document-templates/${id}/versions/${version}/rollback`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+  listGeneratedDocuments: (params?: { requestId?: string; search?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.requestId) q.set('requestId', params.requestId);
+    if (params?.search) q.set('search', params.search);
+    const qs = q.toString();
+    return request<GeneratedDocumentItem[]>(`/documents${qs ? `?${qs}` : ''}`);
+  },
+  getGeneratedDocument: (id: string) =>
+    request<GeneratedDocumentItem>(`/documents/${id}`),
+  generateDocument: (data: { templateId: string; requestId: string; documentNumber?: string }) =>
+    request<GeneratedDocumentItem>('/documents/generate', {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
 };
 

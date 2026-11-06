@@ -576,15 +576,16 @@ describe('RequestsController Unit Tests', () => {
       });
       expect(accepted.status).toBe('repair_in_progress');
 
-      // Staff finishes
+      // Staff finishes without signature, but with resolution and afterPhotos
       const finished = await controller.updateRepair(staff, repairReq.id, {
         action: 'finish',
         pin: '123456',
         resolution: 'เปลี่ยนคอมเพรสเซอร์เรียบร้อย',
-        signature: staff.signature!,
+        afterPhotos: ['data:image/png;base64,mockphoto'],
       });
       expect(finished.status).toBe('repair_awaiting_acceptance');
       expect(finished.resolution).toBe('เปลี่ยนคอมเพรสเซอร์เรียบร้อย');
+      expect((finished as any).afterPhotos).toEqual(['data:image/png;base64,mockphoto']);
 
       // Citizen confirms
       const confirmed = await controller.updateRepair(citizen, repairReq.id, {

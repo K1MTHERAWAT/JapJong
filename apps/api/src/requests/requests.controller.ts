@@ -339,6 +339,9 @@ export class RequestsController {
     @CurrentUser() user: Account,
     @Body() body: CreateBookingDto,
   ) {
+    if (typeof this.db?.isServiceRouteEnabled === 'function' && !this.db.isServiceRouteEnabled('/booking')) {
+      throw new ForbiddenException('บริการขอใช้สถานที่ถูกปิดใช้งานชั่วคราวโดยผู้ดูแลระบบ');
+    }
     return this.bookingMutex.runExclusive(async () => {
       const venueIds = Array.isArray(body.venueIds) ? body.venueIds : [];
       const periods = Array.isArray(body.periods) ? body.periods : [];
@@ -441,6 +444,9 @@ export class RequestsController {
     @CurrentUser() user: Account,
     @Body() body: CreateBorrowDto,
   ) {
+    if (typeof this.db?.isServiceRouteEnabled === 'function' && !this.db.isServiceRouteEnabled('/borrow')) {
+      throw new ForbiddenException('บริการยืม-คืนอุปกรณ์ถูกปิดใช้งานชั่วคราวโดยผู้ดูแลระบบ');
+    }
     return this.bookingMutex.runExclusive(async () => {
       const items = this.sanitizeItems(body.items);
       if (!items.length) throw new BadRequestException('กรุณาเลือกอุปกรณ์อย่างน้อย 1 รายการ');
@@ -523,6 +529,9 @@ export class RequestsController {
     @CurrentUser() user: Account,
     @Body() body: CreateRepairDto,
   ) {
+    if (typeof this.db?.isServiceRouteEnabled === 'function' && !this.db.isServiceRouteEnabled('/repair')) {
+      throw new ForbiddenException('บริการแจ้งซ่อมถูกปิดใช้งานชั่วคราวโดยผู้ดูแลระบบ');
+    }
     if (!body.detail?.trim()) throw new BadRequestException('กรุณาระบุรายละเอียดอาการ');
 
     const isWalkIn =
@@ -1037,6 +1046,9 @@ export class RequestsController {
       req.resolution = String(body.resolution ?? '').slice(0, 1000) || 'ดำเนินการซ่อมเรียบร้อย';
       req.staffSignature = sig;
       req.staffSignerName = user.name;
+      if (Array.isArray(body.afterPhotos)) {
+        req.afterPhotos = body.afterPhotos.slice(0, 5);
+      }
       if (!this.notificationEvents) {
         this.db.notify(req.requesterId, `${req.location} ซ่อมเสร็จแล้ว`, 'รอคุณตรวจรับงาน', `/repair?mode=track&id=${req.id}`);
       }

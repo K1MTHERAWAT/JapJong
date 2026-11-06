@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LogIn, LogOut, Menu, X } from 'lucide-react';
@@ -32,12 +32,19 @@ export function Sidebar({ items }: { items: NavItem[] }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [drawer, closeDrawer]);
 
-  const navGroups = [
-    items.filter((item) => ['/', '/booking', '/borrow', '/repair', '/borrow/my', '/history', '/notifications', '/account'].includes(item.href)),
-    items.filter((item) => ['/staff/review', '/staff/repairs', '/staff/verify'].includes(item.href)),
-    items.filter((item) => ['/approver'].includes(item.href)),
-    items.filter((item) => ['/admin', '/admin/line', '/admin/notifications', '/admin/resources', '/admin/permissions'].includes(item.href)),
-  ].filter((group) => group.length > 0);
+  const navGroups = useMemo(() => {
+    const sections: string[] = [];
+    const map = new Map<string, NavItem[]>();
+    for (const item of items) {
+      const sec = item.section || 'ทั่วไป';
+      if (!map.has(sec)) {
+        sections.push(sec);
+        map.set(sec, []);
+      }
+      map.get(sec)!.push(item);
+    }
+    return sections.map((sec) => map.get(sec)!).filter((group) => group.length > 0);
+  }, [items]);
 
   return (
     <>

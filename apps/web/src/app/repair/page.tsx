@@ -640,15 +640,42 @@ export default function RepairPage() {
                   </div>
                 </div>
 
-                {activeRepair.status === 'repair_awaiting_acceptance' && (
-                  <div className="pt-3 border-t border-line flex flex-col gap-2 bg-amber-50/50 dark:bg-amber-950/20 p-3.5 rounded-2xl border border-amber-200">
-                    <b className="text-[14px] text-amber-900 dark:text-amber-200">งานซ่อมเสร็จเรียบร้อยแล้ว รอการตรวจรับจากคุณ</b>
-                    <p className="text-[13px] text-amber-800 dark:text-amber-300">
+                {(activeRepair.status === 'repair_awaiting_acceptance' || activeRepair.status === 'repair_done') && (
+                  <div className={`pt-3 border-t border-line flex flex-col gap-2 p-3.5 rounded-2xl border ${
+                    activeRepair.status === 'repair_done'
+                      ? 'bg-brand-mint/40 border-brand/30'
+                      : 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200'
+                  }`}>
+                    <b className={`text-[14px] ${activeRepair.status === 'repair_done' ? 'text-brand' : 'text-amber-900 dark:text-amber-200'}`}>
+                      {activeRepair.status === 'repair_done' ? '✓ งานซ่อมนี้ได้รับการตรวจรับเรียบร้อยแล้ว' : 'งานซ่อมเสร็จเรียบร้อยแล้ว รอการตรวจรับจากคุณ'}
+                    </b>
+                    <p className={`text-[13px] ${activeRepair.status === 'repair_done' ? 'text-ink' : 'text-amber-800 dark:text-amber-300'}`}>
                       ผลการซ่อม: {activeRepair.resolution || 'ดำเนินการซ่อมเรียบร้อย'}
                     </p>
-                    <p className="text-[12px] text-ink-mute">
-                      หากผลงานเรียบร้อยดี กรุณากดปุ่ม <b>"ยืนยันตรวจรับงานซ่อม"</b> ด้านล่าง (ไม่ต้องลงนาม)
-                    </p>
+                    {activeRepair.afterPhotos && activeRepair.afterPhotos.length > 0 && (
+                      <div className="flex flex-col gap-1.5 pt-1">
+                        <span className="text-[12px] font-semibold text-ink">รูปภาพหลังซ่อม ({activeRepair.afterPhotos.length} รูป):</span>
+                        <div className="flex flex-wrap gap-2">
+                          {activeRepair.afterPhotos.map((url, i) => (
+                            <a
+                              key={i}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block w-20 h-20 rounded-xl border border-line overflow-hidden hover:opacity-90 transition shadow-sm"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={url} alt={`รูปหลังซ่อม ${i + 1}`} className="w-full h-full object-cover" />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {activeRepair.status === 'repair_awaiting_acceptance' && (
+                      <p className="text-[12px] text-ink-mute">
+                        หากผลงานเรียบร้อยดี กรุณากดปุ่ม <b>&quot;ยืนยันตรวจรับงานซ่อม&quot;</b> ด้านล่าง (ไม่ต้องลงนาม)
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

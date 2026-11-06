@@ -74,6 +74,25 @@ describe('AdminController Unit Tests', () => {
       }),
       clearTransactions: vi.fn().mockResolvedValue(true),
       reset: vi.fn().mockResolvedValue(true),
+      listRoles: vi.fn().mockReturnValue([
+        { id: 'role-admin', key: 'ADMIN', name: 'ผู้ดูแลระบบ', enabled: true, userCount: 1 },
+        { id: 'role-user', key: 'USER', name: 'ผู้ใช้งานทั่วไป', enabled: true, userCount: 1 },
+      ]),
+      createRole: vi.fn().mockImplementation((dto, actor) =>
+        Promise.resolve({ id: 'role-new', key: dto.key || 'NEW', ...dto }),
+      ),
+      updateRole: vi.fn().mockImplementation((id, dto, actor) =>
+        Promise.resolve({ id, ...dto }),
+      ),
+      toggleRole: vi.fn().mockImplementation((id, actor) =>
+        Promise.resolve({ id, enabled: false }),
+      ),
+      deleteRole: vi.fn().mockImplementation((id, actor) =>
+        Promise.resolve(),
+      ),
+      bulkAssignRole: vi.fn().mockImplementation((userIds, role, actor) =>
+        Promise.resolve({ updatedCount: userIds.length, errors: [] }),
+      ),
     };
 
     controller = new AdminController(mockDb);
@@ -220,6 +239,47 @@ describe('AdminController Unit Tests', () => {
       const res = await controller.reset();
       expect(res.ok).toBe(true);
       expect(mockDb.reset).toHaveBeenCalled();
+    });
+  });
+
+  describe('Role Management Endpoints', () => {
+    it('listRoles returns roles from db', () => {
+      const roles = controller.listRoles();
+      expect(roles.length).toBe(2);
+      expect(mockDb.listRoles).toHaveBeenCalled();
+    });
+
+    it('createRole calls db.createRole with dto and actor', async () => {
+      const dto = { name: 'บทบาททดสอบ', key: 'TEST_ROLE', description: 'คำอธิบาย' };
+      const res = await controller.createRole(dto, actorAdmin);
+      expect(res.name).toBe('บทบาททดสอบ');
+      expect(mockDb.createRole).toHaveBeenCalledWith(dto, actorAdmin);
+    });
+
+    it('updateRole calls db.updateRole with id, dto and actor', async () => {
+      const dto = { name: 'ชื่อใหม่' };
+      const res = await controller.updateRole('role-user', dto, actorAdmin);
+      expect(res.name).toBe('ชื่อใหม่');
+      expect(mockDb.updateRole).toHaveBeenCalledWith('role-user', dto, actorAdmin);
+    });
+
+    it('toggleRole calls db.toggleRole with id and actor', async () => {
+      const res = await controller.toggleRole('role-user', actorAdmin);
+      expect(res.enabled).toBe(false);
+      expect(mockDb.toggleRole).toHaveBeenCalledWith('role-user', actorAdmin);
+    });
+
+    it('deleteRole calls db.deleteRole with id and actor', async () => {
+      const res = await controller.deleteRole('role-user', actorAdmin);
+      expect(res.ok).toBe(true);
+      expect(mockDb.deleteRole).toHaveBeenCalledWith('role-user', actorAdmin);
+    });
+
+    it('bulkAssignRole calls db.bulkAssignRole with userIds, role and actor', async () => {
+      const dto = { userIds: ['u-target-01'], role: 'STAFF' as const };
+      const res = await controller.bulkAssignRole(dto, actorAdmin);
+      expect(res.updatedCount).toBe(1);
+      expect(mockDb.bulkAssignRole).toHaveBeenCalledWith(['u-target-01'], 'STAFF', actorAdmin);
     });
   });
 });
