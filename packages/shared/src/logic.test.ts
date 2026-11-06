@@ -359,6 +359,11 @@ describe('Logic & Permissions Unit Tests', () => {
       expect(canAccessRoute(dummyCitizen, '/staff/review').allowed).toBe(false);
     });
 
+    it('checks /staff/repairs access', () => {
+      expect(canAccessRoute(dummyStaff, '/staff/repairs').allowed).toBe(true);
+      expect(canAccessRoute(dummyCitizen, '/staff/repairs').allowed).toBe(false);
+    });
+
     it('checks /staff/walk-in access', () => {
       expect(canAccessRoute(dummyStaff, '/staff/walk-in').allowed).toBe(true);
       expect(canAccessRoute(dummyCitizen, '/staff/walk-in').allowed).toBe(false);

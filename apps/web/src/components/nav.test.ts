@@ -98,8 +98,12 @@ describe('Navigation Menu Access Control (getVisibleNav)', () => {
   it('renders staff operations menus for staff role', () => {
     const visible = getVisibleNav(baseStaff);
     expect(visible.some((i) => i.href === '/staff/review')).toBe(true);
+    expect(visible.some((i) => i.href === '/staff/repairs')).toBe(true);
     expect(visible.some((i) => i.href === '/staff/verify')).toBe(true);
     expect(visible.some((i) => i.href === '/admin/resources')).toBe(true);
+
+    // Staff does not have repair citizen service in nav
+    expect(visible.some((i) => i.href === '/repair')).toBe(false);
 
     // Staff cannot see approver L1/L2 approval queue or admin user management
     expect(visible.some((i) => i.href === '/approver')).toBe(false);
@@ -129,5 +133,6 @@ describe('Navigation Menu Access Control (getVisibleNav)', () => {
     expect(visible.some((i) => i.href === '/borrow')).toBe(false);
     expect(visible.some((i) => i.href === '/repair')).toBe(false);
     expect(visible.some((i) => i.href === '/staff/review')).toBe(false);
+    expect(visible.some((i) => i.href === '/staff/repairs')).toBe(false);
   });
 });

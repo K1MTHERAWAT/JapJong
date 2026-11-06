@@ -297,12 +297,26 @@ export function canAccessRoute(
     };
   }
 
-  // 4. หน้าตรวจและลงนามคำขอของเจ้าหน้าที่ (/staff/review)
+  // 4. หน้าตรวจคำขอของเจ้าหน้าที่ (/staff/review)
   if (pathname.startsWith('/staff/review')) {
     const ok = (account.role === 'STAFF' || account.role === 'ADMIN') && hasPermission(account, 'review');
     return {
       allowed: ok,
-      title: 'ตรวจและลงนามคำขอ (ระดับเจ้าหน้าที่)',
+      title: 'ตรวจคำขอ (สถานที่/อุปกรณ์)',
+      requiredRoles: ['STAFF', 'ADMIN'],
+      requiredPermission: 'review',
+      reason: ok
+        ? undefined
+        : `ต้องมีบทบาทเจ้าหน้าที่/แอดมิน และเปิดสิทธิ์ "${PERMISSION_LABEL.review}"`,
+    };
+  }
+
+  // 4.1 หน้าจัดการงานซ่อมของเจ้าหน้าที่ (/staff/repairs)
+  if (pathname.startsWith('/staff/repairs')) {
+    const ok = (account.role === 'STAFF' || account.role === 'ADMIN') && hasPermission(account, 'review');
+    return {
+      allowed: ok,
+      title: 'จัดการงานซ่อม',
       requiredRoles: ['STAFF', 'ADMIN'],
       requiredPermission: 'review',
       reason: ok

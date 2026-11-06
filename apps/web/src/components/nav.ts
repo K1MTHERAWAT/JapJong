@@ -60,7 +60,8 @@ export const NAV: NavItem[] = [
   },
 
   // เจ้าหน้าที่
-  { href: '/staff/review', label: 'ตรวจคำขอ & งานซ่อม', icon: ClipboardList, section: 'งานเจ้าหน้าที่', roles: ['STAFF', 'ADMIN'] },
+  { href: '/staff/review', label: 'ตรวจคำขอ (สถานที่/อุปกรณ์)', icon: ClipboardList, section: 'งานเจ้าหน้าที่', roles: ['STAFF', 'ADMIN'] },
+  { href: '/staff/repairs', label: 'จัดการงานซ่อม', icon: Wrench, section: 'งานเจ้าหน้าที่', roles: ['STAFF', 'ADMIN'] },
   { href: '/staff/verify', label: 'ตรวจสอบเอกสาร QR Code', icon: QrCode, section: 'งานเจ้าหน้าที่', roles: ['STAFF', 'ADMIN'] },
 
   // ผู้อนุมัติ (ปลัด / นายก)
@@ -97,6 +98,7 @@ export function getVisibleNav(account: PublicAccount | null): NavItem[] {
         '/notifications',
         '/account',
         '/staff/review',
+        '/staff/repairs',
         '/staff/walk-in',
         '/staff/verify',
       ].includes(item.href);
@@ -104,6 +106,11 @@ export function getVisibleNav(account: PublicAccount | null): NavItem[] {
       if (isCitizenOrStaffService) {
         return false;
       }
+    }
+
+    // สำหรับเจ้าหน้าที่: ไม่ต้องมีบริการ แจ้งซ่อม / ปัญหา
+    if (account?.role === 'STAFF' && item.href === '/repair') {
+      return false;
     }
 
     if (item.roles && !account) {

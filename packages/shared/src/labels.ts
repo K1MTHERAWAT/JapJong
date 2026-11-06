@@ -149,7 +149,7 @@ export const PERMISSION_META: Record<PermissionKey, PermissionMetaInfo> = {
     label: PERMISSION_LABEL.review,
     description: 'เข้าหน้า /staff/review เพื่อตรวจเอกสาร ลงนามระดับที่ 1 (เจ้าหน้าที่) และรับเรื่อง/ปิดงานแจ้งซ่อม',
     defaultRoles: ['STAFF', 'ADMIN'],
-    routes: ['/staff', '/staff/review'],
+    routes: ['/staff', '/staff/review', '/staff/repairs'],
   },
   handover: {
     key: 'handover',
