@@ -31,7 +31,12 @@ export default function AddResourcePage() {
   const [availableForms, setAvailableForms] = useState<FormTemplateItem[]>([]);
 
   useEffect(() => {
+    // Initial from cache
     setAvailableForms(getFormTemplates());
+    // Live from backend database API
+    fetchFormTemplatesFromApi().then((templates) => {
+      setAvailableForms(templates);
+    });
   }, []);
 
   // รูปภาพจริง (สูงสุด 3 รูป)
@@ -663,14 +668,14 @@ export default function AddResourcePage() {
           initialConfig={getFormTemplate(formName)?.config}
           isBorrowMode={formName.includes('ครุภัณฑ์') || formName.includes('อุปกรณ์')}
           onClose={() => setShowDocEditor(false)}
-          onSave={({ formTitle, config }) => {
+          onSave={async ({ formTitle, config }) => {
             const trimmed = formTitle.trim();
-            if (isCreatingNewForm && trimmed) {
-              saveNewFormTemplate(trimmed, undefined, config);
-            } else if (config) {
-              saveFormTemplateConfig(trimmed, config);
+            if (config) {
+              await saveTemplateToDatabase(trimmed, config, kind);
+            } else if (isCreatingNewForm && trimmed) {
+              saveNewFormTemplate(trimmed);
             }
-            const updated = getFormTemplates();
+            const updated = await fetchFormTemplatesFromApi();
             setAvailableForms(updated);
             setFormName(trimmed);
             setShowDocEditor(false);

@@ -21,6 +21,8 @@ import {
   getFormTemplate,
   saveNewFormTemplate,
   saveFormTemplateConfig,
+  fetchFormTemplatesFromApi,
+  saveTemplateToDatabase,
 } from '@/lib/forms-store';
 
 type Kind = 'venue' | 'equipment';
@@ -60,6 +62,9 @@ function EditResourceContent() {
 
   useEffect(() => {
     setAvailableForms(getFormTemplates());
+    fetchFormTemplatesFromApi().then((templates) => {
+      setAvailableForms(templates);
+    });
   }, []);
   const [approvalOrder, setApprovalOrder] = useState<string[]>([
     'เจ้าหน้าที่ตรวจสอบ',
@@ -726,14 +731,14 @@ function EditResourceContent() {
           initialConfig={getFormTemplate(formName)?.config}
           isBorrowMode={formName.includes('ครุภัณฑ์') || formName.includes('อุปกรณ์')}
           onClose={() => setShowDocEditor(false)}
-          onSave={({ formTitle, config }) => {
+          onSave={async ({ formTitle, config }) => {
             const trimmed = formTitle.trim();
-            if (isCreatingNewForm && trimmed) {
-              saveNewFormTemplate(trimmed, undefined, config);
-            } else if (config) {
-              saveFormTemplateConfig(trimmed, config);
+            if (config) {
+              await saveTemplateToDatabase(trimmed, config, kind);
+            } else if (isCreatingNewForm && trimmed) {
+              saveNewFormTemplate(trimmed);
             }
-            const updated = getFormTemplates();
+            const updated = await fetchFormTemplatesFromApi();
             setAvailableForms(updated);
             setFormName(trimmed);
             setShowDocEditor(false);

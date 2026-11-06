@@ -3952,6 +3952,38 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
     // Map snapshot with real booking/request data
     const snapshot = clone(template.structure);
+    if (snapshot) {
+      snapshot.writtenAt = request.writtenAt || snapshot.writtenAt || 'ที่ทำการองค์การบริหารส่วนตำบล';
+      snapshot.subject = request.type === 'borrow' ? 'ขออนุญาตใช้อุปกรณ์ของทางราชการ' : (snapshot.subject || 'ขออนุญาตใช้สถานที่ราชการ');
+      snapshot.recipient = snapshot.recipient || 'ผู้มีอำนาจอนุมัติ';
+      
+      // Hydrate requester slots with real values
+      if (Array.isArray(snapshot.requesterSlots)) {
+        snapshot.requesterSlots = snapshot.requesterSlots.map((s: any) => {
+          let val = '';
+          if (s.binding === 'requester.name') val = request.requesterName;
+          else if (s.binding === 'requester.position') val = request.requesterPosition || '';
+          else if (s.binding === 'requester.organization') val = request.organization || '';
+          else if (s.binding === 'requester.phone') val = request.requesterPhone || '';
+          else if (s.binding === 'requester.address') val = request.addressHouseNo || '';
+          return { ...s, value: val };
+        });
+      }
+
+      // Hydrate custom slots with real values
+      if (Array.isArray(snapshot.customSlots)) {
+        snapshot.customSlots = snapshot.customSlots.map((s: any) => {
+          let val = '';
+          if (s.fieldKey === 'requester_name') val = request.requesterName;
+          else if (s.fieldKey === 'requester_position') val = request.requesterPosition || '';
+          else if (s.fieldKey === 'organization') val = request.organization || '';
+          else if (s.fieldKey === 'requester_phone') val = request.requesterPhone || '';
+          else if (s.fieldKey === 'purpose') val = (request as any).purpose || '';
+          return { ...s, value: val };
+        });
+      }
+    }
+
     const generated: GeneratedDocumentItem = {
       id,
       templateId: template.id,

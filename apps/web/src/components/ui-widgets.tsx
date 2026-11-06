@@ -986,6 +986,10 @@ export function OfficialGovFormDocument({
     attendeesText?: string;
     requesterSignature?: string | null;
     requesterRoleCaption?: string;
+    logoUrl?: string | null;
+    closingText?: string;
+    customSlots?: any[];
+    slotsConfig?: any;
   };
 }) {
   const [internalVer, setInternalVer] = useState<DocumentVerification | null>(null);
@@ -1144,6 +1148,16 @@ export function OfficialGovFormDocument({
   return (
     <div className="gov-form-paper bg-white p-5 sm:p-8 text-black text-[13.5px] sm:text-[14.5px] leading-[1.65] relative">
       <div>
+        {customFields?.logoUrl && (
+          <div className="text-center mb-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={customFields.logoUrl}
+              alt="ตราสัญลักษณ์"
+              className="max-h-16 inline-block object-contain"
+            />
+          </div>
+        )}
         <h2 className="text-center text-[18px] sm:text-[20px] font-bold text-black tracking-wide mb-5">
           {formTitle}
         </h2>
@@ -1191,6 +1205,18 @@ export function OfficialGovFormDocument({
             <span>หน่วยงาน</span>
             <DottedSpan minW="min-w-[140px] flex-1">{organization}</DottedSpan>
           </div>
+          {customFields?.customSlots && customFields.customSlots.length > 0 && (
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 pt-1">
+              {customFields.customSlots.map((cs: any) => (
+                <span key={cs.id || cs.fieldKey} className="inline-flex items-baseline gap-1">
+                  <span>{cs.label}:</span>
+                  <DottedSpan minW={`min-w-[${Math.max(60, Math.min(250, cs.width || 120))}px]`}>
+                    {blankMode ? '' : sampleDocMode ? cs.label : ''}
+                  </DottedSpan>
+                </span>
+              ))}
+            </div>
+          )}
           <div>{desireLabel}</div>
         </div>
 
@@ -1218,7 +1244,9 @@ export function OfficialGovFormDocument({
         </div>
 
         {/* จึงเรียนมาเพื่อพิจารณาอนุญาต */}
-        <div className="pl-6 sm:pl-10 mb-3">จึงเรียนมาเพื่อพิจารณาอนุญาต</div>
+        <div className="pl-6 sm:pl-10 mb-3">
+          {customFields?.closingText || 'จึงเรียนมาเพื่อพิจารณาอนุญาต'}
+        </div>
 
         {/* ขอแสดงความนับถือ + ลายมือชื่อผู้ขออนุญาตใช้สถานที่ราชการ (ฝ่ายที่ 1) */}
         <div className="gov-form-requester-signature flex justify-end pr-4 sm:pr-8 mb-4">

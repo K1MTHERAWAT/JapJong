@@ -19,7 +19,10 @@ import {
   FormTemplateItem,
   deleteCustomFormTemplate,
   getFormTemplates,
+  getFormTemplate,
   saveNewFormTemplate,
+  saveTemplateToDatabase,
+  fetchFormTemplatesFromApi,
 } from '@/lib/forms-store';
 
 type ResourceTab = 'venues' | 'equipment' | 'vehicles' | 'forms';
@@ -42,8 +45,10 @@ function ManageResourcesContent() {
   const [previewImg, setPreviewImg] = useState<string | null>(null);
 
   const loadForms = useCallback(() => {
-    const list = getFormTemplates();
-    setFormsList(list);
+    setFormsList(getFormTemplates());
+    fetchFormTemplatesFromApi().then((list) => {
+      setFormsList(list);
+    });
   }, []);
 
   const load = useCallback(() => {
@@ -352,14 +357,20 @@ function ManageResourcesContent() {
                   blankMode={formPreviewMode === 'blank'}
                   sampleDocMode={formPreviewMode === 'sample'}
                   customFields={{
-                    formTitle: currentSelectedForm?.title || 'แบบขอใช้สถานที่ราชการ',
-                    subject: currentSelectedForm?.sub?.replace(/^เรื่อง\s*/, '') || 'ขออนุญาตใช้สถานที่ราชการ',
+                    formTitle: currentSelectedForm?.config?.formTitle || currentSelectedForm?.title || 'แบบขอใช้สถานที่ราชการ',
+                    subject: currentSelectedForm?.config?.subjectText || currentSelectedForm?.sub?.replace(/^เรื่อง\s*/, '') || 'ขออนุญาตใช้สถานที่ราชการ',
+                    toWhom: currentSelectedForm?.config?.recipientText || 'ผู้มีอำนาจอนุมัติ',
+                    writtenAt: currentSelectedForm?.config?.writtenAtSlot?.label,
                     desireLabel: currentSelectedForm?.title?.includes('ครุภัณฑ์')
                       ? 'มีความประสงค์ขอยืมครุภัณฑ์ราชการ ดังนี้'
                       : 'มีความประสงค์ขอใช้สถานที่ราชการ ดังนี้',
                     requesterRoleCaption: currentSelectedForm?.title?.includes('ครุภัณฑ์')
                       ? 'ผู้ขออนุญาตยืมครุภัณฑ์ราชการ'
                       : 'ผู้ขออนุญาตใช้สถานที่ราชการ',
+                    logoUrl: currentSelectedForm?.config?.logoUrl,
+                    customSlots: currentSelectedForm?.config?.customSlots,
+                    closingText: currentSelectedForm?.config?.closingText,
+                    slotsConfig: currentSelectedForm?.config,
                   }}
                 />
               </div>
@@ -400,18 +411,27 @@ function ManageResourcesContent() {
               ? 'แบบขอใช้สถานที่ราชการ (แบบใหม่)'
               : currentSelectedForm?.title || 'แบบขอใช้สถานที่ราชการ'
           }
+          initialConfig={currentSelectedForm?.config || getFormTemplate(currentSelectedForm?.title || '')?.config}
           isBorrowMode={currentSelectedForm?.title?.includes('ครุภัณฑ์') || currentSelectedForm?.title?.includes('อุปกรณ์')}
           onClose={() => {
             setShowDocEditor(false);
             setIsCreatingNewForm(false);
           }}
-          onSave={({ formTitle }) => {
+          onSave={async ({ formTitle, config }) => {
             const trimmed = formTitle.trim();
-            if (isCreatingNewForm && trimmed) {
-              const saved = saveNewFormTemplate(trimmed);
-              loadForms();
-              setSelectedFormKey(saved.id);
+            if (config) {
+              await saveTemplateToDatabase(
+                trimmed,
+                config,
+                currentSelectedForm?.title?.includes('ครุภัณฑ์') ? 'equipment' : 'venue'
+              );
+            } else if (isCreatingNewForm && trimmed) {
+              saveNewFormTemplate(trimmed);
             }
+            const updated = await fetchFormTemplatesFromApi();
+            setFormsList(updated);
+            const found = updated.find((f) => f.title === trimmed || f.id === trimmed);
+            if (found) setSelectedFormKey(found.id);
             setShowDocEditor(false);
             setIsCreatingNewForm(false);
           }}
