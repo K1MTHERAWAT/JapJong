@@ -1,6 +1,6 @@
 import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, NotFoundException, Patch, Post, Req, UnauthorizedException } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import * as crypto from 'crypto';
 import { DEFAULT_PERMISSIONS, Account, DemoAccountSummary } from '@japjong/shared';
 import { DbService } from '../db/db.service';
@@ -560,6 +560,7 @@ export class AuthController {
     };
   }
 
+  @SkipThrottle()
   @Get('sign-session/status')
   async getSignSessionStatus(@CurrentUser() user: Account, @Req() req: any) {
     const sessionToken = req.token;

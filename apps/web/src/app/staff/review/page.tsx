@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { RequestWithTimeline } from '@japjong/shared';
+import { RequestWithTimeline, canSignRequest } from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
@@ -40,10 +40,19 @@ export default function StaffReviewPage() {
   const load = useCallback((preferId?: string | null) => {
     api
       .listRequests({ queue: 'staff' })
-      .then((list) => {
-        setQueue(list);
+      .then(async (list) => {
+        let combined = [...list];
+        if (preferId && !combined.some((r) => r.id === preferId || r.code === preferId)) {
+          try {
+            const single = await api.getRequest(preferId);
+            if (single) combined = [single, ...combined];
+          } catch {
+            // ignore if not found
+          }
+        }
+        setQueue(combined);
         if (preferId) {
-          const foundIdx = list.findIndex((r) => r.id === preferId || r.code === preferId);
+          const foundIdx = combined.findIndex((r) => r.id === preferId || r.code === preferId);
           setIndex(foundIdx >= 0 ? foundIdx : 0);
         } else {
           setIndex(0);
@@ -189,30 +198,53 @@ export default function StaffReviewPage() {
               >
                 ลงนามซ่อมเสร็จ
               </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  disabled={submitting || !staffSignature.trim()}
-                  onClick={() => handleStartDecision('reject')}
-                  className="jw-btn-red flex-1 sm:w-44"
-                >
-                  ลงนามไม่ผ่าน
-                </button>
-                <button
-                  type="button"
-                  disabled={submitting || !confirmed || !staffSignature.trim()}
-                  onClick={() => handleStartDecision('approve')}
-                  className="jw-btn flex-[1.5] sm:w-64"
-                >
-                  {submitting
-                    ? 'กำลังบันทึก...'
-                    : isSessionVerified
-                      ? 'ลงนามส่งต่อปลัด (มีผลทันที)'
-                      : 'ลงนามและยืนยัน OTP'}
-                </button>
-              </>
-            )}
+            ) : (() => {
+              const signCheck = canSignRequest(account, current);
+              if (!signCheck.allowed) {
+                return (
+                  <div className="w-full flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-[13px]">
+                    <div className="flex items-center gap-2">
+                      <Icon name="info" className="w-4 h-4 shrink-0 text-amber-600" />
+                      <span>{signCheck.reason || 'คำขอนี้ไม่ได้อยู่ในสถานะที่เจ้าหน้าที่ตรวจสอบสามารถลงนามได้'}</span>
+                    </div>
+                    {current.status === 'pending_l2' && (
+                      <Link href={`/approver/sign/${current.id}`} className="text-brand font-semibold underline shrink-0">
+                        ไปหน้าลงนามระดับปลัด →
+                      </Link>
+                    )}
+                    {current.status === 'pending_l1' && (
+                      <Link href={`/approver/sign/${current.id}`} className="text-brand font-semibold underline shrink-0">
+                        ไปหน้าลงนามระดับนายก →
+                      </Link>
+                    )}
+                  </div>
+                );
+              }
+              return (
+                <>
+                  <button
+                    type="button"
+                    disabled={submitting || !staffSignature.trim()}
+                    onClick={() => handleStartDecision('reject')}
+                    className="jw-btn-red flex-1 sm:w-44"
+                  >
+                    ลงนามไม่ผ่าน
+                  </button>
+                  <button
+                    type="button"
+                    disabled={submitting || !confirmed || !staffSignature.trim()}
+                    onClick={() => handleStartDecision('approve')}
+                    className="jw-btn flex-[1.5] sm:w-64"
+                  >
+                    {submitting
+                      ? 'กำลังบันทึก...'
+                      : isSessionVerified
+                        ? 'ลงนามส่งต่อปลัด (มีผลทันที)'
+                        : 'ลงนามและยืนยัน OTP'}
+                  </button>
+                </>
+              );
+            })()}
           </div>
         ) : undefined
       }

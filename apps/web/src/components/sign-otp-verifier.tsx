@@ -26,6 +26,10 @@ export function SignOtpVerifier({
   const [maskedEmail, setMaskedEmail] = useState<string>('');
   const [targetEmail, setTargetEmail] = useState<string>(initialEmail || '');
 
+  // ใช้ ref เพื่อป้องกัน re-render loop เมื่อ onVerified ถูกส่งเข้ามาแบบ anonymous function
+  const onVerifiedRef = useRef(onVerified);
+  onVerifiedRef.current = onVerified;
+
   // OTP Request State
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -38,21 +42,21 @@ export function SignOtpVerifier({
   const [digits, setDigits] = useState<string[]>(['', '', '', '', '', '']);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // ตรวจสอบสถานะ Signing Session ปัจจุบัน
+  // ตรวจสอบสถานะ Signing Session ปัจจุบัน (เรียกเฉพาะตอน mount)
   const checkStatus = useCallback(async () => {
     try {
       const res = await api.getSignSessionStatus();
       setIsVerified(res.isVerified);
       if (res.expiresAt) setExpiresAt(res.expiresAt);
       if (res.maskedEmail) setMaskedEmail(res.maskedEmail);
-      if (res.email && !targetEmail) setTargetEmail(res.email);
-      if (res.isVerified && onVerified) {
-        onVerified(res.expiresAt);
+      if (res.email) setTargetEmail((prev) => prev || res.email || '');
+      if (res.isVerified && onVerifiedRef.current) {
+        onVerifiedRef.current(res.expiresAt);
       }
     } catch {
       setIsVerified(false);
     }
-  }, [onVerified, targetEmail]);
+  }, []);
 
   useEffect(() => {
     checkStatus();
@@ -106,7 +110,7 @@ export function SignOtpVerifier({
       setIsVerified(true);
       setExpiresAt(res.expiresAt);
       setSuccessMsg(res.message || 'ยืนยันตัวตนสำเร็จ');
-      if (onVerified) onVerified(res.expiresAt);
+      if (onVerifiedRef.current) onVerifiedRef.current(res.expiresAt);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'รหัส OTP ไม่ถูกต้อง';
       setError(msg);
