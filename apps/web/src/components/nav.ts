@@ -79,6 +79,7 @@ export const NAV: NavItem[] = [
   // เจ้าหน้าที่
   { href: '/staff/review', label: 'ตรวจคำขอ (สถานที่/อุปกรณ์)', icon: ClipboardList, section: 'งานเจ้าหน้าที่', roles: ['STAFF', 'ADMIN'] },
   { href: '/staff/repairs', label: 'จัดการงานซ่อม', icon: Wrench, section: 'งานเจ้าหน้าที่', roles: ['STAFF', 'ADMIN'] },
+  { href: '/staff/resources', label: 'จัดการสถานที่/อุปกรณ์', icon: Shield, section: 'งานเจ้าหน้าที่', roles: ['STAFF', 'ADMIN'] },
   { href: '/staff/verify', label: 'ตรวจสอบเอกสาร QR Code', icon: QrCode, section: 'งานเจ้าหน้าที่', roles: ['STAFF', 'ADMIN'] },
 
   // ผู้อนุมัติ (ปลัด / นายก)
@@ -89,7 +90,6 @@ export const NAV: NavItem[] = [
   { href: '/admin/services', label: 'จัดการบริการ & เมนู', icon: Layers, section: 'ระบบและผู้ดูแล', roles: ['ADMIN'] },
   { href: '/admin/line', label: 'จัดการ LINE & Rich Menu', icon: Smartphone, section: 'ระบบและผู้ดูแล', roles: ['ADMIN'] },
   { href: '/admin/notifications', label: 'บันทึกแจ้งเตือน & LINE', icon: BellRing, section: 'ระบบและผู้ดูแล', roles: ['ADMIN'] },
-  { href: '/admin/resources', label: 'จัดการสถานที่/อุปกรณ์', icon: Shield, section: 'ระบบและผู้ดูแล', roles: ['ADMIN', 'STAFF'] },
   { href: '/admin/permissions', label: 'บัญชีผู้ใช้ & สิทธิ์', icon: Users, section: 'ระบบและผู้ดูแล', roles: ['ADMIN'] },
 
   // บัญชีของฉัน
@@ -143,6 +143,7 @@ export function getVisibleNav(account: PublicAccount | null, services?: SidebarS
               '/account',
               '/staff/review',
               '/staff/repairs',
+              '/staff/resources',
               '/staff/walk-in',
               '/staff/verify',
             ].includes(s.href);
@@ -176,6 +177,7 @@ export function getVisibleNav(account: PublicAccount | null, services?: SidebarS
         '/account',
         '/staff/review',
         '/staff/repairs',
+        '/staff/resources',
         '/staff/walk-in',
         '/staff/verify',
       ].includes(item.href);

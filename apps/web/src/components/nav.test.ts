@@ -100,7 +100,7 @@ describe('Navigation Menu Access Control (getVisibleNav)', () => {
     expect(visible.some((i) => i.href === '/staff/review')).toBe(true);
     expect(visible.some((i) => i.href === '/staff/repairs')).toBe(true);
     expect(visible.some((i) => i.href === '/staff/verify')).toBe(true);
-    expect(visible.some((i) => i.href === '/admin/resources')).toBe(true);
+    expect(visible.some((i) => i.href === '/staff/resources')).toBe(true);
 
     // Staff does not have repair citizen service in nav
     expect(visible.some((i) => i.href === '/repair')).toBe(false);
@@ -124,15 +124,15 @@ describe('Navigation Menu Access Control (getVisibleNav)', () => {
     expect(visible.some((i) => i.href === '/admin')).toBe(true);
     expect(visible.some((i) => i.href === '/admin/line')).toBe(true);
     expect(visible.some((i) => i.href === '/admin/notifications')).toBe(true);
-    expect(visible.some((i) => i.href === '/admin/resources')).toBe(true);
     expect(visible.some((i) => i.href === '/admin/permissions')).toBe(true);
 
-    // Citizen services (Image 2) must be hidden for Admin
+    // Citizen & Staff services must be hidden for Admin
     expect(visible.some((i) => i.href === '/')).toBe(false);
     expect(visible.some((i) => i.href === '/booking')).toBe(false);
     expect(visible.some((i) => i.href === '/borrow')).toBe(false);
     expect(visible.some((i) => i.href === '/repair')).toBe(false);
     expect(visible.some((i) => i.href === '/staff/review')).toBe(false);
     expect(visible.some((i) => i.href === '/staff/repairs')).toBe(false);
+    expect(visible.some((i) => i.href === '/staff/resources')).toBe(false);
   });
 });

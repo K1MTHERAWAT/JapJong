@@ -98,19 +98,6 @@ export default function AdminHomePage() {
             </Link>
 
             <Link
-              href="/admin/resources"
-              className="jw-card p-4 flex items-center gap-3 hover:ring-1 hover:ring-brand transition"
-            >
-              <div className="w-11 h-11 rounded-2xl bg-brand-mint text-brand flex items-center justify-center shrink-0">
-                <Icon name="building-community" className="w-6 h-6" />
-              </div>
-              <div>
-                <b className="text-[15px] block text-ink">ทรัพยากร</b>
-                <span className="text-[12px] text-ink-mute">สถานที่ & อุปกรณ์</span>
-              </div>
-            </Link>
-
-            <Link
               href="/admin/document-templates"
               className="jw-card p-4 flex items-center gap-3 hover:ring-1 hover:ring-brand transition"
             >
@@ -170,12 +157,6 @@ export default function AdminHomePage() {
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <b className="text-[16px] sm:text-[18px]">กิจกรรมล่าสุด</b>
-            <Link
-              href="/admin/resources/new"
-              className="text-[13px] font-semibold text-brand inline-flex items-center gap-1 hover:underline"
-            >
-              + เพิ่มทรัพยากรใหม่ <Icon name="chevron-right" className="w-4 h-4" />
-            </Link>
           </div>
 
           <div className="jw-card px-4 divide-y divide-line">

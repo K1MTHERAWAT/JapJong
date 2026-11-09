@@ -351,11 +351,11 @@ describe('Logic & Permissions Unit Tests', () => {
       expect(canAccessRoute(dummyStaff, '/admin/permissions').allowed).toBe(false);
     });
 
-    it('checks /admin/resources access', () => {
-      expect(canAccessRoute(dummyAdmin, '/admin/resources').allowed).toBe(true);
-      expect(canAccessRoute(dummyCitizen, '/admin/resources').allowed).toBe(false);
+    it('checks /staff/resources access', () => {
+      expect(canAccessRoute(dummyAdmin, '/staff/resources').allowed).toBe(true);
+      expect(canAccessRoute(dummyCitizen, '/staff/resources').allowed).toBe(false);
       const staffWithRes = { ...dummyStaff, permissions: { ...dummyStaff.permissions, manageResources: true } };
-      expect(canAccessRoute(staffWithRes, '/admin/resources').allowed).toBe(true);
+      expect(canAccessRoute(staffWithRes, '/staff/resources').allowed).toBe(true);
     });
 
     it('checks /admin home dashboard access', () => {

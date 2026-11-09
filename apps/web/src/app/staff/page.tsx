@@ -96,7 +96,7 @@ export default function StaffHomePage() {
             </Link>
 
             <Link
-              href="/admin/resources"
+              href="/staff/resources"
               className={`jw-card p-4 flex flex-col items-center text-center gap-2 hover:shadow-high transition ${
                 !hasPermission(account, 'manageResources') ? 'opacity-50' : ''
               }`}
