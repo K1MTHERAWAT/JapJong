@@ -12,6 +12,7 @@ import {
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
+import { Pagination, SortableHeader } from '@/components/ui';
 import { api, formatThaiDate, formatThaiDateTime, readAndCompressImages } from '@/lib/api';
 
 type BorrowTab = 'borrowing' | 'inspect' | 'history';
@@ -25,7 +26,7 @@ const ALLOWED_IMAGE_MIMES = [
   'image/webp',
 ];
 const MAX_IMAGE_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
-const INITIAL_VISIBLE_COUNT = 8;
+const PAGE_SIZE = 10;
 
 export default function MyBorrowsPage() {
   const { account } = useAuth();
@@ -34,7 +35,8 @@ export default function MyBorrowsPage() {
   const [tab, setTab] = useState<BorrowTab>('borrowing');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [visibleCount, setVisibleCount] = useState<number>(INITIAL_VISIBLE_COUNT);
+  const [page, setPage] = useState<number>(1);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -157,18 +159,29 @@ export default function MyBorrowsPage() {
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return tabFiltered;
-    return tabFiltered.filter((r) => {
-      const eqInfo = getEquipmentInfo(r);
-      return (
-        r.code.toLowerCase().includes(q) ||
-        eqInfo.name.toLowerCase().includes(q) ||
-        eqInfo.code.toLowerCase().includes(q) ||
-        eqInfo.itemSummaries.join(' ').toLowerCase().includes(q) ||
-        (r.requesterName || '').toLowerCase().includes(q)
-      );
+    const list = !q
+      ? tabFiltered
+      : tabFiltered.filter((r) => {
+          const eqInfo = getEquipmentInfo(r);
+          return (
+            r.code.toLowerCase().includes(q) ||
+            eqInfo.name.toLowerCase().includes(q) ||
+            eqInfo.code.toLowerCase().includes(q) ||
+            eqInfo.itemSummaries.join(' ').toLowerCase().includes(q) ||
+            (r.requesterName || '').toLowerCase().includes(q)
+          );
+        });
+
+    return [...list].sort((a, b) => {
+      const tA = new Date(a.pickupDate || a.createdAt).getTime();
+      const tB = new Date(b.pickupDate || b.createdAt).getTime();
+      return sortDir === 'desc' ? tB - tA : tA - tB;
     });
-  }, [tabFiltered, searchQuery, getEquipmentInfo]);
+  }, [tabFiltered, searchQuery, getEquipmentInfo, sortDir]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [tab, searchQuery]);
 
   // Maintain selected item when tab or filtered list changes
   useEffect(() => {
@@ -186,9 +199,9 @@ export default function MyBorrowsPage() {
     [filtered, selectedId],
   );
 
-  const visibleItems = useMemo(
-    () => filtered.slice(0, visibleCount),
-    [filtered, visibleCount],
+  const pagedItems = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page],
   );
 
   // Validate selected files (JPG, JPEG, PNG, WEBP & <= 10MB)
@@ -398,13 +411,13 @@ export default function MyBorrowsPage() {
     switch (status) {
       case 'approved':
         return (
-          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-warn-bg text-warn-fg border border-amber-200 shrink-0">
             รอรับมอบ
           </span>
         );
       case 'borrowing':
         return (
-          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-info-bg text-info-fg border border-blue-200 shrink-0">
             กำลังใช้งาน
           </span>
         );
@@ -416,25 +429,25 @@ export default function MyBorrowsPage() {
         );
       case 'returned':
         return (
-          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-[#E6F4EC] text-[#0F6B4C] border border-[#BFE3CF] shrink-0">
+          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-brand-tint text-brand-ink border border-brand/25 shrink-0">
             เสร็จสิ้น
           </span>
         );
       case 'rejected':
         return (
-          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-red-50 text-red-700 border border-red-200 shrink-0">
+          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-danger-bg text-danger-fg border border-red-200 shrink-0">
             ไม่อนุมัติ
           </span>
         );
       case 'cancelled':
         return (
-          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-slate-100 text-slate-600 border border-slate-300 shrink-0">
+          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-surface-muted text-ink-mute border border-line shrink-0">
             ยกเลิกคำขอ
           </span>
         );
       default:
         return (
-          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-surface-muted text-ink-mute border border-line shrink-0">
             รอดำเนินการ
           </span>
         );
@@ -445,49 +458,37 @@ export default function MyBorrowsPage() {
 
   return (
     <AppShell title="รายการยืม–คืนอุปกรณ์" backHref="/" maxWidth="max-w-none">
-      <div className="flex flex-col gap-6 pb-8 text-[#0F172A] w-full">
-        {/* ==================== PAGE HEADER (from borrow-split.html) ==================== */}
+      <div className="flex flex-col gap-5 pb-8 text-ink w-full">
+        {/* ==================== PAGE HEADER ==================== */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-[20px] leading-[28px] font-semibold text-[#0F172A] m-0">
+            <h1 className="text-[20px] sm:text-[22px] leading-[28px] font-bold text-ink m-0">
               รายการยืม–คืนอุปกรณ์
             </h1>
-            <p className="text-[14px] leading-[20px] font-normal text-[#475569] mt-1">
-              ติดตามสถานะและหลักฐานรูปภาพของแต่ละคำขอ เลือกรายการทางซ้ายเพื่อดูรายละเอียด
+            <p className="text-[13.5px] leading-[20px] font-normal text-ink-mute mt-1">
+              ติดตามสถานะการรับมอบ ส่งคืน และหลักฐานรูปภาพเปรียบเทียบก่อน–หลังใช้งาน เลือกรายการในตารางเพื่อดูรายละเอียด
             </p>
           </div>
           <Link
             href="/borrow"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-[8px] bg-[#0F6B4C] text-white text-[16px] leading-[24px] font-semibold transition hover:opacity-90 hover:-translate-y-px active:scale-[0.98]"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-brand text-white text-[14px] leading-[20px] font-semibold transition hover:bg-brand-ink active:scale-[0.98]"
           >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 256 256"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="16"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M40 128h176M128 40v176" />
-            </svg>
+            <Icon name="plus" className="w-4 h-4" />
             <span>ยื่นขอยืมอุปกรณ์ใหม่</span>
           </Link>
         </div>
 
         {/* ==================== ALERTS (Success / Error) ==================== */}
         {successMsg && (
-          <div className="bg-[#E6F4EC] border border-[#BFE3CF] rounded-[16px] p-4 flex items-center justify-between gap-3 text-[#0F6B4C] text-[14px] leading-[20px]">
+          <div className="bg-brand-tint border border-brand/30 rounded-xl p-3.5 flex items-center justify-between gap-3 text-brand-ink text-[13.5px]">
             <div className="flex items-center gap-2.5">
-              <Icon name="check" className="w-5 h-5 text-[#0F6B4C] shrink-0" />
+              <Icon name="check" className="w-5 h-5 text-brand shrink-0" />
               <span className="font-medium">{successMsg}</span>
             </div>
             <button
               type="button"
               onClick={() => setSuccessMsg('')}
-              className="text-[#0F6B4C]/80 hover:text-[#0F6B4C] text-[12px] font-semibold px-2 py-1 rounded-[6px] hover:bg-white/50 transition"
+              className="text-brand-ink/80 hover:text-brand-ink text-[12px] font-semibold px-2 py-1 rounded-md hover:bg-surface/60 transition"
             >
               ปิด
             </button>
@@ -495,23 +496,23 @@ export default function MyBorrowsPage() {
         )}
 
         {errorMsg && (
-          <div className="bg-red-50 border border-red-200 rounded-[16px] p-4 flex items-center justify-between gap-3 text-red-700 text-[14px] leading-[20px]">
+          <div className="bg-danger-bg border border-danger-fg/25 rounded-xl p-3.5 flex items-center justify-between gap-3 text-danger-fg text-[13.5px]">
             <div className="flex items-center gap-2.5">
-              <Icon name="alert-triangle" className="w-5 h-5 text-red-600 shrink-0" />
+              <Icon name="alert-triangle" className="w-5 h-5 text-danger-fg shrink-0" />
               <span className="font-medium">{errorMsg}</span>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={load}
-                className="text-red-700 hover:bg-red-100 text-[12px] font-semibold px-2.5 py-1 rounded-[6px] border border-red-200 transition"
+                className="text-danger-fg hover:bg-surface/60 text-[12px] font-semibold px-2.5 py-1 rounded-md border border-danger-fg/30 transition"
               >
                 ลองใหม่
               </button>
               <button
                 type="button"
                 onClick={() => setErrorMsg('')}
-                className="text-red-500 hover:text-red-800 text-[12px] font-semibold px-2 py-1"
+                className="text-danger-fg/80 hover:text-danger-fg text-[12px] font-semibold px-2 py-1"
               >
                 ปิด
               </button>
@@ -519,116 +520,145 @@ export default function MyBorrowsPage() {
           </div>
         )}
 
-        {/* ==================== MASTER–DETAIL SPLIT GRID (from borrow-split.html) ==================== */}
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)] gap-6 items-start">
-          {/* -------------------- LEFT COLUMN: MASTER LIST -------------------- */}
-          <section className="flex flex-col gap-3 min-w-0">
-            {/* 3 Category Pill Tabs */}
-            <nav className="flex flex-wrap gap-1" aria-label="หมวดหมู่รายการยืมและคืนอุปกรณ์">
-              <button
-                type="button"
-                onClick={() => {
-                  setTab('borrowing');
-                  setVisibleCount(INITIAL_VISIBLE_COUNT);
-                  setErrorMsg('');
-                  setSuccessMsg('');
-                }}
-                className={`px-3 py-2 rounded-[8px] text-[14px] leading-[20px] font-medium transition-colors ${
-                  tab === 'borrowing'
-                    ? 'bg-[#0F172A] text-white'
-                    : 'text-[#475569] hover:bg-[#F1F5F9]'
-                }`}
-              >
-                ที่กำลังใช้งาน ({borrowingItems.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setTab('inspect');
-                  setVisibleCount(INITIAL_VISIBLE_COUNT);
-                  setErrorMsg('');
-                  setSuccessMsg('');
-                }}
-                className={`px-3 py-2 rounded-[8px] text-[14px] leading-[20px] font-medium transition-colors ${
-                  tab === 'inspect'
-                    ? 'bg-[#0F172A] text-white'
-                    : 'text-[#475569] hover:bg-[#F1F5F9]'
-                }`}
-              >
-                รอตรวจสอบ ({inspectItems.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setTab('history');
-                  setVisibleCount(INITIAL_VISIBLE_COUNT);
-                  setErrorMsg('');
-                  setSuccessMsg('');
-                }}
-                className={`px-3 py-2 rounded-[8px] text-[14px] leading-[20px] font-medium transition-colors ${
-                  tab === 'history'
-                    ? 'bg-[#0F172A] text-white'
-                    : 'text-[#475569] hover:bg-[#F1F5F9]'
-                }`}
-              >
-                ประวัติ ({historyItems.length})
-              </button>
-            </nav>
+        {/* ==================== COMPACT KPI SUMMARY ROW ==================== */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <button
+            type="button"
+            onClick={() => setTab('borrowing')}
+            className={`rounded-xl border bg-surface p-3.5 text-left transition ${
+              tab === 'borrowing'
+                ? 'border-brand ring-2 ring-brand/15 bg-brand-tint/20'
+                : 'border-line hover:border-brand/40'
+            }`}
+          >
+            <span className="text-[12px] text-ink-mute block">ที่กำลังใช้งาน / รอรับมอบ</span>
+            <b className="text-[22px] font-bold text-ink">{borrowingItems.length}</b>
+          </button>
+          <div className="rounded-xl border border-line bg-surface p-3.5">
+            <span className="text-[12px] text-ink-mute block">รอรับมอบอุปกรณ์</span>
+            <b className="text-[22px] font-bold text-warn-fg">
+              {items.filter((r) => r.status === 'approved').length}
+            </b>
+          </div>
+          <button
+            type="button"
+            onClick={() => setTab('inspect')}
+            className={`rounded-xl border bg-surface p-3.5 text-left transition ${
+              tab === 'inspect'
+                ? 'border-brand ring-2 ring-brand/15 bg-brand-tint/20'
+                : 'border-line hover:border-brand/40'
+            }`}
+          >
+            <span className="text-[12px] text-ink-mute block">รอตรวจสอบหลังส่งคืน</span>
+            <b className="text-[22px] font-bold text-purple-700">{inspectItems.length}</b>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('history')}
+            className={`rounded-xl border bg-surface p-3.5 text-left transition ${
+              tab === 'history'
+                ? 'border-brand ring-2 ring-brand/15 bg-brand-tint/20'
+                : 'border-line hover:border-brand/40'
+            }`}
+          >
+            <span className="text-[12px] text-ink-mute block">ประวัติยืม–คืนเสร็จสิ้น</span>
+            <b className="text-[22px] font-bold text-brand">{historyItems.length}</b>
+          </button>
+        </div>
 
-            {/* Search Input Card */}
-            <div className="bg-white border border-[#E2E8F0] rounded-[16px] px-3 py-2 flex items-center gap-2 text-[#475569] focus-within:border-[#0F6B4C] transition-colors">
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 256 256"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="16"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-                className="shrink-0"
-              >
-                <path d="M112 40a72 72 0 100 144 72 72 0 000-144zM168 168l48 48" />
-              </svg>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setVisibleCount(INITIAL_VISIBLE_COUNT);
-                }}
-                placeholder="ค้นหาเลขที่คำขอหรือชื่ออุปกรณ์"
-                aria-label="ค้นหาเลขที่คำขอหรือชื่ออุปกรณ์"
-                className="w-full bg-transparent border-none outline-none text-[14px] leading-[20px] text-[#0F172A] placeholder:text-[#475569]"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="text-[#475569] hover:text-[#0F172A] p-0.5 rounded-full"
-                  aria-label="ล้างคำค้นหา"
-                >
-                  <Icon name="x" className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
+        {/* ==================== UNIFIED FILTER & SEARCH TOOLBAR ==================== */}
+        <div className="rounded-xl border border-line bg-surface p-3 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+          {/* 3 Category Pill Tabs */}
+          <nav className="flex flex-wrap gap-1" aria-label="หมวดหมู่รายการยืมและคืนอุปกรณ์">
+            <button
+              type="button"
+              onClick={() => {
+                setTab('borrowing');
+                setErrorMsg('');
+                setSuccessMsg('');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-[13.5px] font-semibold transition-colors ${
+                tab === 'borrowing'
+                  ? 'bg-ink text-white'
+                  : 'text-ink-soft hover:bg-hover'
+              }`}
+            >
+              ที่กำลังใช้งาน ({borrowingItems.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTab('inspect');
+                setErrorMsg('');
+                setSuccessMsg('');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-[13.5px] font-semibold transition-colors ${
+                tab === 'inspect'
+                  ? 'bg-ink text-white'
+                  : 'text-ink-soft hover:bg-hover'
+              }`}
+            >
+              รอตรวจสอบ ({inspectItems.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTab('history');
+                setErrorMsg('');
+                setSuccessMsg('');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-[13.5px] font-semibold transition-colors ${
+                tab === 'history'
+                  ? 'bg-ink text-white'
+                  : 'text-ink-soft hover:bg-hover'
+              }`}
+            >
+              ประวัติ ({historyItems.length})
+            </button>
+          </nav>
 
-            {/* Master List Rows */}
+          {/* Search Input */}
+          <div className="bg-surface-muted/60 border border-line-input rounded-lg px-3 py-1.5 flex items-center gap-2 text-ink-mute focus-within:border-brand focus-within:bg-surface transition-colors w-full md:w-80">
+            <Icon name="search" className="w-4 h-4 shrink-0" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="ค้นหาเลขที่คำขอหรือชื่ออุปกรณ์..."
+              aria-label="ค้นหาเลขที่คำขอหรือชื่ออุปกรณ์"
+              className="w-full bg-transparent border-none outline-none text-[13.5px] text-ink placeholder:text-ink-ph"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="text-ink-mute hover:text-ink p-0.5 rounded-full"
+                aria-label="ล้างคำค้นหา"
+              >
+                <Icon name="x" className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ==================== DESKTOP DATA TABLE + MASTER-DETAIL SPLIT GRID ==================== */}
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(440px,1.15fr)_minmax(420px,1fr)] gap-5 items-start">
+          {/* -------------------- LEFT: DESKTOP DATA TABLE & MOBILE COMPACT LIST -------------------- */}
+          <section className="bg-surface border border-line rounded-2xl overflow-hidden shadow-xs min-w-0">
             {loading ? (
-              <div className="bg-white border border-[#E2E8F0] rounded-[16px] p-8 text-center flex flex-col items-center justify-center gap-3 text-[#475569]">
-                <div className="size-6 border-2 border-[#0F6B4C] border-t-transparent rounded-full animate-spin" />
-                <span className="text-[14px] leading-[20px]">กำลังโหลดรายการ...</span>
+              <div className="p-10 text-center flex flex-col items-center justify-center gap-3 text-ink-mute">
+                <div className="size-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+                <span className="text-[13.5px]">กำลังโหลดรายการยืม–คืนอุปกรณ์...</span>
               </div>
             ) : filtered.length === 0 ? (
-              <div className="bg-white border border-[#E2E8F0] rounded-[16px] p-8 text-center flex flex-col items-center justify-center gap-2 text-[#475569]">
-                <span className="w-10 h-10 rounded-[8px] bg-[#F1F5F9] text-[#475569] flex items-center justify-center">
+              <div className="p-10 text-center flex flex-col items-center justify-center gap-2 text-ink-mute">
+                <span className="w-10 h-10 rounded-lg bg-surface-muted text-ink-mute flex items-center justify-center">
                   <Icon name="package" className="w-5 h-5" />
                 </span>
-                <span className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+                <span className="text-[14px] font-semibold text-ink">
                   {searchQuery ? 'ไม่พบรายการที่ค้นหา' : 'ไม่มีรายการในหมวดนี้'}
                 </span>
-                <span className="text-[12px] leading-[16px] text-[#475569]">
+                <span className="text-[12.5px] text-ink-mute">
                   {searchQuery
                     ? 'ลองเปลี่ยนคำค้นหาหรือตรวจสอบในหมวดอื่น'
                     : tab === 'borrowing'
@@ -639,97 +669,207 @@ export default function MyBorrowsPage() {
                 </span>
               </div>
             ) : (
-              <div className="flex flex-col gap-1.5">
-                {visibleItems.map((r, idx) => {
-                  const eqInfo = getEquipmentInfo(r);
-                  const isSelected = selectedRequest?.id === r.id;
+              <>
+                {/* Desktop Data Table (md+) */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-[13px]">
+                    <thead>
+                      <tr className="border-b border-line bg-surface-muted/70 text-ink-soft font-semibold text-[12px]">
+                        <th className="py-2.5 px-3.5 whitespace-nowrap">เลขที่คำขอ</th>
+                        <th className="py-2.5 px-3">รายการอุปกรณ์</th>
+                        <th className="py-2.5 px-2.5 text-center whitespace-nowrap">จำนวน</th>
+                        <th className="py-2.5 px-3 whitespace-nowrap">
+                          <SortableHeader
+                            label="วันเริ่มยืม – กำหนดคืน"
+                            active
+                            direction={sortDir}
+                            onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
+                          />
+                        </th>
+                        <th className="py-2.5 px-3 whitespace-nowrap">สถานะ</th>
+                        <th className="py-2.5 px-3.5 text-right whitespace-nowrap">การดำเนินการ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line-soft">
+                      {pagedItems.map((r) => {
+                        const eqInfo = getEquipmentInfo(r);
+                        const isSelected = selectedRequest?.id === r.id;
+                        const eligibility = checkBorrowReceiveEligibility(r.pickupDate);
 
-                  return (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedId(r.id);
-                        if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                        return (
+                          <tr
+                            key={r.id}
+                            onClick={() => setSelectedId(r.id)}
+                            className={`cursor-pointer transition-colors ${
+                              isSelected
+                                ? 'bg-brand-tint/45 font-medium'
+                                : 'hover:bg-hover/70'
+                            }`}
+                          >
+                            <td className="py-3 px-3.5 font-mono font-semibold text-ink whitespace-nowrap">
+                              <div className="flex items-center gap-1.5">
+                                {isSelected && (
+                                  <span className="w-1.5 h-4 rounded-full bg-brand shrink-0" />
+                                )}
+                                <span>{r.code}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 max-w-[200px]">
+                              <div className="font-semibold text-ink truncate">{eqInfo.name}</div>
+                              <div className="text-[11.5px] text-ink-mute truncate">
+                                ผู้ยืม: {r.requesterName}
+                              </div>
+                            </td>
+                            <td className="py-3 px-2.5 text-center whitespace-nowrap font-semibold text-ink">
+                              {eqInfo.totalQty} ชิ้น
+                            </td>
+                            <td className="py-3 px-3 whitespace-nowrap">
+                              <div className="text-ink-soft">
+                                {formatThaiDate(r.pickupDate, false)} –{' '}
+                                {formatThaiDate(r.returnDate, true)}
+                              </div>
+                              {r.receivedAt && (
+                                <div className="text-[11px] text-brand-ink">
+                                  รับจริง: {formatThaiDate(r.receivedAt)}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 whitespace-nowrap">
+                              {renderStatusBadge(r.status)}
+                            </td>
+                            <td
+                              className="py-3 px-3.5 text-right whitespace-nowrap"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {r.status === 'approved' ? (
+                                eligibility.allowed ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedId(r.id);
+                                      setReceiveModalTarget(r);
+                                      setFormPhotos([]);
+                                      setFormNote('');
+                                      setModalError('');
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-brand text-white text-[12px] font-semibold hover:bg-brand-ink transition"
+                                  >
+                                    <span>ยืนยันรับมอบ</span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedId(r.id);
+                                      setRescheduleModalTarget(r);
+                                      setNewPickupDate(r.pickupDate);
+                                      setNewReturnDate(r.returnDate);
+                                      setModalError('');
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-line bg-surface text-ink text-[12px] font-semibold hover:bg-hover transition"
+                                  >
+                                    <span>เลื่อนวันรับ</span>
+                                  </button>
+                                )
+                              ) : r.status === 'borrowing' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedId(r.id);
+                                    setReturnModalTarget(r);
+                                    setFormNote('');
+                                    setModalError('');
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-brand text-white text-[12px] font-semibold hover:bg-brand-ink transition"
+                                >
+                                  <span>ยืนยันส่งคืน</span>
+                                </button>
+                              ) : r.status === 'return_inspect' && isStaffOrAdmin ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedId(r.id);
+                                    setInspectModalTarget(r);
+                                    setInspectResult('normal');
+                                    setFormPhotos([]);
+                                    setFormNote('');
+                                    setModalError('');
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-brand text-white text-[12px] font-semibold hover:bg-brand-ink transition"
+                                >
+                                  <span>ตรวจรับคืน</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedId(r.id)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-line bg-surface text-ink-soft text-[12px] font-semibold hover:bg-hover transition"
+                                >
+                                  <span>ดูรายละเอียด</span>
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Compact Row List (< md) */}
+                <div className="md:hidden flex flex-col divide-y divide-line-soft p-2">
+                  {pagedItems.map((r) => {
+                    const eqInfo = getEquipmentInfo(r);
+                    const isSelected = selectedRequest?.id === r.id;
+
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedId(r.id);
                           detailPaneRef.current?.scrollIntoView({
                             behavior: 'smooth',
                             block: 'start',
                           });
-                        }
-                      }}
-                      className={`w-full text-left flex items-center gap-3 p-3 rounded-[12px] border transition-colors ${
-                        isSelected
-                          ? 'bg-white border-[#0F6B4C] shadow-xs'
-                          : 'border-transparent hover:bg-[#F1F5F9]'
-                      }`}
-                    >
-                      {/* Icon Box (40x40px rounded-8px #F1F5F9) */}
-                      <span className="w-10 h-10 rounded-[8px] bg-[#F1F5F9] text-[#475569] flex items-center justify-center shrink-0 overflow-hidden">
-                        {idx % 2 === 0 ? (
-                          <svg
-                            width="20"
-                            height="20"
-                            viewBox="0 0 256 256"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="16"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <path d="M226 80a56 56 0 01-70 54L80 210a24 24 0 01-34-34l76-76a56 56 0 0154-70l-34 34 8 24 24 8z" />
-                          </svg>
-                        ) : (
-                          <svg
-                            width="20"
-                            height="20"
-                            viewBox="0 0 256 256"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="16"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <path d="M40 216V72l88-48 88 48v144M24 216h208M96 216v-48h64v48" />
-                          </svg>
-                        )}
-                      </span>
-
-                      {/* Title & Code · Date */}
-                      <span className="flex-1 min-w-0 flex flex-col">
-                        <span className="text-[16px] leading-[24px] font-medium text-[#0F172A] truncate">
-                          {eqInfo.name}
+                        }}
+                        className={`w-full text-left flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                          isSelected
+                            ? 'bg-brand-tint/30 border-brand'
+                            : 'border-transparent hover:bg-hover'
+                        }`}
+                      >
+                        <span className="w-10 h-10 rounded-lg bg-surface-muted text-ink-soft flex items-center justify-center shrink-0">
+                          <Icon name="package" className="w-5 h-5" />
                         </span>
-                        <span className="text-[14px] leading-[20px] font-normal text-[#475569] truncate">
-                          {r.code} · {formatThaiDate(r.pickupDate)}
+                        <span className="flex-1 min-w-0 flex flex-col">
+                          <span className="text-[14.5px] font-semibold text-ink truncate">
+                            {eqInfo.name}
+                          </span>
+                          <span className="text-[12.5px] text-ink-mute truncate">
+                            {r.code} · {formatThaiDate(r.pickupDate)} ({eqInfo.totalQty} ชิ้น)
+                          </span>
                         </span>
-                      </span>
+                        {renderStatusBadge(r.status)}
+                      </button>
+                    );
+                  })}
+                </div>
 
-                      {/* Status Badge */}
-                      {renderStatusBadge(r.status)}
-                    </button>
-                  );
-                })}
-
-                {/* Expand More Button (from borrow-split.html) */}
-                {filtered.length > visibleCount && (
-                  <button
-                    type="button"
-                    onClick={() => setVisibleCount((prev) => prev + 10)}
-                    className="w-full flex items-center justify-center p-3 rounded-[12px] border border-transparent hover:bg-[#F1F5F9] text-[14px] leading-[20px] font-medium text-[#475569] transition-colors"
-                  >
-                    แสดงอีก {filtered.length - visibleCount} รายการ
-                  </button>
-                )}
-              </div>
+                <Pagination
+                  page={page}
+                  pageSize={PAGE_SIZE}
+                  totalItems={filtered.length}
+                  onPageChange={setPage}
+                />
+              </>
             )}
           </section>
 
           {/* -------------------- RIGHT COLUMN: DETAIL VIEW CARD -------------------- */}
           <article
             ref={detailPaneRef}
-            className="bg-white border border-[#E2E8F0] rounded-[16px] p-5 sm:p-8 flex flex-col gap-6 min-w-0"
+            className="bg-surface border border-line rounded-2xl p-5 sm:p-6 flex flex-col gap-5 min-w-0 shadow-xs"
           >
             {loading ? (
               <div className="py-16 text-center flex flex-col items-center justify-center gap-3 text-[#475569]">

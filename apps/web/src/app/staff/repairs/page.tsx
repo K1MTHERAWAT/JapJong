@@ -8,8 +8,14 @@ import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
 import {
   Chip,
+  FilterToolbar,
+  PageHeader,
+  Pagination,
   PinKeypad,
+  SearchInput,
+  SortableHeader,
   StatusChip,
+  Tabs,
 } from '@/components/ui';
 import { api, formatThaiDateTime, readAndCompressImages } from '@/lib/api';
 
@@ -28,6 +34,11 @@ export default function StaffRepairsPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [lastCompleted, setLastCompleted] = useState<RequestWithTimeline | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'repair_submitted' | 'repair_in_progress'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback((preferId?: string | null) => {
@@ -263,65 +274,218 @@ export default function StaffRepairsPage() {
       )}
 
       {!current ? (
-        /* ===================== หน้ารายการงานซ่อม (List View) ===================== */
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <b className="text-[17px] sm:text-[19px] text-ink">รายการงานซ่อมรอจัดการ</b>
-              <Chip tone="amber">รอจัดการ {queue.length} รายการ</Chip>
-            </div>
-            <Link
-              href="/history"
-              className="text-[13px] font-semibold text-ink inline-flex items-center gap-1 hover:underline"
-            >
-              ดูประวัติทั้งหมด <Icon name="chevron-right" className="w-4 h-4" />
-            </Link>
-          </div>
+        /* ===================== หน้ารายการงานซ่อม (Enterprise Work Queue Table) ===================== */
+        (() => {
+          const filteredQueue = queue
+            .filter((r) => {
+              if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+              if (searchQuery.trim()) {
+                const q = searchQuery.toLowerCase();
+                return (
+                  r.code.toLowerCase().includes(q) ||
+                  r.title.toLowerCase().includes(q) ||
+                  (r.building || '').toLowerCase().includes(q) ||
+                  (r.location || '').toLowerCase().includes(q) ||
+                  r.requesterName.toLowerCase().includes(q) ||
+                  r.organization.toLowerCase().includes(q)
+                );
+              }
+              return true;
+            })
+            .sort((a, b) => {
+              const tA = new Date(a.createdAt).getTime();
+              const tB = new Date(b.createdAt).getTime();
+              return sortDir === 'desc' ? tB - tA : tA - tB;
+            });
 
-          {loading ? (
-            <div className="jw-card p-10 text-center text-[14px] text-ink-mute">
-              กำลังโหลดรายการงานซ่อม...
-            </div>
-          ) : queue.length === 0 ? (
-            <div className="jw-card p-12 text-center flex flex-col items-center justify-center gap-3">
-              <div className="w-16 h-16 rounded-full bg-brand-mint text-brand flex items-center justify-center">
-                <Icon name="check" className="w-8 h-8" strokeWidth={2.5} />
-              </div>
-              <b className="text-[17px] text-ink">ไม่มีงานแจ้งซ่อมรอจัดการในขณะนี้</b>
-              <p className="text-[13px] text-ink-mute max-w-md">
-                เมื่อมีประชาชนหรือเจ้าหน้าที่แจ้งอุปกรณ์ชำรุดหรือปัญหาอาคารสถานที่ รายการจะปรากฏที่นี่
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {queue.map((r) => (
-                <div
-                  key={r.id}
-                  onClick={() => handleSelectRepair(r.id)}
-                  className="jw-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:ring-1 hover:ring-brand transition"
-                >
-                  <div className="min-w-0 flex flex-col gap-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <b className="text-[16px] text-ink">{r.code}</b>
-                      <Chip tone="orange">{r.category || 'แจ้งซ่อม'}</Chip>
-                      <StatusChip status={r.status} />
-                    </div>
-                    <span className="text-[14px] font-semibold text-ink truncate">
-                      {r.building} · {r.floor} · {r.location} — {r.title}
-                    </span>
-                    <span className="text-[12.5px] text-ink-mute">
-                      ผู้แจ้ง: {r.requesterName} · {r.organization} · แจ้งเมื่อ {formatThaiDateTime(r.createdAt)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[13px] font-semibold text-brand shrink-0">
-                    <span>{r.status === 'repair_in_progress' ? 'บันทึกผลการซ่อม' : 'จัดการงานซ่อม'}</span>
+          const pagedQueue = filteredQueue.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+          return (
+            <div className="flex flex-col gap-4">
+              <PageHeader
+                title="คิวจัดการงานซ่อมและปัญหา"
+                subtitle="รับเรื่องซ่อม ดำเนินการแก้ไข และแนบรูปภาพหลังซ่อมเพื่อส่งต่อให้ผู้แจ้งตรวจรับงาน"
+                badge={<Chip tone="amber">รอจัดการ {queue.length} รายการ</Chip>}
+                actions={
+                  <Link
+                    href="/history"
+                    className="inline-flex h-9 items-center gap-1 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-hover transition"
+                  >
+                    <span>ดูประวัติทั้งหมด</span>
                     <Icon name="chevron-right" className="w-4 h-4" />
+                  </Link>
+                }
+              />
+
+              <FilterToolbar
+                left={
+                  <Tabs<'all' | 'repair_submitted' | 'repair_in_progress'>
+                    value={statusFilter}
+                    onChange={(v) => {
+                      setStatusFilter(v);
+                      setPage(1);
+                    }}
+                    className="w-full sm:w-auto"
+                    options={[
+                      { value: 'all', label: `ทั้งหมด (${queue.length})` },
+                      {
+                        value: 'repair_submitted',
+                        label: `รอรับเรื่อง (${queue.filter((r) => r.status === 'repair_submitted').length})`,
+                      },
+                      {
+                        value: 'repair_in_progress',
+                        label: `กำลังซ่อม (${queue.filter((r) => r.status === 'repair_in_progress').length})`,
+                      },
+                    ]}
+                  />
+                }
+                right={
+                  <SearchInput
+                    value={searchQuery}
+                    onChange={(v) => {
+                      setSearchQuery(v);
+                      setPage(1);
+                    }}
+                    placeholder="ค้นหาเลขที่ใบงาน, อาคาร, อาการ, ผู้แจ้ง..."
+                    className="w-full sm:w-72"
+                  />
+                }
+              />
+
+              <div className="rounded-2xl border border-line bg-surface overflow-hidden shadow-xs">
+                {loading ? (
+                  <div className="p-10 text-center text-[13.5px] text-ink-mute">
+                    กำลังโหลดรายการงานซ่อม...
                   </div>
-                </div>
-              ))}
+                ) : filteredQueue.length === 0 ? (
+                  <div className="p-12 text-center flex flex-col items-center justify-center gap-3">
+                    <div className="w-14 h-14 rounded-full bg-brand-mint text-brand flex items-center justify-center">
+                      <Icon name="check" className="w-7 h-7" strokeWidth={2.5} />
+                    </div>
+                    <b className="text-[16px] text-ink">ไม่มีงานแจ้งซ่อมในหมวดนี้</b>
+                    <p className="text-[13px] text-ink-mute max-w-md">
+                      เมื่อมีประชาชนหรือเจ้าหน้าที่แจ้งอุปกรณ์ชำรุดหรือปัญหาอาคารสถานที่ รายการจะปรากฏในตารางนี้
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Desktop Data Table (md+) */}
+                    <div className="hidden md:block overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-[13px]">
+                        <thead>
+                          <tr className="border-b border-line bg-surface-muted/70 text-ink-soft font-semibold text-[12px]">
+                            <th className="py-2.5 px-4 whitespace-nowrap">เลขที่ใบงาน</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">หมวดหมู่</th>
+                            <th className="py-2.5 px-3">สถานที่ / อาคาร</th>
+                            <th className="py-2.5 px-3">อาการที่แจ้ง</th>
+                            <th className="py-2.5 px-3">ผู้แจ้ง / หน่วยงาน</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">
+                              <SortableHeader
+                                label="วันที่แจ้ง"
+                                active
+                                direction={sortDir}
+                                onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
+                              />
+                            </th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">สถานะ</th>
+                            <th className="py-2.5 px-4 text-right whitespace-nowrap">การดำเนินการ</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-line-soft">
+                          {pagedQueue.map((r) => (
+                            <tr
+                              key={r.id}
+                              onClick={() => handleSelectRepair(r.id)}
+                              className="hover:bg-hover/70 cursor-pointer transition-colors"
+                            >
+                              <td className="py-3 px-4 font-mono font-semibold text-ink whitespace-nowrap">
+                                {r.code}
+                              </td>
+                              <td className="py-3 px-3 whitespace-nowrap">
+                                <Chip tone="orange">{r.category || 'แจ้งซ่อม'}</Chip>
+                              </td>
+                              <td className="py-3 px-3 max-w-[180px] truncate text-ink-soft">
+                                {r.building} · {r.floor} · {r.location}
+                              </td>
+                              <td className="py-3 px-3 max-w-[240px]">
+                                <div className="font-semibold text-ink truncate">{r.title}</div>
+                              </td>
+                              <td className="py-3 px-3 max-w-[170px]">
+                                <div className="font-medium text-ink truncate">
+                                  {r.requesterName}
+                                </div>
+                                <div className="text-[11.5px] text-ink-mute truncate">
+                                  {r.organization}
+                                </div>
+                              </td>
+                              <td className="py-3 px-3 text-[12px] text-ink-mute whitespace-nowrap">
+                                {formatThaiDateTime(r.createdAt)}
+                              </td>
+                              <td className="py-3 px-3 whitespace-nowrap">
+                                <StatusChip status={r.status} />
+                              </td>
+                              <td className="py-3 px-4 text-right whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSelectRepair(r.id);
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-md bg-brand px-2.5 py-1 text-[12px] font-semibold text-white hover:bg-brand-ink transition"
+                                >
+                                  <span>
+                                    {r.status === 'repair_in_progress'
+                                      ? 'บันทึกผลซ่อม'
+                                      : 'รับเรื่องซ่อม'}
+                                  </span>
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile Compact Cards (< md) */}
+                    <div className="md:hidden divide-y divide-line-soft">
+                      {pagedQueue.map((r) => (
+                        <div
+                          key={r.id}
+                          onClick={() => handleSelectRepair(r.id)}
+                          className="p-3.5 hover:bg-hover transition-colors flex flex-col gap-1.5 cursor-pointer"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <b className="font-mono text-[13px] text-ink">{r.code}</b>
+                              <Chip tone="orange">{r.category || 'แจ้งซ่อม'}</Chip>
+                            </div>
+                            <StatusChip status={r.status} />
+                          </div>
+                          <div className="text-[14px] font-semibold text-ink truncate">
+                            {r.building} · {r.location} — {r.title}
+                          </div>
+                          <div className="text-[12px] text-ink-mute flex items-center justify-between gap-2">
+                            <span className="truncate">
+                              ผู้แจ้ง: {r.requesterName} · {formatThaiDateTime(r.createdAt)}
+                            </span>
+                            <span className="text-brand font-semibold shrink-0">จัดการ →</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <Pagination
+                      page={page}
+                      pageSize={PAGE_SIZE}
+                      totalItems={filteredQueue.length}
+                      onPageChange={setPage}
+                    />
+                  </>
+                )}
+              </div>
             </div>
-          )}
-        </div>
+          );
+        })()
       ) : (
         /* ===================== หน้ารายละเอียดงานซ่อม (Detail View) ===================== */
         <div className="flex flex-col gap-4 sm:gap-5">

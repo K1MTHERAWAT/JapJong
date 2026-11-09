@@ -5,6 +5,7 @@ export * from './Input';
 export * from './ServiceCard';
 export * from './ListRow';
 export * from './Feedback';
+export * from './EnterpriseTable';
 
 // Re-export specialized widgets from ui-widgets
 export {

@@ -8,12 +8,19 @@ import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
 import {
   Chip,
+  FilterToolbar,
   OfficialGovFormDocument,
+  PageHeader,
+  Pagination,
   PinKeypad,
+  RequestTypeChip,
+  SearchInput,
   SignatureBox,
   SignaturePreviewCard,
   SignOtpVerifier,
+  SortableHeader,
   StatusChip,
+  Tabs,
 } from '@/components/ui';
 import { api, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
 
@@ -37,6 +44,11 @@ export default function StaffReviewPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [lastCompleted, setLastCompleted] = useState<RequestWithTimeline | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<'all' | 'booking' | 'borrow'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const load = useCallback((preferId?: string | null) => {
     setLoading(true);
@@ -297,73 +309,235 @@ export default function StaffReviewPage() {
           )}
         </div>
       ) : !current ? (
-        /* ===================== หน้ารายการ (List View) ===================== */
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <b className="text-[17px] sm:text-[19px] text-ink">รายการคำขอรอตรวจสอบ</b>
-              <Chip tone="amber">รอตรวจ {queue.length} รายการ</Chip>
-            </div>
-            <Link
-              href="/history"
-              className="text-[13px] font-semibold text-ink inline-flex items-center gap-1 hover:underline"
-            >
-              ดูประวัติทั้งหมด <Icon name="chevron-right" className="w-4 h-4" />
-            </Link>
-          </div>
-
-          {loading ? (
-            <div className="jw-card p-10 text-center text-[14px] text-ink-mute">
-              กำลังโหลดรายการคำขอ...
-            </div>
-          ) : queue.length === 0 ? (
-            <div className="jw-card p-12 text-center flex flex-col items-center justify-center gap-3">
-              <div className="w-16 h-16 rounded-full bg-brand-mint text-brand flex items-center justify-center">
-                <Icon name="check" className="w-8 h-8" strokeWidth={2.5} />
-              </div>
-              <b className="text-[17px] text-ink">ไม่มีคำขอรอตรวจในขณะนี้</b>
-              <p className="text-[13px] text-ink-mute max-w-md">
-                คำขอขอใช้สถานที่และยืมอุปกรณ์ราชการที่รอการตรวจสอบระดับเจ้าหน้าที่จะปรากฏที่นี่
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {queue.map((r) => {
-                const dateInfo =
-                  r.type === 'booking'
-                    ? r.periods.map((p) => formatPeriodRange(p)).join(', ')
-                    : `${formatThaiDate(r.pickupDate, false)}–${formatThaiDate(r.returnDate, true)}`;
+        /* ===================== หน้ารายการ (Enterprise Work Queue Table) ===================== */
+        (() => {
+          const filteredQueue = queue
+            .filter((r) => {
+              if (typeFilter !== 'all' && r.type !== typeFilter) return false;
+              if (searchQuery.trim()) {
+                const q = searchQuery.toLowerCase();
                 return (
-                  <div
-                    key={r.id}
-                    onClick={() => handleSelectRequest(r.id)}
-                    className="jw-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:ring-1 hover:ring-brand transition"
-                  >
-                    <div className="min-w-0 flex flex-col gap-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <b className="text-[16px] text-ink">{r.code}</b>
-                        <Chip tone={r.type === 'booking' ? 'blue' : 'teal'}>
-                          {r.type === 'booking' ? 'ขอใช้สถานที่' : 'ยืมอุปกรณ์'}
-                        </Chip>
-                        <StatusChip status={r.status} />
-                      </div>
-                      <span className="text-[14px] font-semibold text-ink truncate">
-                        {r.title} {r.subtitle ? `(${r.subtitle})` : ''}
-                      </span>
-                      <span className="text-[12.5px] text-ink-mute">
-                        ผู้ขอ: {r.requesterName} · {r.organization} · วัน-เวลา: {dateInfo}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[13px] font-semibold text-brand shrink-0">
-                      <span>ตรวจคำขอ</span>
-                      <Icon name="chevron-right" className="w-4 h-4" />
-                    </div>
-                  </div>
+                  r.code.toLowerCase().includes(q) ||
+                  r.title.toLowerCase().includes(q) ||
+                  r.requesterName.toLowerCase().includes(q) ||
+                  r.organization.toLowerCase().includes(q)
                 );
-              })}
+              }
+              return true;
+            })
+            .sort((a, b) => {
+              const tA = new Date(a.createdAt).getTime();
+              const tB = new Date(b.createdAt).getTime();
+              return sortDir === 'desc' ? tB - tA : tA - tB;
+            });
+
+          const pagedQueue = filteredQueue.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+          return (
+            <div className="flex flex-col gap-4">
+              <PageHeader
+                title="คิวตรวจคำขอ (สถานที่และครุภัณฑ์)"
+                subtitle="ตรวจสอบความถูกต้องของแบบคำขอและเอกสารแนบก่อนลงนามส่งต่อปลัด อบต. (ระดับ 2)"
+                badge={<Chip tone="amber">รอตรวจ {queue.length} รายการ</Chip>}
+                actions={
+                  <Link
+                    href="/history"
+                    className="inline-flex h-9 items-center gap-1 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-hover transition"
+                  >
+                    <span>ดูประวัติทั้งหมด</span>
+                    <Icon name="chevron-right" className="w-4 h-4" />
+                  </Link>
+                }
+              />
+
+              <FilterToolbar
+                left={
+                  <Tabs<'all' | 'booking' | 'borrow'>
+                    value={typeFilter}
+                    onChange={(v) => {
+                      setTypeFilter(v);
+                      setPage(1);
+                    }}
+                    className="w-full sm:w-auto"
+                    options={[
+                      { value: 'all', label: `ทั้งหมด (${queue.length})` },
+                      {
+                        value: 'booking',
+                        label: `ขอใช้สถานที่ (${queue.filter((r) => r.type === 'booking').length})`,
+                      },
+                      {
+                        value: 'borrow',
+                        label: `ยืมอุปกรณ์ (${queue.filter((r) => r.type === 'borrow').length})`,
+                      },
+                    ]}
+                  />
+                }
+                right={
+                  <SearchInput
+                    value={searchQuery}
+                    onChange={(v) => {
+                      setSearchQuery(v);
+                      setPage(1);
+                    }}
+                    placeholder="ค้นหาเลขที่คำขอ, ชื่อรายการ, ผู้ยื่น, หน่วยงาน..."
+                    className="w-full sm:w-72"
+                  />
+                }
+              />
+
+              <div className="rounded-2xl border border-line bg-surface overflow-hidden shadow-xs">
+                {loading ? (
+                  <div className="p-10 text-center text-[13.5px] text-ink-mute">
+                    กำลังโหลดรายการคำขอรอตรวจสอบ...
+                  </div>
+                ) : filteredQueue.length === 0 ? (
+                  <div className="p-12 text-center flex flex-col items-center justify-center gap-3">
+                    <div className="w-14 h-14 rounded-full bg-brand-mint text-brand flex items-center justify-center">
+                      <Icon name="check" className="w-7 h-7" strokeWidth={2.5} />
+                    </div>
+                    <b className="text-[16px] text-ink">ไม่มีคำขอรอตรวจในหมวดนี้</b>
+                    <p className="text-[13px] text-ink-mute max-w-md">
+                      คำขอขอใช้สถานที่และยืมอุปกรณ์ราชการที่รอการตรวจสอบระดับเจ้าหน้าที่จะปรากฏในตารางนี้
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Desktop Data Table (md+) */}
+                    <div className="hidden md:block overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-[13px]">
+                        <thead>
+                          <tr className="border-b border-line bg-surface-muted/70 text-ink-soft font-semibold text-[12px]">
+                            <th className="py-2.5 px-4 whitespace-nowrap">เลขที่คำขอ</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">ประเภทบริการ</th>
+                            <th className="py-2.5 px-3">หัวข้อ / รายการ</th>
+                            <th className="py-2.5 px-3">ผู้ยื่นคำขอ / หน่วยงาน</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">กำหนดการใช้งาน</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">
+                              <SortableHeader
+                                label="วันที่ยื่นคำขอ"
+                                active
+                                direction={sortDir}
+                                onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
+                              />
+                            </th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">สถานะ</th>
+                            <th className="py-2.5 px-4 text-right whitespace-nowrap">การดำเนินการ</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-line-soft">
+                          {pagedQueue.map((r) => {
+                            const dateInfo =
+                              r.type === 'booking'
+                                ? r.periods.map((p) => formatPeriodRange(p)).join(', ')
+                                : `${formatThaiDate(r.pickupDate, false)}–${formatThaiDate(
+                                    r.returnDate,
+                                    true,
+                                  )}`;
+                            return (
+                              <tr
+                                key={r.id}
+                                onClick={() => handleSelectRequest(r.id)}
+                                className="hover:bg-hover/70 cursor-pointer transition-colors"
+                              >
+                                <td className="py-3 px-4 font-mono font-semibold text-ink whitespace-nowrap">
+                                  {r.code}
+                                </td>
+                                <td className="py-3 px-3 whitespace-nowrap">
+                                  <RequestTypeChip type={r.type} />
+                                </td>
+                                <td className="py-3 px-3 max-w-[240px]">
+                                  <div className="font-semibold text-ink truncate">{r.title}</div>
+                                  {r.subtitle && (
+                                    <div className="text-[11.5px] text-ink-mute truncate">
+                                      {r.subtitle}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="py-3 px-3 max-w-[180px]">
+                                  <div className="font-medium text-ink truncate">
+                                    {r.requesterName}
+                                  </div>
+                                  <div className="text-[11.5px] text-ink-mute truncate">
+                                    {r.organization}
+                                  </div>
+                                </td>
+                                <td className="py-3 px-3 text-ink-soft whitespace-nowrap max-w-[200px] truncate">
+                                  {dateInfo}
+                                </td>
+                                <td className="py-3 px-3 text-[12px] text-ink-mute whitespace-nowrap">
+                                  {formatThaiDateTime(r.createdAt)}
+                                </td>
+                                <td className="py-3 px-3 whitespace-nowrap">
+                                  <StatusChip status={r.status} />
+                                </td>
+                                <td className="py-3 px-4 text-right whitespace-nowrap">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSelectRequest(r.id);
+                                    }}
+                                    className="inline-flex items-center gap-1 rounded-md bg-brand px-2.5 py-1 text-[12px] font-semibold text-white hover:bg-brand-ink transition"
+                                  >
+                                    <span>ตรวจคำขอ</span>
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile Compact List (< md) */}
+                    <div className="md:hidden divide-y divide-line-soft">
+                      {pagedQueue.map((r) => {
+                        const dateInfo =
+                          r.type === 'booking'
+                            ? r.periods.map((p) => formatPeriodRange(p)).join(', ')
+                            : `${formatThaiDate(r.pickupDate, false)}–${formatThaiDate(
+                                r.returnDate,
+                                true,
+                              )}`;
+                        return (
+                          <div
+                            key={r.id}
+                            onClick={() => handleSelectRequest(r.id)}
+                            className="p-3.5 hover:bg-hover transition-colors flex flex-col gap-1.5 cursor-pointer"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <RequestTypeChip type={r.type} />
+                                <b className="font-mono text-[13px] text-ink">{r.code}</b>
+                              </div>
+                              <StatusChip status={r.status} />
+                            </div>
+                            <div className="text-[14px] font-semibold text-ink truncate">
+                              {r.title}
+                            </div>
+                            <div className="text-[12px] text-ink-mute flex items-center justify-between gap-2">
+                              <span className="truncate">
+                                {r.requesterName} · {dateInfo}
+                              </span>
+                              <span className="text-brand font-semibold shrink-0">ตรวจคำขอ →</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <Pagination
+                      page={page}
+                      pageSize={PAGE_SIZE}
+                      totalItems={filteredQueue.length}
+                      onPageChange={setPage}
+                    />
+                  </>
+                )}
+              </div>
             </div>
-          )}
-        </div>
+          );
+        })()
       ) : (
         /* ===================== หน้ารายละเอียดคำขอ (Detail View) ===================== */
         <div className="flex flex-col gap-4 sm:gap-5">
