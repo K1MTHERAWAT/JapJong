@@ -74,13 +74,13 @@ export function Sidebar({ items }: { items: NavItem[] }) {
           'transition-[width] duration-300 ease-in-out',
           drawer ? 'translate-x-0' : '-translate-x-full',
           'lg:sticky lg:top-3 lg:z-auto lg:m-3 lg:h-[calc(100dvh-24px)] lg:translate-x-0',
-          'lg:rounded-float lg:border lg:border-line-soft lg:shadow-float',
+          'lg:rounded-float lg:border lg:border-line-soft lg:shadow-float overflow-hidden',
           open ? 'lg:w-sidebar' : 'lg:w-[72px]',
         ].join(' ')}
       >
-        <div className="relative flex flex-col gap-1 overflow-visible flex-1">
+        <div className="relative flex flex-col gap-1 flex-1 min-h-0">
           {/* Header */}
-          <div className={`relative flex items-center mb-2 ${open ? 'h-11 justify-between pl-2' : 'h-11 justify-center'}`}>
+          <div className={`relative flex items-center mb-2 shrink-0 ${open ? 'h-11 justify-between pl-2' : 'h-11 justify-center'}`}>
             <Link
               href={account?.role === 'ADMIN' ? '/admin' : '/'}
               className={`flex items-center gap-2.5 min-w-0 ${open ? '' : 'justify-center'}`}
@@ -108,7 +108,10 @@ export function Sidebar({ items }: { items: NavItem[] }) {
           </div>
 
           {/* Navigation Links */}
-          <nav aria-label="เมนูระบบ" className="flex flex-col gap-1 overflow-y-auto overflow-x-hidden">
+          <nav
+            aria-label="เมนูระบบ"
+            className="flex flex-col gap-1 overflow-y-auto overflow-x-hidden flex-1 min-h-0 pr-0.5 overscroll-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-line [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
+          >
             {navGroups.map((group, groupIndex) => (
               <div key={`group-${groupIndex}`} className={`flex flex-col gap-1 ${groupIndex > 0 ? 'mt-2 border-t border-[#CDD5E0] pt-2' : ''}`}>
                 {group.map((i) => {
@@ -144,7 +147,7 @@ export function Sidebar({ items }: { items: NavItem[] }) {
         </div>
 
         {/* Footer / User Profile */}
-        <div className={`border-t border-line-soft pt-3 mt-2 flex flex-col gap-1 ${open ? '' : 'lg:items-center'}`}>
+        <div className={`border-t border-line-soft pt-3 mt-2 flex flex-col gap-1 shrink-0 ${open ? '' : 'lg:items-center'}`}>
           {account ? (
             <>
               <div className={`flex items-center justify-between gap-2 p-1.5 rounded-control bg-surface-muted ${open ? 'w-full' : 'lg:w-11 lg:justify-center lg:bg-transparent'}`}>
