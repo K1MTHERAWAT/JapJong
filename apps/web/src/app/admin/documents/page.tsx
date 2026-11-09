@@ -40,7 +40,7 @@ export default function GeneratedDocumentsPage() {
       backHref="/admin/document-templates"
       rightLabel="แอดมิน"
     >
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-ink">เอกสารราชการที่สร้างจากคำขอ</h1>

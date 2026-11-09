@@ -317,9 +317,9 @@ export default function AccountPage() {
   };
 
   return (
-    <AppShell title="จัดการบัญชีผู้ใช้งาน" maxWidth="max-w-[1440px]">
+    <AppShell title="จัดการบัญชีผู้ใช้งาน" maxWidth="max-w-none">
       {account && (
-        <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-4 sm:gap-5">
+        <div className="flex w-full flex-col gap-4 sm:gap-5">
           {/* Header Card Summary */}
           <Card className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:p-6">
             <div className="flex items-center gap-4 min-w-0">
@@ -559,7 +559,7 @@ export default function AccountPage() {
 
           {/* TAB 2: Change Password */}
           {activeTab === 'password' && (
-            <Card className="w-full max-w-[720px] self-center p-4 sm:p-6 lg:p-7">
+            <Card className="w-full p-4 sm:p-6 lg:p-7">
               <form onSubmit={handleChangePassword} className="flex flex-col gap-4 sm:gap-5">
                 <div className="flex items-center gap-2.5 border-b border-line-soft pb-3">
                   <KeyRound className="size-5 text-brand" />

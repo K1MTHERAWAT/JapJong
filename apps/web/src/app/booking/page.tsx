@@ -1165,7 +1165,7 @@ export default function BookingWizardPage() {
 
       {/* ================= STEP 3: เลือกอุปกรณ์เสริม ================= */}
       {step === 3 && (
-        <div className="max-w-[900px] mx-auto flex flex-col gap-4">
+        <div className="w-full flex flex-col gap-4">
           <div className="jw-card p-4 sm:p-5 flex flex-col gap-2 bg-gradient-to-r from-soft to-white">
             <div className="flex items-center justify-between">
               <div>
@@ -1442,7 +1442,7 @@ export default function BookingWizardPage() {
 
       {/* ================= STEP 4: กรอกคำขอ (แบบขอใช้สถานที่ราชการ) ================= */}
       {step === 4 && (
-        <div className="max-w-[960px] mx-auto jw-card p-5 sm:p-7 flex flex-col gap-4">
+        <div className="w-full jw-card p-5 sm:p-7 flex flex-col gap-4">
           {showRequestErrors && missingRequestFields.length > 0 && (
             <div id="request-form-errors" role="alert" className="rounded-2xl border border-status-crit/30 bg-status-crit/5 p-4 text-[13px] text-status-crit">
               <b className="mb-1 block">กรุณากรอกข้อมูลและแนบเอกสารให้ครบก่อนดำเนินการต่อ</b>
@@ -1793,7 +1793,7 @@ export default function BookingWizardPage() {
 
       {/* ================= STEP 5: ลงนามและส่ง ================= */}
       {step === 5 && (
-        <div className="max-w-[960px] mx-auto flex flex-col gap-4">
+        <div className="w-full flex flex-col gap-4">
           {submitError && (
             <div
               id="booking-submit-error"

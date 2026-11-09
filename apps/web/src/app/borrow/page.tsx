@@ -996,7 +996,7 @@ export default function BorrowWizardPage() {
 
       {/* ================= STEP 3: กรอกคำขอ (Copy UI/UX จากขั้นตอนกรอกคำขอของสถานที่) ================= */}
       {step === 3 && (
-        <div className="max-w-[960px] mx-auto flex flex-col gap-4">
+        <div className="w-full flex flex-col gap-4">
           <div className="jw-card p-5 sm:p-7 flex flex-col gap-4">
             <div className="pb-3 border-b border-line flex flex-wrap items-center justify-between gap-2">
               <div>
@@ -1381,7 +1381,7 @@ export default function BorrowWizardPage() {
 
       {/* ================= STEP 4: ลงนามและส่ง (Copy UI/UX จากขั้นตอนลงนามของสถานที่) ================= */}
       {step === 4 && (
-        <div className="max-w-[960px] mx-auto flex flex-col gap-4">
+        <div className="w-full flex flex-col gap-4">
           {/* แสดงเอกสารจริงตามแบบคำขอใช้อุปกรณ์ราชการ */}
           <OfficialGovFormDocument
             customFields={{

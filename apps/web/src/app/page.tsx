@@ -107,7 +107,7 @@ export default function HomePage() {
 
   return (
     <AppShell>
-      <div className="flex flex-col gap-7 max-w-[1200px] mx-auto">
+      <div className="flex flex-col gap-7 w-full">
         {/* Banner if staff/approver/admin viewing citizen home */}
         {account && account.role !== 'USER' && (
           <Card className="bg-brand-tint border-brand/30 flex flex-wrap items-center justify-between gap-4 p-4">

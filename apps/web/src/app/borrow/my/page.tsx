@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   BorrowRequest,
@@ -12,7 +12,6 @@ import {
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
-import { Tabs } from '@/components/ui';
 import { api, formatThaiDate, formatThaiDateTime, readAndCompressImages } from '@/lib/api';
 
 type BorrowTab = 'borrowing' | 'inspect' | 'history';
@@ -26,12 +25,16 @@ const ALLOWED_IMAGE_MIMES = [
   'image/webp',
 ];
 const MAX_IMAGE_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
+const INITIAL_VISIBLE_COUNT = 8;
 
 export default function MyBorrowsPage() {
   const { account } = useAuth();
   const [items, setItems] = useState<ExtendedBorrowRequest[]>([]);
   const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
   const [tab, setTab] = useState<BorrowTab>('borrowing');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState<number>(INITIAL_VISIBLE_COUNT);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -57,22 +60,25 @@ export default function MyBorrowsPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const replaceInputRef = useRef<HTMLInputElement>(null);
+  const detailPaneRef = useRef<HTMLElement>(null);
 
   const isStaffOrAdmin =
     account?.role === 'STAFF' || account?.role === 'ADMIN' || Boolean(account?.permissions?.review);
 
-  // Load equipment & borrow requests
+  // Load equipment & borrow requests from real API
   const load = useCallback(async () => {
     setLoading(true);
+    setErrorMsg('');
     try {
       const [eqs, reqs] = await Promise.all([
         api.equipment().catch(() => [] as Equipment[]),
-        api.listRequests({ mine: !isStaffOrAdmin, type: 'borrow' }).catch(() => []),
+        api.listRequests({ mine: !isStaffOrAdmin, type: 'borrow' }),
       ]);
       setEquipmentList(eqs);
-      setItems(reqs as ExtendedBorrowRequest[]);
-    } catch {
-      // silently keep previous state
+      const borrowReqs = (reqs as ExtendedBorrowRequest[]) || [];
+      setItems(borrowReqs);
+    } catch (err: unknown) {
+      setErrorMsg((err as Error).message || 'ไม่สามารถดึงข้อมูลรายการยืม–คืนอุปกรณ์ได้');
     } finally {
       setLoading(false);
     }
@@ -83,25 +89,107 @@ export default function MyBorrowsPage() {
   }, [load, account?.id]);
 
   // Helper to find equipment metadata
-  const getEquipmentInfo = (r: ExtendedBorrowRequest) => {
-    const firstItem = r.items?.[0];
-    const eq = equipmentList.find((e) => e.id === firstItem?.equipmentId);
-    const totalQty = r.items?.reduce((sum, i) => sum + (i.qty || 0), 0) || 1;
-    const name = eq?.name || r.title || 'อุปกรณ์';
-    const code = eq?.id || firstItem?.equipmentId || '-';
-    const photo = eq?.images?.[0] || null;
-    const itemSummaries = (r.items || []).map((it) => {
-      const found = equipmentList.find((e) => e.id === it.equipmentId);
-      return `${found?.name || it.equipmentId} (${it.qty} ชิ้น)`;
-    });
-    return { name, code, totalQty, photo, itemSummaries };
-  };
+  const getEquipmentInfo = useCallback(
+    (r: ExtendedBorrowRequest) => {
+      const firstItem = r.items?.[0];
+      const eq = equipmentList.find((e) => e.id === firstItem?.equipmentId);
+      const totalQty = r.items?.reduce((sum, i) => sum + (i.qty || 0), 0) || 1;
+      const baseName = eq?.name || r.title || 'อุปกรณ์';
+      const extraCount = Math.max(0, (r.items?.length || 1) - 1);
+      const name = extraCount > 0 ? `${baseName} และอุปกรณ์อื่น` : baseName;
+      const code = eq?.id || firstItem?.equipmentId || '-';
+      const photo = eq?.images?.[0] || null;
+      const itemSummaries = (r.items || []).map((it) => {
+        const found = equipmentList.find((e) => e.id === it.equipmentId);
+        return `${found?.name || it.equipmentId} (${it.qty} ชิ้น)`;
+      });
+      return { name, baseName, code, totalQty, photo, itemSummaries };
+    },
+    [equipmentList],
+  );
 
   // Helper to extract approval date
   const getApprovalDate = (r: ExtendedBorrowRequest) => {
+    const l2Sig = r.signatures?.find((s) => s.decision === 'approve' && s.level === 'l2');
     const l1Sig = r.signatures?.find((s) => s.decision === 'approve' && s.level === 'l1');
-    return l1Sig?.at || r.updatedAt;
+    const staffSig = r.signatures?.find((s) => s.decision === 'approve' && s.level === 'staff');
+    return l2Sig?.at || l1Sig?.at || staffSig?.at || r.updatedAt;
   };
+
+  // Counts per tab
+  const borrowingItems = useMemo(
+    () => items.filter((r) => r.status === 'approved' || r.status === 'borrowing'),
+    [items],
+  );
+  const inspectItems = useMemo(
+    () => items.filter((r) => r.status === 'return_inspect'),
+    [items],
+  );
+  const historyItems = useMemo(
+    () =>
+      items.filter(
+        (r) => r.status === 'returned' || r.status === 'cancelled' || r.status === 'rejected',
+      ),
+    [items],
+  );
+
+  // Auto-switch to a populated tab on initial load if "borrowing" is empty
+  const hasAutoSelectedTab = useRef(false);
+  useEffect(() => {
+    if (!loading && !hasAutoSelectedTab.current && items.length > 0) {
+      hasAutoSelectedTab.current = true;
+      if (borrowingItems.length > 0) {
+        setTab('borrowing');
+      } else if (inspectItems.length > 0) {
+        setTab('inspect');
+      } else if (historyItems.length > 0) {
+        setTab('history');
+      }
+    }
+  }, [loading, items.length, borrowingItems.length, inspectItems.length, historyItems.length]);
+
+  // Filter items by active tab and search query
+  const tabFiltered = useMemo(() => {
+    if (tab === 'borrowing') return borrowingItems;
+    if (tab === 'inspect') return inspectItems;
+    return historyItems;
+  }, [tab, borrowingItems, inspectItems, historyItems]);
+
+  const filtered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return tabFiltered;
+    return tabFiltered.filter((r) => {
+      const eqInfo = getEquipmentInfo(r);
+      return (
+        r.code.toLowerCase().includes(q) ||
+        eqInfo.name.toLowerCase().includes(q) ||
+        eqInfo.code.toLowerCase().includes(q) ||
+        eqInfo.itemSummaries.join(' ').toLowerCase().includes(q) ||
+        (r.requesterName || '').toLowerCase().includes(q)
+      );
+    });
+  }, [tabFiltered, searchQuery, getEquipmentInfo]);
+
+  // Maintain selected item when tab or filtered list changes
+  useEffect(() => {
+    if (filtered.length === 0) {
+      setSelectedId(null);
+      return;
+    }
+    if (!selectedId || !filtered.some((r) => r.id === selectedId)) {
+      setSelectedId(filtered[0].id);
+    }
+  }, [filtered, selectedId]);
+
+  const selectedRequest = useMemo(
+    () => filtered.find((r) => r.id === selectedId) || filtered[0] || null,
+    [filtered, selectedId],
+  );
+
+  const visibleItems = useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount],
+  );
 
   // Validate selected files (JPG, JPEG, PNG, WEBP & <= 10MB)
   const validateSelectedFiles = (fileList: FileList): string | null => {
@@ -193,7 +281,8 @@ export default function MyBorrowsPage() {
     setSubmitting(true);
     setErrorMsg('');
     try {
-      await api.receiveEquipment(receiveModalTarget.id, {
+      const targetId = receiveModalTarget.id;
+      await api.receiveEquipment(targetId, {
         photos: formPhotos,
         note: formNote.trim(),
       });
@@ -201,6 +290,7 @@ export default function MyBorrowsPage() {
       setReceiveModalTarget(null);
       setFormPhotos([]);
       setFormNote('');
+      setSelectedId(targetId);
       await load();
     } catch (err: unknown) {
       setModalError((err as Error).message || 'เกิดข้อผิดพลาดในการยืนยันรับมอบอุปกรณ์');
@@ -216,13 +306,15 @@ export default function MyBorrowsPage() {
     setSubmitting(true);
     setErrorMsg('');
     try {
-      await api.submitReturnEquipment(returnModalTarget.id, {
+      const targetId = returnModalTarget.id;
+      await api.submitReturnEquipment(targetId, {
         note: formNote.trim(),
       });
-      setSuccessMsg('ยืนยันส่งคืนอุปกรณ์เรียบร้อยแล้ว รายการย้ายไปที่แถบ "รอตรวจสอบ" เพื่อให้เจ้าหน้าที่ตรวจสภาพ');
+      setSuccessMsg('ยืนยันส่งคืนอุปกรณ์เรียบร้อยแล้ว รายการย้ายไปที่หมวด "รอตรวจสอบ" เพื่อให้เจ้าหน้าที่ตรวจสภาพ');
       setReturnModalTarget(null);
       setFormNote('');
       setTab('inspect');
+      setSelectedId(targetId);
       await load();
     } catch (err: unknown) {
       setModalError((err as Error).message || 'เกิดข้อผิดพลาดในการส่งคืนอุปกรณ์');
@@ -250,16 +342,18 @@ export default function MyBorrowsPage() {
     setSubmitting(true);
     setErrorMsg('');
     try {
-      await api.inspectReturnEquipment(inspectModalTarget.id, {
+      const targetId = inspectModalTarget.id;
+      await api.inspectReturnEquipment(targetId, {
         result: inspectResult,
         note: formNote.trim(),
         photos: formPhotos,
       });
-      setSuccessMsg('บันทึกผลการตรวจสอบและรูปภาพหลังส่งคืนเรียบร้อยแล้ว สถานะเปลี่ยนเป็น "เสร็จสิ้น" และย้ายไปที่แถบ "ประวัติ"');
+      setSuccessMsg('บันทึกผลการตรวจสอบและรูปภาพหลังส่งคืนเรียบร้อยแล้ว สถานะเปลี่ยนเป็น "เสร็จสิ้น" และย้ายไปที่หมวด "ประวัติ"');
       setInspectModalTarget(null);
       setFormPhotos([]);
       setFormNote('');
       setTab('history');
+      setSelectedId(targetId);
       await load();
     } catch (err: unknown) {
       setModalError((err as Error).message || 'เกิดข้อผิดพลาดในการบันทึกผลการตรวจสอบ');
@@ -282,7 +376,8 @@ export default function MyBorrowsPage() {
     }
     setSubmitting(true);
     try {
-      await api.reschedule(rescheduleModalTarget.id, {
+      const targetId = rescheduleModalTarget.id;
+      await api.reschedule(targetId, {
         pickupDate: newPickupDate,
         returnDate: newReturnDate,
       });
@@ -290,6 +385,7 @@ export default function MyBorrowsPage() {
         `แก้ไขวันรับครุภัณฑ์เป็น ${formatThaiDate(newPickupDate)} เรียบร้อยแล้ว ระบบคำนวณสิทธิ์การกดยืนยันรับมอบใหม่อัตโนมัติ`,
       );
       setRescheduleModalTarget(null);
+      setSelectedId(targetId);
       await load();
     } catch (err: unknown) {
       setModalError((err as Error).message || 'ไม่สามารถเลื่อนวันรับครุภัณฑ์ได้');
@@ -298,50 +394,100 @@ export default function MyBorrowsPage() {
     }
   };
 
-  // Filter items by tab
-  const filtered = items.filter((r) => {
-    if (tab === 'borrowing') {
-      // แถบ "ที่กำลังใช้งาน": แสดงรายการที่ผ่านการอนุมัติครบ 3 ระดับแล้ว ("รอรับมอบ" = approved) และรายการที่รับมอบแล้ว ("กำลังใช้งาน" = borrowing)
-      return r.status === 'approved' || r.status === 'borrowing';
+  const renderStatusBadge = (status: ExtendedBorrowRequest['status']) => {
+    switch (status) {
+      case 'approved':
+        return (
+          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+            รอรับมอบ
+          </span>
+        );
+      case 'borrowing':
+        return (
+          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+            กำลังใช้งาน
+          </span>
+        );
+      case 'return_inspect':
+        return (
+          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-purple-50 text-purple-700 border border-purple-200 shrink-0">
+            รอตรวจสอบ
+          </span>
+        );
+      case 'returned':
+        return (
+          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-[#E6F4EC] text-[#0F6B4C] border border-[#BFE3CF] shrink-0">
+            เสร็จสิ้น
+          </span>
+        );
+      case 'rejected':
+        return (
+          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-red-50 text-red-700 border border-red-200 shrink-0">
+            ไม่อนุมัติ
+          </span>
+        );
+      case 'cancelled':
+        return (
+          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-slate-100 text-slate-600 border border-slate-300 shrink-0">
+            ยกเลิกคำขอ
+          </span>
+        );
+      default:
+        return (
+          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+            รอดำเนินการ
+          </span>
+        );
     }
-    if (tab === 'inspect') {
-      // แถบ "รอตรวจสอบ": รอเจ้าหน้าที่ตรวจสอบสภาพหลังส่งคืน
-      return r.status === 'return_inspect';
-    }
-    // แถบ "ประวัติ": เสร็จสิ้น (returned) หรือ ยกเลิก/ไม่อนุมัติ
-    return r.status === 'returned' || r.status === 'cancelled' || r.status === 'rejected';
-  });
+  };
 
   const todayStr = getBangkokDateString();
 
   return (
-    <AppShell title="อุปกรณ์" backHref="/" maxWidth="max-w-[1000px]">
-      <div className="flex flex-col gap-5">
-        {/* Header Title & Description */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <AppShell title="รายการยืม–คืนอุปกรณ์" backHref="/" maxWidth="max-w-none">
+      <div className="flex flex-col gap-6 pb-8 text-[#0F172A] w-full">
+        {/* ==================== PAGE HEADER (from borrow-split.html) ==================== */}
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-heading font-bold text-ink">รายการยืม–คืนอุปกรณ์</h1>
-            <p className="text-body text-ink-mute mt-0.5">
-              ติดตามสถานะการรับมอบ ใช้งาน ส่งคืน และตรวจสอบสภาพอุปกรณ์พร้อมหลักฐานรูปภาพแยกตามขั้นตอน
+            <h1 className="text-[20px] leading-[28px] font-semibold text-[#0F172A] m-0">
+              รายการยืม–คืนอุปกรณ์
+            </h1>
+            <p className="text-[14px] leading-[20px] font-normal text-[#475569] mt-1">
+              ติดตามสถานะและหลักฐานรูปภาพของแต่ละคำขอ เลือกรายการทางซ้ายเพื่อดูรายละเอียด
             </p>
           </div>
-          <Link href="/borrow" className="jw-btn shrink-0 self-start sm:self-auto flex items-center gap-1.5">
-            <Icon name="plus" className="w-4 h-4" />
+          <Link
+            href="/borrow"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-[8px] bg-[#0F6B4C] text-white text-[16px] leading-[24px] font-semibold transition hover:opacity-90 hover:-translate-y-px active:scale-[0.98]"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 256 256"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="16"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M40 128h176M128 40v176" />
+            </svg>
             <span>ยื่นขอยืมอุปกรณ์ใหม่</span>
           </Link>
         </div>
 
-        {/* Success / Error Alerts */}
+        {/* ==================== ALERTS (Success / Error) ==================== */}
         {successMsg && (
-          <div className="jw-card bg-brand-soft/40 border-brand/40 p-4 flex items-center justify-between gap-3 text-brand-ink text-body rounded-2xl animate-fade-in">
+          <div className="bg-[#E6F4EC] border border-[#BFE3CF] rounded-[16px] p-4 flex items-center justify-between gap-3 text-[#0F6B4C] text-[14px] leading-[20px]">
             <div className="flex items-center gap-2.5">
-              <Icon name="check" className="w-5 h-5 text-brand shrink-0" />
-              <span>{successMsg}</span>
+              <Icon name="check" className="w-5 h-5 text-[#0F6B4C] shrink-0" />
+              <span className="font-medium">{successMsg}</span>
             </div>
             <button
               type="button"
               onClick={() => setSuccessMsg('')}
-              className="text-ink-mute hover:text-ink text-caption"
+              className="text-[#0F6B4C]/80 hover:text-[#0F6B4C] text-[12px] font-semibold px-2 py-1 rounded-[6px] hover:bg-white/50 transition"
             >
               ปิด
             </button>
@@ -349,578 +495,855 @@ export default function MyBorrowsPage() {
         )}
 
         {errorMsg && (
-          <div className="jw-card bg-red-50 border-red-200 p-4 flex items-center justify-between gap-3 text-red-700 text-body rounded-2xl">
+          <div className="bg-red-50 border border-red-200 rounded-[16px] p-4 flex items-center justify-between gap-3 text-red-700 text-[14px] leading-[20px]">
             <div className="flex items-center gap-2.5">
               <Icon name="alert-triangle" className="w-5 h-5 text-red-600 shrink-0" />
-              <span>{errorMsg}</span>
+              <span className="font-medium">{errorMsg}</span>
             </div>
-            <button
-              type="button"
-              onClick={() => setErrorMsg('')}
-              className="text-red-500 hover:text-red-800 text-caption"
-            >
-              ปิด
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={load}
+                className="text-red-700 hover:bg-red-100 text-[12px] font-semibold px-2.5 py-1 rounded-[6px] border border-red-200 transition"
+              >
+                ลองใหม่
+              </button>
+              <button
+                type="button"
+                onClick={() => setErrorMsg('')}
+                className="text-red-500 hover:text-red-800 text-[12px] font-semibold px-2 py-1"
+              >
+                ปิด
+              </button>
+            </div>
           </div>
         )}
 
-        {/* 3 Main Tabs */}
-        <Tabs<BorrowTab>
-          value={tab}
-          onChange={(t) => {
-            setTab(t);
-            setErrorMsg('');
-            setSuccessMsg('');
-          }}
-          options={[
-            {
-              value: 'borrowing',
-              label: `ที่กำลังใช้งาน (${items.filter((r) => r.status === 'approved' || r.status === 'borrowing').length})`,
-            },
-            {
-              value: 'inspect',
-              label: `รอตรวจสอบ (${items.filter((r) => r.status === 'return_inspect').length})`,
-            },
-            {
-              value: 'history',
-              label: `ประวัติ (${items.filter((r) => r.status === 'returned' || r.status === 'cancelled' || r.status === 'rejected').length})`,
-            },
-          ]}
-        />
+        {/* ==================== MASTER–DETAIL SPLIT GRID (from borrow-split.html) ==================== */}
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)] gap-6 items-start">
+          {/* -------------------- LEFT COLUMN: MASTER LIST -------------------- */}
+          <section className="flex flex-col gap-3 min-w-0">
+            {/* 3 Category Pill Tabs */}
+            <nav className="flex flex-wrap gap-1" aria-label="หมวดหมู่รายการยืมและคืนอุปกรณ์">
+              <button
+                type="button"
+                onClick={() => {
+                  setTab('borrowing');
+                  setVisibleCount(INITIAL_VISIBLE_COUNT);
+                  setErrorMsg('');
+                  setSuccessMsg('');
+                }}
+                className={`px-3 py-2 rounded-[8px] text-[14px] leading-[20px] font-medium transition-colors ${
+                  tab === 'borrowing'
+                    ? 'bg-[#0F172A] text-white'
+                    : 'text-[#475569] hover:bg-[#F1F5F9]'
+                }`}
+              >
+                ที่กำลังใช้งาน ({borrowingItems.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTab('inspect');
+                  setVisibleCount(INITIAL_VISIBLE_COUNT);
+                  setErrorMsg('');
+                  setSuccessMsg('');
+                }}
+                className={`px-3 py-2 rounded-[8px] text-[14px] leading-[20px] font-medium transition-colors ${
+                  tab === 'inspect'
+                    ? 'bg-[#0F172A] text-white'
+                    : 'text-[#475569] hover:bg-[#F1F5F9]'
+                }`}
+              >
+                รอตรวจสอบ ({inspectItems.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTab('history');
+                  setVisibleCount(INITIAL_VISIBLE_COUNT);
+                  setErrorMsg('');
+                  setSuccessMsg('');
+                }}
+                className={`px-3 py-2 rounded-[8px] text-[14px] leading-[20px] font-medium transition-colors ${
+                  tab === 'history'
+                    ? 'bg-[#0F172A] text-white'
+                    : 'text-[#475569] hover:bg-[#F1F5F9]'
+                }`}
+              >
+                ประวัติ ({historyItems.length})
+              </button>
+            </nav>
 
-        {/* Content Area */}
-        {loading ? (
-          <div className="jw-card p-12 text-center text-body text-ink-mute flex flex-col items-center justify-center gap-3">
-            <div className="size-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-            <span>กำลังโหลดรายการยืม–คืนอุปกรณ์...</span>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="jw-card p-12 text-center flex flex-col items-center justify-center gap-3">
-            <div className="w-14 h-14 rounded-2xl bg-soft text-ink-mute flex items-center justify-center">
-              <Icon name="package" className="w-7 h-7" />
-            </div>
-            <b className="text-body font-semibold text-ink">ไม่มีรายการในหมวดนี้</b>
-            <p className="text-caption text-ink-mute max-w-sm">
-              {tab === 'borrowing'
-                ? 'ไม่มีรายการที่รอรับมอบหรือกำลังใช้งานในขณะนี้'
-                : tab === 'inspect'
-                ? 'ไม่มีรายการที่ส่งคืนและกำลังรอเจ้าหน้าที่ตรวจสอบสภาพ'
-                : 'ยังไม่มีประวัติการยืม–คืนที่เสร็จสิ้น'}
-            </p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {filtered.map((r) => {
-              const eqInfo = getEquipmentInfo(r);
-              const approvalDate = getApprovalDate(r);
-              const isOverdue = r.returnDate < todayStr && r.status === 'borrowing';
-              const isDueToday = r.returnDate === todayStr && r.status === 'borrowing';
-              const eligibility = checkBorrowReceiveEligibility(r.pickupDate);
-
-              return (
-                <div
-                  key={r.id}
-                  className="jw-card p-5 sm:p-6 flex flex-col gap-4 border border-line hover:border-brand/30 transition-all shadow-xs"
+            {/* Search Input Card */}
+            <div className="bg-white border border-[#E2E8F0] rounded-[16px] px-3 py-2 flex items-center gap-2 text-[#475569] focus-within:border-[#0F6B4C] transition-colors">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 256 256"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="16"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                className="shrink-0"
+              >
+                <path d="M112 40a72 72 0 100 144 72 72 0 000-144zM168 168l48 48" />
+              </svg>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setVisibleCount(INITIAL_VISIBLE_COUNT);
+                }}
+                placeholder="ค้นหาเลขที่คำขอหรือชื่ออุปกรณ์"
+                aria-label="ค้นหาเลขที่คำขอหรือชื่ออุปกรณ์"
+                className="w-full bg-transparent border-none outline-none text-[14px] leading-[20px] text-[#0F172A] placeholder:text-[#475569]"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="text-[#475569] hover:text-[#0F172A] p-0.5 rounded-full"
+                  aria-label="ล้างคำค้นหา"
                 >
-                  {/* Top Row: Equipment info & Request Number */}
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                    <div className="flex items-start gap-3.5 min-w-0">
-                      {/* Equipment Photo or Icon */}
-                      <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-brand-soft/50 border border-line-soft overflow-hidden shrink-0 flex items-center justify-center">
-                        {eqInfo.photo ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={eqInfo.photo}
-                            alt={eqInfo.name}
-                            className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
-                            onClick={() => setPreviewImage(eqInfo.photo)}
-                          />
+                  <Icon name="x" className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Master List Rows */}
+            {loading ? (
+              <div className="bg-white border border-[#E2E8F0] rounded-[16px] p-8 text-center flex flex-col items-center justify-center gap-3 text-[#475569]">
+                <div className="size-6 border-2 border-[#0F6B4C] border-t-transparent rounded-full animate-spin" />
+                <span className="text-[14px] leading-[20px]">กำลังโหลดรายการ...</span>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="bg-white border border-[#E2E8F0] rounded-[16px] p-8 text-center flex flex-col items-center justify-center gap-2 text-[#475569]">
+                <span className="w-10 h-10 rounded-[8px] bg-[#F1F5F9] text-[#475569] flex items-center justify-center">
+                  <Icon name="package" className="w-5 h-5" />
+                </span>
+                <span className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+                  {searchQuery ? 'ไม่พบรายการที่ค้นหา' : 'ไม่มีรายการในหมวดนี้'}
+                </span>
+                <span className="text-[12px] leading-[16px] text-[#475569]">
+                  {searchQuery
+                    ? 'ลองเปลี่ยนคำค้นหาหรือตรวจสอบในหมวดอื่น'
+                    : tab === 'borrowing'
+                    ? 'ยังไม่มีคำขอยืมที่รอรับมอบหรือกำลังใช้งาน'
+                    : tab === 'inspect'
+                    ? 'ไม่มีรายการที่กำลังรอเจ้าหน้าที่ตรวจสอบสภาพ'
+                    : 'ยังไม่มีประวัติการยืม–คืนที่เสร็จสิ้น'}
+                </span>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {visibleItems.map((r, idx) => {
+                  const eqInfo = getEquipmentInfo(r);
+                  const isSelected = selectedRequest?.id === r.id;
+
+                  return (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedId(r.id);
+                        if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                          detailPaneRef.current?.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start',
+                          });
+                        }
+                      }}
+                      className={`w-full text-left flex items-center gap-3 p-3 rounded-[12px] border transition-colors ${
+                        isSelected
+                          ? 'bg-white border-[#0F6B4C] shadow-xs'
+                          : 'border-transparent hover:bg-[#F1F5F9]'
+                      }`}
+                    >
+                      {/* Icon Box (40x40px rounded-8px #F1F5F9) */}
+                      <span className="w-10 h-10 rounded-[8px] bg-[#F1F5F9] text-[#475569] flex items-center justify-center shrink-0 overflow-hidden">
+                        {idx % 2 === 0 ? (
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 256 256"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="16"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M226 80a56 56 0 01-70 54L80 210a24 24 0 01-34-34l76-76a56 56 0 0154-70l-34 34 8 24 24 8z" />
+                          </svg>
                         ) : (
-                          <Icon name="package" className="w-8 h-8 text-brand" />
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 256 256"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="16"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M40 216V72l88-48 88 48v144M24 216h208M96 216v-48h64v48" />
+                          </svg>
                         )}
+                      </span>
+
+                      {/* Title & Code · Date */}
+                      <span className="flex-1 min-w-0 flex flex-col">
+                        <span className="text-[16px] leading-[24px] font-medium text-[#0F172A] truncate">
+                          {eqInfo.name}
+                        </span>
+                        <span className="text-[14px] leading-[20px] font-normal text-[#475569] truncate">
+                          {r.code} · {formatThaiDate(r.pickupDate)}
+                        </span>
+                      </span>
+
+                      {/* Status Badge */}
+                      {renderStatusBadge(r.status)}
+                    </button>
+                  );
+                })}
+
+                {/* Expand More Button (from borrow-split.html) */}
+                {filtered.length > visibleCount && (
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount((prev) => prev + 10)}
+                    className="w-full flex items-center justify-center p-3 rounded-[12px] border border-transparent hover:bg-[#F1F5F9] text-[14px] leading-[20px] font-medium text-[#475569] transition-colors"
+                  >
+                    แสดงอีก {filtered.length - visibleCount} รายการ
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
+
+          {/* -------------------- RIGHT COLUMN: DETAIL VIEW CARD -------------------- */}
+          <article
+            ref={detailPaneRef}
+            className="bg-white border border-[#E2E8F0] rounded-[16px] p-5 sm:p-8 flex flex-col gap-6 min-w-0"
+          >
+            {loading ? (
+              <div className="py-16 text-center flex flex-col items-center justify-center gap-3 text-[#475569]">
+                <div className="size-7 border-2 border-[#0F6B4C] border-t-transparent rounded-full animate-spin" />
+                <span className="text-[14px] leading-[20px]">
+                  กำลังโหลดรายละเอียดคำขอยืม–คืนอุปกรณ์...
+                </span>
+              </div>
+            ) : !selectedRequest ? (
+              <div className="py-16 text-center flex flex-col items-center justify-center gap-3 text-[#475569]">
+                <div className="w-12 h-12 rounded-[12px] bg-[#F1F5F9] text-[#475569] flex items-center justify-center">
+                  <Icon name="package" className="w-6 h-6" />
+                </div>
+                <div className="text-[16px] leading-[24px] font-medium text-[#0F172A]">
+                  เลือกรายการทางซ้ายเพื่อดูรายละเอียด
+                </div>
+                <p className="text-[14px] leading-[20px] text-[#475569] max-w-md">
+                  เมื่อมีรายการยืม–คืนในหมวดที่เลือก รายละเอียดของคำขอ ไทม์ไลน์สถานะ และรูปภาพเปรียบเทียบก่อน–หลังใช้งานจะแสดงในพื้นที่นี้
+                </p>
+              </div>
+            ) : (
+              (() => {
+                const eqInfo = getEquipmentInfo(selectedRequest);
+                const approvalDate = getApprovalDate(selectedRequest);
+                const isOverdue =
+                  selectedRequest.returnDate < todayStr && selectedRequest.status === 'borrowing';
+                const isDueToday =
+                  selectedRequest.returnDate === todayStr && selectedRequest.status === 'borrowing';
+                const eligibility = checkBorrowReceiveEligibility(selectedRequest.pickupDate);
+
+                const isStepApproved =
+                  selectedRequest.status === 'approved' ||
+                  selectedRequest.status === 'borrowing' ||
+                  selectedRequest.status === 'return_inspect' ||
+                  selectedRequest.status === 'returned';
+                const isStepReceived = Boolean(selectedRequest.receivedAt);
+                const returnDateTimestamp =
+                  selectedRequest.returnSubmittedAt ||
+                  selectedRequest.returnRequestedAt ||
+                  selectedRequest.returnedAt;
+                const isStepReturned =
+                  Boolean(returnDateTimestamp) ||
+                  selectedRequest.status === 'return_inspect' ||
+                  selectedRequest.status === 'returned';
+                const isStepInspected =
+                  Boolean(selectedRequest.inspectedAt) || selectedRequest.status === 'returned';
+
+                const receivePhotos = selectedRequest.receivePhotos || [];
+                const inspectPhotos = selectedRequest.inspectPhotos || [];
+
+                return (
+                  <>
+                    {/* 1. Detail Header */}
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div>
+                        <h2 className="text-[24px] leading-[32px] font-semibold text-[#0F172A] m-0">
+                          {eqInfo.name}
+                        </h2>
+                        <div className="text-[14px] leading-[20px] font-normal text-[#475569] mt-0.5">
+                          เลขที่คำขอ {selectedRequest.code} · รหัส {eqInfo.code}
+                        </div>
                       </div>
-
-                      {/* Equipment & Request Info */}
-                      <div className="flex-1 min-w-0 flex flex-col gap-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <b className="text-[17px] font-bold text-ink leading-tight truncate">
-                            {eqInfo.name}
-                          </b>
-                          <span className="text-[12px] font-mono px-2 py-0.5 rounded-md bg-soft text-ink-mute border border-line">
-                            รหัส: {eqInfo.code}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {isOverdue && (
+                          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-red-100 text-red-700 border border-red-200">
+                            เกินกำหนดส่งคืน
                           </span>
+                        )}
+                        {isDueToday && (
+                          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-amber-100 text-amber-800 border border-amber-200">
+                            ครบกำหนดคืนวันนี้
+                          </span>
+                        )}
+                        {renderStatusBadge(selectedRequest.status)}
+                      </div>
+                    </div>
+
+                    {/* 2. Two-Column Grid: Metadata (Left) + Vertical 4-Step Timeline (Right) */}
+                    <div className="grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-8">
+                      {/* Left Sub-grid: Borrow Metadata */}
+                      <div className="grid grid-cols-2 gap-y-6 gap-x-4 content-start">
+                        <div>
+                          <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                            ผู้ยืม
+                          </div>
+                          <div className="text-[16px] leading-[24px] font-medium text-[#0F172A]">
+                            {selectedRequest.requesterName}
+                          </div>
                         </div>
-
-                        <div className="text-[13px] text-ink-mute flex flex-wrap items-center gap-x-3 gap-y-1">
-                          <span>
-                            เลขที่คำขอ: <b className="text-ink font-semibold">{r.code}</b>
-                          </span>
-                          <span>·</span>
-                          <span>
-                            ผู้ยืม: <b className="text-ink font-semibold">{r.requesterName}</b>
-                          </span>
-                          <span>·</span>
-                          <span>
-                            จำนวนรวม: <b className="text-ink font-semibold">{eqInfo.totalQty} ชิ้น</b>
-                          </span>
+                        <div>
+                          <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                            จำนวนรวม
+                          </div>
+                          <div className="text-[16px] leading-[24px] font-medium text-[#0F172A]">
+                            {eqInfo.totalQty} ชิ้น
+                          </div>
                         </div>
-
-                        {eqInfo.itemSummaries.length > 0 && (
-                          <div className="text-[12px] text-ink-mute">
-                            รายการอุปกรณ์: <span className="text-ink font-medium">{eqInfo.itemSummaries.join(', ')}</span>
+                        <div>
+                          <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                            วันที่เริ่มยืม
+                          </div>
+                          <div className="text-[16px] leading-[24px] font-medium text-[#0F172A]">
+                            {formatThaiDate(selectedRequest.pickupDate)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                            วันครบกำหนดคืน
+                          </div>
+                          <div
+                            className={`text-[16px] leading-[24px] font-medium ${
+                              isOverdue ? 'text-red-600' : 'text-[#0F172A]'
+                            }`}
+                          >
+                            {formatThaiDate(selectedRequest.returnDate)}
+                          </div>
+                        </div>
+                        {selectedRequest.receivedAt && (
+                          <div>
+                            <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                              วันที่รับมอบจริง
+                            </div>
+                            <div className="text-[16px] leading-[24px] font-medium text-[#0F172A]">
+                              {formatThaiDate(selectedRequest.receivedAt)}
+                            </div>
                           </div>
                         )}
-
-                        <div className="text-[12px] text-ink-mute flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
-                          <span>วันที่เริ่มยืม (วันรับครุภัณฑ์): <b className="text-ink">{formatThaiDate(r.pickupDate)}</b></span>
-                          <span>·</span>
-                          <span className={isOverdue ? 'text-danger font-semibold' : ''}>
-                            วันครบกำหนดคืน: <b className={isOverdue ? 'text-danger' : 'text-ink'}>{formatThaiDate(r.returnDate)}</b>
-                          </span>
-                          <span>·</span>
-                          <span>วันที่อนุมัติ: {formatThaiDate(approvalDate)}</span>
+                        {returnDateTimestamp && (
+                          <div>
+                            <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                              วันที่ส่งคืน
+                            </div>
+                            <div className="text-[16px] leading-[24px] font-medium text-[#0F172A]">
+                              {formatThaiDate(returnDateTimestamp)}
+                            </div>
+                          </div>
+                        )}
+                        <div className="col-span-2">
+                          <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                            รายการอุปกรณ์
+                          </div>
+                          <div className="text-[16px] leading-[24px] font-medium text-[#0F172A]">
+                            {eqInfo.itemSummaries.length > 0
+                              ? eqInfo.itemSummaries.join(', ')
+                              : `${eqInfo.name} (${eqInfo.totalQty} ชิ้น)`}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Status Badge */}
-                    <div className="flex items-center sm:flex-col sm:items-end gap-2 shrink-0">
-                      {r.status === 'approved' && (
-                        <span className="px-3 py-1 rounded-full text-[12px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-                          รอรับมอบ
-                        </span>
-                      )}
-                      {r.status === 'borrowing' && (
-                        <span className="px-3 py-1 rounded-full text-[12px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                          กำลังใช้งาน
-                        </span>
-                      )}
-                      {r.status === 'return_inspect' && (
-                        <span className="px-3 py-1 rounded-full text-[12px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
-                          รอตรวจสอบ
-                        </span>
-                      )}
-                      {r.status === 'returned' && (
-                        <span className="px-3 py-1 rounded-full text-[12px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          เสร็จสิ้น
-                        </span>
-                      )}
-                      {r.status === 'rejected' && (
-                        <span className="px-3 py-1 rounded-full text-[12px] font-semibold bg-red-50 text-red-700 border border-red-200">
-                          ไม่อนุมัติ
-                        </span>
-                      )}
-                      {r.status === 'cancelled' && (
-                        <span className="px-3 py-1 rounded-full text-[12px] font-semibold bg-gray-100 text-gray-700 border border-gray-300">
-                          ยกเลิกคำขอ
-                        </span>
-                      )}
-                      {isOverdue && (
-                        <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-red-100 text-red-700">
-                          เกินกำหนดส่งคืน
-                        </span>
-                      )}
-                      {isDueToday && (
-                        <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-100 text-amber-800">
-                          ครบกำหนดวันนี้
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* -------------------- TAB 1: ที่กำลังใช้งาน -------------------- */}
-                  {tab === 'borrowing' && (
-                    <div className="border-t border-line-soft pt-3.5 flex flex-col gap-3">
-                      {/* กรณีที่ 1: รอรับมอบ (status === approved) — แสดงเฉพาะปุ่ม "ยืนยันรับมอบ" ยังไม่แสดงปุ่มส่งคืน */}
-                      {r.status === 'approved' && (
-                        <div className="flex flex-col gap-3">
-                          {eligibility.allowed ? (
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-50/60 p-3.5 rounded-2xl border border-amber-200">
-                              <div className="text-[13px] text-amber-900 flex items-start gap-2">
-                                <Icon name="check" className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                                <div>
-                                  <b className="font-semibold block">เอกสารผ่านการอนุมัติครบ 3 ระดับแล้ว พร้อมรับมอบอุปกรณ์</b>
-                                  <span className="text-[12px] text-amber-800">
-                                    ต้องกดยืนยันรับมอบล่วงหน้าอย่างน้อย 1 วันก่อนวันรับครุภัณฑ์ (ภายในวันที่ {formatThaiDate(eligibility.lastAllowedReceiveDate)})
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setReceiveModalTarget(r);
-                                    setFormPhotos([]);
-                                    setFormNote('');
-                                    setModalError('');
-                                  }}
-                                  className="jw-btn jw-btn-sm bg-brand hover:bg-brand-hover text-white flex items-center gap-1.5"
+                      {/* Right Sub-grid: Vertical 4-Step Stepper (from borrow-split.html) */}
+                      <div className="flex flex-col">
+                        {/* Step 1: อนุมัติคำขอ */}
+                        <div className="flex gap-3">
+                          <div className="flex flex-col items-center">
+                            <span
+                              className={`w-6 h-6 rounded-full flex items-center justify-center text-white shrink-0 ${
+                                isStepApproved ? 'bg-[#0F6B4C]' : 'bg-[#CBD5E1]'
+                              }`}
+                            >
+                              {isStepApproved && (
+                                <svg
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 256 256"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="16"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  aria-hidden="true"
                                 >
-                                  <Icon name="check" className="w-4 h-4" />
-                                  <span>ยืนยันรับมอบ</span>
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col gap-3 bg-red-50/80 p-4 rounded-2xl border border-red-200">
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                <div className="text-[13px] text-red-900 flex items-start gap-2.5">
-                                  <Icon name="alert-triangle" className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-                                  <div className="flex flex-col gap-0.5">
-                                    <b className="font-bold text-red-800">
-                                      ไม่สามารถกดยืนยันรับมอบได้ (เลยกำหนดยืนยันล่วงหน้า 1 วัน)
-                                    </b>
-                                    <span className="text-[12.5px] text-red-700">
-                                      {eligibility.reason}
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="flex flex-wrap items-center gap-2 shrink-0 self-end sm:self-auto">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setRescheduleModalTarget(r);
-                                      setNewPickupDate(r.pickupDate);
-                                      setNewReturnDate(r.returnDate);
-                                      setModalError('');
-                                    }}
-                                    className="jw-btn-sec jw-btn-sm border-red-300 text-red-800 hover:bg-red-100"
-                                  >
-                                    เลื่อนวันรับครุภัณฑ์
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled
-                                    className="jw-btn jw-btn-sm opacity-50 cursor-not-allowed flex items-center gap-1.5"
-                                    title={eligibility.reason}
-                                  >
-                                    <Icon name="check" className="w-4 h-4" />
-                                    <span>ยืนยันรับมอบ</span>
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* กรณีที่ 2: กำลังใช้งาน (status === borrowing) — แสดงวันที่รับมอบจริงจาก DB และปุ่ม "ยืนยันส่งคืนอุปกรณ์" */}
-                      {r.status === 'borrowing' && (
-                        <div className="flex flex-col gap-3 bg-soft/40 p-3.5 sm:p-4 rounded-2xl border border-line-soft">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[13px]">
-                            <div>
-                              <span className="text-ink-mute">วันที่รับมอบ: </span>
-                              <b className="text-ink font-semibold">
-                                {r.receivedAt ? formatThaiDate(r.receivedAt) : '-'}
-                              </b>
-                              {r.receivedAt && (
-                                <span className="text-[11.5px] text-ink-mute ml-1.5">
-                                  ({formatThaiDateTime(r.receivedAt)})
-                                </span>
+                                  <path d="M40 128l56 56 120-120" />
+                                </svg>
                               )}
+                            </span>
+                            <span className="flex-1 w-[2px] bg-[#E2E8F0] min-h-[16px]" />
+                          </div>
+                          <div className="pb-4">
+                            <div className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+                              อนุมัติคำขอ
                             </div>
-                            <div>
-                              <span className="text-ink-mute">กำหนดส่งคืน: </span>
-                              <b className="text-ink font-semibold">
-                                {formatThaiDate(r.returnDate)}
-                              </b>
+                            <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                              {isStepApproved ? formatThaiDate(approvalDate) : 'รออนุมัติ'}
                             </div>
                           </div>
+                        </div>
 
-                          {/* รายละเอียดที่บันทึกไว้ตอนรับมอบ */}
-                          {r.receiveNote && (
-                            <div className="text-[13px] bg-white p-2.5 rounded-xl border border-line-soft">
-                              <span className="text-ink-mute font-medium">หมายเหตุเมื่อรับมอบ: </span>
-                              <span className="text-ink">{r.receiveNote}</span>
+                        {/* Step 2: รับมอบอุปกรณ์ */}
+                        <div className="flex gap-3">
+                          <div className="flex flex-col items-center">
+                            <span
+                              className={`w-6 h-6 rounded-full flex items-center justify-center text-white shrink-0 ${
+                                isStepReceived ? 'bg-[#0F6B4C]' : 'bg-[#CBD5E1]'
+                              }`}
+                            >
+                              {isStepReceived && (
+                                <svg
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 256 256"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="16"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  aria-hidden="true"
+                                >
+                                  <path d="M40 128l56 56 120-120" />
+                                </svg>
+                              )}
+                            </span>
+                            <span className="flex-1 w-[2px] bg-[#E2E8F0] min-h-[16px]" />
+                          </div>
+                          <div className="pb-4">
+                            <div className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+                              รับมอบอุปกรณ์
                             </div>
-                          )}
+                            <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                              {selectedRequest.receivedAt
+                                ? formatThaiDate(selectedRequest.receivedAt)
+                                : selectedRequest.status === 'approved'
+                                ? 'รอผู้ยืมยืนยันรับมอบ'
+                                : 'ไม่มีบันทึก'}
+                            </div>
+                          </div>
+                        </div>
 
-                          {/* รูปภาพก่อนใช้งาน (อัปโหลดโดยผู้ยืม) */}
-                          {r.receivePhotos && r.receivePhotos.length > 0 && (
-                            <div className="flex flex-col gap-1.5">
-                              <span className="text-[12px] text-ink-mute font-semibold">
-                                รูปภาพอุปกรณ์ก่อนใช้งาน — อัปโหลดโดยผู้ยืม ({r.receivePhotos.length} รูป):
-                              </span>
-                              <div className="flex flex-wrap gap-2">
-                                {r.receivePhotos.map((src, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="w-16 h-16 rounded-xl border border-line overflow-hidden cursor-pointer hover:opacity-90 transition shrink-0"
-                                    onClick={() => setPreviewImage(src)}
-                                  >
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                      src={src}
-                                      alt={`รูปก่อนใช้งาน ${idx + 1}`}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  </div>
-                                ))}
+                        {/* Step 3: ส่งคืนอุปกรณ์ */}
+                        <div className="flex gap-3">
+                          <div className="flex flex-col items-center">
+                            <span
+                              className={`w-6 h-6 rounded-full flex items-center justify-center text-white shrink-0 ${
+                                isStepReturned ? 'bg-[#0F6B4C]' : 'bg-[#CBD5E1]'
+                              }`}
+                            >
+                              {isStepReturned && (
+                                <svg
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 256 256"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="16"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  aria-hidden="true"
+                                >
+                                  <path d="M40 128l56 56 120-120" />
+                                </svg>
+                              )}
+                            </span>
+                            <span className="flex-1 w-[2px] bg-[#E2E8F0] min-h-[16px]" />
+                          </div>
+                          <div className="pb-4">
+                            <div className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+                              ส่งคืนอุปกรณ์
+                            </div>
+                            <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                              {returnDateTimestamp
+                                ? formatThaiDate(returnDateTimestamp)
+                                : 'รอส่งคืน'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Step 4: ตรวจสอบเสร็จสิ้น */}
+                        <div className="flex gap-3">
+                          <div className="flex flex-col items-center">
+                            <span
+                              className={`w-6 h-6 rounded-full flex items-center justify-center text-white shrink-0 ${
+                                isStepInspected ? 'bg-[#0F6B4C]' : 'bg-[#CBD5E1]'
+                              }`}
+                            >
+                              {isStepInspected && (
+                                <svg
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 256 256"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="16"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  aria-hidden="true"
+                                >
+                                  <path d="M40 128l56 56 120-120" />
+                                </svg>
+                              )}
+                            </span>
+                            <span className="flex-1 w-[2px] bg-[#E2E8F0] min-h-[16px]" />
+                          </div>
+                          <div className="pb-4">
+                            <div className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+                              ตรวจสอบเสร็จสิ้น
+                            </div>
+                            <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                              {isStepInspected
+                                ? `${formatThaiDate(
+                                    selectedRequest.inspectedAt || selectedRequest.updatedAt,
+                                  )}${
+                                    selectedRequest.inspectorName
+                                      ? ` · ${selectedRequest.inspectorName}`
+                                      : ''
+                                  }`
+                                : selectedRequest.status === 'return_inspect'
+                                ? 'รอเจ้าหน้าที่ตรวจสอบ'
+                                : 'ยังไม่เสร็จสิ้น'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 3. Status-Specific Action Box */}
+                    {/* 3.1 หมวด "ที่กำลังใช้งาน" — สถานะ: รอรับมอบ (approved) */}
+                    {selectedRequest.status === 'approved' && (
+                      <div className="border border-[#E2E8F0] rounded-[12px] p-4 bg-[#F8FAFC] flex flex-col gap-3">
+                        {eligibility.allowed ? (
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="flex flex-col gap-1">
+                              <div className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+                                สถานะ: รอรับมอบอุปกรณ์ (อนุมัติครบ 3 ระดับแล้ว)
+                              </div>
+                              <div className="text-[14px] leading-[20px] text-[#475569]">
+                                กำหนดการยืม {formatThaiDate(selectedRequest.pickupDate)} –{' '}
+                                {formatThaiDate(selectedRequest.returnDate)} · กรุณากดยืนยันรับมอบล่วงหน้าอย่างน้อย 1 วันก่อนวันเริ่มยืม (ภายในวันที่{' '}
+                                {formatThaiDate(eligibility.lastAllowedReceiveDate)})
                               </div>
                             </div>
-                          )}
-
-                          {/* ปุ่มยืนยันส่งคืนอุปกรณ์ */}
-                          <div className="flex justify-end pt-1">
                             <button
                               type="button"
                               onClick={() => {
-                                setReturnModalTarget(r);
+                                setReceiveModalTarget(selectedRequest);
+                                setFormPhotos([]);
                                 setFormNote('');
                                 setModalError('');
                               }}
-                              className="jw-btn jw-btn-sm shrink-0 bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5"
+                              className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-[8px] bg-[#0F6B4C] text-white text-[14px] leading-[20px] font-semibold shrink-0 transition hover:opacity-90 active:scale-[0.98]"
                             >
-                              <Icon name="package" className="w-4 h-4" />
-                              <span>ยืนยันส่งคืนอุปกรณ์</span>
+                              <Icon name="check" className="w-4 h-4" />
+                              <span>ยืนยันรับมอบ</span>
                             </button>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* -------------------- TAB 2: รอตรวจสอบ -------------------- */}
-                  {tab === 'inspect' && (
-                    <div className="border-t border-line-soft pt-3.5 flex flex-col gap-4">
-                      {/* Notice Banner */}
-                      <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-purple-50 text-purple-900 border border-purple-200 text-[13px]">
-                        <div className="size-2 rounded-full bg-purple-600 animate-pulse shrink-0" />
-                        <span className="font-semibold">รอตรวจสอบสภาพอุปกรณ์หลังส่งคืน</span>
-                        <span className="text-purple-700 hidden sm:inline">
-                          — ผู้ยืมแจ้งส่งคืนแล้ว รอเจ้าหน้าที่อัปโหลดรูปภาพหลังส่งคืนและบันทึกผลตรวจสภาพ
-                        </span>
-                      </div>
-
-                      {/* รายละเอียดวันที่รับมอบและวันที่ส่งคืน */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[13px] bg-soft/30 p-3 rounded-xl border border-line-soft">
-                        <div>
-                          <span className="text-ink-mute">วันที่รับมอบ: </span>
-                          <b className="text-ink font-semibold">
-                            {r.receivedAt ? formatThaiDate(r.receivedAt) : '-'}
-                          </b>
-                        </div>
-                        <div>
-                          <span className="text-ink-mute">วันที่ผู้ยืมส่งคืน: </span>
-                          <b className="text-ink font-semibold">
-                            {r.returnSubmittedAt
-                              ? formatThaiDateTime(r.returnSubmittedAt)
-                              : r.returnRequestedAt
-                              ? formatThaiDateTime(r.returnRequestedAt)
-                              : '-'}
-                          </b>
-                        </div>
-                        {r.returnNote && (
-                          <div className="sm:col-span-2">
-                            <span className="text-ink-mute">หมายเหตุการส่งคืนจากผู้ยืม: </span>
-                            <span className="text-ink font-medium">{r.returnNote}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* แสดงรูปภาพก่อนใช้งานที่ผู้ยืมอัปโหลดไว้ เพื่อให้เจ้าหน้าที่ตรวจสอบเปรียบเทียบ */}
-                      <div className="flex flex-col gap-2 p-3.5 rounded-xl border border-line-soft bg-white">
-                        <b className="text-[13px] text-ink font-semibold flex items-center gap-1.5">
-                          <span className="size-2 rounded-full bg-emerald-500" />
-                          รูปภาพอุปกรณ์ก่อนใช้งาน (อัปโหลดโดยผู้ยืมเมื่อรับมอบ)
-                        </b>
-                        {r.receiveNote && (
-                          <p className="text-[12px] text-ink-mute bg-soft/60 p-2 rounded-lg">
-                            หมายเหตุตอนรับมอบ: {r.receiveNote}
-                          </p>
-                        )}
-                        {r.receivePhotos && r.receivePhotos.length > 0 ? (
-                          <div className="flex flex-wrap gap-2">
-                            {r.receivePhotos.map((src, i) => (
-                              <div
-                                key={i}
-                                className="w-20 h-20 rounded-xl border border-line overflow-hidden cursor-pointer hover:opacity-85"
-                                onClick={() => setPreviewImage(src)}
-                              >
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={src}
-                                  alt={`ก่อนใช้งาน ${i + 1}`}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            ))}
-                          </div>
                         ) : (
-                          <span className="text-[12px] text-ink-mute italic">ไม่มีรูปภาพก่อนใช้งาน</span>
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="flex flex-col gap-1">
+                              <div className="text-[14px] leading-[20px] font-semibold text-red-700">
+                                ไม่สามารถกดยืนยันรับมอบได้ (ต้องรับมอบก่อนวันเริ่มยืมอย่างน้อย 1 วัน)
+                              </div>
+                              <div className="text-[14px] leading-[20px] text-red-600">
+                                {eligibility.reason}
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRescheduleModalTarget(selectedRequest);
+                                  setNewPickupDate(selectedRequest.pickupDate);
+                                  setNewReturnDate(selectedRequest.returnDate);
+                                  setModalError('');
+                                }}
+                                className="inline-flex items-center justify-center px-3 py-2 rounded-[8px] border border-[#E2E8F0] bg-white hover:bg-[#F1F5F9] text-[#0F172A] text-[14px] leading-[20px] font-medium transition"
+                              >
+                                เลื่อนวันรับครุภัณฑ์
+                              </button>
+                              <button
+                                type="button"
+                                disabled
+                                className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-[8px] bg-[#0F6B4C] text-white text-[14px] leading-[20px] font-semibold opacity-50 cursor-not-allowed"
+                                title={eligibility.reason}
+                              >
+                                <Icon name="check" className="w-4 h-4" />
+                                <span>ยืนยันรับมอบ</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 3.2 หมวด "ที่กำลังใช้งาน" — สถานะ: กำลังใช้งาน (borrowing) */}
+                    {selectedRequest.status === 'borrowing' && (
+                      <div className="border border-[#E2E8F0] rounded-[12px] p-4 bg-[#F8FAFC] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex flex-col gap-1">
+                          <div className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+                            สถานะ: กำลังใช้งานอุปกรณ์
+                          </div>
+                          <div className="text-[14px] leading-[20px] text-[#475569]">
+                            วันที่รับมอบจริง:{' '}
+                            <b className="text-[#0F172A] font-medium">
+                              {selectedRequest.receivedAt
+                                ? formatThaiDateTime(selectedRequest.receivedAt)
+                                : '-'}
+                            </b>{' '}
+                            · กำหนดส่งคืน:{' '}
+                            <b className="text-[#0F172A] font-medium">
+                              {formatThaiDate(selectedRequest.returnDate)}
+                            </b>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReturnModalTarget(selectedRequest);
+                            setFormNote('');
+                            setModalError('');
+                          }}
+                          className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-[8px] bg-[#0F6B4C] text-white text-[14px] leading-[20px] font-semibold shrink-0 transition hover:opacity-90 active:scale-[0.98]"
+                        >
+                          <Icon name="package" className="w-4 h-4" />
+                          <span>ยืนยันส่งคืนอุปกรณ์</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* 3.3 หมวด "รอตรวจสอบ" — สถานะ: รอตรวจสอบ (return_inspect) */}
+                    {selectedRequest.status === 'return_inspect' && (
+                      <div className="border border-[#E2E8F0] rounded-[12px] p-4 bg-[#F8FAFC] flex flex-col gap-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex flex-col gap-1">
+                            <div className="text-[14px] leading-[20px] font-medium text-[#0F172A] flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse" />
+                              <span>รอเจ้าหน้าที่ตรวจสอบสภาพอุปกรณ์</span>
+                            </div>
+                            <div className="text-[14px] leading-[20px] text-[#475569]">
+                              วันที่แจ้งส่งคืน:{' '}
+                              <b className="text-[#0F172A] font-medium">
+                                {returnDateTimestamp
+                                  ? formatThaiDateTime(returnDateTimestamp)
+                                  : '-'}
+                              </b>
+                              {selectedRequest.returnNote
+                                ? ` · หมายเหตุผู้ยืม: ${selectedRequest.returnNote}`
+                                : ''}
+                            </div>
+                          </div>
+
+                          {isStaffOrAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setInspectModalTarget(selectedRequest);
+                                setInspectResult('normal');
+                                setFormPhotos([]);
+                                setFormNote('');
+                                setModalError('');
+                              }}
+                              className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-[8px] bg-[#0F6B4C] text-white text-[14px] leading-[20px] font-semibold shrink-0 transition hover:opacity-90 active:scale-[0.98]"
+                            >
+                              <Icon name="check" className="w-4 h-4" />
+                              <span>ตรวจสอบและยืนยันรับคืน</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 4. Inspection Result & Separated Photo Evidence Box (from borrow-split.html line 51) */}
+                    <div className="border border-[#E2E8F0] rounded-[12px] p-4 flex flex-col gap-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+                            ผลการตรวจสภาพ:
+                          </span>
+                          {selectedRequest.status === 'returned' ? (
+                            selectedRequest.inspectResult === 'damaged' ? (
+                              <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-red-50 text-red-700 border border-red-200">
+                                ⚠ ชำรุด
+                              </span>
+                            ) : selectedRequest.inspectResult === 'incomplete' ? (
+                              <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-amber-50 text-amber-800 border border-amber-200">
+                                ✕ อุปกรณ์ไม่ครบ
+                              </span>
+                            ) : (
+                              <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-[#E6F4EC] text-[#0F6B4C] border border-[#BFE3CF]">
+                                ✓ ปกติ
+                              </span>
+                            )
+                          ) : selectedRequest.status === 'return_inspect' ? (
+                            <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                              รอเจ้าหน้าที่ตรวจสอบ
+                            </span>
+                          ) : selectedRequest.status === 'borrowing' ? (
+                            <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                              บันทึกสภาพก่อนใช้งานแล้ว
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                              รอรับมอบอุปกรณ์
+                            </span>
+                          )}
+                        </div>
+
+                        {selectedRequest.inspectorName && (
+                          <span className="text-[14px] leading-[20px] text-[#475569]">
+                            ผู้ตรวจสอบ: <b className="text-[#0F172A] font-medium">{selectedRequest.inspectorName}</b>
+                          </span>
                         )}
                       </div>
 
-                      {/* ส่วนปฏิบัติการของเจ้าหน้าที่ (Staff / Admin Action) */}
-                      {isStaffOrAdmin && (
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-brand-soft/30 p-3.5 rounded-2xl border border-brand/30 mt-1">
-                          <div className="text-[13px] text-brand-ink">
-                            <b className="font-semibold">สำหรับเจ้าหน้าที่:</b> ตรวจสอบสภาพอุปกรณ์ อัปโหลดรูปภาพหลังส่งคืน และยืนยันผลการตรวจรับ
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setInspectModalTarget(r);
-                              setInspectResult('normal');
-                              setFormPhotos([]);
-                              setFormNote('');
-                              setModalError('');
-                            }}
-                            className="jw-btn jw-btn-sm shrink-0 bg-brand hover:bg-brand-hover text-white flex items-center gap-1.5"
-                          >
-                            <Icon name="check" className="w-4 h-4" />
-                            <span>ตรวจสอบและยืนยันรับคืน</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* -------------------- TAB 3: ประวัติ -------------------- */}
-                  {tab === 'history' && (
-                    <div className="border-t border-line-soft pt-3.5 flex flex-col gap-3">
-                      {/* Dates Summary Grid */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[12px] bg-soft/40 p-3 rounded-xl border border-line-soft">
-                        <div>
-                          <span className="text-ink-mute block">วันที่อนุมัติ:</span>
-                          <b className="text-ink font-semibold">{formatThaiDate(approvalDate)}</b>
-                        </div>
-                        <div>
-                          <span className="text-ink-mute block">วันที่รับมอบ:</span>
-                          <b className="text-ink font-semibold">
-                            {r.receivedAt ? formatThaiDate(r.receivedAt) : '-'}
-                          </b>
-                        </div>
-                        <div>
-                          <span className="text-ink-mute block">วันที่ส่งคืน:</span>
-                          <b className="text-ink font-semibold">
-                            {r.returnSubmittedAt
-                              ? formatThaiDate(r.returnSubmittedAt)
-                              : r.returnedAt
-                              ? formatThaiDate(r.returnedAt)
-                              : '-'}
-                          </b>
-                        </div>
-                        <div>
-                          <span className="text-ink-mute block">วันที่ตรวจสอบเสร็จสิ้น:</span>
-                          <b className="text-ink font-semibold">
-                            {r.inspectedAt ? formatThaiDate(r.inspectedAt) : '-'}
-                          </b>
-                        </div>
-                      </div>
-
-                      {/* Inspection Result & Separated Photo Galleries */}
-                      {r.status === 'returned' && (
-                        <div className="flex flex-col gap-3 p-3.5 rounded-xl bg-white border border-line-soft">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[13px] font-semibold text-ink">ผลการตรวจสภาพ:</span>
-                              {r.inspectResult === 'normal' || !r.inspectResult ? (
-                                <span className="px-2.5 py-0.5 rounded-md text-[12px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  ✓ ปกติ
-                                </span>
-                              ) : r.inspectResult === 'damaged' ? (
-                                <span className="px-2.5 py-0.5 rounded-md text-[12px] font-semibold bg-red-50 text-red-700 border border-red-200">
-                                  ⚠ ชำรุด
-                                </span>
-                              ) : (
-                                <span className="px-2.5 py-0.5 rounded-md text-[12px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-                                  ✕ อุปกรณ์ไม่ครบ
-                                </span>
-                              )}
-                            </div>
-                            {r.inspectorName && (
-                              <span className="text-[12px] text-ink-mute">
-                                เจ้าหน้าที่ผู้ตรวจ: <b className="text-ink">{r.inspectorName}</b>
-                              </span>
-                            )}
-                          </div>
-
-                          {r.inspectNote && (
-                            <div className="text-[13px] text-ink bg-soft/50 p-2.5 rounded-lg border border-line-soft">
-                              <b className="text-ink-mute font-medium">บันทึกผลการตรวจของเจ้าหน้าที่: </b>
-                              {r.inspectNote}
+                      {/* Notes if present */}
+                      {(selectedRequest.receiveNote ||
+                        selectedRequest.returnNote ||
+                        selectedRequest.inspectNote) && (
+                        <div className="flex flex-col gap-1 text-[14px] leading-[20px] text-[#475569] bg-[#F8FAFC] p-3 rounded-[8px] border border-[#E2E8F0]">
+                          {selectedRequest.receiveNote && (
+                            <div>
+                              <span className="font-medium text-[#0F172A]">หมายเหตุก่อนใช้งาน: </span>
+                              {selectedRequest.receiveNote}
                             </div>
                           )}
-
-                          {/* เปรียบเทียบรูปภาพ 2 ประเภทที่จัดเก็บแยกกันอย่างชัดเจน */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                            {/* ประเภทที่ 1: รูปภาพก่อนใช้งาน (ผู้ยืม) */}
-                            <div className="p-3 rounded-xl bg-canvas border border-line flex flex-col gap-2">
-                              <span className="text-[12px] font-bold text-ink flex items-center gap-1.5">
-                                <span className="size-2 rounded-full bg-emerald-500" />
-                                1. รูปภาพก่อนใช้งาน — อัปโหลดโดยผู้ยืม ({(r.receivePhotos || []).length} รูป)
-                              </span>
-                              {(r.receivePhotos || []).length > 0 ? (
-                                <div className="flex flex-wrap gap-2">
-                                  {(r.receivePhotos || []).map((src, i) => (
-                                    <div
-                                      key={`rec-${i}`}
-                                      className="relative w-16 h-16 rounded-lg border border-line overflow-hidden cursor-pointer hover:opacity-85"
-                                      onClick={() => setPreviewImage(src)}
-                                      title="รูปภาพก่อนใช้งาน (ผู้ยืม)"
-                                    >
-                                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                                      <img src={src} alt="ก่อนใช้งาน" className="w-full h-full object-cover" />
-                                      <span className="absolute bottom-0 inset-x-0 bg-emerald-900/75 text-white text-[9px] text-center">
-                                        ก่อนใช้งาน
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-[12px] text-ink-mute italic">ไม่มีรูปภาพ</span>
-                              )}
+                          {selectedRequest.returnNote && (
+                            <div>
+                              <span className="font-medium text-[#0F172A]">หมายเหตุเมื่อส่งคืน: </span>
+                              {selectedRequest.returnNote}
                             </div>
-
-                            {/* ประเภทที่ 2: รูปภาพหลังส่งคืน (เจ้าหน้าที่) */}
-                            <div className="p-3 rounded-xl bg-canvas border border-line flex flex-col gap-2">
-                              <span className="text-[12px] font-bold text-ink flex items-center gap-1.5">
-                                <span className="size-2 rounded-full bg-blue-600" />
-                                2. รูปภาพหลังส่งคืน — อัปโหลดโดยเจ้าหน้าที่ ({(r.inspectPhotos || []).length} รูป)
-                              </span>
-                              {(r.inspectPhotos || []).length > 0 ? (
-                                <div className="flex flex-wrap gap-2">
-                                  {(r.inspectPhotos || []).map((src, i) => (
-                                    <div
-                                      key={`ins-${i}`}
-                                      className="relative w-16 h-16 rounded-lg border border-line overflow-hidden cursor-pointer hover:opacity-85"
-                                      onClick={() => setPreviewImage(src)}
-                                      title="รูปภาพหลังส่งคืน (เจ้าหน้าที่)"
-                                    >
-                                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                                      <img src={src} alt="หลังส่งคืน" className="w-full h-full object-cover" />
-                                      <span className="absolute bottom-0 inset-x-0 bg-blue-900/75 text-white text-[9px] text-center">
-                                        หลังส่งคืน
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-[12px] text-ink-mute italic">ไม่มีรูปภาพ</span>
-                              )}
+                          )}
+                          {selectedRequest.inspectNote && (
+                            <div>
+                              <span className="font-medium text-[#0F172A]">บันทึกผลตรวจสอบ: </span>
+                              {selectedRequest.inspectNote}
                             </div>
-                          </div>
+                          )}
                         </div>
                       )}
-                    </div>
-                  )}
 
-                  {/* Request Detail Link */}
-                  <div className="flex justify-end pt-1">
-                    <Link
-                      href={`/requests/${r.id}`}
-                      className="text-[13px] text-brand hover:text-brand-hover font-semibold flex items-center gap-1"
-                    >
-                      <span>ดูรายละเอียดคำขอและไทม์ไลน์</span>
-                      <Icon name="chevron-right" className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                      {/* Two Side-by-Side Photo Cards (Before Use vs After Return) */}
+                      <div className="grid grid-cols-1 sm:grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
+                        {/* Card 1: รูปภาพก่อนใช้งาน (อัปโหลดโดยผู้ยืม) */}
+                        <div className="border border-[#E2E8F0] rounded-[12px] p-4 flex flex-col gap-3 min-h-[104px]">
+                          <div className="text-[14px] leading-[20px] font-medium text-[#0F172A] flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-[#10B981] shrink-0" />
+                            <span>รูปภาพก่อนใช้งาน ({receivePhotos.length} รูป)</span>
+                          </div>
+                          {receivePhotos.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {receivePhotos.map((src, i) => (
+                                <button
+                                  key={`rec-${i}`}
+                                  type="button"
+                                  onClick={() => setPreviewImage(src)}
+                                  title="คลิกเพื่อดูรูปภาพก่อนใช้งานขนาดใหญ่"
+                                  className="w-16 h-16 rounded-[8px] bg-[#E2E8F0] overflow-hidden border border-[#E2E8F0] hover:border-[#0F6B4C] transition shrink-0"
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={src}
+                                    alt={`รูปภาพก่อนใช้งาน ${i + 1}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                              ไม่มีรูปภาพ
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Card 2: รูปภาพหลังส่งคืน (อัปโหลดโดยเจ้าหน้าที่) */}
+                        <div className="border border-[#E2E8F0] rounded-[12px] p-4 flex flex-col gap-3 min-h-[104px]">
+                          <div className="text-[14px] leading-[20px] font-medium text-[#0F172A] flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-[#3B82F6] shrink-0" />
+                            <span>รูปภาพหลังส่งคืน ({inspectPhotos.length} รูป)</span>
+                          </div>
+                          {inspectPhotos.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {inspectPhotos.map((src, i) => (
+                                <button
+                                  key={`ins-${i}`}
+                                  type="button"
+                                  onClick={() => setPreviewImage(src)}
+                                  title="คลิกเพื่อดูรูปภาพหลังส่งคืนขนาดใหญ่"
+                                  className="w-16 h-16 rounded-[8px] bg-[#E2E8F0] overflow-hidden border border-[#E2E8F0] hover:border-[#0F6B4C] transition shrink-0"
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={src}
+                                    alt={`รูปภาพหลังส่งคืน ${i + 1}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                              ไม่มีรูปภาพ
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 5. Footer Link to Full Permit / Request Document */}
+                    <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-[#E2E8F0]">
+                      <span className="text-[12px] leading-[16px] text-[#475569]">
+                        แจ้งเตือนผ่าน LINE อัตโนมัติเมื่อสถานะคำขอเปลี่ยนแปลง
+                      </span>
+                      <Link
+                        href={`/requests/${selectedRequest.id}`}
+                        className="text-[14px] leading-[20px] font-medium text-[#0F6B4C] hover:underline inline-flex items-center gap-1"
+                      >
+                        <span>ดูเอกสารคำขอและไทม์ไลน์การลงนาม</span>
+                        <Icon name="chevron-right" className="w-4 h-4" />
+                      </Link>
+                    </div>
+                  </>
+                );
+              })()
+            )}
+          </article>
+        </div>
 
         {/* Hidden input for replacing a single photo */}
         <input
@@ -930,12 +1353,6 @@ export default function MyBorrowsPage() {
           onChange={handleReplaceFile}
           className="hidden"
         />
-
-        {/* Footer info tip */}
-        <p className="text-[13px] text-ink-mute flex items-center gap-2 mt-2">
-          <Icon name="bell" className="w-4 h-4 text-brand shrink-0" />
-          <span>ระบบแจ้งเตือนผ่าน LINE ล่วงหน้า 1 วันก่อนครบกำหนดคืนอุปกรณ์</span>
-        </p>
       </div>
 
       {/* ==================== MODAL 1: ยืนยันรับมอบอุปกรณ์ (ผู้ยืมอัปโหลดรูปก่อนใช้งาน) ==================== */}
@@ -945,64 +1362,76 @@ export default function MyBorrowsPage() {
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in"
         >
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-line-soft">
+          <div className="bg-white border border-[#E2E8F0] rounded-[16px] max-w-lg w-full p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-brand-soft text-brand flex items-center justify-center">
+                <div className="w-10 h-10 rounded-[8px] bg-[#E6F4EC] text-[#0F6B4C] flex items-center justify-center">
                   <Icon name="check" className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-[17px] font-bold text-ink">ยืนยันรับมอบอุปกรณ์</h3>
-                  <p className="text-[12px] text-ink-mute">
-                    คำขอ {receiveModalTarget.code} · วันรับครุภัณฑ์ {formatThaiDate(receiveModalTarget.pickupDate)}
+                  <h3 className="text-[18px] leading-[26px] font-semibold text-[#0F172A]">
+                    ยืนยันรับมอบอุปกรณ์
+                  </h3>
+                  <p className="text-[12px] leading-[16px] text-[#475569]">
+                    คำขอ {receiveModalTarget.code} · วันเริ่มยืม{' '}
+                    {formatThaiDate(receiveModalTarget.pickupDate)}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setReceiveModalTarget(null)}
-                className="w-8 h-8 rounded-full hover:bg-soft text-ink-mute flex items-center justify-center transition"
+                className="w-8 h-8 rounded-[8px] hover:bg-[#F1F5F9] text-[#475569] flex items-center justify-center transition"
               >
                 <Icon name="x" className="w-4 h-4" />
               </button>
             </div>
 
-            {/* 1. ข้อมูลอุปกรณ์ที่รับมอบ */}
-            <div className="bg-soft/40 p-3.5 rounded-2xl border border-line-soft text-[13px] flex flex-col gap-1">
-              <div className="flex justify-between">
-                <span className="text-ink-mute">รายการอุปกรณ์:</span>
-                <b className="text-ink">{getEquipmentInfo(receiveModalTarget).name}</b>
+            {/* ข้อมูลอุปกรณ์และเงื่อนไขการรับมอบ */}
+            <div className="bg-[#F8FAFC] p-4 rounded-[12px] border border-[#E2E8F0] text-[14px] leading-[20px] flex flex-col gap-1.5">
+              <div className="flex justify-between gap-2">
+                <span className="text-[#475569]">รายการอุปกรณ์:</span>
+                <b className="text-[#0F172A] font-medium text-right">
+                  {getEquipmentInfo(receiveModalTarget).name}
+                </b>
               </div>
-              <div className="flex justify-between">
-                <span className="text-ink-mute">จำนวนรวม:</span>
-                <b className="text-ink">{getEquipmentInfo(receiveModalTarget).totalQty} ชิ้น</b>
+              <div className="flex justify-between gap-2">
+                <span className="text-[#475569]">จำนวนรวม:</span>
+                <b className="text-[#0F172A] font-medium">
+                  {getEquipmentInfo(receiveModalTarget).totalQty} ชิ้น
+                </b>
               </div>
-              <div className="flex justify-between">
-                <span className="text-ink-mute">กำหนดส่งคืน:</span>
-                <b className="text-ink">{formatThaiDate(receiveModalTarget.returnDate)}</b>
+              <div className="flex justify-between gap-2">
+                <span className="text-[#475569]">ระยะเวลายืม:</span>
+                <b className="text-[#0F172A] font-medium">
+                  {formatThaiDate(receiveModalTarget.pickupDate)} –{' '}
+                  {formatThaiDate(receiveModalTarget.returnDate)}
+                </b>
+              </div>
+              <div className="pt-1.5 mt-1 border-t border-[#E2E8F0] text-[12px] leading-[16px] text-[#0F6B4C] font-medium">
+                เงื่อนไขการรับมอบ: ต้องยืนยันรับมอบล่วงหน้าอย่างน้อย 1 วันก่อนวันเริ่มยืม และแนบรูปถ่ายสภาพอุปกรณ์ก่อนใช้งาน
               </div>
             </div>
 
-            {/* 2. อัปโหลดรูปภาพสภาพอุปกรณ์ก่อนใช้งาน */}
+            {/* อัปโหลดรูปภาพสภาพอุปกรณ์ก่อนใช้งาน */}
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <label className="text-[13px] font-bold text-ink">
+                <label className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
                   อัปโหลดรูปภาพอุปกรณ์ก่อนใช้งาน <span className="text-red-500">*</span>
                 </label>
-                <span className="text-[11px] text-ink-mute">
+                <span className="text-[12px] leading-[16px] text-[#475569]">
                   ({formPhotos.length}/6 รูป · JPG, PNG, WEBP)
                 </span>
               </div>
-              <p className="text-[12px] text-ink-mute">
-                ถ่ายภาพสภาพอุปกรณ์ทุกมุมเพื่อใช้เป็นหลักฐานก่อนใช้งาน (คลิกที่รูปเพื่อดูภาพขยาย กดปุ่มเปลี่ยนรูปหรือลบรูปได้ก่อนบันทึก)
+              <p className="text-[12px] leading-[16px] text-[#475569]">
+                ถ่ายภาพสภาพอุปกรณ์เพื่อใช้เป็นหลักฐานก่อนใช้งาน (คลิกที่รูปเพื่อดูภาพขยาย กดปุ่มเปลี่ยนรูปหรือลบรูปได้)
               </p>
 
               <div className="flex flex-wrap gap-2.5 pt-1">
                 {formPhotos.map((src, i) => (
                   <div
                     key={i}
-                    className="relative w-24 h-24 rounded-2xl overflow-hidden border border-line group"
+                    className="relative w-24 h-24 rounded-[12px] overflow-hidden border border-[#E2E8F0] group"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -1025,7 +1454,7 @@ export default function MyBorrowsPage() {
                         setReplaceIndex(i);
                         replaceInputRef.current?.click();
                       }}
-                      className="absolute bottom-0 inset-x-0 bg-black/70 text-white text-[10px] py-0.5 text-center hover:bg-brand transition"
+                      className="absolute bottom-0 inset-x-0 bg-black/70 text-white text-[10px] py-0.5 text-center hover:bg-[#0F6B4C] transition"
                     >
                       เปลี่ยนรูป
                     </button>
@@ -1036,7 +1465,7 @@ export default function MyBorrowsPage() {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-24 h-24 rounded-2xl border-2 border-dashed border-line hover:border-brand flex flex-col items-center justify-center gap-1 text-[11px] text-ink-mute hover:text-brand transition bg-soft/40"
+                    className="w-24 h-24 rounded-[12px] border-2 border-dashed border-[#E2E8F0] hover:border-[#0F6B4C] flex flex-col items-center justify-center gap-1 text-[12px] text-[#475569] hover:text-[#0F6B4C] transition bg-[#F8FAFC]"
                   >
                     <Icon name="upload" className="w-5 h-5" />
                     <span>เพิ่มรูปภาพ</span>
@@ -1053,9 +1482,9 @@ export default function MyBorrowsPage() {
               />
             </div>
 
-            {/* 3. ช่องหมายเหตุจากผู้ยืม */}
+            {/* หมายเหตุจากผู้ยืม */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[13px] font-bold text-ink">
+              <label className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
                 หมายเหตุสภาพอุปกรณ์ก่อนใช้งาน (ถ้ามี)
               </label>
               <textarea
@@ -1063,24 +1492,23 @@ export default function MyBorrowsPage() {
                 placeholder="เช่น ทดสอบเปิดติดปกติ อุปกรณ์เสริมครบถ้วน หรือระบุรอยตำหนิเดิมก่อนใช้งาน..."
                 value={formNote}
                 onChange={(e) => setFormNote(e.target.value)}
-                className="jw-in text-[13px] rounded-2xl p-3 resize-none"
+                className="w-full border border-[#E2E8F0] focus:border-[#0F6B4C] outline-none text-[14px] leading-[20px] rounded-[12px] p-3 resize-none"
               />
             </div>
 
             {modalError && (
-              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-[12.5px] flex items-center gap-2">
+              <div className="p-3 rounded-[12px] bg-red-50 border border-red-200 text-red-700 text-[13px] flex items-center gap-2">
                 <Icon name="alert-triangle" className="w-4 h-4 shrink-0" />
                 <span>{modalError}</span>
               </div>
             )}
 
-            {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-line-soft">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#E2E8F0]">
               <button
                 type="button"
                 onClick={() => setReceiveModalTarget(null)}
                 disabled={submitting}
-                className="jw-btn-sec jw-btn-sm"
+                className="px-3 py-2 rounded-[8px] border border-[#E2E8F0] text-[#475569] hover:bg-[#F1F5F9] text-[14px] leading-[20px] font-medium transition"
               >
                 ยกเลิก
               </button>
@@ -1088,14 +1516,14 @@ export default function MyBorrowsPage() {
                 type="button"
                 onClick={handleConfirmReceive}
                 disabled={submitting || formPhotos.length === 0}
-                className="jw-btn jw-btn-sm bg-brand hover:bg-brand-hover text-white flex items-center gap-1.5 disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-[8px] bg-[#0F6B4C] text-white text-[14px] leading-[20px] font-semibold disabled:opacity-50 transition"
               >
                 {submitting ? (
                   <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <Icon name="check" className="w-4 h-4" />
                 )}
-                <span>บันทึกและยืนยันรับมอบ</span>
+                <span>ยืนยันรับมอบ</span>
               </button>
             </div>
           </div>
@@ -1109,16 +1537,17 @@ export default function MyBorrowsPage() {
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in"
         >
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-line-soft">
+          <div className="bg-white border border-[#E2E8F0] rounded-[16px] max-w-lg w-full p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-[8px] bg-[#E6F4EC] text-[#0F6B4C] flex items-center justify-center">
                   <Icon name="package" className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-[17px] font-bold text-ink">ยืนยันส่งคืนอุปกรณ์</h3>
-                  <p className="text-[12px] text-ink-mute">
+                  <h3 className="text-[18px] leading-[26px] font-semibold text-[#0F172A]">
+                    ยืนยันส่งคืนอุปกรณ์
+                  </h3>
+                  <p className="text-[12px] leading-[16px] text-[#475569]">
                     คำขอ {returnModalTarget.code}
                   </p>
                 </div>
@@ -1126,29 +1555,29 @@ export default function MyBorrowsPage() {
               <button
                 type="button"
                 onClick={() => setReturnModalTarget(null)}
-                className="w-8 h-8 rounded-full hover:bg-soft text-ink-mute flex items-center justify-center transition"
+                className="w-8 h-8 rounded-[8px] hover:bg-[#F1F5F9] text-[#475569] flex items-center justify-center transition"
               >
                 <Icon name="x" className="w-4 h-4" />
               </button>
             </div>
 
-            {/* 1. ข้อมูลอุปกรณ์ที่ส่งคืน */}
-            <div className="bg-soft/40 p-4 rounded-2xl border border-line-soft flex flex-col gap-1.5 text-[13px]">
-              <div className="flex justify-between">
-                <span className="text-ink-mute">อุปกรณ์ที่ส่งคืน:</span>
-                <b className="text-ink font-semibold">
+            {/* ข้อมูลอุปกรณ์ที่ส่งคืน */}
+            <div className="bg-[#F8FAFC] p-4 rounded-[12px] border border-[#E2E8F0] flex flex-col gap-1.5 text-[14px] leading-[20px]">
+              <div className="flex justify-between gap-2">
+                <span className="text-[#475569]">อุปกรณ์ที่ส่งคืน:</span>
+                <b className="text-[#0F172A] font-medium text-right">
                   {getEquipmentInfo(returnModalTarget).name}
                 </b>
               </div>
-              <div className="flex justify-between">
-                <span className="text-ink-mute">จำนวน:</span>
-                <b className="text-ink">
+              <div className="flex justify-between gap-2">
+                <span className="text-[#475569]">จำนวนรวม:</span>
+                <b className="text-[#0F172A] font-medium">
                   {getEquipmentInfo(returnModalTarget).totalQty} ชิ้น
                 </b>
               </div>
-              <div className="flex justify-between">
-                <span className="text-ink-mute">วันที่รับมอบ:</span>
-                <span className="text-ink font-semibold">
+              <div className="flex justify-between gap-2">
+                <span className="text-[#475569]">วันที่รับมอบจริง:</span>
+                <span className="text-[#0F172A] font-medium">
                   {returnModalTarget.receivedAt
                     ? formatThaiDate(returnModalTarget.receivedAt)
                     : '-'}
@@ -1156,39 +1585,37 @@ export default function MyBorrowsPage() {
               </div>
             </div>
 
-            {/* 2. ช่องหมายเหตุการส่งคืน (ไม่มีช่องอัปโหลดรูปของฝั่งผู้ยืมตามข้อกำหนด) */}
+            {/* ช่องหมายเหตุการส่งคืน (ไม่มีช่องอัปโหลดรูปภาพตามข้อกำหนด 5.3 และ 6) */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[13px] font-bold text-ink">
-                หมายเหตุการส่งคืน (ถ้ามี)
+              <label className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+                หมายเหตุเพิ่มเติม (ถ้ามี)
               </label>
               <textarea
                 rows={3}
                 placeholder="ระบุหมายเหตุการส่งคืน เช่น ส่งคืนที่ห้องพัสดุครบถ้วน หรือแจ้งอาการผิดปกติให้เจ้าหน้าที่ทราบ..."
                 value={formNote}
                 onChange={(e) => setFormNote(e.target.value)}
-                className="jw-in text-[13px] rounded-2xl p-3 resize-none"
+                className="w-full border border-[#E2E8F0] focus:border-[#0F6B4C] outline-none text-[14px] leading-[20px] rounded-[12px] p-3 resize-none"
               />
             </div>
 
-            {/* Notice info */}
-            <p className="text-[12px] text-amber-800 bg-amber-50 p-3 rounded-xl border border-amber-200">
-              * เมื่อกดยืนยันส่งคืน สถานะจะเปลี่ยนเป็น &quot;รอตรวจสอบ&quot; โดยเจ้าหน้าที่ผู้รับผิดชอบจะเป็นผู้ถ่ายภาพอุปกรณ์หลังส่งคืนและบันทึกผลการตรวจสภาพ
+            <p className="text-[12px] leading-[16px] text-[#475569] bg-[#F8FAFC] p-3 rounded-[8px] border border-[#E2E8F0]">
+              เมื่อกดยืนยันส่งคืนอุปกรณ์ ระบบจะบันทึกวันและเวลาที่แจ้งส่งคืน เปลี่ยนสถานะเป็น &quot;รอตรวจสอบ&quot; และแจ้งเตือนเจ้าหน้าที่เพื่อตรวจสภาพและถ่ายภาพหลังส่งคืน
             </p>
 
             {modalError && (
-              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-[12.5px] flex items-center gap-2">
+              <div className="p-3 rounded-[12px] bg-red-50 border border-red-200 text-red-700 text-[13px] flex items-center gap-2">
                 <Icon name="alert-triangle" className="w-4 h-4 shrink-0" />
                 <span>{modalError}</span>
               </div>
             )}
 
-            {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-line-soft">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#E2E8F0]">
               <button
                 type="button"
                 onClick={() => setReturnModalTarget(null)}
                 disabled={submitting}
-                className="jw-btn-sec jw-btn-sm"
+                className="px-3 py-2 rounded-[8px] border border-[#E2E8F0] text-[#475569] hover:bg-[#F1F5F9] text-[14px] leading-[20px] font-medium transition"
               >
                 ยกเลิก
               </button>
@@ -1196,7 +1623,7 @@ export default function MyBorrowsPage() {
                 type="button"
                 onClick={handleConfirmReturn}
                 disabled={submitting}
-                className="jw-btn jw-btn-sm bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-[8px] bg-[#0F6B4C] text-white text-[14px] leading-[20px] font-semibold disabled:opacity-50 transition"
               >
                 {submitting ? (
                   <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -1217,16 +1644,17 @@ export default function MyBorrowsPage() {
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in"
         >
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-line-soft">
+          <div className="bg-white border border-[#E2E8F0] rounded-[16px] max-w-xl w-full p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-brand-soft text-brand flex items-center justify-center">
+                <div className="w-10 h-10 rounded-[8px] bg-[#E6F4EC] text-[#0F6B4C] flex items-center justify-center">
                   <Icon name="check" className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-[17px] font-bold text-ink">ตรวจสอบอุปกรณ์หลังส่งคืน (เจ้าหน้าที่)</h3>
-                  <p className="text-[12px] text-ink-mute">
+                  <h3 className="text-[18px] leading-[26px] font-semibold text-[#0F172A]">
+                    ตรวจสอบอุปกรณ์หลังส่งคืน (เจ้าหน้าที่)
+                  </h3>
+                  <p className="text-[12px] leading-[16px] text-[#475569]">
                     คำขอ {inspectModalTarget.code}
                   </p>
                 </div>
@@ -1234,31 +1662,34 @@ export default function MyBorrowsPage() {
               <button
                 type="button"
                 onClick={() => setInspectModalTarget(null)}
-                className="w-8 h-8 rounded-full hover:bg-soft text-ink-mute flex items-center justify-center transition"
+                className="w-8 h-8 rounded-[8px] hover:bg-[#F1F5F9] text-[#475569] flex items-center justify-center transition"
               >
                 <Icon name="x" className="w-4 h-4" />
               </button>
             </div>
 
-            {/* สรุปข้อมูลผู้ยืมและวันที่รับมอบ/ส่งคืน */}
-            <div className="bg-soft/40 p-3.5 rounded-2xl border border-line-soft text-[13px] grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+            <div className="bg-[#F8FAFC] p-3.5 rounded-[12px] border border-[#E2E8F0] text-[14px] leading-[20px] grid grid-cols-1 sm:grid-cols-2 gap-1.5">
               <div>
-                <span className="text-ink-mute">ผู้ยืม: </span>
-                <b className="text-ink">{inspectModalTarget.requesterName}</b>
+                <span className="text-[#475569]">ผู้ยืม: </span>
+                <b className="text-[#0F172A] font-medium">{inspectModalTarget.requesterName}</b>
               </div>
               <div>
-                <span className="text-ink-mute">อุปกรณ์: </span>
-                <b className="text-ink">{getEquipmentInfo(inspectModalTarget).name}</b>
-              </div>
-              <div>
-                <span className="text-ink-mute">วันที่รับมอบจริง: </span>
-                <b className="text-ink">
-                  {inspectModalTarget.receivedAt ? formatThaiDate(inspectModalTarget.receivedAt) : '-'}
+                <span className="text-[#475569]">อุปกรณ์: </span>
+                <b className="text-[#0F172A] font-medium">
+                  {getEquipmentInfo(inspectModalTarget).name}
                 </b>
               </div>
               <div>
-                <span className="text-ink-mute">วันที่ส่งคืน: </span>
-                <b className="text-ink">
+                <span className="text-[#475569]">วันที่รับมอบจริง: </span>
+                <b className="text-[#0F172A] font-medium">
+                  {inspectModalTarget.receivedAt
+                    ? formatThaiDate(inspectModalTarget.receivedAt)
+                    : '-'}
+                </b>
+              </div>
+              <div>
+                <span className="text-[#475569]">วันที่แจ้งส่งคืน: </span>
+                <b className="text-[#0F172A] font-medium">
                   {inspectModalTarget.returnSubmittedAt
                     ? formatThaiDate(inspectModalTarget.returnSubmittedAt)
                     : '-'}
@@ -1266,26 +1697,25 @@ export default function MyBorrowsPage() {
               </div>
               {inspectModalTarget.returnNote && (
                 <div className="sm:col-span-2">
-                  <span className="text-ink-mute">หมายเหตุการส่งคืนจากผู้ยืม: </span>
-                  <span className="text-ink">{inspectModalTarget.returnNote}</span>
+                  <span className="text-[#475569]">หมายเหตุจากผู้ยืม: </span>
+                  <span className="text-[#0F172A]">{inspectModalTarget.returnNote}</span>
                 </div>
               )}
             </div>
 
             {/* เปรียบเทียบรูปภาพก่อนใช้งาน vs รูปภาพหลังส่งคืน */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* รูปก่อนใช้งานของผู้ยืม */}
-              <div className="p-3 rounded-2xl border border-line bg-canvas flex flex-col gap-2">
-                <b className="text-[12.5px] text-ink flex items-center gap-1.5">
-                  <span className="size-2 rounded-full bg-emerald-500" />
-                  รูปภาพก่อนใช้งาน (ผู้ยืมอัปโหลด)
+              <div className="p-3.5 rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] flex flex-col gap-2">
+                <b className="text-[13px] font-medium text-[#0F172A] flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#10B981]" />
+                  รูปภาพก่อนใช้งาน (ผู้ยืม)
                 </b>
                 {(inspectModalTarget.receivePhotos || []).length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {(inspectModalTarget.receivePhotos || []).map((src, i) => (
                       <div
                         key={i}
-                        className="w-16 h-16 rounded-xl border border-line overflow-hidden cursor-pointer hover:opacity-85"
+                        className="w-16 h-16 rounded-[8px] border border-[#E2E8F0] overflow-hidden cursor-pointer hover:opacity-85"
                         onClick={() => setPreviewImage(src)}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1294,24 +1724,23 @@ export default function MyBorrowsPage() {
                     ))}
                   </div>
                 ) : (
-                  <span className="text-[12px] text-ink-mute italic">ไม่มีรูปภาพก่อนใช้งาน</span>
+                  <span className="text-[12px] text-[#475569]">ไม่มีรูปภาพก่อนใช้งาน</span>
                 )}
               </div>
 
-              {/* อัปโหลดรูปภาพหลังส่งคืนโดยเจ้าหน้าที่ */}
-              <div className="p-3 rounded-2xl border border-brand/40 bg-brand-soft/15 flex flex-col gap-2">
+              <div className="p-3.5 rounded-[12px] border border-[#BFE3CF] bg-[#E6F4EC]/30 flex flex-col gap-2">
                 <div className="flex items-center justify-between">
-                  <b className="text-[12.5px] text-ink flex items-center gap-1.5">
-                    <span className="size-2 rounded-full bg-blue-600" />
-                    รูปภาพหลังส่งคืน (เจ้าหน้าที่) <span className="text-red-500">*</span>
+                  <b className="text-[13px] font-medium text-[#0F172A] flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-[#3B82F6]" />
+                    รูปภาพหลังส่งคืน <span className="text-red-500">*</span>
                   </b>
-                  <span className="text-[11px] text-ink-mute">({formPhotos.length}/6)</span>
+                  <span className="text-[11px] text-[#475569]">({formPhotos.length}/6)</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {formPhotos.map((src, i) => (
                     <div
                       key={i}
-                      className="relative w-16 h-16 rounded-xl overflow-hidden border border-line group"
+                      className="relative w-16 h-16 rounded-[8px] overflow-hidden border border-[#E2E8F0] group"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -1343,7 +1772,7 @@ export default function MyBorrowsPage() {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="w-16 h-16 rounded-xl border-2 border-dashed border-brand/50 hover:border-brand flex flex-col items-center justify-center text-[10.5px] text-brand font-semibold transition bg-white"
+                      className="w-16 h-16 rounded-[8px] border-2 border-dashed border-[#0F6B4C]/50 hover:border-[#0F6B4C] flex flex-col items-center justify-center text-[11px] text-[#0F6B4C] font-medium transition bg-white"
                     >
                       <Icon name="upload" className="w-4 h-4" />
                       <span>เพิ่มรูป</span>
@@ -1363,29 +1792,29 @@ export default function MyBorrowsPage() {
 
             {/* ผลการตรวจสอบสภาพ */}
             <div className="flex flex-col gap-2">
-              <label className="text-[13px] font-bold text-ink">
-                สถานะผลการตรวจสอบ <span className="text-red-500">*</span>
+              <label className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+                ผลการตรวจสภาพ <span className="text-red-500">*</span>
               </label>
               <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => setInspectResult('normal')}
-                  className={`p-3 rounded-2xl text-[13px] font-semibold flex flex-col items-center justify-center gap-1 border transition ${
+                  className={`p-3 rounded-[12px] text-[13px] font-medium flex flex-col items-center justify-center gap-1 border transition ${
                     inspectResult === 'normal'
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-500 ring-2 ring-emerald-500/20'
-                      : 'bg-soft/50 text-ink-mute border-line hover:border-line-hover'
+                      ? 'bg-[#E6F4EC] text-[#0F6B4C] border-[#0F6B4C]'
+                      : 'bg-[#F8FAFC] text-[#475569] border-[#E2E8F0]'
                   }`}
                 >
-                  <Icon name="check" className="w-4 h-4 text-emerald-600" />
+                  <Icon name="check" className="w-4 h-4 text-[#0F6B4C]" />
                   <span>ปกติ</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setInspectResult('damaged')}
-                  className={`p-3 rounded-2xl text-[13px] font-semibold flex flex-col items-center justify-center gap-1 border transition ${
+                  className={`p-3 rounded-[12px] text-[13px] font-medium flex flex-col items-center justify-center gap-1 border transition ${
                     inspectResult === 'damaged'
-                      ? 'bg-red-50 text-red-800 border-red-500 ring-2 ring-red-500/20'
-                      : 'bg-soft/50 text-ink-mute border-line hover:border-line-hover'
+                      ? 'bg-red-50 text-red-800 border-red-500'
+                      : 'bg-[#F8FAFC] text-[#475569] border-[#E2E8F0]'
                   }`}
                 >
                   <Icon name="alert-triangle" className="w-4 h-4 text-red-600" />
@@ -1394,10 +1823,10 @@ export default function MyBorrowsPage() {
                 <button
                   type="button"
                   onClick={() => setInspectResult('incomplete')}
-                  className={`p-3 rounded-2xl text-[13px] font-semibold flex flex-col items-center justify-center gap-1 border transition ${
+                  className={`p-3 rounded-[12px] text-[13px] font-medium flex flex-col items-center justify-center gap-1 border transition ${
                     inspectResult === 'incomplete'
-                      ? 'bg-amber-50 text-amber-900 border-amber-500 ring-2 ring-amber-500/20'
-                      : 'bg-soft/50 text-ink-mute border-line hover:border-line-hover'
+                      ? 'bg-amber-50 text-amber-900 border-amber-500'
+                      : 'bg-[#F8FAFC] text-[#475569] border-[#E2E8F0]'
                   }`}
                 >
                   <Icon name="x" className="w-4 h-4 text-amber-600" />
@@ -1406,9 +1835,8 @@ export default function MyBorrowsPage() {
               </div>
             </div>
 
-            {/* หมายเหตุ / ระบุความเสียหาย */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[13px] font-bold text-ink">
+              <label className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
                 หมายเหตุ / รายละเอียดความเสียหาย{' '}
                 {(inspectResult === 'damaged' || inspectResult === 'incomplete') && (
                   <span className="text-red-500">*</span>
@@ -1419,24 +1847,23 @@ export default function MyBorrowsPage() {
                 placeholder="ระบุผลการตรวจสภาพอุปกรณ์หลังส่งคืน หรือรายละเอียดความเสียหาย/รายการที่ไม่ครบ..."
                 value={formNote}
                 onChange={(e) => setFormNote(e.target.value)}
-                className="jw-in text-[13px] rounded-2xl p-3 resize-none"
+                className="w-full border border-[#E2E8F0] focus:border-[#0F6B4C] outline-none text-[14px] leading-[20px] rounded-[12px] p-3 resize-none"
               />
             </div>
 
             {modalError && (
-              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-[12.5px] flex items-center gap-2">
+              <div className="p-3 rounded-[12px] bg-red-50 border border-red-200 text-red-700 text-[13px] flex items-center gap-2">
                 <Icon name="alert-triangle" className="w-4 h-4 shrink-0" />
                 <span>{modalError}</span>
               </div>
             )}
 
-            {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-line-soft">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#E2E8F0]">
               <button
                 type="button"
                 onClick={() => setInspectModalTarget(null)}
                 disabled={submitting}
-                className="jw-btn-sec jw-btn-sm"
+                className="px-3 py-2 rounded-[8px] border border-[#E2E8F0] text-[#475569] hover:bg-[#F1F5F9] text-[14px] leading-[20px] font-medium transition"
               >
                 ยกเลิก
               </button>
@@ -1444,7 +1871,7 @@ export default function MyBorrowsPage() {
                 type="button"
                 onClick={handleConfirmInspect}
                 disabled={submitting || formPhotos.length === 0}
-                className="jw-btn jw-btn-sm bg-brand hover:bg-brand-hover text-white flex items-center gap-1.5 disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-[8px] bg-[#0F6B4C] text-white text-[14px] leading-[20px] font-semibold disabled:opacity-50 transition"
               >
                 {submitting ? (
                   <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -1458,35 +1885,41 @@ export default function MyBorrowsPage() {
         </div>
       )}
 
-      {/* ==================== MODAL 4: เลื่อนวันรับครุภัณฑ์ (คำนวณสิทธิ์รับมอบใหม่อัตโนมัติ) ==================== */}
+      {/* ==================== MODAL 4: เลื่อนวันรับครุภัณฑ์ ==================== */}
       {rescheduleModalTarget && (
         <div
           role="dialog"
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in"
         >
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl flex flex-col gap-4">
-            <div className="flex items-center justify-between pb-3 border-b border-line-soft">
+          <div className="bg-white border border-[#E2E8F0] rounded-[16px] max-w-md w-full p-6 shadow-2xl flex flex-col gap-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
               <div>
-                <h3 className="text-[16px] font-bold text-ink">แก้ไข/เลื่อนวันรับครุภัณฑ์</h3>
-                <p className="text-[12px] text-ink-mute">คำขอ {rescheduleModalTarget.code}</p>
+                <h3 className="text-[18px] leading-[26px] font-semibold text-[#0F172A]">
+                  แก้ไข/เลื่อนวันรับครุภัณฑ์
+                </h3>
+                <p className="text-[12px] leading-[16px] text-[#475569]">
+                  คำขอ {rescheduleModalTarget.code}
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setRescheduleModalTarget(null)}
-                className="w-8 h-8 rounded-full hover:bg-soft text-ink-mute flex items-center justify-center"
+                className="w-8 h-8 rounded-[8px] hover:bg-[#F1F5F9] text-[#475569] flex items-center justify-center"
               >
                 <Icon name="x" className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-[12.5px] text-ink-mute">
-              ผู้ยืมต้องยืนยันรับมอบอย่างน้อย 1 วันก่อนวันรับครุภัณฑ์ หากเลือกวันรับครุภัณฑ์เป็นวันพรุ่งนี้เป็นต้นไป ระบบจะเปิดให้กดยืนยันรับมอบได้ทันที
+            <p className="text-[13px] leading-[20px] text-[#475569]">
+              ผู้ยืมต้องยืนยันรับมอบอย่างน้อย 1 วันก่อนวันเริ่มยืม หากเลือกวันเริ่มยืมเป็นวันพรุ่งนี้เป็นต้นไป ระบบจะเปิดให้กดยืนยันรับมอบได้ทันที
             </p>
 
             <div className="flex flex-col gap-3">
               <div>
-                <label className="jw-lbl">วันรับครุภัณฑ์ใหม่ *</label>
+                <label className="text-[14px] leading-[20px] font-medium text-[#0F172A] block mb-1">
+                  วันที่เริ่มยืมใหม่ *
+                </label>
                 <input
                   type="date"
                   value={newPickupDate}
@@ -1496,32 +1929,34 @@ export default function MyBorrowsPage() {
                       setNewReturnDate(e.target.value);
                     }
                   }}
-                  className="jw-in"
+                  className="w-full border border-[#E2E8F0] focus:border-[#0F6B4C] outline-none rounded-[8px] px-3 py-2 text-[14px]"
                 />
               </div>
               <div>
-                <label className="jw-lbl">วันครบกำหนดคืนใหม่ *</label>
+                <label className="text-[14px] leading-[20px] font-medium text-[#0F172A] block mb-1">
+                  วันครบกำหนดคืนใหม่ *
+                </label>
                 <input
                   type="date"
                   value={newReturnDate}
                   min={newPickupDate}
                   onChange={(e) => setNewReturnDate(e.target.value)}
-                  className="jw-in"
+                  className="w-full border border-[#E2E8F0] focus:border-[#0F6B4C] outline-none rounded-[8px] px-3 py-2 text-[14px]"
                 />
               </div>
             </div>
 
             {modalError && (
-              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-[12.5px]">
+              <div className="p-3 rounded-[12px] bg-red-50 border border-red-200 text-red-700 text-[13px]">
                 {modalError}
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-line-soft">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E2E8F0]">
               <button
                 type="button"
                 onClick={() => setRescheduleModalTarget(null)}
-                className="jw-btn-sec jw-btn-sm"
+                className="px-3 py-2 rounded-[8px] border border-[#E2E8F0] text-[#475569] hover:bg-[#F1F5F9] text-[14px] leading-[20px] font-medium"
               >
                 ยกเลิก
               </button>
@@ -1529,7 +1964,7 @@ export default function MyBorrowsPage() {
                 type="button"
                 onClick={handleConfirmReschedule}
                 disabled={submitting}
-                className="jw-btn jw-btn-sm"
+                className="px-3 py-2 rounded-[8px] bg-[#0F6B4C] text-white text-[14px] leading-[20px] font-semibold"
               >
                 {submitting ? 'กำลังบันทึก...' : 'บันทึกวันรับครุภัณฑ์ใหม่'}
               </button>
@@ -1551,12 +1986,12 @@ export default function MyBorrowsPage() {
             <img
               src={previewImage}
               alt="ดูรูปภาพขนาดใหญ่"
-              className="max-w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl"
+              className="max-w-full max-h-[80vh] object-contain rounded-[16px] shadow-2xl"
             />
             <button
               type="button"
               onClick={() => setPreviewImage(null)}
-              className="absolute -top-10 right-0 text-white hover:text-white/80 flex items-center gap-1 text-[13px]"
+              className="absolute -top-10 right-0 text-white hover:text-white/80 flex items-center gap-1 text-[14px]"
             >
               <Icon name="x" className="w-5 h-5" />
               <span>ปิดหน้าต่าง</span>
