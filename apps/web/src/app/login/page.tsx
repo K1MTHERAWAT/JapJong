@@ -48,6 +48,7 @@ export default function LoginPage() {
   const { loginWithCredentials, loginWithDemo, refreshMe } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [pdpa, setPdpa] = useState(true);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -237,187 +238,349 @@ export default function LoginPage() {
     }
   };
 
-  const handleLineLogin = () => {
-    if (!pdpa) {
-      setError('กรุณายินยอมนโยบายคุ้มครองข้อมูลส่วนบุคคล (PDPA) ก่อนเข้าสู่ระบบ');
-      return;
-    }
-    setError('');
-    setSubmitting(true);
-    // Direct browser redirect to backend LINE login endpoint (ไม่กระทบระบบเดิม)
-    window.location.href = '/api/auth/line';
-  };
-
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 sm:p-8">
-      <div className="w-full max-w-[960px] grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-        {/* การ์ดเข้าสู่ระบบด้วยชื่อผู้ใช้และรหัสผ่าน */}
-        <form onSubmit={handleLogin} className="jw-card p-6 sm:p-8 flex flex-col justify-center gap-4">
-          <div className="flex flex-col items-center text-center gap-2">
+    <div className="min-h-screen w-full bg-[#f6f5f0] text-[#14231f] flex flex-col lg:flex-row font-sans">
+      
+      {/* ========================================================
+          DESKTOP (>= lg): Left Brand Sidebar (แบบ A)
+          โทนเขียวลึก #0b4f43 พร้อมลวดลายตาราง โลโก้ และ 3 บริการ
+          ======================================================== */}
+      <aside className="hidden lg:flex flex-[5_1_500px] min-w-[420px] relative overflow-hidden bg-[#0b4f43] text-white p-12 xl:p-16 flex-col justify-between gap-12">
+        {/* ลายตารางจางๆ แบบโมเดิร์น */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 pointer-events-none opacity-40"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)',
+            backgroundSize: '48px 48px',
+          }}
+        />
+
+        {/* แบรนด์ & โลโก้ของเรา */}
+        <div className="relative flex items-center gap-4">
+          <div className="w-[56px] h-[56px] rounded-[16px] bg-white p-1 flex items-center justify-center shadow-lg border border-white/30 shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logo.png"
               alt="โลโก้จับจอง"
-              className="w-20 h-20 rounded-[20px] bg-white p-1.5 object-contain shadow-low border border-line"
+              className="size-full object-contain"
             />
-            <h1 className="text-[28px] font-bold text-ink">จับจอง</h1>
-            <p className="text-[13px] text-ink-mute leading-relaxed">
-              ระบบขอใช้สถานที่ ขอใช้อุปกรณ์ และแจ้งซ่อม
-              <br />
+          </div>
+          <div>
+            <div className="text-[26px] font-bold tracking-tight text-white leading-tight">จับจอง</div>
+            <div className="text-[13px] text-[#b9ddd1] font-medium">ระบบบริการดิจิทัลส่วนท้องถิ่น</div>
+          </div>
+        </div>
+
+        {/* หัวข้อระบบ & รายการ 3 บริการเด่น */}
+        <div className="relative flex flex-col gap-9 max-w-[480px]">
+          <div className="flex flex-col gap-3">
+            <span className="text-[14px] font-semibold text-[#b9ddd1] tracking-wide uppercase">
               องค์การบริหารส่วนตำบล (อบต.)
+            </span>
+            <h1 className="text-[36px] xl:text-[40px] font-bold leading-[1.25] text-white">
+              ระบบขอใช้สถานที่ ขอใช้อุปกรณ์ และแจ้งซ่อม
+            </h1>
+            <p className="text-[15px] leading-relaxed text-[#d0e7df] mt-1">
+              ยื่นคำขอ จองคิวล่วงหน้า ตรวจสอบสถานะการอนุมัติ 3 ระดับ พร้อมเอกสารราชการดิจิทัลที่มีผลถูกต้องครบวงจร
             </p>
           </div>
 
-          {/* แจ้งเตือนกรณีพยายามล็อกอินด้วย LINE แต่ยังไม่ได้เชื่อมต่อบัญชี */}
-          {unlinkedNotice.show && (
-            <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 text-[13px] text-amber-900 flex flex-col gap-2">
-              <div className="flex items-center gap-2 font-bold text-amber-950">
-                <Icon name="alert-triangle" className="w-5 h-5 text-amber-600 shrink-0" />
-                <span>ยังไม่พบบัญชีจับจองที่เชื่อมต่อกับ LINE</span>
+          {/* 3 การบริการ */}
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center shrink-0 text-white">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
+                  <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
+                  <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
+                  <path d="M10 6h4M10 10h4M10 14h4M10 18h4" />
+                </svg>
               </div>
-              <p className="leading-relaxed">
-                บัญชี LINE <b>{unlinkedNotice.displayName || 'ของคุณ'}</b> ยังไม่ได้เชื่อมโยงกับระบบจับจอง
-                <br />
-                กรุณาเข้าสู่ระบบด้วย <b>ชื่อผู้ใช้และรหัสผ่านเดิม</b> ของท่าน เพื่อเข้าใช้งานระบบ
-              </p>
-              <div className="text-[11.5px] text-amber-700 bg-amber-100/60 rounded-xl px-3 py-1.5 mt-1">
-                💡 เมื่อเข้าสู่ระบบสำเร็จ ท่านจะสามารถเชื่อมต่อบัญชี LINE ได้ที่หน้าตั้งค่าโปรไฟล์
+              <div>
+                <div className="text-[16.5px] font-semibold text-white">ขอใช้สถานที่</div>
+                <div className="text-[13px] text-[#b9ddd1]">อาคารอเนกประสงค์ สนามกีฬา ห้องประชุม</div>
               </div>
             </div>
-          )}
 
-          {/* ปุ่ม Single Sign-On (Gov Center SSO) */}
-          <div className="flex flex-col gap-2.5">
+            <div className="flex items-center gap-4">
+              <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center shrink-0 text-white">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="3" width="20" height="14" rx="2" />
+                  <path d="M8 21h8M12 17v4" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-[16.5px] font-semibold text-white">ขอใช้อุปกรณ์</div>
+                <div className="text-[13px] text-[#b9ddd1]">เต็นท์ โต๊ะ เก้าอี้ เครื่องเสียง โปรเจกเตอร์</div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center shrink-0 text-white">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-[16.5px] font-semibold text-white">แจ้งซ่อมแซม</div>
+                <div className="text-[13px] text-[#b9ddd1]">ถนน ไฟฟ้าสาธารณะ ประปา รางระบายน้ำ</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* แถบความปลอดภัยล่าง */}
+        <div className="relative flex items-center gap-2.5 text-[13px] text-[#a9cfc2] border-t border-white/15 pt-5">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+          <span>รับรองการยืนยันตัวตนผ่านระบบราชการ Gov SSO &amp; PDPA Compliant</span>
+        </div>
+      </aside>
+
+      {/* ========================================================
+          RIGHT AREA:
+          - Desktop (>= lg): การ์ดขาวลอยตัว สไตล์ A
+          - Mobile (< lg): สไตล์ B เรียบ สว่าง มนมน พร้อมโลโก้ตรงกลาง
+          ======================================================== */}
+      <main className="flex-[7_1_500px] min-w-0 flex items-center justify-center p-4 sm:p-8 lg:p-12">
+        <div className="w-full max-w-[460px] flex flex-col gap-5">
+          
+          {/* Card Container: บนคอมจะเป็นการ์ดขาวขอบมนเงา บนมือถือจะเป็นการ์ดเรียบโปร่งสว่าง */}
+          <div className="bg-transparent lg:bg-white lg:border lg:border-[#e3e1d8] lg:rounded-[24px] p-2 sm:p-4 lg:p-9 lg:shadow-[0_1px_2px_rgba(20,35,31,0.04),0_16px_40px_rgba(20,35,31,0.07)] flex flex-col gap-5">
+
+            {/* MOBILE ONLY HEADER (สไตล์ B: โลโก้กล่อง 64x64 สีขาวตรงกลาง บนพื้นสว่าง) */}
+            <div className="flex lg:hidden flex-col items-center text-center gap-2.5 pt-2 pb-1">
+              <div className="w-16 h-16 rounded-[20px] bg-white border border-[#e3e1d8] p-1.5 flex items-center justify-center shadow-[0_6px_18px_rgba(20,35,31,0.06)] shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/logo.png"
+                  alt="โลโก้จับจอง"
+                  className="size-full object-contain"
+                />
+              </div>
+              <h1 className="text-[28px] font-bold tracking-tight text-[#14231f] leading-tight">จับจอง</h1>
+              <p className="text-[13.5px] text-[#4a5853] leading-relaxed">
+                ระบบขอใช้สถานที่ ขอใช้อุปกรณ์ และแจ้งซ่อม
+                <br />
+                องค์การบริหารส่วนตำบล (อบต.)
+              </p>
+            </div>
+
+            {/* DESKTOP ONLY HEADER (สไตล์ A: หัวเรื่องในการ์ดขวา) */}
+            <div className="hidden lg:flex flex-col gap-1.5">
+              <h1 className="text-[28px] font-bold tracking-tight text-[#14231f]">เข้าสู่ระบบ</h1>
+              <p className="text-[14.5px] text-[#4a5853]">เข้าใช้งานด้วยบัญชีหน่วยงาน หรือชื่อผู้ใช้ของคุณ</p>
+            </div>
+
+            {/* แจ้งเตือนกรณีพยายามล็อกอินด้วย LINE แต่ยังไม่ได้เชื่อมต่อบัญชี */}
+            {unlinkedNotice.show && (
+              <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 text-[13px] text-amber-900 flex flex-col gap-2">
+                <div className="flex items-center gap-2 font-bold text-amber-950">
+                  <Icon name="alert-triangle" className="w-5 h-5 text-amber-600 shrink-0" />
+                  <span>ยังไม่พบบัญชีจับจองที่เชื่อมต่อกับ LINE</span>
+                </div>
+                <p className="leading-relaxed">
+                  บัญชี LINE <b>{unlinkedNotice.displayName || 'ของคุณ'}</b> ยังไม่ได้เชื่อมโยงกับระบบจับจอง
+                  <br />
+                  กรุณาเข้าสู่ระบบด้วย <b>ชื่อผู้ใช้และรหัสผ่านเดิม</b> ของท่าน เพื่อเข้าใช้งานระบบ
+                </p>
+                <div className="text-[11.5px] text-amber-700 bg-amber-100/60 rounded-xl px-3 py-1.5 mt-1">
+                  💡 เมื่อเข้าสู่ระบบสำเร็จ ท่านจะสามารถเชื่อมต่อบัญชี LINE ได้ที่หน้าตั้งค่าโปรไฟล์
+                </div>
+              </div>
+            )}
+
+            {/* ปุ่ม Single Sign-On (Gov Center SSO)
+                - บน Desktop: ปุ่มมน 12px สีเขียวอ่อน #e1efe9
+                - บน Mobile: ปุ่มมนแคปซูล rounded-full สีขาว ขอบเขียว 1.5px
+            */}
             <button
               type="button"
               disabled={submitting}
               onClick={handleOpenGovSso}
-              className="h-[52px] w-full rounded-full bg-[#0F766E] hover:bg-[#0D6860] active:scale-[0.99] text-white font-semibold text-[15px] sm:text-[16px] flex items-center justify-center gap-2.5 shadow-low transition disabled:opacity-50 cursor-pointer"
+              className="h-[52px] w-full rounded-full lg:rounded-[14px] bg-white lg:bg-[#e1efe9] hover:bg-[#f1f5f3] lg:hover:bg-[#d3e8df] active:scale-[0.99] border-[1.5px] border-[#0b6b5c] lg:border-transparent text-[#074d41] font-semibold text-[15.5px] flex items-center justify-center gap-2.5 shadow-sm transition disabled:opacity-50 cursor-pointer"
             >
-              <GovIcon className="w-5 h-5 text-teal-100" />
+              <GovIcon className="w-5 h-5 text-[#074d41]" />
               <span>เข้าสู่ระบบด้วย Gov Center (SSO)</span>
             </button>
-          </div>
 
-          <div className="flex items-center gap-3 text-[12px] text-ink-mute">
-            <span className="flex-1 h-px bg-line" />
-            <span>หรือเข้าด้วยชื่อผู้ใช้ / รหัสผ่าน</span>
-            <span className="flex-1 h-px bg-line" />
-          </div>
-
-          <div>
-            <label className="jw-lbl">ชื่อผู้ใช้, อีเมล หรือ เบอร์โทรศัพท์</label>
-            <input
-              id="login-username-input"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="กรอกชื่อผู้ใช้ เช่น somchai หรืออีเมล"
-              className="jw-in"
-            />
-          </div>
-
-          <div>
-            <label className="jw-lbl">รหัสผ่าน</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="กรอกรหัสผ่าน"
-              className="jw-in"
-            />
-          </div>
-
-          <div
-            onClick={() => setPdpa((v) => !v)}
-            className="jw-card p-3.5 border border-line flex items-start gap-2.5 cursor-pointer select-none"
-          >
-            <div
-              className={`w-[22px] h-[22px] rounded-[6px] border-[1.5px] flex items-center justify-center shrink-0 mt-0.5 ${
-                pdpa ? 'bg-brand border-brand text-white' : 'bg-white border-[#7A7A7A]'
-              }`}
-            >
-              {pdpa && <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} />}
+            {/* ตัวแบ่งเส้นกลาง */}
+            <div className="flex items-center gap-3 text-[12.5px] text-[#56625d]">
+              <span className="flex-1 h-px bg-[#d7deda]" />
+              <span>หรือเข้าด้วยชื่อผู้ใช้ / รหัสผ่าน</span>
+              <span className="flex-1 h-px bg-[#d7deda]" />
             </div>
-            <div className="text-[13px] text-ink-mute leading-relaxed">
-              ยินยอมให้เก็บ ใช้ และเปิดเผยข้อมูลส่วนบุคคลตามนโยบาย PDPA{' '}
-              <u className="text-ink font-medium">อ่านประกาศความเป็นส่วนตัว</u>
-            </div>
-          </div>
 
-          {error && (
-            <div className="rounded-2xl bg-[#FDE8E8] border border-[#f9b4b4] px-3.5 py-2.5 text-[13px] text-[#7a1010] flex items-center gap-2">
-              <Icon name="x" className="w-4 h-4 text-status-crit shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <button type="submit" disabled={submitting} className="jw-btn w-full">
-            {submitting ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
-          </button>
-
-          <div className="text-[13px] text-ink-mute text-center">
-            ยังไม่มีบัญชี?{' '}
-            <Link href="/register" className="font-bold text-ink hover:underline">
-              ลงทะเบียน
-            </Link>{' '}
-            · ลืมรหัสผ่าน? ติดต่อผู้ดูแลระบบ
-          </div>
-        </form>
-
-        {/* โหมดเดโม: แสดงเฉพาะเมื่อเปิด NEXT_PUBLIC_DEMO=true และดึงจาก /auth/demo-accounts */}
-        {isDemo && (
-          <div className="jw-card p-6 sm:p-7 flex flex-col gap-3.5">
-            <div>
-              <div className="flex items-center justify-between">
-                <h2 className="text-[18px] font-bold text-ink">เข้าสู่ระบบแบบคลิกเดียว (Demo)</h2>
-                <Chip tone="green">One-Click Demo</Chip>
+            {/* ฟอร์มกรอกชื่อผู้ใช้และรหัสผ่าน */}
+            <form onSubmit={handleLogin} className="flex flex-col gap-4">
+              
+              {/* ช่องกรอกชื่อผู้ใช้ */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[13.5px] font-semibold text-[#1e302a]">
+                  ชื่อผู้ใช้, อีเมล หรือ เบอร์โทรศัพท์
+                </label>
+                <input
+                  id="login-username-input"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="เช่น somchai หรืออีเมล"
+                  className="w-full h-[50px] px-5 lg:px-4 rounded-full lg:rounded-[12px] border-[1.5px] border-[#87928d] bg-white text-[#14231f] text-[15px] focus:outline-none focus:border-[#0b6b5c] focus:ring-2 focus:ring-[#0b6b5c]/20 transition"
+                  autoComplete="username"
+                />
               </div>
-              <p className="text-[13px] text-ink-mute mt-1">
-                เลือกบทบาทที่ต้องการเพื่อเข้าใช้งานทันทีโดยไม่ต้องใส่รหัสผ่าน
-              </p>
-            </div>
 
-            <div className="flex flex-col gap-2.5">
-              {loadingDemo ? (
-                <div className="py-8 text-center text-[13px] text-ink-mute">
-                  กำลังโหลดรายชื่อบัญชีสาธิต...
-                </div>
-              ) : (
-                demoAccounts.map((acc) => (
+              {/* ช่องกรอกรหัสผ่าน พร้อมปุ่มเปิด/ปิดตา */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[13.5px] font-semibold text-[#1e302a]">รหัสผ่าน</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="กรอกรหัสผ่าน"
+                    className="w-full h-[50px] pl-5 lg:pl-4 pr-12 rounded-full lg:rounded-[12px] border-[1.5px] border-[#87928d] bg-white text-[#14231f] text-[15px] focus:outline-none focus:border-[#0b6b5c] focus:ring-2 focus:ring-[#0b6b5c]/20 transition"
+                    autoComplete="current-password"
+                  />
                   <button
-                    key={acc.id}
                     type="button"
-                    disabled={submitting}
-                    onClick={() => handleDemoLoginClick(acc.id)}
-                    className="w-full text-left border border-line hover:border-brand hover:bg-brand-mint/30 rounded-2xl p-3 bg-white flex items-center justify-between gap-3 cursor-pointer transition group disabled:opacity-50"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute top-1/2 -translate-y-1/2 right-2 w-10 h-10 flex items-center justify-center text-[#56625d] hover:text-[#0b6b5c] rounded-full transition cursor-pointer"
+                    aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
                   >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="w-10 h-10 rounded-full bg-brand-mint text-brand font-bold flex items-center justify-center shrink-0">
-                        {acc.initial}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <b className="text-[14px] text-ink truncate">{acc.name}</b>
-                          <Chip tone={ROLE_TONE[acc.role]}>{ROLE_LABEL[acc.role]}</Chip>
-                        </div>
-                        <div className="text-[12px] text-ink-mute truncate">
-                          {acc.position} · {acc.department}
-                        </div>
-                      </div>
-                    </div>
-                    <span className="shrink-0 text-[12.5px] font-semibold text-brand inline-flex items-center gap-1 group-hover:translate-x-0.5 transition">
-                      เข้าใช้งาน <Icon name="chevron-right" className="w-4 h-4" />
-                    </span>
+                    {showPassword ? (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+                        <circle cx="12" cy="12" r="3" />
+                        <line x1="3" y1="3" x2="21" y2="21" />
+                      </svg>
+                    ) : (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
                   </button>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+                </div>
+              </div>
 
-      {/* หน้าต่างเข้าสู่ระบบด้วย Gov Center (SSO) แบบ Direct Flow (มาตรฐานเดียวกับ TownTrack) */}
+              {/* ส่วนยินยอม PDPA
+                  - บน Desktop: กล่องพื้นหลังเขียวอ่อน #f1f5f3 มน 12px
+                  - บน Mobile: บรรทัดคลีนแนวนอน เรียบง่าย
+              */}
+              <div
+                onClick={() => setPdpa((v) => !v)}
+                className="lg:bg-[#f1f5f3] lg:rounded-[12px] lg:p-3.5 flex items-start gap-3 cursor-pointer select-none py-1"
+              >
+                <div
+                  className={`w-[22px] h-[22px] rounded-[6px] border-[1.5px] flex items-center justify-center shrink-0 mt-0.5 transition ${
+                    pdpa ? 'bg-[#0b6b5c] border-[#0b6b5c] text-white' : 'bg-white border-[#87928d]'
+                  }`}
+                >
+                  {pdpa && <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} />}
+                </div>
+                <div className="text-[13px] text-[#2b3833] leading-relaxed">
+                  ยินยอมให้เก็บ ใช้ และเปิดเผยข้อมูลส่วนบุคคลตามนโยบาย PDPA{' '}
+                  <span className="text-[#0b6b5c] font-semibold underline underline-offset-2">
+                    อ่านประกาศความเป็นส่วนตัว
+                  </span>
+                </div>
+              </div>
+
+              {/* แสดงข้อผิดพลาด */}
+              {error && (
+                <div className="rounded-xl bg-[#FDE8E8] border border-[#f9b4b4] px-4 py-2.5 text-[13px] text-[#7a1010] flex items-center gap-2">
+                  <Icon name="x" className="w-4 h-4 text-status-crit shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* ปุ่มเข้าสู่ระบบ
+                  - Desktop: rounded-xl
+                  - Mobile: rounded-full
+              */}
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full h-[52px] rounded-full lg:rounded-[14px] bg-[#0b6b5c] hover:bg-[#095a4d] active:scale-[0.99] text-white font-semibold text-[16px] shadow-sm transition disabled:opacity-50 cursor-pointer"
+              >
+                {submitting ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
+              </button>
+
+              {/* แถบลิงก์ล่าง */}
+              <div className="text-[13.5px] text-[#4a5853] text-center pt-1">
+                ยังไม่มีบัญชี?{' '}
+                <Link href="/register" className="font-bold text-[#0b6b5c] hover:underline">
+                  ลงทะเบียน
+                </Link>{' '}
+                · ลืมรหัสผ่าน?{' '}
+                <span className="text-[#0b6b5c] font-semibold cursor-pointer hover:underline">
+                  ติดต่อผู้ดูแลระบบ
+                </span>
+              </div>
+            </form>
+
+            {/* บัญชีสาธิตสำหรับทดสอบระบบ (Demo Accounts) */}
+            {isDemo && (
+              <div className="mt-2 pt-4 border-t border-dashed border-[#c8d4cf] flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[12px] font-bold text-[#0b6b5c] uppercase tracking-wide">
+                      ⚡ บัญชีทดสอบ (Demo)
+                    </span>
+                    <Chip tone="green">คลิกเดียวเข้าใช้งาน</Chip>
+                  </div>
+                  <span className="text-[11px] text-[#697872]">ไม่ต้องกรอกรหัส</span>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2 max-h-[220px] overflow-y-auto pr-1">
+                  {loadingDemo ? (
+                    <div className="py-4 text-center text-[12px] text-ink-mute">
+                      กำลังโหลดรายชื่อบัญชีสาธิต...
+                    </div>
+                  ) : (
+                    demoAccounts.map((acc) => (
+                      <button
+                        key={acc.id}
+                        type="button"
+                        disabled={submitting}
+                        onClick={() => handleDemoLoginClick(acc.id)}
+                        className="w-full text-left border border-[#d7deda] hover:border-[#0b6b5c] hover:bg-[#f1f8f5] rounded-xl p-2.5 bg-white flex items-center justify-between gap-2.5 cursor-pointer transition group disabled:opacity-50"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-full bg-[#e1efe9] text-[#074d41] font-bold text-[12px] flex items-center justify-center shrink-0">
+                            {acc.initial}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <b className="text-[13px] text-[#14231f] truncate">{acc.name}</b>
+                              <Chip tone={ROLE_TONE[acc.role]}>{ROLE_LABEL[acc.role]}</Chip>
+                            </div>
+                            <div className="text-[11.5px] text-[#56625d] truncate">
+                              {acc.position} · {acc.department}
+                            </div>
+                          </div>
+                        </div>
+                        <span className="shrink-0 text-[12px] font-semibold text-[#0b6b5c] inline-flex items-center gap-0.5 group-hover:translate-x-0.5 transition">
+                          เข้าสู่ระบบ <Icon name="chevron-right" className="w-3.5 h-3.5" />
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+      </main>
+
+      {/* ========================================================
+          หน้าต่างเข้าสู่ระบบด้วย Gov Center (SSO) แบบ Direct Flow
+          ======================================================== */}
       {showGovModal && (
         <div
           className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-4"
@@ -429,7 +592,7 @@ export default function LoginPage() {
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-[#0F766E]/10 text-[#0F766E] flex items-center justify-center shrink-0">
+                <div className="w-11 h-11 rounded-2xl bg-[#0b6b5c]/10 text-[#0b6b5c] flex items-center justify-center shrink-0">
                   <GovIcon className="w-6 h-6" />
                 </div>
                 <div>
@@ -510,7 +673,7 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={govSubmitting}
-                  className="h-[46px] flex-1 rounded-full bg-[#0F766E] hover:bg-[#0D6860] text-white font-semibold text-[14.5px] transition disabled:opacity-50 cursor-pointer"
+                  className="h-[46px] flex-1 rounded-full bg-[#0b6b5c] hover:bg-[#095a4d] text-white font-semibold text-[14.5px] transition disabled:opacity-50 cursor-pointer"
                 >
                   {govSubmitting ? 'กำลังยืนยันตัวตน...' : 'เข้าสู่ระบบ Gov Center'}
                 </button>
