@@ -42,6 +42,34 @@ import { HourlyBookingSection } from '@/components/hourly-booking-section';
 
 const STEPS = ['เลือกสถานที่', 'วัน-เวลา', 'อุปกรณ์เสริม', 'กรอกคำขอ', 'ลงนามและส่ง'];
 
+const VENUE_FACILITY_LABEL: Record<string, string> = {
+  projector: 'โปรเจกเตอร์',
+  mic: 'เครื่องเสียง/ไมค์',
+  air: 'แอร์',
+  wifi: 'Wi-Fi',
+  fan: 'พัดลม',
+  light: 'ไฟส่องสว่าง',
+  water: 'จุดต่อน้ำประปา',
+  parking: 'ที่จอดรถ',
+};
+
+function formatFacilityLabel(facility: string): string {
+  return VENUE_FACILITY_LABEL[facility] || facility;
+}
+
+function formatOpenDaysText(openDays?: number[]): string {
+  if (!openDays || openDays.length === 0 || openDays.length === 7) return 'เปิดทุกวัน';
+  const sorted = [...openDays].sort((a, b) => a - b);
+  if (sorted.length === 5 && [1, 2, 3, 4, 5].every((d) => sorted.includes(d))) {
+    return 'จันทร์ – ศุกร์';
+  }
+  if (sorted.length === 2 && [0, 6].every((d) => sorted.includes(d))) {
+    return 'เสาร์ – อาทิตย์';
+  }
+  const dayNames = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+  return sorted.map((d) => dayNames[d] ?? '').filter(Boolean).join(', ');
+}
+
 function validateBookingPeriods(periods: Period[], venues: Venue[], attendeesCount?: number): string[] {
   const errors: string[] = [];
   if (!periods || periods.length === 0) {
@@ -136,6 +164,8 @@ export default function BookingWizardPage() {
   const [buildingFilter, setBuildingFilter] = useState('all');
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [search, setSearch] = useState('');
+  const [cardView, setCardView] = useState<'grid' | 'list'>('grid');
+  const [inspectedVenue, setInspectedVenue] = useState<Venue | null>(null);
 
   // Step 2 state (ค่าเริ่มต้น 1 ช่วงเวลา)
   const [month, setMonth] = useState(() => {
@@ -365,7 +395,17 @@ export default function BookingWizardPage() {
     if (catFilter !== 'all' && v.type !== catFilter) return false;
     if (buildingFilter !== 'all' && v.building !== buildingFilter) return false;
     if (onlyAvailable && (v.status !== 'available' || !v.enabled)) return false;
-    if (search.trim() && !v.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      const facText = (v.facilities || []).map((f) => formatFacilityLabel(f)).join(' ').toLowerCase();
+      const typeLabel = (VENUE_TYPE_LABEL[v.type] || '').toLowerCase();
+      const matched =
+        v.name.toLowerCase().includes(q) ||
+        (v.building || '').toLowerCase().includes(q) ||
+        typeLabel.includes(q) ||
+        facText.includes(q);
+      if (!matched) return false;
+    }
     return true;
   });
 
@@ -644,14 +684,71 @@ export default function BookingWizardPage() {
       maxWidth="max-w-[1440px]"
       footer={
         step === 1 ? (
-          <button
-            type="button"
-            disabled={selectedIds.length === 0}
-            onClick={() => setStep(2)}
-            className="jw-btn w-full sm:w-auto sm:min-w-[260px]"
-          >
-            ถัดไป · เลือกวัน-เวลา ({selectedIds.length} รายการ)
-          </button>
+          <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-10 h-10 rounded-xl bg-brand text-white font-bold text-[15px] flex items-center justify-center shrink-0 shadow-xs">
+                {selectedVenues.length}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[14px] font-bold text-ink">สถานที่ที่เลือกไว้</span>
+                  <span className="text-[11.5px] px-2.5 py-0.5 rounded-full bg-brand-mint text-brand font-semibold">
+                    {selectedVenues.length > 0 && minAdvanceDays > 0
+                      ? `ต้องจองล่วงหน้าอย่างน้อย ${minAdvanceDays} วัน`
+                      : 'เลือกได้มากกว่า 1 แห่ง'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                  {selectedVenues.length === 0 ? (
+                    <span className="text-[12.5px] text-ink-mute">
+                      ยังไม่ได้เลือกสถานที่ (คลิกเลือกจากการ์ดด้านบน)
+                    </span>
+                  ) : (
+                    selectedVenues.map((v) => (
+                      <span
+                        key={v.id}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-semibold bg-brand-mint text-brand border border-brand/20"
+                      >
+                        <span className="truncate max-w-[160px] sm:max-w-[220px]">{v.name}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleVenue(v);
+                          }}
+                          className="w-4 h-4 rounded-full hover:bg-brand/15 flex items-center justify-center text-brand hover:text-status-crit transition"
+                          title="นำออก"
+                        >
+                          <Icon name="x" className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {selectedVenues.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds([])}
+                  className="h-10 px-3.5 rounded-xl border border-line bg-surface text-[12.5px] font-semibold text-ink-mute hover:text-status-crit hover:bg-soft transition"
+                >
+                  ล้างทั้งหมด
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={selectedIds.length === 0}
+                onClick={() => setStep(2)}
+                className="jw-btn h-10 px-5 rounded-xl text-[13.5px] w-full sm:w-auto"
+              >
+                <span>ถัดไป · เลือกวัน-เวลา ({selectedIds.length} รายการ)</span>
+                <Icon name="chevron-right" className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         ) : step === 2 ? (
           <div className="flex w-full sm:w-auto gap-2.5">
             <button type="button" onClick={() => setStep(1)} className="jw-btn-sec flex-1 sm:w-36">
@@ -744,153 +841,201 @@ export default function BookingWizardPage() {
         )
       }
     >
-      <div className="w-full mb-5">
-        <Stepper steps={STEPS} current={step} onSelect={setStep} />
-      </div>
-
-      {/* ================= STEP 1: เลือกสถานที่ ================= */}
-      {step === 1 && (
-        <div className="flex flex-col gap-3.5">
-          {/* แถวค้นหา */}
-          <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-ph">
-              <Icon name="search" className="w-5 h-5" />
-            </span>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="ค้นหาสถานที่..."
-              className="jw-in rounded-full pl-11 h-[42px]"
-            />
-          </div>
-
-          {/* แถวตัวกรองสถานที่ (แนวนอนขนานกัน ทั้งหมดอยู่เหนือรายการที่เลือก) */}
-          <div className="jw-card p-3 sm:p-3.5 flex flex-wrap items-center justify-between gap-3">
-            {/* ซ้าย: ประเภทสถานที่ (Pills แนวนอน) */}
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <span className="text-[13px] font-bold text-ink shrink-0 mr-1 flex items-center gap-1.5">
-                <Icon name="filter" className="w-3.5 h-3.5 text-brand" />
-                <span>ประเภท:</span>
-              </span>
-              {(
-                [
-                  ['all', 'ทั้งหมด'],
-                  ['meeting', 'ห้องประชุม'],
-                  ['pavilion', 'ศาลา'],
-                  ['field', 'สนามกีฬา'],
-                  ['yard', 'ลานกิจกรรม'],
-                ] as const
-              ).map(([val, label]) => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => setCatFilter(val)}
-                  className={`h-8 sm:h-9 px-3 sm:px-3.5 rounded-full border text-[12px] sm:text-[13px] font-semibold transition ${
-                    catFilter === val
-                      ? 'border-brand bg-brand text-white shadow-xs'
-                      : 'border-line bg-white text-ink-soft hover:bg-hover'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+      {step === 1 ? (
+        <div className="jw-card p-3.5 sm:px-5 sm:py-4 mb-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-brand-mint text-brand flex items-center justify-center shrink-0">
+              <Icon name="building" className="w-5 h-5" />
             </div>
-
-            {/* ขวา: ตัวกรองอาคาร + เฉพาะที่พร้อมใช้งาน */}
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[12.5px] font-semibold text-ink-mute shrink-0">อาคาร:</span>
-                <select
-                  value={buildingFilter}
-                  onChange={(e) => setBuildingFilter(e.target.value)}
-                  className="jw-in h-8 sm:h-9 text-[12.5px] sm:text-[13px] py-1 px-2.5 rounded-xl min-w-[110px]"
-                >
-                  <option value="all">ทั้งหมด</option>
-                  {buildings.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setOnlyAvailable((v) => !v)}
-                className={`h-8 sm:h-9 px-3 rounded-xl border text-[12.5px] font-semibold transition flex items-center gap-1.5 ${
-                  onlyAvailable
-                    ? 'border-brand bg-brand-mint text-brand'
-                    : 'border-line bg-white text-ink-soft hover:bg-hover'
-                }`}
-              >
-                <i
-                  className={`w-3.5 h-3.5 rounded-[4px] border flex items-center justify-center ${
-                    onlyAvailable ? 'bg-brand border-brand text-white' : 'border-line bg-white'
-                  }`}
-                >
-                  {onlyAvailable && <Icon name="check" className="w-2.5 h-2.5" strokeWidth={3} />}
-                </i>
-                <span>เฉพาะที่พร้อมใช้งาน</span>
-              </button>
-            </div>
-          </div>
-
-          {/* รายการที่เลือก (ใต้แถวตัวกรอง จัดวางในแถวเดียวกัน Wrap ได้) */}
-            <div className="jw-card p-3 sm:p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2 shrink-0">
-                <Icon name="check" className="w-4 h-4 text-brand" />
-                <span className="text-[13.5px] font-bold text-ink">รายการที่เลือก</span>
-                <span className="text-[12px] font-semibold text-brand bg-brand-mint px-2 py-0.5 rounded-full">
-                  {selectedVenues.length} แห่ง
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-[16px] sm:text-[18px] font-bold text-ink">ขอใช้สถานที่ราชการ</h1>
+                <span className="text-[11.5px] font-semibold px-2.5 py-0.5 rounded-full bg-brand-mint text-brand">
+                  ขั้นตอนที่ {step} / {STEPS.length}
                 </span>
               </div>
+              <p className="text-[12.5px] text-ink-mute mt-0.5">
+                เลือกสถานที่ที่ต้องการใช้งาน (สามารถเลือกได้มากกว่า 1 แห่งในคำขอเดียวกัน)
+              </p>
+            </div>
+          </div>
 
-              <div className="flex flex-1 flex-wrap items-center gap-1.5 min-w-0">
-                {selectedVenues.length === 0 ? (
-                  <span className="text-[12.5px] text-ink-mute">ยังไม่ได้เลือกสถานที่ (แตะเลือกสถานที่ด้านล่าง)</span>
-                ) : (
-                  selectedVenues.map((v) => (
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto py-0.5">
+            {STEPS.map((label, idx) => {
+              const num = idx + 1;
+              const active = num === step;
+              const done = num < step;
+              const isLast = idx === STEPS.length - 1;
+              return (
+                <React.Fragment key={label}>
+                  <button
+                    type="button"
+                    disabled={num > step}
+                    onClick={() => setStep(num)}
+                    className={`flex items-center gap-1.5 shrink-0 text-[12px] font-semibold transition ${
+                      active
+                        ? 'text-brand-ink font-bold'
+                        : done
+                        ? 'text-ink cursor-pointer hover:text-brand'
+                        : 'text-ink-mute opacity-65'
+                    }`}
+                  >
                     <span
-                      key={v.id}
-                      className="inline-flex items-center gap-1.5 bg-brand-mint/50 border border-brand/20 text-ink text-[12.5px] font-medium pl-2.5 pr-1.5 py-1 rounded-full animate-fadeIn"
+                      className={`w-6 h-6 rounded-full text-[11.5px] font-bold flex items-center justify-center ${
+                        active
+                          ? 'bg-brand text-white ring-4 ring-brand/15'
+                          : done
+                          ? 'bg-brand text-white'
+                          : 'bg-soft border border-line text-ink-mute'
+                      }`}
                     >
-                      <span className="truncate max-w-[130px] sm:max-w-[180px]">{v.name}</span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleVenue(v);
-                        }}
-                        className="w-4 h-4 rounded-full hover:bg-brand/10 flex items-center justify-center text-ink-mute hover:text-ink transition"
-                        title="นำออก"
-                      >
-                        <Icon name="x" className="w-3 h-3" />
-                      </button>
+                      {done ? <Icon name="check" className="w-3 h-3" strokeWidth={3} /> : num}
                     </span>
-                  ))
+                    <span>{label}</span>
+                  </button>
+                  {!isLast && <div className="w-4 sm:w-6 h-[2px] bg-line shrink-0" />}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="w-full mb-5">
+          <Stepper steps={STEPS} current={step} onSelect={setStep} />
+        </div>
+      )}
+
+      {/* ================= STEP 1: เลือกสถานที่ (Layout B) ================= */}
+      {step === 1 && (
+        <div className="flex flex-col gap-4">
+          {/* แถบค้นหาและตัวกรองแบบรวมศูนย์ (Unified Search & Filter Control Bar - Single Row) */}
+          <div className="jw-card p-3.5 sm:p-4">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2.5">
+              <div className="relative flex-1 min-w-[220px]">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-ph pointer-events-none">
+                  <Icon name="search" className="w-4 h-4" />
+                </span>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="ค้นหาชื่อสถานที่, อาคาร หรือสิ่งอำนวยความสะดวก..."
+                  className="w-full h-10 pl-10 pr-8 rounded-xl bg-soft border border-line text-[13.5px] text-ink placeholder:text-ink-ph focus:outline-none focus:border-brand focus:bg-surface transition"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full hover:bg-hover flex items-center justify-center text-ink-mute hover:text-ink transition"
+                    title="ล้างคำค้นหา"
+                  >
+                    <Icon name="x" className="w-3.5 h-3.5" />
+                  </button>
                 )}
               </div>
 
-              {selectedVenues.length > 0 && (
-                <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* ตัวกรองประเภทสถานที่ (Dropdown List) */}
+                <div className="flex items-center gap-1.5 bg-soft border border-line rounded-xl px-3 h-10">
+                  <Icon name="filter" className="w-3.5 h-3.5 text-brand shrink-0" />
+                  <span className="text-[12.5px] font-bold text-ink shrink-0">ประเภท:</span>
+                  <select
+                    value={catFilter}
+                    onChange={(e) => setCatFilter(e.target.value as 'all' | VenueType)}
+                    className="bg-transparent text-[12.5px] font-semibold text-ink focus:outline-none cursor-pointer pr-1"
+                  >
+                    {(
+                      [
+                        ['all', 'ทั้งหมด'],
+                        ['meeting', VENUE_TYPE_LABEL.meeting],
+                        ['pavilion', VENUE_TYPE_LABEL.pavilion],
+                        ['field', VENUE_TYPE_LABEL.field],
+                        ['yard', VENUE_TYPE_LABEL.yard],
+                        ['training', VENUE_TYPE_LABEL.training],
+                      ] as const
+                    ).map(([val, label]) => {
+                      const count = val === 'all' ? venues.length : venues.filter((v) => v.type === val).length;
+                      const labelWithCount = count > 1 ? `${label} (${count})` : label;
+                      return (
+                        <option key={val} value={val}>
+                          {labelWithCount}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setOnlyAvailable((v) => !v)}
+                  className={`h-10 px-3.5 rounded-xl border text-[12.5px] font-semibold transition flex items-center gap-2 ${
+                    onlyAvailable
+                      ? 'border-brand bg-brand-mint text-brand'
+                      : 'border-line bg-soft text-ink-soft hover:bg-hover'
+                  }`}
+                >
+                  <span
+                    className={`w-4 h-4 rounded-[4px] border flex items-center justify-center ${
+                      onlyAvailable ? 'bg-brand border-brand text-white' : 'border-line bg-surface'
+                    }`}
+                  >
+                    {onlyAvailable && <Icon name="check" className="w-2.5 h-2.5" strokeWidth={3} />}
+                  </span>
+                  <span>เฉพาะที่พร้อมใช้งาน</span>
+                </button>
+
+                <div className="flex items-center bg-soft border border-line rounded-xl p-1 h-10">
                   <button
                     type="button"
-                    onClick={() => setSelectedIds([])}
-                    className="text-[12px] font-semibold text-ink-mute hover:text-status-crit transition px-2 py-1 rounded-lg hover:bg-soft"
+                    onClick={() => setCardView('grid')}
+                    className={`px-2.5 h-full rounded-lg text-[12px] font-semibold flex items-center gap-1.5 transition ${
+                      cardView === 'grid'
+                        ? 'bg-brand text-white shadow-xs'
+                        : 'text-ink-mute hover:text-ink'
+                    }`}
+                    title="มุมมองการ์ด"
                   >
-                    ล้างทั้งหมด
+                    <Icon name="layout-grid" className="w-3.5 h-3.5" />
+                    <span>การ์ด</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCardView('list')}
+                    className={`px-2.5 h-full rounded-lg text-[12px] font-semibold flex items-center gap-1.5 transition ${
+                      cardView === 'list'
+                        ? 'bg-brand text-white shadow-xs'
+                        : 'text-ink-mute hover:text-ink'
+                    }`}
+                    title="มุมมองแถวแนวนอน"
+                  >
+                    <Icon name="align-left" className="w-3.5 h-3.5" />
+                    <span>แถว</span>
                   </button>
                 </div>
-              )}
+              </div>
             </div>
+          </div>
 
-            <div className="flex items-center justify-between">
-              <b className="text-[16px] sm:text-[18px]">สถานที่ทั้งหมด</b>
-              <span className="text-[13px] text-ink-mute">{filteredVenues.length} แห่ง</span>
+          {/* พื้นที่แสดงรายการสถานที่ (Layout B Full-Width Grid / List) */}
+          {filteredVenues.length === 0 ? (
+            <div className="jw-card p-10 text-center flex flex-col items-center gap-2">
+              <p className="text-[15px] font-bold text-ink">ไม่พบสถานที่ที่ตรงกับเงื่อนไขการค้นหา</p>
+              <p className="text-[13px] text-ink-mute">ลองเปลี่ยนคำค้นหา หรือล้างตัวกรองประเภทสถานที่</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setCatFilter('all');
+                  setBuildingFilter('all');
+                  setOnlyAvailable(false);
+                  setSearch('');
+                }}
+                className="mt-2 h-9 px-4 rounded-xl bg-brand-mint text-brand text-[12.5px] font-semibold hover:bg-brand/15 transition"
+              >
+                รีเซ็ตตัวกรองทั้งหมด
+              </button>
             </div>
-
-            <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-3.5">
+          ) : cardView === 'list' ? (
+            <div className="grid grid-cols-1 gap-3">
               {filteredVenues.map((v) => {
                 const isSelected = selectedIds.includes(v.id);
                 const disabled = v.status !== 'available' || !v.enabled;
@@ -898,42 +1043,427 @@ export default function BookingWizardPage() {
                   <div
                     key={v.id}
                     onClick={() => toggleVenue(v)}
-                    className={`bg-white rounded-hard shadow-low overflow-hidden relative transition ${
+                    className={`group bg-surface rounded-2xl p-3.5 border transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                       disabled
-                        ? 'opacity-55 cursor-not-allowed'
+                        ? 'opacity-60 cursor-not-allowed border-line'
                         : 'cursor-pointer hover:shadow-card'
-                    } ${isSelected ? 'ring-2 ring-brand' : 'border border-line/60'}`}
+                    } ${
+                      isSelected
+                        ? 'border-brand ring-2 ring-brand/25 bg-brand-mint/20'
+                        : 'border-line'
+                    }`}
                   >
-                    {isSelected && (
-                      <div className="absolute top-2 right-2 z-10 w-[22px] h-[22px] rounded-full bg-brand text-white flex items-center justify-center shadow">
-                        <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} />
-                      </div>
-                    )}
-                    <div className="h-28 sm:h-36 bg-brand-mint text-brand flex items-center justify-center overflow-hidden">
-                      <ThumbnailImage
-                        src={v.images?.[0]}
-                        alt={v.name}
-                        iconName={venueIconName(v.type)}
-                      />
-                    </div>
-                    <div className="p-3 flex flex-col gap-1">
-                      <b className="text-[14px] sm:text-[15px] text-ink truncate">{v.name}</b>
-                      <span className="text-[12px] text-ink-mute inline-flex items-center gap-1">
-                        <Icon name="users" className="w-3.5 h-3.5" /> {v.capacity} คน · {VENUE_TYPE_LABEL[v.type]}
-                      </span>
-                      <div className="pt-0.5">
-                        {disabled ? (
-                          <Chip tone="red">ปิดปรับปรุง</Chip>
-                        ) : (
-                          <Chip tone="green">พร้อมใช้งาน</Chip>
+                    <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                      <div className="w-16 h-16 rounded-xl bg-brand-mint text-brand flex items-center justify-center shrink-0 relative overflow-hidden">
+                        <ThumbnailImage
+                          src={v.images?.[0]}
+                          alt={v.name}
+                          iconName={venueIconName(v.type)}
+                        />
+                        {isSelected && (
+                          <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-brand text-white flex items-center justify-center shadow">
+                            <Icon name="check" className="w-3 h-3" strokeWidth={3} />
+                          </span>
                         )}
                       </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold text-[15px] text-ink truncate">{v.name}</span>
+                          <span className="text-[11.5px] px-2 py-0.5 rounded-full bg-soft border border-line text-ink-soft font-semibold">
+                            {VENUE_TYPE_LABEL[v.type]}
+                          </span>
+                          {disabled ? (
+                            <Chip tone="red">ปิดปรับปรุง</Chip>
+                          ) : (
+                            <Chip tone="green">พร้อมใช้งาน</Chip>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-ink-mute mt-1">
+                          <span className="inline-flex items-center gap-1">
+                            <Icon name="building" className="w-3.5 h-3.5 text-ink-mute" />
+                            <span>
+                              {v.building}
+                              {v.floor ? ` (${v.floor})` : ''}
+                            </span>
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <Icon name="users" className="w-3.5 h-3.5 text-ink-mute" />
+                            <span>รองรับ {v.capacity} คน</span>
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <Icon name="clock" className="w-3.5 h-3.5 text-ink-mute" />
+                            <span>
+                              {v.openTime}–{v.closeTime} น. ({formatOpenDaysText(v.openDays)})
+                            </span>
+                          </span>
+                          {v.advanceDays > 0 && (
+                            <span className="inline-flex items-center gap-1 font-semibold text-brand">
+                              <Icon name="calendar" className="w-3.5 h-3.5 text-brand" />
+                              <span>จองล่วงหน้าอย่างน้อย {v.advanceDays} วัน</span>
+                            </span>
+                          )}
+                        </div>
+                        {v.facilities && v.facilities.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            {v.facilities.map((f) => (
+                              <span
+                                key={f}
+                                className="text-[11.5px] px-2 py-0.5 rounded-md bg-soft border border-line text-ink-mute"
+                              >
+                                {formatFacilityLabel(f)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-line">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInspectedVenue(v);
+                        }}
+                        className="text-[12px] font-semibold text-ink-mute hover:text-ink underline-offset-2 hover:underline px-2 py-1"
+                      >
+                        ดูรายละเอียด
+                      </button>
+                      <span
+                        className={`px-3 py-1.5 rounded-xl text-[12px] font-semibold inline-flex items-center gap-1.5 transition ${
+                          disabled
+                            ? 'bg-soft text-ink-mute'
+                            : isSelected
+                            ? 'bg-brand text-white shadow-xs'
+                            : 'bg-brand-mint text-brand group-hover:bg-brand group-hover:text-white'
+                        }`}
+                      >
+                        {disabled ? (
+                          <span>งดให้บริการ</span>
+                        ) : isSelected ? (
+                          <>
+                            <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} />
+                            <span>เลือกแล้ว</span>
+                          </>
+                        ) : (
+                          <>
+                            <Icon name="plus" className="w-3.5 h-3.5" />
+                            <span>เลือกสถานที่</span>
+                          </>
+                        )}
+                      </span>
                     </div>
                   </div>
                 );
               })}
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3.5">
+              {filteredVenues.map((v) => {
+                const isSelected = selectedIds.includes(v.id);
+                const disabled = v.status !== 'available' || !v.enabled;
+                return (
+                  <div
+                    key={v.id}
+                    onClick={() => toggleVenue(v)}
+                    className={`group bg-surface rounded-2xl border overflow-hidden transition flex flex-col justify-between ${
+                      disabled
+                        ? 'opacity-60 cursor-not-allowed border-line'
+                        : 'cursor-pointer hover:shadow-card hover:-translate-y-0.5'
+                    } ${
+                      isSelected
+                        ? 'border-brand ring-2 ring-brand shadow-low'
+                        : 'border-line'
+                    }`}
+                  >
+                    <div>
+                      {/* ส่วนหัวการ์ดและรูปภาพ (แบบที่ 2: ภาพเต็มตา h-56 พร้อม Overlay ชื่อและข้อมูลสถานที่ด้านล่างภาพ) */}
+                      <div className="h-56 bg-brand-mint relative flex items-center justify-center text-brand overflow-hidden">
+                        <ThumbnailImage
+                          src={v.images?.[0]}
+                          alt={v.name}
+                          iconName={venueIconName(v.type)}
+                          className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
+                        />
+                        {/* Gradient Overlay ล่างภาพสำหรับข้อความ */}
+                        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none" />
+
+                        {/* มุมบนซ้าย: ประเภทสถานที่ & สถานะพร้อมใช้งาน */}
+                        <div className="absolute top-2.5 left-2.5 flex flex-wrap items-center gap-1.5 z-10">
+                          {disabled ? (
+                            <Chip tone="red">ปิดปรับปรุง</Chip>
+                          ) : (
+                            <Chip tone="green">พร้อมใช้งาน</Chip>
+                          )}
+                          <span className="px-2.5 py-0.5 rounded-full text-[11.5px] font-semibold bg-surface/90 backdrop-blur text-ink shadow-xs">
+                            {VENUE_TYPE_LABEL[v.type]}
+                          </span>
+                        </div>
+
+                        {/* มุมบนขวา: เครื่องหมายเลือก */}
+                        <div className="absolute top-2.5 right-2.5 z-10">
+                          {isSelected ? (
+                            <div className="w-7 h-7 rounded-full bg-brand text-white flex items-center justify-center shadow-md">
+                              <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} />
+                            </div>
+                          ) : (
+                            <div className="w-7 h-7 rounded-full bg-surface/85 border border-line flex items-center justify-center text-transparent group-hover:border-brand transition">
+                              <Icon name="check" className="w-3.5 h-3.5" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* ข้อความซ้อนด้านล่างของรูปภาพ: ชื่อสถานที่ + อาคาร & ชั้น + ป้ายจองล่วงหน้า */}
+                        <div className="absolute bottom-2.5 inset-x-3 text-white flex items-end justify-between gap-2 z-10">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-bold text-[15.5px] leading-snug truncate drop-shadow-sm text-white" title={v.name}>
+                              {v.name}
+                            </h3>
+                            <p className="text-[12px] text-white/90 truncate flex items-center gap-1 mt-0.5">
+                              <Icon name="building" className="w-3.5 h-3.5 text-white/80 shrink-0" />
+                              <span className="truncate">
+                                {v.building}
+                                {v.floor ? ` · ${v.floor}` : ''}
+                              </span>
+                            </p>
+                          </div>
+                          {v.advanceDays > 0 && (
+                            <span
+                              className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-white/20 backdrop-blur text-white shrink-0 shadow-xs"
+                              title={`ต้องจองล่วงหน้าอย่างน้อย ${v.advanceDays} วัน`}
+                            >
+                              ล่วงหน้า {v.advanceDays} วัน
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* เนื้อหาการ์ดส่วนล่าง: แถบความจุ & เวลาทำการแบบกระชับ + สิ่งอำนวยความสะดวก */}
+                      <div className="p-3">
+                        <div className="flex items-center justify-between text-[12px] text-ink bg-soft border border-line rounded-xl px-3 py-2">
+                          <span className="font-semibold inline-flex items-center gap-1">
+                            <Icon name="users" className="w-3.5 h-3.5 text-brand shrink-0" />
+                            <span>{v.capacity} คน</span>
+                          </span>
+                          <span className="text-line">|</span>
+                          <span className="font-semibold inline-flex items-center gap-1">
+                            <Icon name="clock" className="w-3.5 h-3.5 text-brand shrink-0" />
+                            <span>{v.openTime}–{v.closeTime} น.</span>
+                          </span>
+                        </div>
+
+                        {/* สิ่งอำนวยความสะดวกประจำสถานที่ */}
+                        {v.facilities && v.facilities.length > 0 && (
+                          <div className="mt-2 flex flex-wrap items-center gap-1">
+                            {v.facilities.map((f) => (
+                              <span
+                                key={f}
+                                className="text-[11.5px] px-2 py-0.5 rounded-md bg-soft border border-line text-ink-mute"
+                              >
+                                {formatFacilityLabel(f)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* ส่วนท้ายการ์ด */}
+                    <div className="px-3.5 pb-3.5 pt-2.5 border-t border-line flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInspectedVenue(v);
+                        }}
+                        className="text-[12px] font-semibold text-ink-mute hover:text-ink transition py-1"
+                      >
+                        ดูรายละเอียด
+                      </button>
+                      <span
+                        className={`px-3 py-1.5 rounded-xl text-[12px] font-semibold inline-flex items-center gap-1.5 transition ${
+                          disabled
+                            ? 'bg-soft text-ink-mute'
+                            : isSelected
+                            ? 'bg-brand text-white shadow-xs'
+                            : 'bg-brand-mint text-brand group-hover:bg-brand group-hover:text-white'
+                        }`}
+                      >
+                        {disabled ? (
+                          <span>งดให้บริการ</span>
+                        ) : isSelected ? (
+                          <>
+                            <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} />
+                            <span>เลือกแล้ว</span>
+                          </>
+                        ) : (
+                          <>
+                            <Icon name="plus" className="w-3.5 h-3.5" />
+                            <span>เลือกสถานที่</span>
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* หน้าต่างแสดงรายละเอียดสถานที่ (Detail Modal - ขนาดใหญ่ 75% Viewport) */}
+          {inspectedVenue && (
+            <div
+              className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+              onClick={() => setInspectedVenue(null)}
+            >
+              <div
+                className="bg-surface border border-line rounded-3xl w-[92vw] sm:w-[85vw] lg:w-[75vw] h-[88vh] sm:h-[75vh] max-w-5xl overflow-hidden shadow-pop flex flex-col my-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* ส่วนหัวภาพใหญ่พิเศษ พาโนรามา (กินพื้นที่ 55% ของความสูง Modal) */}
+                <div className="relative h-[52%] sm:h-[58%] bg-brand-mint text-brand overflow-hidden shrink-0">
+                  <ThumbnailImage
+                    src={inspectedVenue.images?.[0]}
+                    alt={inspectedVenue.name}
+                    iconName={venueIconName(inspectedVenue.type)}
+                    className="w-full h-full object-cover"
+                  />
+                  {/* แถบ Gradient ดำช่วยให้อ่านข้อความชัดเจน */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent pointer-events-none" />
+
+                  {/* ปุ่มปิด Modal มุมบนขวา */}
+                  <button
+                    type="button"
+                    onClick={() => setInspectedVenue(null)}
+                    className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/45 hover:bg-black/70 backdrop-blur text-white flex items-center justify-center transition shadow-lg"
+                    title="ปิดหน้าต่าง"
+                  >
+                    <Icon name="x" className="w-5 h-5" />
+                  </button>
+
+                  {/* ป้ายด้านบนซ้าย */}
+                  <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-2">
+                    {inspectedVenue.status !== 'available' || !inspectedVenue.enabled ? (
+                      <Chip tone="red">ปิดปรับปรุง</Chip>
+                    ) : (
+                      <Chip tone="green">พร้อมใช้งาน</Chip>
+                    )}
+                    <span className="px-3 py-1 rounded-full text-[12px] font-semibold bg-surface/95 backdrop-blur text-ink shadow-sm">
+                      {VENUE_TYPE_LABEL[inspectedVenue.type]}
+                    </span>
+                  </div>
+
+                  {/* ข้อมูลชื่อและอาคารซ้อนด้านล่างภาพ */}
+                  <div className="absolute bottom-4 inset-x-5 sm:inset-x-7 text-white z-10">
+                    <h3 className="text-[22px] sm:text-[28px] lg:text-[32px] font-extrabold leading-snug drop-shadow-md text-white">
+                      {inspectedVenue.name}
+                    </h3>
+                    <p className="text-[13.5px] sm:text-[15px] text-white/90 flex items-center gap-2 mt-1 drop-shadow-sm">
+                      <Icon name="building" className="w-4 h-4 text-white/80 shrink-0" />
+                      <span>
+                        {inspectedVenue.building}
+                        {inspectedVenue.floor ? ` · ${inspectedVenue.floor}` : ''}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* ส่วนเนื้อหาข้อมูลใน Modal */}
+                <div className="p-4 sm:p-6 overflow-y-auto flex-1 flex flex-col justify-between gap-4 bg-surface">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[12.5px]">
+                    <div className="p-3.5 rounded-2xl bg-soft border border-line">
+                      <span className="text-ink-mute block text-[12px]">ความจุสูงสุด</span>
+                      <b className="text-[15.5px] text-ink inline-flex items-center gap-1.5 mt-1">
+                        <Icon name="users" className="w-4 h-4 text-brand shrink-0" />
+                        <span>{inspectedVenue.capacity} คน</span>
+                      </b>
+                    </div>
+                    <div className="p-3.5 rounded-2xl bg-soft border border-line">
+                      <span className="text-ink-mute block text-[12px]">เวลาเปิดทำการ</span>
+                      <b className="text-[15.5px] text-ink inline-flex items-center gap-1.5 mt-1">
+                        <Icon name="clock" className="w-4 h-4 text-brand shrink-0" />
+                        <span>{inspectedVenue.openTime}–{inspectedVenue.closeTime} น.</span>
+                      </b>
+                    </div>
+                    <div className="p-3.5 rounded-2xl bg-soft border border-line">
+                      <span className="text-ink-mute block text-[12px]">เปิดให้บริการ</span>
+                      <b className="text-[15px] text-ink inline-flex items-center gap-1.5 mt-1">
+                        <Icon name="calendar" className="w-4 h-4 text-brand shrink-0" />
+                        <span>{formatOpenDaysText(inspectedVenue.openDays)}</span>
+                      </b>
+                    </div>
+                    <div className="p-3.5 rounded-2xl bg-soft border border-line">
+                      <span className="text-ink-mute block text-[12px]">จองล่วงหน้า</span>
+                      <b className="text-[15.5px] text-brand inline-flex items-center gap-1.5 mt-1">
+                        <Icon name="info" className="w-4 h-4 text-brand shrink-0" />
+                        <span>
+                          {inspectedVenue.advanceDays > 0
+                            ? `≥ ${inspectedVenue.advanceDays} วัน`
+                            : 'ไม่กำหนด'}
+                        </span>
+                      </b>
+                    </div>
+                  </div>
+
+                  {inspectedVenue.facilities && inspectedVenue.facilities.length > 0 && (
+                    <div className="text-[12.5px]">
+                      <span className="font-bold text-ink block mb-2 text-[13px]">
+                        สิ่งอำนวยความสะดวกประจำสถานที่:
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {inspectedVenue.facilities.map((f) => (
+                          <span
+                            key={f}
+                            className="px-3.5 py-1.5 rounded-xl bg-soft border border-line text-ink font-medium text-[12.5px] flex items-center gap-2"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-brand" />
+                            <span>{formatFacilityLabel(f)}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ส่วนท้าย Modal ปุ่มควบคุม */}
+                  <div className="pt-3 border-t border-line flex items-center justify-between gap-3 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setInspectedVenue(null)}
+                      className="h-11 px-5 rounded-xl border border-line bg-surface hover:bg-soft text-[13px] font-semibold text-ink transition"
+                    >
+                      ปิดหน้าต่าง
+                    </button>
+                    <button
+                      type="button"
+                      disabled={inspectedVenue.status !== 'available' || !inspectedVenue.enabled}
+                      onClick={() => {
+                        toggleVenue(inspectedVenue);
+                        setInspectedVenue(null);
+                      }}
+                      className={`h-11 px-6 rounded-xl text-[13.5px] font-bold disabled:opacity-40 disabled:pointer-events-none transition flex items-center gap-2 shadow-sm ${
+                        selectedIds.includes(inspectedVenue.id)
+                          ? 'border border-status-crit/30 bg-danger-bg text-status-crit hover:bg-status-crit hover:text-white'
+                          : 'bg-brand hover:bg-brand-ink text-white'
+                      }`}
+                    >
+                      {selectedIds.includes(inspectedVenue.id) ? (
+                        <>
+                          <Icon name="x" className="w-4 h-4" />
+                          <span>นำออกจากรายการที่เลือก</span>
+                        </>
+                      ) : (
+                        <>
+                          <Icon name="plus" className="w-4 h-4" />
+                          <span>เลือกสถานที่นี้เข้าในคำขอ</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* ================= STEP 2: เลือกวัน-เวลา ================= */}
