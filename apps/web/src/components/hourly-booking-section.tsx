@@ -358,44 +358,51 @@ export function HourlyBookingSection({
   return (
     <div className="flex flex-col gap-5">
       {/* ================= แถบสลับโหมด: รายชั่วโมง (Default) & รายวัน (Secondary) ================= */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-2xl border border-line shadow-card">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm">
-              2
-            </span>
-            <div>
-              <b className="text-[15px] sm:text-[16px] text-ink">เลือกวันและเวลาใช้งาน</b>
-              <p className="text-[12px] text-ink-mute">
-                {selectedVenues.map((v) => v.name).join(', ')} · เปิดบริการ {effectiveOpenTime} - {effectiveCloseTime} น.
-              </p>
+      <div className="bg-white rounded-2xl border border-line shadow-card overflow-hidden">
+        <div className="p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                2
+              </span>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <b className="text-[15px] sm:text-[16px] text-ink leading-tight">เลือกวันและเวลาใช้งาน</b>
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-mint text-brand border border-brand/20">
+                    ขั้นตอนที่ 2 จาก 5
+                  </span>
+                </div>
+                <p className="text-[12px] text-ink-mute mt-0.5">
+                  {selectedVenues.map((v) => v.name).join(', ')} · เปิดบริการ {effectiveOpenTime} - {effectiveCloseTime} น.
+                </p>
+              </div>
             </div>
           </div>
+
+          {/* ปุ่มสลับโหมด */}
+          <div className="flex items-center gap-1.5 bg-canvas p-1 rounded-full border border-line">
+            <button
+              type="button"
+              aria-pressed={bookingMode === 'hourly'}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-semibold bg-brand text-white shadow-xs transition"
+            >
+              <Icon name="clock" className="w-3.5 h-3.5 text-white" />
+              <span>รายชั่วโมง</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onSwitchToDaily}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-medium text-ink-soft hover:text-ink hover:bg-hover transition"
+              title="สลับไปโหมดรายวัน"
+            >
+              <Icon name="calendar" className="w-3.5 h-3.5 text-ink-mute" />
+              <span>รายวัน</span>
+            </button>
+          </div>
         </div>
-
-        {/* ปุ่มสลับโหมด */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            aria-pressed={bookingMode === 'hourly'}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[13px] font-semibold bg-brand text-white shadow-sm transition"
-          >
-            <Icon name="clock" className="w-4 h-4" />
-            <span>จองรายชั่วโมง</span>
-            <span className="text-[10px] bg-white/20 text-white px-1.5 py-0.5 rounded-full font-normal">
-              ค่าเริ่มต้น
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onSwitchToDaily}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] text-ink-soft hover:text-ink hover:bg-hover border border-line transition"
-            title="สลับไปใช้งานแบบเลือกช่วงวันเริ่มต้น-สิ้นสุด (Flow เดิม)"
-          >
-            <Icon name="calendar" className="w-3.5 h-3.5 text-ink-mute" />
-            <span>จองรายวัน (เดิม)</span>
-          </button>
+        <div className="w-full h-[3px] bg-line/30">
+          <div className="h-full bg-brand transition-all duration-300" style={{ width: '40%' }} />
         </div>
       </div>
 

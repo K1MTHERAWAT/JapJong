@@ -2941,6 +2941,23 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
           createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
           updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : new Date().toISOString(),
         }));
+        for (const s of this.sidebarServices) {
+          if (s.href === '/admin/resources') {
+            s.href = '/staff/resources';
+            s.category = 'งานเจ้าหน้าที่';
+            s.slug = 'staff-resources';
+            s.roles = ['STAFF', 'ADMIN'];
+            await this.prisma
+              .$executeRawUnsafe(
+                `UPDATE "sidebar_services"
+                 SET "href" = '/staff/resources', "category" = 'งานเจ้าหน้าที่', "slug" = 'staff-resources', "roles" = $1, "updated_at" = CURRENT_TIMESTAMP
+                 WHERE "id" = $2`,
+                s.roles,
+                s.id,
+              )
+              .catch(() => {});
+          }
+        }
       } else {
         this.sidebarServices = clone(mockSidebarServices);
         for (const s of this.sidebarServices) {

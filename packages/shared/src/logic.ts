@@ -290,18 +290,18 @@ export function canAccessRoute(
     };
   }
 
-  // 2. หน้าจัดการทรัพยากร (/admin/resources, /admin/resources/new)
-  if (pathname.startsWith('/admin/resources')) {
+  // 2. หน้าจัดการทรัพยากรของเจ้าหน้าที่ (/staff/resources, /staff/resources/new, /staff/resources/edit)
+  if (pathname.startsWith('/staff/resources') || pathname.startsWith('/admin/resources')) {
     const ok =
-      (account.role === 'ADMIN' || account.role === 'STAFF') && hasPermission(account, 'manageResources');
+      (account.role === 'STAFF' || account.role === 'ADMIN') && hasPermission(account, 'manageResources');
     return {
       allowed: ok,
       title: 'จัดการทรัพยากรและแบบฟอร์ม',
-      requiredRoles: ['ADMIN', 'STAFF'],
+      requiredRoles: ['STAFF', 'ADMIN'],
       requiredPermission: 'manageResources',
       reason: ok
         ? undefined
-        : `ต้องมีบทบาทแอดมินหรือเจ้าหน้าที่ และเปิดสิทธิ์ "${PERMISSION_LABEL.manageResources}"`,
+        : `ต้องมีบทบาทเจ้าหน้าที่หรือแอดมิน และเปิดสิทธิ์ "${PERMISSION_LABEL.manageResources}"`,
     };
   }
 

@@ -609,6 +609,18 @@ describe('RequestsController Unit Tests', () => {
       expect(list[0].id).toBe('r-01');
     });
 
+    it('filters requests by mine query strictly by requesterId even for staff (account isolation)', () => {
+      const now = new Date().toISOString();
+      mockDb.requests.push(
+        { id: 'r-staff-own', requesterId: staff.id, type: 'borrow', status: 'borrowing', periods: [], signatures: [], items: [], updatedAt: now },
+        { id: 'r-citizen-created-by-staff', requesterId: citizen.id, createdByStaffId: staff.id, type: 'borrow', status: 'borrowing', periods: [], signatures: [], items: [], updatedAt: now },
+      );
+
+      const list = controller.list(staff, '1');
+      expect(list.some((r) => r.id === 'r-staff-own')).toBe(true);
+      expect(list.some((r) => r.id === 'r-citizen-created-by-staff')).toBe(false);
+    });
+
     it('filters requests by queue for staff review queue', () => {
       const now = new Date().toISOString();
       mockDb.requests.push(

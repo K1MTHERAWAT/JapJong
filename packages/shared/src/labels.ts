@@ -169,9 +169,9 @@ export const PERMISSION_META: Record<PermissionKey, PermissionMetaInfo> = {
   manageResources: {
     key: 'manageResources',
     label: PERMISSION_LABEL.manageResources,
-    description: 'เข้าหน้า /admin/resources และ /admin/resources/new เพื่อเพิ่ม/แก้ไข/เปิด–ปิดสถานที่และครุภัณฑ์',
+    description: 'เข้าหน้า /staff/resources และ /staff/resources/new เพื่อเพิ่ม/แก้ไข/เปิด–ปิดสถานที่และครุภัณฑ์',
     defaultRoles: ['STAFF', 'ADMIN'],
-    routes: ['/admin/resources', '/admin/resources/new'],
+    routes: ['/staff/resources', '/staff/resources/new', '/staff/resources/edit'],
   },
   sign: {
     key: 'sign',

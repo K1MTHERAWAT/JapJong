@@ -387,36 +387,8 @@ export class RequestsController {
     let items = [...this.db.requests];
 
     if (mine === '1') {
-      // ของใครของมัน:
-      // 1. ถ้าเป็นผู้ยื่นคำขอเอง หรือเป็นเจ้าหน้าที่ที่กรอกแทน
-      // 2. ถ้าเป็นเจ้าหน้าที่ / ผู้อนุมัติ L2 / ผู้อนุมัติ L1: ให้รวมคำขอที่ส่งมาถึงตนเองตามสายงาน หรือคำขอที่ตนเองเคยลงนามแล้ว
-      items = items.filter((r) => {
-        if (r.requesterId === user.id || r.createdByStaffId === user.id) return true;
-
-        if (user.role === 'STAFF') {
-          // คำขอที่ส่งมาถึงเจ้าหน้าที่ หรือเจ้าหน้าที่เคยลงนามแล้ว
-          const signed = r.type !== 'repair' && r.signatures.some((s) => s.signerId === user.id || s.level === 'staff');
-          const isQueue = ['pending_staff', 'repair_submitted', 'repair_in_progress'].includes(r.status);
-          const isRepairAssigned = r.type === 'repair' && (r.staffSignature || r.staffSignerName);
-          return signed || isQueue || isRepairAssigned;
-        }
-
-        if (user.role === 'APPROVER_L2') {
-          // คำขอที่ส่งมาถึงปลัด อบต. (pending_l2) หรือปลัดเคยลงนามแล้ว
-          const signed = r.type !== 'repair' && r.signatures.some((s) => s.signerId === user.id || s.level === 'l2');
-          const isQueue = r.status === 'pending_l2';
-          return signed || isQueue;
-        }
-
-        if (user.role === 'APPROVER_L1') {
-          // คำขอที่ส่งมาถึงนายก อบต. (pending_l1) หรือนายกเคยลงนามแล้ว
-          const signed = r.type !== 'repair' && r.signatures.some((s) => s.signerId === user.id || s.level === 'l1');
-          const isQueue = r.status === 'pending_l1';
-          return signed || isQueue;
-        }
-
-        return false;
-      });
+      // ของใครของมัน: แสดงเฉพาะคำขอของผู้ใช้งานที่เข้าสู่ระบบเท่านั้น (บัญชีใครบัญชีมัน)
+      items = items.filter((r) => r.requesterId === user.id);
     } else if (user.role === 'USER') {
       items = items.filter((r) => r.requesterId === user.id);
     }

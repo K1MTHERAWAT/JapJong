@@ -4,430 +4,584 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
+  ArrowRight,
   Building2,
   ClipboardCheck,
-  FileCheck2,
+  FileText,
+  History,
   Package,
+  PackageCheck,
+  Plus,
   QrCode,
-  Shield,
+  Search,
   Wrench,
+  X,
 } from 'lucide-react';
-import { RequestWithTimeline, hasPermission } from '@japjong/shared';
+import { Equipment, RequestWithTimeline, Venue, hasPermission } from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
-import {
-  FilterToolbar,
-  PageHeader,
-  Pagination,
-  RequestTypeChip,
-  SearchInput,
-  SortableHeader,
-  StatusChip,
-  Tabs,
-} from '@/components/ui';
+import { RequestTypeChip, StatusChip } from '@/components/ui';
 import { api, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
 
-type QueueFilter = 'all' | 'review' | 'repair';
-const PAGE_SIZE = 10;
+type QueueTab = 'all' | 'review' | 'repair' | 'inspect';
 
 export default function StaffHomePage() {
   const router = useRouter();
   const { account } = useAuth();
+
   const [queue, setQueue] = useState<RequestWithTimeline[]>([]);
-  const [returnInspectCount, setReturnInspectCount] = useState(0);
+  const [inspectQueue, setInspectQueue] = useState<RequestWithTimeline[]>([]);
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [queueFilter, setQueueFilter] = useState<QueueFilter>('all');
-  const [search, setSearch] = useState('');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [page, setPage] = useState(1);
+
+  const [activeTab, setActiveTab] = useState<QueueTab>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     setLoading(true);
     Promise.all([
       api.listRequests({ queue: 'staff' }).catch(() => [] as RequestWithTimeline[]),
       api.listRequests({ type: 'borrow', queue: 'handover' }).catch(() => [] as RequestWithTimeline[]),
+      api.venues().catch(() => [] as Venue[]),
+      api.equipment().catch(() => [] as Equipment[]),
     ])
-      .then(([staffQueue, inspectList]) => {
-        setQueue(staffQueue);
-        setReturnInspectCount(inspectList.filter((r) => r.status === 'return_inspect').length);
+      .then(([staffList, handoverList, venueList, eqList]) => {
+        setQueue(staffList);
+        setInspectQueue(handoverList.filter((r) => r.status === 'return_inspect'));
+        setVenues(venueList);
+        setEquipment(eqList);
       })
       .finally(() => setLoading(false));
   }, [account?.id]);
 
-  const repairCount = queue.filter((r) => r.type === 'repair').length;
-  const reviewCount = queue.filter((r) => r.type !== 'repair').length;
+  const reviewItems = useMemo(() => queue.filter((r) => r.type !== 'repair'), [queue]);
+  const repairItems = useMemo(() => queue.filter((r) => r.type === 'repair'), [queue]);
 
-  const filteredQueue = useMemo(() => {
-    const list = queue.filter((r) => {
-      if (queueFilter === 'review' && r.type === 'repair') return false;
-      if (queueFilter === 'repair' && r.type !== 'repair') return false;
-      if (search.trim()) {
-        const q = search.toLowerCase();
+  // Combine queue items avoiding duplicates
+  const combinedQueue = useMemo(() => {
+    const map = new Map<string, RequestWithTimeline>();
+    for (const item of queue) map.set(item.id, item);
+    for (const item of inspectQueue) {
+      if (!map.has(item.id)) map.set(item.id, item);
+    }
+    return Array.from(map.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  }, [queue, inspectQueue]);
+
+  const filteredItems = useMemo(() => {
+    return combinedQueue.filter((r) => {
+      if (activeTab === 'review' && (r.type === 'repair' || r.status === 'return_inspect')) {
+        return false;
+      }
+      if (activeTab === 'repair' && r.type !== 'repair') {
+        return false;
+      }
+      if (activeTab === 'inspect' && r.status !== 'return_inspect') {
+        return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
         return (
           r.code.toLowerCase().includes(q) ||
           r.title.toLowerCase().includes(q) ||
           r.requesterName.toLowerCase().includes(q) ||
-          r.organization.toLowerCase().includes(q)
+          (r.organization || '').toLowerCase().includes(q)
         );
       }
       return true;
     });
+  }, [combinedQueue, activeTab, searchQuery]);
 
-    return [...list].sort((a, b) => {
-      const tA = new Date(a.createdAt).getTime();
-      const tB = new Date(b.createdAt).getTime();
-      return sortDir === 'desc' ? tB - tA : tA - tB;
-    });
-  }, [queue, queueFilter, search, sortDir]);
+  const enabledVenuesCount = venues.filter((v) => v.enabled).length;
+  const enabledEquipmentCount = equipment.filter((e) => e.enabled).length;
 
-  useEffect(() => {
-    setPage(1);
-  }, [queueFilter, search]);
-
-  const pagedQueue = useMemo(
-    () => filteredQueue.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [filteredQueue, page],
-  );
+  const handleRowNavigate = (r: RequestWithTimeline) => {
+    if (r.type === 'repair') {
+      router.push(`/staff/repairs?id=${r.id}`);
+    } else if (r.status === 'return_inspect') {
+      router.push(`/borrow/my?tab=inspect&id=${r.id}`);
+    } else {
+      router.push(`/staff/review?id=${r.id}`);
+    }
+  };
 
   return (
-    <AppShell title="แดชบอร์ดเจ้าหน้าที่">
-      <div className="flex flex-col gap-5 w-full">
-        {/* 1. Enterprise Page Header & Quick Service Actions */}
-        <PageHeader
-          title="ศูนย์ปฏิบัติงานเจ้าหน้าที่ (Staff Operations)"
-          subtitle="บริหารจัดการคิวตรวจสอบคำขอใช้สถานที่ ยืม–คืนครุภัณฑ์ และงานแจ้งซ่อมบำรุง"
-          actions={
-            <div className="flex flex-wrap items-center gap-2">
-              <Link
-                href="/booking"
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand px-3.5 text-[13px] font-semibold text-white hover:bg-brand-ink transition"
-              >
-                <Building2 className="size-4" />
-                <span>ขอใช้สถานที่</span>
-              </Link>
-              <Link
-                href="/borrow"
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-brand bg-brand-tint px-3.5 text-[13px] font-semibold text-brand-ink hover:bg-brand hover:text-white transition"
-              >
-                <Package className="size-4" />
-                <span>ยืม–คืนอุปกรณ์</span>
-              </Link>
-              <Link
-                href="/staff/verify"
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line-input bg-surface px-3.5 text-[13px] font-semibold text-ink hover:bg-hover transition"
-              >
-                <QrCode className="size-4 text-brand" />
-                <span>สแกน QR ตรวจใบอนุญาต</span>
-              </Link>
+    <AppShell title="หน้าหลักเจ้าหน้าที่" maxWidth="max-w-none">
+      <div className="flex flex-col gap-6">
+        {/* 1. Top Header Banner */}
+        <div className="jw-card p-5 sm:p-6 bg-gradient-to-r from-surface via-surface to-brand-tint/40 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="min-w-0">
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-brand-tint text-brand text-[12px] font-semibold mb-2">
+              <span className="size-2 rounded-full bg-brand animate-pulse" />
+              <span>ศูนย์ปฏิบัติการเจ้าหน้าที่ · {account?.department || 'สำนักปลัด'}</span>
             </div>
-          }
-        />
-
-        {/* 2. 4-KPI Operations Summary Row */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <Link
-            href="/staff/review"
-            className="rounded-xl border border-line bg-surface p-3.5 flex items-start justify-between gap-3 hover:border-brand/50 transition shadow-xs"
-          >
-            <div>
-              <span className="text-[12px] text-ink-mute block">รอตรวจคำขอ (สถานที่/อุปกรณ์)</span>
-              <b className="text-[26px] font-bold text-status-crit leading-tight block mt-0.5">
-                {reviewCount}
-              </b>
-              <span className="text-[11px] text-ink-mute">รอลงนามระดับที่ 1 (เจ้าหน้าที่)</span>
-            </div>
-            <div className="size-9 rounded-lg bg-danger-bg text-danger-fg flex items-center justify-center shrink-0">
-              <ClipboardCheck className="size-4" />
-            </div>
-          </Link>
-
-          <Link
-            href="/staff/repairs"
-            className="rounded-xl border border-line bg-surface p-3.5 flex items-start justify-between gap-3 hover:border-brand/50 transition shadow-xs"
-          >
-            <div>
-              <span className="text-[12px] text-ink-mute block">งานแจ้งซ่อมรอจัดการ</span>
-              <b className="text-[26px] font-bold text-warn-fg leading-tight block mt-0.5">
-                {repairCount}
-              </b>
-              <span className="text-[11px] text-ink-mute">รอรับเรื่อง / บันทึกผลซ่อม</span>
-            </div>
-            <div className="size-9 rounded-lg bg-warn-bg text-warn-fg flex items-center justify-center shrink-0">
-              <Wrench className="size-4" />
-            </div>
-          </Link>
-
-          <Link
-            href="/borrow/my"
-            className="rounded-xl border border-line bg-surface p-3.5 flex items-start justify-between gap-3 hover:border-brand/50 transition shadow-xs"
-          >
-            <div>
-              <span className="text-[12px] text-ink-mute block">รอตรวจสภาพรับคืนอุปกรณ์</span>
-              <b className="text-[26px] font-bold text-brand leading-tight block mt-0.5">
-                {returnInspectCount}
-              </b>
-              <span className="text-[11px] text-ink-mute">ถ่ายรูปหลังส่งคืน & ปิดงาน</span>
-            </div>
-            <div className="size-9 rounded-lg bg-brand-tint text-brand-ink flex items-center justify-center shrink-0">
-              <FileCheck2 className="size-4" />
-            </div>
-          </Link>
-
-          <Link
-            href="/admin/resources"
-            className="rounded-xl border border-line bg-surface p-3.5 flex items-start justify-between gap-3 hover:border-brand/50 transition shadow-xs"
-          >
-            <div>
-              <span className="text-[12px] text-ink-mute block">จัดการทรัพยากรและแบบฟอร์ม</span>
-              <b className="text-[17px] font-bold text-ink leading-tight block mt-1.5">
-                สถานที่ / ครุภัณฑ์
-              </b>
-              <span className="text-[11px] text-ink-mute">เปิด–ปิดบริการและสต็อก</span>
-            </div>
-            <div className="size-9 rounded-lg bg-surface-muted text-ink-soft flex items-center justify-center shrink-0">
-              <Shield className="size-4" />
-            </div>
-          </Link>
-        </div>
-
-        {/* 3. Quick Module Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Link
-            href="/staff/review"
-            className={`rounded-xl border border-brand/40 bg-surface p-4 flex items-center gap-3.5 hover:bg-brand-tint/20 transition shadow-xs ${
-              !hasPermission(account, 'review') ? 'opacity-50' : ''
-            }`}
-          >
-            <div className="w-11 h-11 rounded-xl bg-brand text-white flex items-center justify-center shrink-0">
-              <ClipboardCheck className="w-5 h-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <b className="text-[14.5px] text-ink block">ตรวจคำขอสถานที่และอุปกรณ์</b>
-              <span className="text-[12px] text-ink-mute">
-                ตรวจสอบเอกสารและลงนามส่งต่อปลัด ({reviewCount} รายการ)
-              </span>
-            </div>
-          </Link>
-
-          <Link
-            href="/staff/repairs"
-            className={`rounded-xl border border-line bg-surface p-4 flex items-center gap-3.5 hover:border-brand/40 transition shadow-xs ${
-              !hasPermission(account, 'review') ? 'opacity-50' : ''
-            }`}
-          >
-            <div className="w-11 h-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0">
-              <Wrench className="w-5 h-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <b className="text-[14.5px] text-ink block">จัดการงานแจ้งซ่อม</b>
-              <span className="text-[12px] text-ink-mute">
-                รับเรื่องซ่อมและแนบรูปหลังซ่อม ({repairCount} รายการ)
-              </span>
-            </div>
-          </Link>
-
-          <Link
-            href="/admin/resources"
-            className={`rounded-xl border border-line bg-surface p-4 flex items-center gap-3.5 hover:border-brand/40 transition shadow-xs ${
-              !hasPermission(account, 'manageResources') ? 'opacity-50' : ''
-            }`}
-          >
-            <div className="w-11 h-11 rounded-xl bg-brand-tint text-brand-ink flex items-center justify-center shrink-0">
-              <Building2 className="w-5 h-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <b className="text-[14.5px] text-ink block">จัดการทรัพยากรและแบบฟอร์ม</b>
-              <span className="text-[12px] text-ink-mute">
-                ตั้งค่าห้องประชุม ครุภัณฑ์ และแบบฟอร์มคำขอ
-              </span>
-            </div>
-          </Link>
-        </div>
-
-        {/* 4. Unified Staff Work Queue Data Table */}
-        <section className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[16px] font-bold text-ink">
-              คิวงานรอดำเนินการทั้งหมด ({filteredQueue.length})
-            </h2>
-            <Link
-              href="/history"
-              className="text-[12.5px] font-semibold text-brand hover:underline"
-            >
-              ดูประวัติคำขอทั้งหมด →
-            </Link>
+            <h1 className="text-[20px] sm:text-[24px] font-bold text-ink tracking-tight">
+              สวัสดี, {account?.name || 'เจ้าหน้าที่ธุรการ'}
+            </h1>
+            <p className="text-[13.5px] text-ink-mute mt-0.5">
+              ตรวจสอบคำขอใช้สถานที่และครุภัณฑ์ ติดตามงานซ่อมบำรุง และบริหารจัดการทรัพยากรส่วนกลาง
+            </p>
           </div>
 
-          <FilterToolbar
-            left={
-              <Tabs<QueueFilter>
-                value={queueFilter}
-                onChange={setQueueFilter}
-                className="w-full sm:w-auto"
-                options={[
-                  { value: 'all', label: `ทั้งหมด (${queue.length})` },
-                  { value: 'review', label: `สถานที่/อุปกรณ์ (${reviewCount})` },
-                  { value: 'repair', label: `งานแจ้งซ่อม (${repairCount})` },
-                ]}
-              />
-            }
-            right={
-              <SearchInput
-                value={search}
-                onChange={setSearch}
-                placeholder="ค้นหาเลขที่คำขอ, ผู้ยื่น, หน่วยงาน..."
-                className="w-full sm:w-72"
-              />
-            }
-          />
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <Link
+              href="/staff/verify"
+              className="px-3.5 py-2.5 rounded-xl border border-line bg-surface text-ink text-[13px] font-semibold hover:border-brand hover:text-brand transition inline-flex items-center gap-2"
+            >
+              <QrCode className="size-4 text-brand" />
+              <span>สแกนตรวจ QR</span>
+            </Link>
+            <Link
+              href="/staff/resources"
+              className="px-3.5 py-2.5 rounded-xl border border-line bg-surface text-ink text-[13px] font-semibold hover:border-brand hover:text-brand transition inline-flex items-center gap-2"
+            >
+              <Building2 className="size-4 text-brand" />
+              <span>จัดการสถานที่/อุปกรณ์</span>
+            </Link>
+            <Link
+              href="/staff/resources/new"
+              className="jw-btn !h-10 !px-4 !text-[13px] !rounded-xl shadow-xs inline-flex items-center gap-1.5"
+            >
+              <Plus className="size-4" />
+              <span>เพิ่มทรัพยากรใหม่</span>
+            </Link>
+          </div>
+        </div>
 
-          <div className="rounded-2xl border border-line bg-surface overflow-hidden shadow-xs">
-            {loading ? (
-              <div className="p-10 text-center text-[13.5px] text-ink-mute">
-                กำลังโหลดคิวงานเจ้าหน้าที่...
+        {/* 2. 4 Primary KPI & Task Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {/* Card 1: ตรวจคำขอ */}
+          <Link
+            href="/staff/review"
+            className={`jw-card p-5 flex flex-col justify-between gap-4 border-l-4 border-l-brand hover:border-brand hover:shadow-md transition group ${
+              !hasPermission(account, 'review') ? 'opacity-60' : ''
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="text-[12.5px] font-semibold text-ink-mute block">
+                  รอตรวจคำขอ (สถานที่/อุปกรณ์)
+                </span>
+                <b className="text-[32px] font-bold text-ink leading-tight mt-1 block tabular-nums">
+                  {reviewItems.length}
+                </b>
               </div>
-            ) : filteredQueue.length === 0 ? (
-              <div className="p-10 text-center text-[13.5px] text-ink-mute">
-                ไม่มีรายการคำขอรอดำเนินการในหมวดนี้
+              <div className="size-11 rounded-2xl bg-brand-tint text-brand flex items-center justify-center shrink-0 group-hover:bg-brand group-hover:text-white transition">
+                <ClipboardCheck className="size-5" />
               </div>
-            ) : (
-              <>
-                {/* Desktop Data Table */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-[13px]">
-                    <thead>
-                      <tr className="border-b border-line bg-surface-muted/70 text-ink-soft font-semibold text-[12px]">
-                        <th className="py-2.5 px-4 whitespace-nowrap">เลขที่คำขอ</th>
-                        <th className="py-2.5 px-3 whitespace-nowrap">ประเภทบริการ</th>
-                        <th className="py-2.5 px-3">รายการ / หัวข้อคำขอ</th>
-                        <th className="py-2.5 px-3">ผู้ยื่นคำขอ / หน่วยงาน</th>
-                        <th className="py-2.5 px-3 whitespace-nowrap">กำหนดการ / สถานที่</th>
-                        <th className="py-2.5 px-3 whitespace-nowrap">
-                          <SortableHeader
-                            label="วันที่ยื่น"
-                            active
-                            direction={sortDir}
-                            onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
-                          />
-                        </th>
-                        <th className="py-2.5 px-3 whitespace-nowrap">สถานะ</th>
-                        <th className="py-2.5 px-4 text-right whitespace-nowrap">การดำเนินการ</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-line-soft">
-                      {pagedQueue.map((r) => {
-                        const scheduleText =
-                          r.type === 'booking'
-                            ? formatPeriodRange(r.periods[0])
-                            : r.type === 'borrow'
-                            ? `${formatThaiDate(r.pickupDate, false)}–${formatThaiDate(
-                                r.returnDate,
-                                true,
-                              )}`
-                            : r.subtitle;
+            </div>
+            <div className="flex items-center justify-between pt-3 border-t border-line text-[12.5px]">
+              <span className={reviewItems.length > 0 ? 'text-status-crit font-semibold' : 'text-ink-mute'}>
+                {reviewItems.length > 0 ? `รอดำเนินการ ${reviewItems.length} รายการ` : 'ไม่มีงานค้าง'}
+              </span>
+              <span className="font-semibold text-brand inline-flex items-center gap-1 group-hover:translate-x-0.5 transition">
+                ไปหน้าตรวจคำขอ <ArrowRight className="size-3.5" />
+              </span>
+            </div>
+          </Link>
 
-                        const actionHref =
-                          r.type === 'repair'
-                            ? `/staff/repairs?id=${r.id}`
-                            : `/staff/review?id=${r.id}`;
+          {/* Card 2: จัดการงานซ่อม */}
+          <Link
+            href="/staff/repairs"
+            className={`jw-card p-5 flex flex-col justify-between gap-4 border-l-4 border-l-amber-500 hover:border-amber-500 hover:shadow-md transition group ${
+              !hasPermission(account, 'review') ? 'opacity-60' : ''
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="text-[12.5px] font-semibold text-ink-mute block">
+                  งานแจ้งซ่อมรอจัดการ
+                </span>
+                <b className="text-[32px] font-bold text-ink leading-tight mt-1 block tabular-nums">
+                  {repairItems.length}
+                </b>
+              </div>
+              <div className="size-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:bg-amber-500 group-hover:text-white transition">
+                <Wrench className="size-5" />
+              </div>
+            </div>
+            <div className="flex items-center justify-between pt-3 border-t border-line text-[12.5px]">
+              <span className={repairItems.length > 0 ? 'text-amber-700 font-semibold' : 'text-ink-mute'}>
+                {repairItems.length > 0 ? `รอรับงาน/ซ่อม ${repairItems.length} รายการ` : 'ไม่มีรายการแจ้งซ่อมค้าง'}
+              </span>
+              <span className="font-semibold text-amber-700 inline-flex items-center gap-1 group-hover:translate-x-0.5 transition">
+                จัดการงานซ่อม <ArrowRight className="size-3.5" />
+              </span>
+            </div>
+          </Link>
 
-                        return (
-                          <tr
-                            key={r.id}
-                            onClick={() => router.push(actionHref)}
-                            className="hover:bg-hover/70 cursor-pointer transition-colors"
-                          >
-                            <td className="py-3 px-4 font-mono font-semibold text-ink whitespace-nowrap">
-                              {r.code}
-                            </td>
-                            <td className="py-3 px-3 whitespace-nowrap">
-                              <RequestTypeChip type={r.type} />
-                            </td>
-                            <td className="py-3 px-3 max-w-[240px]">
-                              <div className="font-semibold text-ink truncate">{r.title}</div>
-                              {r.subtitle && r.type !== 'repair' && (
-                                <div className="text-[11.5px] text-ink-mute truncate">
-                                  {r.subtitle}
-                                </div>
-                              )}
-                            </td>
-                            <td className="py-3 px-3 max-w-[180px]">
-                              <div className="font-medium text-ink truncate">{r.requesterName}</div>
-                              <div className="text-[11.5px] text-ink-mute truncate">
-                                {r.organization}
-                              </div>
-                            </td>
-                            <td className="py-3 px-3 text-ink-soft whitespace-nowrap max-w-[200px] truncate">
-                              {scheduleText}
-                            </td>
-                            <td className="py-3 px-3 text-[12px] text-ink-mute whitespace-nowrap">
-                              {formatThaiDateTime(r.createdAt)}
-                            </td>
-                            <td className="py-3 px-3 whitespace-nowrap">
-                              <StatusChip status={r.status} />
-                            </td>
-                            <td
-                              className="py-3 px-4 text-right whitespace-nowrap"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <Link
-                                href={actionHref}
-                                className="inline-flex items-center gap-1 rounded-md bg-brand px-2.5 py-1 text-[12px] font-semibold text-white hover:bg-brand-ink transition"
-                              >
-                                <span>
-                                  {r.type === 'repair' ? 'จัดการงานซ่อม' : 'ตรวจสอบ/ลงนาม'}
-                                </span>
-                              </Link>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+          {/* Card 3: รอตรวจรับคืนอุปกรณ์ */}
+          <Link
+            href="/borrow/my?tab=inspect"
+            className="jw-card p-5 flex flex-col justify-between gap-4 border-l-4 border-l-blue-600 hover:border-blue-600 hover:shadow-md transition group"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="text-[12.5px] font-semibold text-ink-mute block">
+                  รอตรวจสภาพรับคืนอุปกรณ์
+                </span>
+                <b className="text-[32px] font-bold text-ink leading-tight mt-1 block tabular-nums">
+                  {inspectQueue.length}
+                </b>
+              </div>
+              <div className="size-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-600 group-hover:text-white transition">
+                <PackageCheck className="size-5" />
+              </div>
+            </div>
+            <div className="flex items-center justify-between pt-3 border-t border-line text-[12.5px]">
+              <span className={inspectQueue.length > 0 ? 'text-blue-700 font-semibold' : 'text-ink-mute'}>
+                {inspectQueue.length > 0 ? `รอตรวจรับคืน ${inspectQueue.length} รายการ` : 'ตรวจรับคืนครบแล้ว'}
+              </span>
+              <span className="font-semibold text-blue-700 inline-flex items-center gap-1 group-hover:translate-x-0.5 transition">
+                ตรวจรับคืน <ArrowRight className="size-3.5" />
+              </span>
+            </div>
+          </Link>
+
+          {/* Card 4: จัดการทรัพยากร */}
+          <Link
+            href="/staff/resources"
+            className={`jw-card p-5 flex flex-col justify-between gap-4 border-l-4 border-l-emerald-600 hover:border-brand hover:shadow-md transition group ${
+              !hasPermission(account, 'manageResources') ? 'opacity-60' : ''
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="text-[12.5px] font-semibold text-ink-mute block">
+                  สถานที่ & อุปกรณ์ในระบบ
+                </span>
+                <b className="text-[32px] font-bold text-ink leading-tight mt-1 block tabular-nums">
+                  {venues.length + equipment.length}
+                </b>
+              </div>
+              <div className="size-11 rounded-2xl bg-brand-tint text-brand flex items-center justify-center shrink-0 group-hover:bg-brand group-hover:text-white transition">
+                <Building2 className="size-5" />
+              </div>
+            </div>
+            <div className="flex items-center justify-between pt-3 border-t border-line text-[12.5px]">
+              <span className="text-ink-mute">
+                สถานที่ {enabledVenuesCount} แห่ง · อุปกรณ์ {enabledEquipmentCount} รายการ
+              </span>
+              <span className="font-semibold text-brand inline-flex items-center gap-1 group-hover:translate-x-0.5 transition">
+                ตั้งค่าทรัพยากร <ArrowRight className="size-3.5" />
+              </span>
+            </div>
+          </Link>
+        </div>
+
+        {/* 3. Main 2-Column Layout: Left = Work Queue Table (8 cols), Right = Quick Services & Resource Summary (4 cols) */}
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+          {/* Left Column: Work Queue */}
+          <div className="xl:col-span-8 flex flex-col gap-4 min-w-0">
+            <div className="jw-card overflow-hidden">
+              {/* Queue Header & Filter Bar */}
+              <div className="p-4 sm:p-5 border-b border-line flex flex-col gap-3.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-[17px] font-bold text-ink">
+                      คิวงานรอดำเนินการ (Work Queue)
+                    </h2>
+                    <p className="text-[12.5px] text-ink-mute">
+                      คลิกที่รายการเพื่อตรวจสอบเอกสาร ลงนามความเห็นชอบ หรือรับงานแจ้งซ่อม
+                    </p>
+                  </div>
+                  <Link
+                    href="/history"
+                    className="text-[12.5px] font-semibold text-brand hover:underline inline-flex items-center gap-1"
+                  >
+                    <span>ดูประวัติคำขอทั้งหมด</span>
+                    <ArrowRight className="size-3.5" />
+                  </Link>
                 </div>
 
-                {/* Mobile Compact List (< md) */}
-                <div className="md:hidden divide-y divide-line-soft">
-                  {pagedQueue.map((r) => {
-                    const actionHref =
-                      r.type === 'repair'
-                        ? `/staff/repairs?id=${r.id}`
-                        : `/staff/review?id=${r.id}`;
-                    return (
-                      <div
-                        key={r.id}
-                        onClick={() => router.push(actionHref)}
-                        className="p-3.5 hover:bg-hover transition-colors flex flex-col gap-1.5 cursor-pointer"
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  {/* Filter Pills */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {(
+                      [
+                        { id: 'all', label: `ทั้งหมด (${combinedQueue.length})` },
+                        { id: 'review', label: `สถานที่/อุปกรณ์ (${reviewItems.length})` },
+                        { id: 'repair', label: `แจ้งซ่อม (${repairItems.length})` },
+                        { id: 'inspect', label: `รอตรวจรับคืน (${inspectQueue.length})` },
+                      ] as const
+                    ).map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setActiveTab(t.id)}
+                        className={`px-3 py-1.5 rounded-lg text-[12.5px] font-semibold transition border ${
+                          activeTab === t.id
+                            ? 'bg-ink text-white border-ink'
+                            : 'bg-surface text-ink-mute border-line hover:text-ink hover:bg-surface-muted'
+                        }`}
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <RequestTypeChip type={r.type} />
-                            <b className="font-mono text-[13px] text-ink">{r.code}</b>
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Search Input */}
+                  <div className="relative w-full sm:w-64">
+                    <Search className="size-4 text-ink-mute absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="ค้นหาเลขที่คำขอ, ชื่อผู้ยื่น..."
+                      className="h-9 w-full rounded-lg border border-line bg-surface pl-9 pr-8 text-[13px] text-ink placeholder:text-ink-mute focus:outline-none focus:border-brand"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-mute hover:text-ink"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Queue Table / List */}
+              {loading ? (
+                <div className="p-10 text-center text-[13.5px] text-ink-mute">
+                  กำลังโหลดรายการคิวงาน...
+                </div>
+              ) : filteredItems.length === 0 ? (
+                <div className="p-10 text-center flex flex-col items-center gap-2">
+                  <div className="size-11 rounded-full bg-brand-tint text-brand flex items-center justify-center">
+                    <ClipboardCheck className="size-5" />
+                  </div>
+                  <b className="text-[14.5px] text-ink">ไม่มีรายการคิวงานที่รอดำเนินการในหมวดนี้</b>
+                  <span className="text-[12.5px] text-ink-mute">
+                    คำขอใหม่ที่ยื่นเข้ามาจะแสดงในตารางนี้โดยอัตโนมัติ
+                  </span>
+                </div>
+              ) : (
+                <>
+                  {/* Desktop Table */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-surface-muted/70 border-b border-line text-[12px] font-semibold text-ink-mute">
+                          <th className="py-3 px-4">เลขที่คำขอ</th>
+                          <th className="py-3 px-4">ประเภท</th>
+                          <th className="py-3 px-4">รายการ / เรื่อง</th>
+                          <th className="py-3 px-4">ผู้ยื่นคำขอ</th>
+                          <th className="py-3 px-4">กำหนดการใช้ / วันที่</th>
+                          <th className="py-3 px-4">สถานะ</th>
+                          <th className="py-3 px-4 text-right">การดำเนินการ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-line text-[13.5px]">
+                        {filteredItems.map((r) => {
+                          const scheduleText =
+                            r.type === 'booking'
+                              ? formatPeriodRange(r.periods?.[0])
+                              : r.type === 'borrow'
+                                ? `${formatThaiDate(r.pickupDate, false)} – ${formatThaiDate(r.returnDate, true)}`
+                                : formatThaiDateTime(r.createdAt);
+
+                          return (
+                            <tr
+                              key={r.id}
+                              onClick={() => handleRowNavigate(r)}
+                              className="hover:bg-brand-tint/20 cursor-pointer transition"
+                            >
+                              <td className="py-3.5 px-4 font-bold text-brand whitespace-nowrap">
+                                {r.code}
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <RequestTypeChip type={r.type} />
+                              </td>
+                              <td className="py-3.5 px-4 max-w-[240px]">
+                                <b className="text-ink font-semibold block truncate">{r.title}</b>
+                                {r.subtitle && (
+                                  <span className="text-[12px] text-ink-mute block truncate">
+                                    {r.subtitle}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <span className="font-medium text-ink block">{r.requesterName}</span>
+                                <span className="text-[11.5px] text-ink-mute block">
+                                  {r.organization || 'ประชาชน/หน่วยงาน'}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 text-[12.5px] text-ink-mute whitespace-nowrap">
+                                {scheduleText}
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <StatusChip status={r.status} />
+                              </td>
+                              <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRowNavigate(r);
+                                  }}
+                                  className="px-3 py-1.5 rounded-lg bg-brand text-white text-[12px] font-semibold hover:bg-brand-ink transition inline-flex items-center gap-1"
+                                >
+                                  <span>
+                                    {r.type === 'repair'
+                                      ? 'จัดการงานซ่อม'
+                                      : r.status === 'return_inspect'
+                                        ? 'ตรวจรับคืน'
+                                        : 'ตรวจคำขอ'}
+                                  </span>
+                                  <ArrowRight className="size-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile Card List */}
+                  <div className="md:hidden divide-y divide-line">
+                    {filteredItems.map((r) => {
+                      const sub =
+                        r.type === 'booking'
+                          ? `${r.title} · ${formatPeriodRange(r.periods?.[0])} · ${r.requesterName}`
+                          : r.type === 'borrow'
+                            ? `${r.title} · ${formatThaiDate(r.pickupDate, false)}–${formatThaiDate(r.returnDate, true)}`
+                            : `${r.title} · ${r.requesterName}`;
+                      return (
+                        <div
+                          key={r.id}
+                          onClick={() => handleRowNavigate(r)}
+                          className="p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-brand-tint/20 transition"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <b className="text-[14.5px] text-brand">{r.code}</b>
+                              <RequestTypeChip type={r.type} />
+                            </div>
+                            <span className="text-[13px] text-ink font-medium truncate block">
+                              {sub}
+                            </span>
                           </div>
                           <StatusChip status={r.status} />
                         </div>
-                        <div className="text-[14px] font-semibold text-ink truncate">{r.title}</div>
-                        <div className="text-[12px] text-ink-mute flex items-center justify-between">
-                          <span className="truncate">
-                            {r.requesterName} ({r.organization})
-                          </span>
-                          <span className="text-brand font-semibold shrink-0">ดำเนินการ →</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <Pagination
-                  page={page}
-                  pageSize={PAGE_SIZE}
-                  totalItems={filteredQueue.length}
-                  onPageChange={setPage}
-                />
-              </>
-            )}
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-        </section>
+
+          {/* Right Column: Quick Services & Resource Status */}
+          <div className="xl:col-span-4 flex flex-col gap-4">
+            {/* Quick Operations Card */}
+            <div className="jw-card p-5 flex flex-col gap-3.5">
+              <div>
+                <h2 className="text-[16px] font-bold text-ink">เมนูปฏิบัติงานและบริการด่วน</h2>
+                <p className="text-[12px] text-ink-mute">
+                  ทางลัดสำหรับทำรายการแทนผู้มาติดต่อและจัดการข้อมูลระบบ
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2.5">
+                <Link
+                  href="/staff/resources"
+                  className="p-3 rounded-xl border border-line hover:border-emerald-500 hover:bg-emerald-50/50 transition flex items-center gap-3 group"
+                >
+                  <div className="size-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition">
+                    <Building2 className="size-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <b className="text-[13.5px] text-ink block truncate group-hover:text-emerald-800 transition">
+                      จัดการสถานที่และอุปกรณ์
+                    </b>
+                    <span className="text-[11.5px] text-ink-mute block truncate">
+                      เพิ่ม/แก้ไข/เปิด-ปิดทรัพยากรและแบบฟอร์ม
+                    </span>
+                  </div>
+                  <ArrowRight className="size-4 text-ink-mute group-hover:text-emerald-700 shrink-0 transition" />
+                </Link>
+
+                <Link
+                  href="/staff/resources?tab=forms"
+                  className="p-3 rounded-xl border border-line hover:border-indigo-500 hover:bg-indigo-50/50 transition flex items-center gap-3 group"
+                >
+                  <div className="size-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition">
+                    <FileText className="size-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <b className="text-[13.5px] text-ink block truncate group-hover:text-indigo-800 transition">
+                      ตั้งค่าแม่แบบฟอร์มราชการ
+                    </b>
+                    <span className="text-[11.5px] text-ink-mute block truncate">
+                      ปรับแต่งหัวกระดาษและช่องลงนาม
+                    </span>
+                  </div>
+                  <ArrowRight className="size-4 text-ink-mute group-hover:text-indigo-700 shrink-0 transition" />
+                </Link>
+
+                <Link
+                  href="/booking"
+                  className="p-3 rounded-xl border border-line hover:border-teal-500 hover:bg-teal-50/50 transition flex items-center gap-3 group"
+                >
+                  <div className="size-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center shrink-0 group-hover:bg-teal-600 group-hover:text-white transition">
+                    <Building2 className="size-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <b className="text-[13.5px] text-ink block truncate group-hover:text-teal-800 transition">
+                      ยื่นคำขอใช้สถานที่
+                    </b>
+                    <span className="text-[11.5px] text-ink-mute block truncate">
+                      จองห้องประชุม ศาลา สนามกีฬา
+                    </span>
+                  </div>
+                  <ArrowRight className="size-4 text-ink-mute group-hover:text-teal-700 shrink-0 transition" />
+                </Link>
+
+                <Link
+                  href="/borrow"
+                  className="p-3 rounded-xl border border-line hover:border-amber-500 hover:bg-amber-50/50 transition flex items-center gap-3 group"
+                >
+                  <div className="size-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 group-hover:bg-amber-600 group-hover:text-white transition">
+                    <Package className="size-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <b className="text-[13.5px] text-ink block truncate group-hover:text-amber-800 transition">
+                      ยื่นคำขอยืม–คืนอุปกรณ์
+                    </b>
+                    <span className="text-[11.5px] text-ink-mute block truncate">
+                      เบิกยืมเครื่องเสียง เต็นท์ โต๊ะ เก้าอี้
+                    </span>
+                  </div>
+                  <ArrowRight className="size-4 text-ink-mute group-hover:text-amber-700 shrink-0 transition" />
+                </Link>
+
+                <Link
+                  href="/history"
+                  className="p-3 rounded-xl border border-line hover:border-blue-500 hover:bg-blue-50/50 transition flex items-center gap-3 group"
+                >
+                  <div className="size-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0 group-hover:bg-blue-600 group-hover:text-white transition">
+                    <History className="size-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <b className="text-[13.5px] text-ink block truncate group-hover:text-blue-800 transition">
+                      ประวัติคำขอทั้งหมดในระบบ
+                    </b>
+                    <span className="text-[11.5px] text-ink-mute block truncate">
+                      ค้นหาและดูเอกสารใบอนุญาตย้อนหลัง
+                    </span>
+                  </div>
+                  <ArrowRight className="size-4 text-ink-mute group-hover:text-blue-700 shrink-0 transition" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </AppShell>
   );

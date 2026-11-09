@@ -45,6 +45,8 @@ export default function BorrowWizardPage() {
   const [search, setSearch] = useState('');
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [cardView, setCardView] = useState<'grid' | 'list'>('grid');
+  const [inspectedEquipment, setInspectedEquipment] = useState<Equipment | null>(null);
 
   const setQty = (id: string, max: number, next: number) => {
     const clamped = Math.max(0, Math.min(max, next));
@@ -304,7 +306,11 @@ export default function BorrowWizardPage() {
       if (!e.enabled) return false;
       if (onlyAvailable && e.stock <= 0) return false;
       if (cat !== 'all' && e.category !== cat) return false;
-      if (search.trim() && !e.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        const catLabel = (EQUIPMENT_CATEGORY_LABEL[e.category] || '').toLowerCase();
+        if (!e.name.toLowerCase().includes(q) && !catLabel.includes(q)) return false;
+      }
       return true;
     });
   }, [equipment, cat, search, onlyAvailable]);
@@ -419,18 +425,91 @@ export default function BorrowWizardPage() {
       maxWidth="max-w-[1360px]"
       footer={
         step === 1 ? (
-          <div className="flex w-full sm:w-auto gap-2.5">
-            <Link href="/borrow/my" className="jw-btn-sec flex-1 sm:w-44">
-              รายการอุปกรณ์ของฉัน
-            </Link>
-            <button
-              type="button"
-              disabled={selectedItems.length === 0}
-              onClick={() => setStep(2)}
-              className="jw-btn flex-[1.5] sm:w-64"
-            >
-              ถัดไป · วันยืม-คืน ({selectedItems.length} รายการ)
-            </button>
+          <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-10 h-10 rounded-xl bg-brand text-white font-bold text-[15px] flex items-center justify-center shrink-0 shadow-xs">
+                {selectedItems.length}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[14px] font-bold text-ink">อุปกรณ์ที่เลือกไว้</span>
+                  <span className="text-[11.5px] px-2.5 py-0.5 rounded-full bg-brand-mint text-brand font-semibold">
+                    {totalSelectedUnits > 0 ? `รวมทั้งหมด ${totalSelectedUnits} ชุด` : 'ระบุจำนวนที่ต้องการยืม'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                  {selectedItems.length === 0 ? (
+                    <span className="text-[12.5px] text-ink-mute">
+                      ยังไม่ได้เลือกอุปกรณ์ (ระบุจำนวนที่ต้องการยืมจากการ์ดด้านบน)
+                    </span>
+                  ) : (
+                    selectedItems.map(({ eq, qty }) => (
+                      <span
+                        key={eq.id}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-semibold bg-brand-mint text-brand border border-brand/20"
+                      >
+                        <span className="truncate max-w-[140px] sm:max-w-[190px]">{eq.name}</span>
+                        <span className="text-[11px] font-bold text-brand bg-surface px-1.5 py-0.2 rounded-full border border-brand/20">
+                          {qty} ชุด
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setQty(eq.id, eq.stock, qty - 1)}
+                          className="w-4 h-4 rounded-full hover:bg-brand/15 flex items-center justify-center text-brand transition"
+                          title="ลดจำนวน"
+                        >
+                          <Icon name="minus" className="w-2.5 h-2.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={qty >= eq.stock}
+                          onClick={() => setQty(eq.id, eq.stock, qty + 1)}
+                          className="w-4 h-4 rounded-full hover:bg-brand/15 flex items-center justify-center text-brand disabled:opacity-30 transition"
+                          title="เพิ่มจำนวน"
+                        >
+                          <Icon name="plus" className="w-2.5 h-2.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setQty(eq.id, eq.stock, 0)}
+                          className="w-4 h-4 rounded-full hover:bg-brand/15 flex items-center justify-center text-brand hover:text-status-crit transition"
+                          title="นำออก"
+                        >
+                          <Icon name="x" className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {selectedItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setQuantities({})}
+                  className="h-10 px-3.5 rounded-xl border border-line bg-surface text-[12.5px] font-semibold text-ink-mute hover:text-status-crit hover:bg-soft transition"
+                >
+                  ล้างทั้งหมด
+                </button>
+              )}
+              <Link
+                href="/borrow/my"
+                className="h-10 px-3.5 rounded-xl border border-line bg-surface text-[12.5px] font-semibold text-ink hover:bg-soft transition inline-flex items-center justify-center"
+              >
+                รายการอุปกรณ์ของฉัน
+              </Link>
+              <button
+                type="button"
+                disabled={selectedItems.length === 0}
+                onClick={() => setStep(2)}
+                className="jw-btn h-10 px-5 rounded-xl text-[13.5px] w-full sm:w-auto"
+              >
+                <span>ถัดไป · วันยืม-คืน ({selectedItems.length} รายการ)</span>
+                <Icon name="chevron-right" className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         ) : step === 2 ? (
           <div className="flex w-full sm:w-auto gap-2.5">
@@ -504,194 +583,208 @@ export default function BorrowWizardPage() {
         )
       }
     >
-      <div className="w-full mb-5">
-        <Stepper steps={STEPS} current={step} onSelect={setStep} />
-      </div>
-
-      {/* ================= STEP 1: เลือกอุปกรณ์ (Copy UI/UX จากขั้นตอนเลือกสถานที่) ================= */}
+      {/* Header สไตล์การ์ดเดี่ยวตามแบบที่ผู้ใช้อนุมัติ (ตัด Stepper 1-4 ออก) */}
       {step === 1 && (
-        <div className="flex flex-col gap-3.5">
-          {/* แถวค้นหา */}
-          <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-ph">
-              <Icon name="search" className="w-5 h-5" />
-            </span>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="ค้นหาชื่ออุปกรณ์..."
-              className="jw-in rounded-full pl-11 h-[42px]"
-            />
-          </div>
-
-          {/* แถวตัวกรองอุปกรณ์ (แนวนอนขนานกัน ทั้งหมดอยู่เหนือรายการที่เลือก) */}
-          <div className="jw-card p-3 sm:p-3.5 flex flex-wrap items-center justify-between gap-3">
-            {/* ซ้าย: หมวดหมู่อุปกรณ์ (Pills แนวนอน) */}
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <span className="text-[13px] font-bold text-ink shrink-0 mr-1 flex items-center gap-1.5">
-                <Icon name="filter" className="w-3.5 h-3.5 text-brand" />
-                <span>หมวดหมู่อุปกรณ์:</span>
+        <div className="jw-card p-0 overflow-hidden mb-4 shadow-card border border-line">
+          <div className="p-3.5 sm:px-5 sm:py-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                1
               </span>
-              {(
-                [
-                  ['all', 'ทั้งหมด'],
-                  ['audio', 'เครื่องเสียง'],
-                  ['tent', 'เต็นท์ / โต๊ะ / เก้าอี้'],
-                  ['it', 'IT / โสตทัศนูปกรณ์'],
-                ] as const
-              ).map(([val, label]) => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => setCat(val)}
-                  className={`h-8 sm:h-9 px-3 sm:px-3.5 rounded-full border text-[12px] sm:text-[13px] font-semibold transition ${
-                    cat === val
-                      ? 'border-brand bg-brand text-white shadow-xs'
-                      : 'border-line bg-white text-ink-soft hover:bg-hover'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <b className="text-[15px] sm:text-[16px] text-ink block leading-tight">
+                    เลือกอุปกรณ์ที่ต้องการยืม
+                  </b>
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-mint text-brand border border-brand/20">
+                    ขั้นตอนที่ 1 จาก 4
+                  </span>
+                </div>
+                <p className="text-[12px] text-ink-mute mt-0.5">
+                  เลือกรายการอุปกรณ์และระบุจำนวนที่ต้องการยืม (สามารถเลือกได้หลายรายการในคำขอเดียวกัน)
+                </p>
+              </div>
             </div>
 
-            {/* ขวา: เฉพาะที่พร้อมใช้งาน */}
             <div className="flex items-center gap-2">
+              <span className="text-[12px] font-semibold px-3 py-1.5 rounded-full bg-brand-mint text-brand border border-brand/20">
+                {selectedItems.length > 0
+                  ? `เลือกแล้ว ${selectedItems.length} รายการ (${totalSelectedUnits} ชิ้น)`
+                  : 'ยังไม่ได้เลือกอุปกรณ์'}
+              </span>
+            </div>
+          </div>
+          <div className="w-full h-[3px] bg-line/30">
+            <div className="h-full bg-brand transition-all duration-300" style={{ width: '25%' }} />
+          </div>
+        </div>
+      )}
+
+      {/* ================= STEP 1: เลือกอุปกรณ์ (Layout B) ================= */}
+      {step === 1 && (
+        <div className="flex flex-col gap-4">
+          {/* แถบค้นหาและตัวกรองแบบรวมศูนย์ (Unified Search & Filter Control Bar - Single Row) */}
+          <div className="jw-card p-3.5 sm:p-4">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2.5">
+              <div className="relative flex-1 min-w-[220px]">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-ph pointer-events-none">
+                  <Icon name="search" className="w-4 h-4" />
+                </span>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="ค้นหาชื่ออุปกรณ์ หรือหมวดหมู่อุปกรณ์..."
+                  className="w-full h-10 pl-10 pr-8 rounded-xl bg-soft border border-line text-[13.5px] text-ink placeholder:text-ink-ph focus:outline-none focus:border-brand focus:bg-surface transition"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full hover:bg-hover flex items-center justify-center text-ink-mute hover:text-ink transition"
+                    title="ล้างคำค้นหา"
+                  >
+                    <Icon name="x" className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* ตัวกรองประเภทอุปกรณ์ (Dropdown List) */}
+                <div className="flex items-center gap-1.5 bg-soft border border-line rounded-xl px-3 h-10">
+                  <Icon name="filter" className="w-3.5 h-3.5 text-brand shrink-0" />
+                  <span className="text-[12.5px] font-bold text-ink shrink-0">ประเภท:</span>
+                  <select
+                    value={cat}
+                    onChange={(e) => setCat(e.target.value as 'all' | EquipmentCategory)}
+                    className="bg-transparent text-[12.5px] font-semibold text-ink focus:outline-none cursor-pointer pr-1"
+                  >
+                    {(
+                      [
+                        ['all', 'ทั้งหมด'],
+                        ['audio', 'เครื่องเสียง'],
+                        ['tent', 'เต็นท์ / โต๊ะ / เก้าอี้'],
+                        ['it', 'IT / โสตทัศนูปกรณ์'],
+                      ] as const
+                    ).map(([val, label]) => {
+                      const enabledList = equipment.filter((e) => e.enabled);
+                      const count =
+                        val === 'all'
+                          ? enabledList.length
+                          : enabledList.filter((e) => e.category === val).length;
+                      const labelWithCount = count > 1 ? `${label} (${count})` : label;
+                      return (
+                        <option key={val} value={val}>
+                          {labelWithCount}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setOnlyAvailable((v) => !v)}
+                  className={`h-10 px-3.5 rounded-xl border text-[12.5px] font-semibold transition flex items-center gap-2 ${
+                    onlyAvailable
+                      ? 'border-brand bg-brand-mint text-brand'
+                      : 'border-line bg-soft text-ink-soft hover:bg-hover'
+                  }`}
+                >
+                  <span
+                    className={`w-4 h-4 rounded-[4px] border flex items-center justify-center ${
+                      onlyAvailable ? 'bg-brand border-brand text-white' : 'border-line bg-surface'
+                    }`}
+                  >
+                    {onlyAvailable && <Icon name="check" className="w-2.5 h-2.5" strokeWidth={3} />}
+                  </span>
+                  <span>เฉพาะที่พร้อมใช้งาน</span>
+                </button>
+
+                <div className="flex items-center bg-soft border border-line rounded-xl p-1 h-10">
+                  <button
+                    type="button"
+                    onClick={() => setCardView('grid')}
+                    className={`px-2.5 h-full rounded-lg text-[12px] font-semibold flex items-center gap-1.5 transition ${
+                      cardView === 'grid'
+                        ? 'bg-brand text-white shadow-xs'
+                        : 'text-ink-mute hover:text-ink'
+                    }`}
+                    title="มุมมองการ์ด"
+                  >
+                    <Icon name="layout-grid" className="w-3.5 h-3.5" />
+                    <span>การ์ด</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCardView('list')}
+                    className={`px-2.5 h-full rounded-lg text-[12px] font-semibold flex items-center gap-1.5 transition ${
+                      cardView === 'list'
+                        ? 'bg-brand text-white shadow-xs'
+                        : 'text-ink-mute hover:text-ink'
+                    }`}
+                    title="มุมมองแถวแนวนอน"
+                  >
+                    <Icon name="align-left" className="w-3.5 h-3.5" />
+                    <span>แถว</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {equipmentError && (
+            <div role="alert" className="rounded-2xl border border-[#F1B8B8] bg-[#FFF1F1] p-4 text-[13px] text-[#8A2424]">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span>{equipmentError}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEquipmentLoading(true);
+                    setEquipmentError('');
+                    api
+                      .equipment()
+                      .then(setEquipment)
+                      .catch(() => setEquipmentError('โหลดรายการอุปกรณ์ไม่สำเร็จ ลองโหลดรายการอีกครั้ง'))
+                      .finally(() => setEquipmentLoading(false));
+                  }}
+                  className="font-semibold underline underline-offset-2"
+                >
+                  ลองอีกครั้ง
+                </button>
+              </div>
+            </div>
+          )}
+
+          {equipmentLoading ? (
+            <div role="status" className="jw-card p-8 text-center text-[13px] text-ink-mute">
+              กำลังโหลดรายการอุปกรณ์…
+            </div>
+          ) : null}
+
+          {!equipmentLoading && !equipmentError && filtered.length === 0 && (
+            <div className="jw-card p-10 text-center flex flex-col items-center gap-2">
+              <b className="block text-[15px] text-ink">ไม่พบอุปกรณ์ที่ตรงกับเงื่อนไขการค้นหา</b>
+              <span className="block text-[13px] text-ink-mute">
+                ลองเปลี่ยนคำค้นหา หรือล้างตัวกรองประเภทอุปกรณ์
+              </span>
               <button
                 type="button"
-                onClick={() => setOnlyAvailable((v) => !v)}
-                className={`h-8 sm:h-9 px-3 rounded-xl border text-[12.5px] font-semibold transition flex items-center gap-1.5 ${
-                  onlyAvailable
-                    ? 'border-brand bg-brand-mint text-brand'
-                    : 'border-line bg-white text-ink-soft hover:bg-hover'
-                }`}
+                onClick={() => {
+                  setCat('all');
+                  setOnlyAvailable(false);
+                  setSearch('');
+                }}
+                className="mt-2 h-9 px-4 rounded-xl bg-brand-mint text-brand text-[12.5px] font-semibold hover:bg-brand/15 transition"
               >
-                <i
-                  className={`w-3.5 h-3.5 rounded-[4px] border flex items-center justify-center ${
-                    onlyAvailable ? 'bg-brand border-brand text-white' : 'border-line bg-white'
-                  }`}
-                >
-                  {onlyAvailable && <Icon name="check" className="w-2.5 h-2.5" strokeWidth={3} />}
-                </i>
-                <span>เฉพาะที่พร้อมใช้งาน</span>
+                รีเซ็ตตัวกรองทั้งหมด
               </button>
             </div>
-          </div>
+          )}
 
-          {/* รายการที่เลือก (ใต้แถวตัวกรอง จัดวางในแถวเดียวกัน Wrap ได้) */}
-            <div className="jw-card p-3 sm:p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2 shrink-0">
-                <Icon name="check" className="w-4 h-4 text-brand" />
-                <span className="text-[13.5px] font-bold text-ink">รายการที่เลือก</span>
-                <span className="text-[12px] font-semibold text-brand bg-brand-mint px-2 py-0.5 rounded-full">
-                  {selectedItems.length} รายการ
-                </span>
-                {totalSelectedUnits > 0 && (
-                  <span className="text-[12px] text-ink-mute hidden sm:inline">
-                    (รวม {totalSelectedUnits} ชิ้น)
-                  </span>
-                )}
-              </div>
-
-              <div className="flex flex-1 flex-wrap items-center gap-1.5 min-w-0">
-                {selectedItems.length === 0 ? (
-                  <span className="text-[12.5px] text-ink-mute">ยังไม่ได้เลือกอุปกรณ์ (ระบุจำนวนที่ต้องการยืมด้านล่าง)</span>
-                ) : (
-                  selectedItems.map(({ eq, qty }) => (
-                    <span
-                      key={eq.id}
-                      className="inline-flex items-center gap-1.5 bg-brand-mint/50 border border-brand/20 text-ink text-[12.5px] font-medium pl-2.5 pr-1.5 py-1 rounded-full animate-fadeIn"
-                    >
-                      <span className="truncate max-w-[120px] sm:max-w-[160px]">{eq.name}</span>
-                      <span className="text-[11px] font-bold text-brand bg-white/80 px-1.5 py-0.5 rounded-full border border-brand/20">
-                        {qty} ชุด
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setQty(eq.id, eq.stock, qty - 1)}
-                        className="w-4 h-4 rounded-full hover:bg-brand/10 flex items-center justify-center text-ink-mute hover:text-ink transition"
-                        title="ลดจำนวน"
-                      >
-                        <Icon name="minus" className="w-2.5 h-2.5" />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={qty >= eq.stock}
-                        onClick={() => setQty(eq.id, eq.stock, qty + 1)}
-                        className="w-4 h-4 rounded-full hover:bg-brand/10 flex items-center justify-center text-ink-mute hover:text-ink disabled:opacity-30 transition"
-                        title="เพิ่มจำนวน"
-                      >
-                        <Icon name="plus" className="w-2.5 h-2.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setQty(eq.id, eq.stock, 0)}
-                        className="w-4 h-4 rounded-full hover:bg-red-100 flex items-center justify-center text-ink-mute hover:text-status-crit transition ml-0.5"
-                        title="นำออก"
-                      >
-                        <Icon name="x" className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))
-                )}
-              </div>
-
-              {selectedItems.length > 0 && (
-                <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
-                  <button
-                    type="button"
-                    onClick={() => setQuantities({})}
-                    className="text-[12px] font-semibold text-ink-mute hover:text-status-crit transition px-2 py-1 rounded-lg hover:bg-soft"
-                  >
-                    ล้างทั้งหมด
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between">
-              <b className="text-[16px] sm:text-[18px]">อุปกรณ์ทั้งหมด</b>
-              <span className="text-[13px] text-ink-mute">{filtered.length} รายการ</span>
-            </div>
-
-            {equipmentError && (
-              <div role="alert" className="rounded-2xl border border-[#F1B8B8] bg-[#FFF1F1] p-4 text-[13px] text-[#8A2424]">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span>{equipmentError}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEquipmentLoading(true);
-                      setEquipmentError('');
-                      api.equipment()
-                        .then(setEquipment)
-                        .catch(() => setEquipmentError('โหลดรายการอุปกรณ์ไม่สำเร็จ ลองโหลดรายการอีกครั้ง'))
-                        .finally(() => setEquipmentLoading(false));
-                    }}
-                    className="font-semibold underline underline-offset-2"
-                  >
-                    ลองอีกครั้ง
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {equipmentLoading ? (
-              <div role="status" className="jw-card p-8 text-center text-[13px] text-ink-mute">
-                กำลังโหลดรายการอุปกรณ์…
-              </div>
-            ) : null}
-
-            {!equipmentLoading && !equipmentError && filtered.length === 0 && (
-              <div className="jw-card p-8 text-center">
-                <b className="block text-[15px] text-ink">ไม่พบอุปกรณ์ที่ค้นหา</b>
-                <span className="mt-1 block text-[13px] text-ink-mute">ลองเปลี่ยนหมวดหมู่หรือคำค้นหา อุปกรณ์ที่พร้อมยืมจะแสดงที่นี่</span>
-              </div>
-            )}
-
-            {/* การ์ดอุปกรณ์ในแบบ Grid เสมือนของสถานที่ */}
-            <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-3.5">
+          {/* พื้นที่แสดงรายการอุปกรณ์ (Layout B Full-Width Grid / List) */}
+          {!equipmentLoading && filtered.length > 0 && cardView === 'list' ? (
+            <div className="grid grid-cols-1 gap-3">
               {filtered.map((eq) => {
                 const qty = quantities[eq.id] ?? 0;
                 const isSelected = qty > 0;
@@ -700,52 +793,70 @@ export default function BorrowWizardPage() {
                 return (
                   <div
                     key={eq.id}
-                    className={`bg-white rounded-hard shadow-low overflow-hidden relative transition flex flex-col justify-between ${
-                      outOfStock
-                        ? 'opacity-60'
-                        : 'hover:shadow-card'
-                    } ${isSelected ? 'ring-2 ring-brand' : 'border border-line/60'}`}
+                    className={`group bg-surface rounded-2xl p-3.5 border transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                      outOfStock ? 'opacity-60 border-line' : 'hover:shadow-card'
+                    } ${
+                      isSelected
+                        ? 'border-brand ring-2 ring-brand/25 bg-brand-mint/20'
+                        : 'border-line'
+                    }`}
                   >
-                    {isSelected && (
-                      <div className="absolute top-2 right-2 z-10 w-[22px] h-[22px] rounded-full bg-brand text-white flex items-center justify-center shadow">
-                        <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} />
-                      </div>
-                    )}
-
-                    <div>
-                      <div className="h-28 sm:h-36 bg-brand-mint text-brand flex items-center justify-center overflow-hidden">
+                    <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                      <div className="w-16 h-16 rounded-xl bg-brand-mint text-brand flex items-center justify-center shrink-0 relative overflow-hidden">
                         <ThumbnailImage
                           src={eq.images?.[0]}
                           alt={eq.name}
                           iconName={equipmentIconName(eq.category)}
                         />
+                        {isSelected && (
+                          <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-brand text-white flex items-center justify-center shadow">
+                            <Icon name="check" className="w-3 h-3" strokeWidth={3} />
+                          </span>
+                        )}
                       </div>
-
-                      <div className="p-3 flex flex-col gap-1">
-                        <b className="text-[14px] sm:text-[15px] text-ink truncate" title={eq.name}>{eq.name}</b>
-                        <span className="text-[12px] text-ink-mute inline-flex items-center gap-1">
-                          <Icon name="package" className="w-3.5 h-3.5" /> {EQUIPMENT_CATEGORY_LABEL[eq.category]}
-                        </span>
-                        {outOfStock ? (
-                          <div className="pt-0.5">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold text-[15px] text-ink truncate" title={eq.name}>
+                            {eq.name}
+                          </span>
+                          <span className="text-[11.5px] px-2 py-0.5 rounded-full bg-soft border border-line text-ink-soft font-semibold">
+                            {EQUIPMENT_CATEGORY_LABEL[eq.category]}
+                          </span>
+                          {outOfStock ? (
                             <Chip tone="red">ของหมด</Chip>
-                          </div>
-                        ) : isSelected ? (
-                          <div className="pt-0.5">
+                          ) : isSelected ? (
                             <Chip tone="green">เลือกแล้ว {qty} ชุด</Chip>
-                          </div>
-                        ) : null}
+                          ) : (
+                            <Chip tone="green">พร้อมยืม</Chip>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-ink-mute mt-1">
+                          <span className="inline-flex items-center gap-1">
+                            <Icon name="package" className="w-3.5 h-3.5 text-ink-mute" />
+                            <span>หมวดหมู่: {EQUIPMENT_CATEGORY_LABEL[eq.category]}</span>
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <Icon name="archive" className="w-3.5 h-3.5 text-brand" />
+                            <span>คงเหลือในคลัง {eq.stock} ชุด</span>
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="p-3 pt-0 border-t border-line/40 mt-2 flex items-center justify-between gap-2">
-                      <span className="text-[12px] font-semibold text-ink-mute">จำนวนขอยืม:</span>
+                    <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-line">
+                      <button
+                        type="button"
+                        onClick={() => setInspectedEquipment(eq)}
+                        className="text-[12px] font-semibold text-ink-mute hover:text-ink underline-offset-2 hover:underline px-2 py-1"
+                      >
+                        ดูรายละเอียด
+                      </button>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
                           disabled={qty <= 0}
                           onClick={() => setQty(eq.id, eq.stock, qty - 1)}
-                          className="w-[30px] h-[30px] rounded-full border-[1.5px] border-line hover:border-ink flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none transition"
+                          className="w-8 h-8 rounded-full border border-line bg-surface hover:border-ink flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none transition"
                         >
                           <Icon name="minus" className="w-3.5 h-3.5" />
                         </button>
@@ -759,13 +870,13 @@ export default function BorrowWizardPage() {
                             setQty(eq.id, eq.stock, Number.isNaN(val) ? 0 : val);
                           }}
                           onFocus={(e) => e.target.select()}
-                          className="w-12 h-8 text-center text-[14px] font-bold rounded-xl border border-line bg-white text-ink focus:border-brand focus:ring-1 focus:ring-brand focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          className="w-12 h-8 text-center text-[13.5px] font-bold rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-1 focus:ring-brand focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                         <button
                           type="button"
                           disabled={outOfStock || qty >= eq.stock}
                           onClick={() => setQty(eq.id, eq.stock, qty + 1)}
-                          className="w-[30px] h-[30px] rounded-full bg-brand text-white flex items-center justify-center hover:bg-brand-deep disabled:opacity-30 disabled:pointer-events-none transition"
+                          className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center hover:bg-brand-deep disabled:opacity-30 disabled:pointer-events-none transition"
                         >
                           <Icon name="plus" className="w-3.5 h-3.5" />
                         </button>
@@ -775,30 +886,303 @@ export default function BorrowWizardPage() {
                 );
               })}
             </div>
-          </div>
+          ) : !equipmentLoading && filtered.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3.5">
+              {filtered.map((eq) => {
+                const qty = quantities[eq.id] ?? 0;
+                const isSelected = qty > 0;
+                const outOfStock = eq.stock <= 0;
+
+                return (
+                  <div
+                    key={eq.id}
+                    className={`group bg-surface rounded-2xl border overflow-hidden transition flex flex-col justify-between ${
+                      outOfStock
+                        ? 'opacity-60 border-line'
+                        : 'hover:shadow-card hover:-translate-y-0.5'
+                    } ${
+                      isSelected
+                        ? 'border-brand ring-2 ring-brand shadow-low'
+                        : 'border-line'
+                    }`}
+                  >
+                    <div>
+                      {/* ส่วนหัวการ์ดและรูปภาพ (แบบที่ 2: ภาพเต็มตา h-56 พร้อม Overlay ชื่อและข้อมูลอุปกรณ์ด้านล่างภาพ) */}
+                      <div className="h-56 bg-brand-mint relative flex items-center justify-center text-brand overflow-hidden">
+                        <ThumbnailImage
+                          src={eq.images?.[0]}
+                          alt={eq.name}
+                          iconName={equipmentIconName(eq.category)}
+                          className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
+                        />
+                        {/* Gradient Overlay ล่างภาพสำหรับข้อความ */}
+                        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none" />
+
+                        {/* มุมบนซ้าย: สถานะสต๊อก & หมวดหมู่อุปกรณ์ */}
+                        <div className="absolute top-2.5 left-2.5 flex flex-wrap items-center gap-1.5 z-10">
+                          {outOfStock ? (
+                            <Chip tone="red">ของหมด</Chip>
+                          ) : isSelected ? (
+                            <Chip tone="green">เลือกแล้ว {qty} ชุด</Chip>
+                          ) : (
+                            <Chip tone="green">พร้อมยืม</Chip>
+                          )}
+                          <span className="px-2.5 py-0.5 rounded-full text-[11.5px] font-semibold bg-surface/90 backdrop-blur text-ink shadow-xs">
+                            {EQUIPMENT_CATEGORY_LABEL[eq.category]}
+                          </span>
+                        </div>
+
+                        {/* มุมบนขวา: เครื่องหมายเลือก */}
+                        <div className="absolute top-2.5 right-2.5 z-10">
+                          {isSelected ? (
+                            <div className="w-7 h-7 rounded-full bg-brand text-white flex items-center justify-center shadow-md">
+                              <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} />
+                            </div>
+                          ) : (
+                            <div className="w-7 h-7 rounded-full bg-surface/85 border border-line flex items-center justify-center text-transparent group-hover:border-brand transition">
+                              <Icon name="check" className="w-3.5 h-3.5" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* ข้อความซ้อนด้านล่างของรูปภาพ: ชื่ออุปกรณ์ + หมวดหมู่ & จำนวนคงเหลือ */}
+                        <div className="absolute bottom-2.5 inset-x-3 text-white flex items-end justify-between gap-2 z-10">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-bold text-[15.5px] leading-snug truncate drop-shadow-sm text-white" title={eq.name}>
+                              {eq.name}
+                            </h3>
+                            <p className="text-[12px] text-white/90 truncate flex items-center gap-1 mt-0.5">
+                              <Icon name="package" className="w-3.5 h-3.5 text-white/80 shrink-0" />
+                              <span className="truncate">{EQUIPMENT_CATEGORY_LABEL[eq.category]}</span>
+                            </p>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-white/20 backdrop-blur text-white shrink-0 shadow-xs">
+                            ในคลัง {eq.stock}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* เนื้อหาการ์ดส่วนล่าง: ข้อมูลสต๊อกและจำนวนที่เลือกแบบกระชับ */}
+                      <div className="p-3">
+                        <div className="flex items-center justify-between text-[12px] text-ink bg-soft border border-line rounded-xl px-3 py-2">
+                          <span className="font-semibold inline-flex items-center gap-1">
+                            <Icon name="archive" className="w-3.5 h-3.5 text-brand shrink-0" />
+                            <span>คงเหลือ {eq.stock} ชุด</span>
+                          </span>
+                          <span className="text-line">|</span>
+                          <span className="font-semibold inline-flex items-center gap-1 text-brand">
+                            <Icon name="check" className="w-3.5 h-3.5 text-brand shrink-0" />
+                            <span>เลือก {qty} ชุด</span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ส่วนท้ายการ์ด: ปุ่มดูรายละเอียด + ตัวปรับจำนวน */}
+                    <div className="px-3.5 pb-3.5 pt-2.5 border-t border-line flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setInspectedEquipment(eq)}
+                        className="text-[12px] font-semibold text-ink-mute hover:text-ink transition py-1"
+                      >
+                        ดูรายละเอียด
+                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          disabled={qty <= 0}
+                          onClick={() => setQty(eq.id, eq.stock, qty - 1)}
+                          className="w-8 h-8 rounded-full border border-line bg-surface hover:border-ink flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none transition"
+                        >
+                          <Icon name="minus" className="w-3.5 h-3.5" />
+                        </button>
+                        <input
+                          type="number"
+                          min={0}
+                          max={eq.stock}
+                          value={qty}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
+                            setQty(eq.id, eq.stock, Number.isNaN(val) ? 0 : val);
+                          }}
+                          onFocus={(e) => e.target.select()}
+                          className="w-11 h-8 text-center text-[13.5px] font-bold rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-1 focus:ring-brand focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <button
+                          type="button"
+                          disabled={outOfStock || qty >= eq.stock}
+                          onClick={() => setQty(eq.id, eq.stock, qty + 1)}
+                          className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center hover:bg-brand-deep disabled:opacity-30 disabled:pointer-events-none transition"
+                        >
+                          <Icon name="plus" className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {/* หน้าต่างแสดงรายละเอียดอุปกรณ์ (Detail Modal - ขนาดใหญ่ 75% Viewport) */}
+          {inspectedEquipment && (
+            <div
+              className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+              onClick={() => setInspectedEquipment(null)}
+            >
+              <div
+                className="bg-surface border border-line rounded-3xl w-[92vw] sm:w-[85vw] lg:w-[75vw] h-[88vh] sm:h-[75vh] max-w-4xl overflow-hidden shadow-pop flex flex-col my-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* ส่วนหัวภาพใหญ่พิเศษ (Hero Image in Modal - 55% ของความสูง Modal) */}
+                <div className="relative h-[52%] sm:h-[58%] bg-brand-mint text-brand overflow-hidden shrink-0">
+                  <ThumbnailImage
+                    src={inspectedEquipment.images?.[0]}
+                    alt={inspectedEquipment.name}
+                    iconName={equipmentIconName(inspectedEquipment.category)}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent pointer-events-none" />
+
+                  {/* ปุ่มปิด Modal มุมบนขวา */}
+                  <button
+                    type="button"
+                    onClick={() => setInspectedEquipment(null)}
+                    className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/45 hover:bg-black/70 backdrop-blur text-white flex items-center justify-center transition shadow-lg"
+                    title="ปิดหน้าต่าง"
+                  >
+                    <Icon name="x" className="w-5 h-5" />
+                  </button>
+
+                  {/* ป้ายด้านบนซ้าย */}
+                  <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-2">
+                    {inspectedEquipment.stock <= 0 ? (
+                      <Chip tone="red">ของหมด</Chip>
+                    ) : (
+                      <Chip tone="green">พร้อมยืม</Chip>
+                    )}
+                    <span className="px-3 py-1 rounded-full text-[12px] font-semibold bg-surface/95 backdrop-blur text-ink shadow-sm">
+                      {EQUIPMENT_CATEGORY_LABEL[inspectedEquipment.category]}
+                    </span>
+                  </div>
+
+                  {/* ข้อมูลชื่ออุปกรณ์ซ้อนด้านล่างภาพ */}
+                  <div className="absolute bottom-4 inset-x-5 sm:inset-x-7 text-white z-10">
+                    <h3 className="text-[22px] sm:text-[28px] lg:text-[32px] font-extrabold leading-snug drop-shadow-md text-white">
+                      {inspectedEquipment.name}
+                    </h3>
+                    <p className="text-[13.5px] sm:text-[15px] text-white/90 flex items-center gap-2 mt-1 drop-shadow-sm">
+                      <Icon name="package" className="w-4 h-4 text-white/80 shrink-0" />
+                      <span>หมวดหมู่: {EQUIPMENT_CATEGORY_LABEL[inspectedEquipment.category]}</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* ส่วนเนื้อหาข้อมูลใน Modal */}
+                <div className="p-4 sm:p-6 overflow-y-auto flex-1 flex flex-col justify-between gap-4 bg-surface">
+                  <div className="grid grid-cols-2 gap-3 text-[12.5px]">
+                    <div className="p-4 rounded-2xl bg-soft border border-line">
+                      <span className="text-ink-mute block text-[12px]">หมวดหมู่อุปกรณ์</span>
+                      <b className="text-[16px] text-ink inline-flex items-center gap-2 mt-1">
+                        <Icon name="package" className="w-4 h-4 text-brand shrink-0" />
+                        <span>{EQUIPMENT_CATEGORY_LABEL[inspectedEquipment.category]}</span>
+                      </b>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-soft border border-line">
+                      <span className="text-ink-mute block text-[12px]">จำนวนคงคลังทั้งหมด</span>
+                      <b className="text-[16px] text-brand inline-flex items-center gap-2 mt-1">
+                        <Icon name="archive" className="w-4 h-4 text-brand shrink-0" />
+                        <span>{inspectedEquipment.stock} ชุด</span>
+                      </b>
+                    </div>
+                  </div>
+
+                  {/* ส่วนท้าย Modal: ตัวปรับจำนวน + ปุ่มปิด */}
+                  <div className="pt-3 border-t border-line flex items-center justify-between gap-3 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setInspectedEquipment(null)}
+                      className="h-11 px-5 rounded-xl border border-line bg-surface hover:bg-soft text-[13px] font-semibold text-ink transition"
+                    >
+                      ปิดหน้าต่าง
+                    </button>
+
+                    <div className="flex items-center gap-3">
+                      <span className="text-[13.5px] font-semibold text-ink-mute">จำนวนขอยืม:</span>
+                      <button
+                        type="button"
+                        disabled={(quantities[inspectedEquipment.id] ?? 0) <= 0}
+                        onClick={() =>
+                          setQty(
+                            inspectedEquipment.id,
+                            inspectedEquipment.stock,
+                            (quantities[inspectedEquipment.id] ?? 0) - 1,
+                          )
+                        }
+                        className="w-10 h-10 rounded-full border border-line bg-surface hover:border-ink flex items-center justify-center disabled:opacity-30 transition"
+                      >
+                        <Icon name="minus" className="w-4 h-4" />
+                      </button>
+                      <span className="min-w-[36px] text-center font-bold text-[16px] text-ink">
+                        {quantities[inspectedEquipment.id] ?? 0}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={
+                          inspectedEquipment.stock <= 0 ||
+                          (quantities[inspectedEquipment.id] ?? 0) >= inspectedEquipment.stock
+                        }
+                        onClick={() =>
+                          setQty(
+                            inspectedEquipment.id,
+                            inspectedEquipment.stock,
+                            (quantities[inspectedEquipment.id] ?? 0) + 1,
+                          )
+                        }
+                        className="w-10 h-10 rounded-full bg-brand text-white flex items-center justify-center hover:bg-brand-deep disabled:opacity-30 transition"
+                      >
+                        <Icon name="plus" className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* ================= STEP 2: วันยืม-คืน (รายวันเท่านั้น) ================= */}
       {step === 2 && (
         <div className="flex flex-col gap-4">
           {/* ส่วนหัวแสดงโหมดรายวัน */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-2xl border border-line shadow-card">
-            <div className="flex items-center gap-2.5">
-              <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm">
-                2
-              </span>
-              <div>
-                <b className="text-[15px] sm:text-[16px] text-ink">เลือกกำหนดวันยืมและคืนอุปกรณ์ (รายวัน)</b>
-                <p className="text-[12px] text-ink-mute">
-                  {selectedItems.map((s) => s.eq.name).join(', ')} · รูปแบบรายวัน (วันรับ - วันคืน)
-                </p>
+          <div className="bg-white rounded-2xl border border-line shadow-card overflow-hidden">
+            <div className="p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                  2
+                </span>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <b className="text-[15px] sm:text-[16px] text-ink leading-tight">เลือกกำหนดวันยืมและคืนอุปกรณ์</b>
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-mint text-brand border border-brand/20">
+                      ขั้นตอนที่ 2 จาก 4
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-ink-mute mt-0.5">
+                    {selectedItems.map((s) => s.eq.name).join(', ')} · รูปแบบรายวัน (วันรับ - วันคืน)
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[12px] font-semibold text-brand bg-brand-mint px-3.5 py-1.5 rounded-full border border-brand/20">
+                  ยืม-คืนแบบรายวัน
+                </span>
               </div>
             </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-[12px] font-semibold text-brand bg-brand-mint px-3.5 py-1.5 rounded-full border border-brand/20">
-                ยืม-คืนแบบรายวัน
-              </span>
+            <div className="w-full h-[3px] bg-line/30">
+              <div className="h-full bg-brand transition-all duration-300" style={{ width: '50%' }} />
             </div>
           </div>
 
@@ -999,11 +1383,21 @@ export default function BorrowWizardPage() {
         <div className="w-full flex flex-col gap-4">
           <div className="jw-card p-5 sm:p-7 flex flex-col gap-4">
             <div className="pb-3 border-b border-line flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <b className="text-[17px] text-ink block">แบบคำขอใช้อุปกรณ์ราชการ</b>
-                <span className="text-[12.5px] text-ink-mute">
-                  เรื่อง ขออนุญาตใช้อุปกรณ์ของทางราชการ
+              <div className="flex items-center gap-3">
+                <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                  3
                 </span>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <b className="text-[17px] text-ink block leading-tight">แบบคำขอใช้อุปกรณ์ราชการ</b>
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-mint text-brand border border-brand/20">
+                      ขั้นตอนที่ 3 จาก 4
+                    </span>
+                  </div>
+                  <span className="text-[12.5px] text-ink-mute">
+                    เรื่อง ขออนุญาตใช้อุปกรณ์ของทางราชการ
+                  </span>
+                </div>
               </div>
               <span className="text-[12.5px] font-semibold text-brand bg-brand-mint px-3 py-1 rounded-full">
                 {selectedItems.length} รายการ · {borrowDays} วัน
@@ -1382,6 +1776,29 @@ export default function BorrowWizardPage() {
       {/* ================= STEP 4: ลงนามและส่ง (Copy UI/UX จากขั้นตอนลงนามของสถานที่) ================= */}
       {step === 4 && (
         <div className="w-full flex flex-col gap-4">
+          {/* ส่วนหัวขั้นตอนที่ 4 */}
+          <div className="jw-card p-0 overflow-hidden border border-line">
+            <div className="p-3.5 sm:px-5 sm:py-4 flex items-center gap-3">
+              <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                4
+              </span>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <b className="text-[15px] sm:text-[16px] text-ink block leading-tight">ลงนามและยืนยันส่งคำขอ</b>
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-mint text-brand border border-brand/20">
+                    ขั้นตอนที่ 4 จาก 4
+                  </span>
+                </div>
+                <p className="text-[12px] text-ink-mute mt-0.5">
+                  ตรวจสอบความถูกต้องของรายการอุปกรณ์ ลงลายมือชื่อดิจิทัล และส่งคำขอให้อบต.พิจารณา
+                </p>
+              </div>
+            </div>
+            <div className="w-full h-[3px] bg-line/30">
+              <div className="h-full bg-brand transition-all duration-300" style={{ width: '100%' }} />
+            </div>
+          </div>
+
           {/* แสดงเอกสารจริงตามแบบคำขอใช้อุปกรณ์ราชการ */}
           <OfficialGovFormDocument
             customFields={{

@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   DocumentScanLog,
+  RequestStatus,
+  STATUS_META,
   StaffVerificationResult,
   VERIFICATION_DOC_TYPE_LABEL,
   VERIFICATION_STATUS_LABEL,
@@ -52,6 +54,7 @@ export default function StaffVerifyPage() {
   const [scanElapsedSec, setScanElapsedSec] = useState(0);
   const [enhancePassCount, setEnhancePassCount] = useState(0);
   const [lastScannedBanner, setLastScannedBanner] = useState('');
+  const [copiedHash, setCopiedHash] = useState(false);
 
   const qrScannerRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -320,7 +323,7 @@ export default function StaffVerifyPage() {
     <AppShell
       title="ตรวจสอบเอกสาร QR Code"
       backHref="/staff"
-      maxWidth="max-w-[840px]"
+      maxWidth="max-w-[760px]"
     >
       <div className="flex flex-col gap-5">
         {/* แถบโหมดการสแกน (แสดงเสมอเมื่อยังไม่พบผลลัพธ์ หรือเมื่อเปิดโหมดสแกนต่อเนื่อง) */}
@@ -628,177 +631,239 @@ export default function StaffVerifyPage() {
           </div>
         )}
 
-        {/* แสดงผลการตรวจสอบ (Result Screen) */}
+        {/* แสดงผลการตรวจสอบ (Result Screen - Layout Option 1: Clean Official Card) */}
         {result && !verifying && (
-          <div className="jw-card p-5 sm:p-7 flex flex-col gap-6">
-            {/* Header แสดงสถานะ */}
+          <div className="jw-card p-0 overflow-hidden flex flex-col shadow-xs border border-line">
+            {/* Header แสดงสถานะ สไตล์ Option 1 */}
             <div
-              className={`p-5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 ${
+              className={`p-4 sm:p-5 relative ${
                 status === 'VALID'
-                  ? 'bg-[#F2FBF6] border-[#A3E5C1]'
+                  ? 'bg-emerald-700 text-white'
                   : status === 'REVOKED'
-                  ? 'bg-[#FFF9EC] border-[#FDE3A7]'
-                  : 'bg-[#FFF2F2] border-[#F9C2C2]'
+                  ? 'bg-amber-600 text-white'
+                  : 'bg-rose-700 text-white'
               }`}
             >
-              <div className="flex items-center gap-3.5">
-                <div
-                  className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
-                    status === 'VALID'
-                      ? 'bg-status-act text-white'
-                      : status === 'REVOKED'
-                      ? 'bg-status-amber text-white'
-                      : 'bg-status-crit text-white'
-                  }`}
-                >
-                  <Icon
-                    name={status === 'VALID' ? 'check' : status === 'REVOKED' ? 'clock' : 'x'}
-                    className="w-6 h-6"
-                  />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <b className="text-[18px] text-ink">{VERIFICATION_STATUS_LABEL[status]}</b>
-                    <Chip tone={tone}>{status}</Chip>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-11 h-11 rounded-xl bg-white/15 border border-white/25 flex items-center justify-center text-white shrink-0 shadow-inner">
+                    <Icon
+                      name={status === 'VALID' ? 'check' : status === 'REVOKED' ? 'clock' : 'x'}
+                      className="w-6 h-6 text-white"
+                    />
                   </div>
-                  <span className="text-[13px] text-ink-mute">
-                    {result.message}
-                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-white/20 text-white border border-white/30">
+                        {status === 'VALID' ? 'เอกสารสมบูรณ์' : status === 'REVOKED' ? 'ยกเลิกแล้ว' : 'ไม่ถูกต้อง'}
+                      </span>
+                      <span className="text-[11px] text-white/80">อบต. ตรวจสอบแล้ว</span>
+                    </div>
+                    <h2 className="text-base sm:text-lg font-bold text-white mt-0.5 truncate">
+                      {VERIFICATION_STATUS_LABEL[status]}
+                    </h2>
+                    {result.message && (
+                      <p className="text-[12px] text-white/85 truncate mt-0.5">
+                        {result.message}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={handleResetScan}
-                  className="jw-btn-sec py-2 px-4 text-[13px] flex items-center gap-1.5"
+                  className="shrink-0 text-[11px] font-semibold bg-white/15 hover:bg-white/25 text-white px-2.5 py-1.5 rounded-lg border border-white/20 transition flex items-center gap-1"
                 >
-                  <Icon name="photo" className="w-4 h-4" />
+                  <Icon name="photo" className="w-3.5 h-3.5" />
                   สแกนใหม่
                 </button>
               </div>
             </div>
 
-            {/* ข้อมูลเอกสารและผู้ยื่นคำขอ (เฉพาะเจ้าหน้าที่) */}
-            {status !== 'NOT_FOUND' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[13.5px]">
-                <div className="border border-line rounded-2xl p-4.5 flex flex-col gap-3 bg-white">
-                  <b className="text-[14.5px] text-ink border-b border-line pb-2 flex items-center gap-2">
-                    <Icon name="file-text" className="w-4 h-4 text-brand" />
-                    ข้อมูลเอกสาร
-                  </b>
-                  <div className="flex flex-col gap-2">
-                    <div className="flex justify-between py-1 border-b border-soft">
-                      <span className="text-ink-mute">เลขที่เอกสาร:</span>
-                      <b className="font-mono text-ink">{result.documentNumber}</b>
+            {/* เนื้อหาผลการตรวจสอบ */}
+            <div className="p-4 sm:p-5 flex flex-col gap-4">
+              {status !== 'NOT_FOUND' && (
+                <>
+                  {/* ข้อมูลเอกสารและผู้ยื่นคำขอ (Grid Auto-wrap ไม่ล้นจอ) */}
+                  <div className="bg-slate-50/80 rounded-xl border border-line p-3.5 space-y-2.5 text-xs sm:text-[13px]">
+                    <div className="text-ink font-bold text-xs flex items-center gap-1.5 border-b border-line pb-2">
+                      <Icon name="file-text" className="w-3.5 h-3.5 text-brand" />
+                      <span>รายละเอียดเอกสารและคำขอ</span>
                     </div>
-                    <div className="flex justify-between py-1 border-b border-soft">
-                      <span className="text-ink-mute">ประเภทเอกสาร:</span>
-                      <span className="font-semibold text-ink">
-                        {result.documentType ? VERIFICATION_DOC_TYPE_LABEL[result.documentType] : result.title}
-                      </span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-soft">
-                      <span className="text-ink-mute">ฉบับที่ (Version):</span>
-                      <span className="font-semibold text-ink">ฉบับที่ {result.version || 1}</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-soft">
-                      <span className="text-ink-mute">วันที่ออกเอกสาร:</span>
-                      <span className="font-semibold text-ink">{formatThaiDateTime(result.issuedAt, true)}</span>
-                    </div>
-                    {result.revokedAt && (
-                      <div className="flex justify-between py-1 border-b border-soft text-status-amber">
-                        <span>วันที่ยกเลิก:</span>
-                        <b className="font-semibold">{formatThaiDateTime(result.revokedAt, true)}</b>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                      <div className="flex justify-between items-center py-1 border-b border-soft">
+                        <span className="text-ink-mute">เลขที่เอกสาร:</span>
+                        <b className="font-mono text-ink bg-white px-2 py-0.5 rounded border border-line text-xs">
+                          {result.documentNumber}
+                        </b>
                       </div>
-                    )}
-                    <div className="flex justify-between py-1 border-b border-soft">
-                      <span className="text-ink-mute">ผู้ออกเอกสาร:</span>
-                      <span className="font-semibold text-ink">{result.issuingOrg || 'องค์การบริหารส่วนตำบล (อบต.)'}</span>
-                    </div>
-                  </div>
-                </div>
 
-                <div className="border border-line rounded-2xl p-4.5 flex flex-col gap-3 bg-white">
-                  <b className="text-[14.5px] text-ink border-b border-line pb-2 flex items-center gap-2">
-                    <Icon name="user" className="w-4 h-4 text-brand" />
-                    ข้อมูลผู้ยื่นคำขอ & การอนุมัติ
-                  </b>
-                  <div className="flex flex-col gap-2">
-                    <div className="flex justify-between py-1 border-b border-soft">
-                      <span className="text-ink-mute">ชื่อผู้ยื่นคำขอ:</span>
-                      <b className="text-ink">{result.requesterName || '-'}</b>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-soft">
-                      <span className="text-ink-mute">หน่วยงาน/ชุมชน:</span>
-                      <span className="text-ink">{result.organization || '-'}</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-soft">
-                      <span className="text-ink-mute">วัตถุประสงค์:</span>
-                      <span className="text-ink line-clamp-1">{result.purpose || '-'}</span>
-                    </div>
-                    <div className="flex justify-between py-1 border-b border-soft">
-                      <span className="text-ink-mute">สถานะคำขอ:</span>
-                      <Chip tone="green">{result.requestStatus || 'อนุมัติแล้ว'}</Chip>
-                    </div>
-                  </div>
-                </div>
+                      <div className="flex justify-between items-center py-1 border-b border-soft">
+                        <span className="text-ink-mute">ประเภทเอกสาร:</span>
+                        <span className="font-semibold text-ink">
+                          {result.documentType ? VERIFICATION_DOC_TYPE_LABEL[result.documentType] : result.title}
+                        </span>
+                      </div>
 
-                {/* ลายมือชื่อผู้พิจารณาและอนุมัติ */}
-                {result.signatures && result.signatures.length > 0 && (
-                  <div className="md:col-span-2 border border-line rounded-2xl p-4.5 bg-white flex flex-col gap-2.5">
-                    <b className="text-[14.5px] text-ink border-b border-line pb-2 flex items-center gap-2">
-                      <Icon name="file-text" className="w-4 h-4 text-brand" />
-                      ลายมือชื่อและการอนุมัติดิจิทัล (3 ระดับ)
-                    </b>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                      {result.signatures.map((sig, idx) => (
-                        <div key={idx} className="p-3 rounded-xl bg-soft/70 border border-line flex flex-col gap-1 text-[12.5px]">
-                          <span className="font-bold text-brand">{sig.title}</span>
-                          <span className="font-semibold text-ink">{sig.signerName}</span>
-                          <span className="text-[11.5px] text-ink-mute">{formatThaiDateTime(sig.signedAt, true)}</span>
-                          <span className="text-[11px] text-status-act font-semibold">✓ อนุมัติผ่านระบบ</span>
+                      <div className="flex justify-between items-center py-1 border-b border-soft">
+                        <span className="text-ink-mute">ผู้ยื่นคำขอ:</span>
+                        <div className="text-right">
+                          <b className="text-ink">{result.requesterName || '-'}</b>
+                          {result.requesterName && (
+                            <span className="text-[10px] text-brand bg-brand-mint/60 px-1 py-0.2 rounded font-medium ml-1">
+                              Gov SSO
+                            </span>
+                          )}
                         </div>
-                      ))}
+                      </div>
+
+                      <div className="flex justify-between items-center py-1 border-b border-soft">
+                        <span className="text-ink-mute">หน่วยงาน/ชุมชน:</span>
+                        <span className="text-ink font-medium">{result.organization || '-'}</span>
+                      </div>
+
+                      <div className="flex justify-between items-center py-1 border-b border-soft sm:col-span-2">
+                        <span className="text-ink-mute shrink-0">วัตถุประสงค์:</span>
+                        <span className="text-ink font-medium text-right truncate ml-2" title={result.purpose}>
+                          {result.purpose || '-'}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center py-1 border-b border-soft">
+                        <span className="text-ink-mute">ฉบับที่ (Version):</span>
+                        <span className="font-semibold text-ink">ฉบับที่ {result.version || 1}</span>
+                      </div>
+
+                      <div className="flex justify-between items-center py-1 border-b border-soft">
+                        <span className="text-ink-mute">วันที่ออกเอกสาร:</span>
+                        <span className="font-medium text-ink">{formatThaiDateTime(result.issuedAt, true)}</span>
+                      </div>
+
+                      {result.revokedAt && (
+                        <div className="flex justify-between py-1 border-b border-soft text-status-amber sm:col-span-2">
+                          <span>วันที่ยกเลิก:</span>
+                          <b className="font-semibold">{formatThaiDateTime(result.revokedAt, true)}</b>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between items-center py-1 border-b border-soft">
+                        <span className="text-ink-mute">ผู้ออกเอกสาร:</span>
+                        <span className="font-medium text-ink">{result.issuingOrg || 'องค์การบริหารส่วนตำบล (อบต.)'}</span>
+                      </div>
+
+                      <div className="flex justify-between items-center py-1 border-b border-soft">
+                        <span className="text-ink-mute">สถานะคำขอ:</span>
+                        {(() => {
+                          const statusKey = result.requestStatus as RequestStatus | undefined;
+                          const meta = statusKey ? STATUS_META[statusKey] : undefined;
+                          return (
+                            <Chip tone={meta?.tone || 'green'}>
+                              {meta?.label || result.requestStatus || 'อนุมัติแล้ว'}
+                            </Chip>
+                          );
+                        })()}
+                      </div>
                     </div>
                   </div>
-                )}
 
-                {/* Document Hash */}
-                {result.documentHash && (
-                  <div className="md:col-span-2 p-3 rounded-xl bg-soft text-[12px] flex flex-col gap-1">
-                    <span className="text-ink-mute font-medium">รหัสลายพิมพ์เอกสารดิจิทัล (SHA-256 Hash):</span>
-                    <code className="font-mono text-[11px] bg-white p-2 rounded-lg border border-line break-all text-ink">
-                      {result.documentHash}
-                    </code>
-                  </div>
-                )}
-              </div>
-            )}
+                  {/* ลายมือชื่อและการอนุมัติดิจิทัล (3 ระดับ - Responsive ปลอดภัยไม่ล้นจอ) */}
+                  {result.signatures && result.signatures.length > 0 && (
+                    <div className="rounded-xl border border-line p-3.5 space-y-2.5">
+                      <div className="flex items-center justify-between border-b border-line pb-2">
+                        <b className="text-xs text-ink flex items-center gap-1.5">
+                          <Icon name="file-text" className="w-3.5 h-3.5 text-brand" />
+                          ลายมือชื่อและการอนุมัติดิจิทัล ({result.signatures.length} ระดับ)
+                        </b>
+                        <span className="text-[10px] font-bold text-status-act bg-[#F2FBF6] px-2 py-0.5 rounded border border-[#A3E5C1]">
+                          ✓ อนุมัติผ่านระบบครบถ้วน
+                        </span>
+                      </div>
 
-            {/* ปุ่มนำทาง */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-line">
-              <div className="flex gap-2 w-full sm:w-auto">
-                {result.documentId && (
-                  <Link
-                    href={`/approver/permit/${result.documentId}`}
-                    className="jw-btn-sec flex-1 sm:flex-none px-5 py-2.5 text-[13px] text-center"
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                        {result.signatures.map((sig, idx) => {
+                          const isLast = idx === (result.signatures?.length ?? 1) - 1;
+                          return (
+                            <div
+                              key={idx}
+                              className={`p-2.5 rounded-lg border flex sm:flex-col justify-between gap-1 transition ${
+                                isLast
+                                  ? 'bg-emerald-50/70 border-emerald-200'
+                                  : 'bg-slate-50 border-line'
+                              }`}
+                            >
+                              <div>
+                                <span className="text-[10px] font-bold text-ink-mute block uppercase">
+                                  {idx + 1}. {sig.title}
+                                </span>
+                                <b className="text-ink block text-xs">{sig.signerName}</b>
+                                <span className="text-[10px] text-ink-mute block">
+                                  {formatThaiDateTime(sig.signedAt, true)}
+                                </span>
+                              </div>
+                              <div className="text-right sm:text-left sm:pt-1 sm:border-t sm:border-line">
+                                <span className={`text-[10px] font-semibold ${isLast ? 'text-emerald-800 font-bold' : 'text-status-act'}`}>
+                                  ✓ {isLast ? 'อนุมัติเสร็จสิ้น' : 'อนุมัติแล้ว'}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Cryptographic SHA-256 Hash Box พร้อมปุ่มคัดลอก */}
+                  {result.documentHash && (
+                    <div className="rounded-xl bg-slate-50 border border-line p-2.5 space-y-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-medium text-ink-mute">รหัสลายพิมพ์ดิจิทัล (SHA-256 Hash):</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(result.documentHash || '');
+                            setCopiedHash(true);
+                            setTimeout(() => setCopiedHash(false), 2000);
+                          }}
+                          className="text-brand hover:underline font-semibold"
+                        >
+                          {copiedHash ? '✓ คัดลอกแล้ว' : 'คัดลอก'}
+                        </button>
+                      </div>
+                      <div className="bg-white px-2.5 py-1.5 rounded border border-line font-mono text-[10.5px] text-ink break-all select-all">
+                        {result.documentHash}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* ปุ่มนำทาง */}
+              <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 border-t border-line">
+                <div className="flex gap-2">
+                  {result.documentId && (
+                    <Link
+                      href={`/approver/permit/${result.documentId}`}
+                      className="jw-btn flex-1 sm:flex-none px-4 py-2.5 text-[13px] text-center flex items-center justify-center gap-1.5"
+                    >
+                      <Icon name="file-text" className="w-4 h-4" />
+                      เปิดดูเอกสารฉบับเต็ม (PDF)
+                    </Link>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleResetScan}
+                    className="jw-btn-sec flex-1 sm:flex-none px-4 py-2.5 text-[13px]"
                   >
-                    เปิดดูเอกสารฉบับเต็ม (PDF)
-                  </Link>
-                )}
-                <button
-                  type="button"
-                  onClick={handleResetScan}
-                  className="jw-btn flex-1 sm:flex-none px-6 py-2.5 text-[13px]"
-                >
-                  สแกนเอกสารอื่น
-                </button>
-              </div>
+                    สแกนเอกสารอื่น
+                  </button>
+                </div>
 
-              <Link href="/staff" className="text-[13px] text-ink-mute hover:text-ink underline">
-                กลับหน้าหลักเจ้าหน้าที่
-              </Link>
+                <Link href="/staff" className="text-center text-[12.5px] text-ink-mute hover:text-ink underline py-1">
+                  ← กลับหน้าหลักเจ้าหน้าที่
+                </Link>
+              </div>
             </div>
           </div>
         )}

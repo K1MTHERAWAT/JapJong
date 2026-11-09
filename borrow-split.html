@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="th">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&family=Noto+Sans+Thai:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            margin: 0
+        }
+
+        .p {
+            font-family: Manrope, 'Noto Sans Thai', sans-serif;
+            background: #F8FAFC;
+            color: #0F172A;
+            min-height: 1000px;
+            display: flex;
+            gap: 16px;
+            padding: 16px;
+            box-sizing: border-box
+        }
+
+        .p a {
+            color: inherit;
+            text-decoration: none
+        }
+
+        .muted {
+            color: #475569
+        }
+
+        .heading-5 {
+            font-size: 24px;
+            line-height: 32px;
+            font-weight: 600
+        }
+
+        .heading-6 {
+            font-size: 20px;
+            line-height: 28px;
+            font-weight: 600
+        }
+
+        .body-2 {
+            font-size: 16px;
+            line-height: 24px;
+            font-weight: 500
+        }
+
+        .body-5 {
+            font-size: 14px;
+            line-height: 20px;
+            font-weight: 500
+        }
+
+        .body-6 {
+            font-size: 14px;
+            line-height: 20px;
+            font-weight: 400;
+            text-wrap: pretty
+        }
+
+        .button-md {
+            font-size: 16px;
+            line-height: 24px;
+            font-weight: 600
+        }
+
+        .caption-2 {
+            font-size: 14px;
+            line-height: 20px;
+            font-weight: 400
+        }
+
+        .caption-4 {
+            font-size: 12px;
+            line-height: 16px;
+            font-weight: 500
+        }
+
+        .card {
+            background: #fff;
+            border: 1px solid #E2E8F0;
+            border-radius: 16px
+        }
+
+        .ok {
+            padding: 4px 8px;
+            border-radius: 6px;
+            background: #E6F4EC;
+            color: #0F6B4C;
+            border: 1px solid #BFE3CF
+        }
+
+        .ico {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background: #F1F5F9;
+            color: #475569;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: none
+        }
+
+        .sb {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #475569;
+            transition: background .3s cubic-bezier(.22, 1, .36, 1)
+        }
+
+        .sb:hover {
+            background: #F1F5F9
+        }
+
+        .sb.on {
+            background: #E6F4EC;
+            color: #0F6B4C
+        }
+
+        .tab {
+            padding: 8px 12px;
+            border-radius: 8px;
+            color: #475569;
+            transition: background .3s cubic-bezier(.22, 1, .36, 1)
+        }
+
+        .tab.on {
+            background: #0F172A;
+            color: #fff
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid transparent;
+            transition: background .3s cubic-bezier(.22, 1, .36, 1)
+        }
+
+        .row:hover {
+            background: #F1F5F9
+        }
+
+        .row.sel {
+            background: #fff;
+            border-color: #0F6B4C
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: #0F6B4C;
+            color: #fff !important;
+            transition: transform .5s cubic-bezier(.22, 1, .36, 1), opacity .3s cubic-bezier(.22, 1, .36, 1)
+        }
+
+        .btn:hover {
+            opacity: .88;
+            transform: translateY(-1px)
+        }
+
+        .btn:active {
+            transform: scale(.98)
+        }
+
+        a:focus-visible {
+            outline: 2px solid #0F172A;
+            outline-offset: 2px
+        }
+    </style>
+
+    <title>ยืมและคืนอุปกรณ์ แบบรายการและรายละเอียด · จับจอง</title>
+</head>
+
+<body>
+
+
+    <div class="p">
+        <aside
+            style="width:72px;flex:none;background:#fff;border:1px solid #E2E8F0;border-radius:24px;padding:16px 0;display:flex;flex-direction:column;align-items:center;gap:8px;align-self:flex-start;position:sticky;top:16px">
+            <div style="width:40px;height:40px;border-radius:12px;background:#0F6B4C;color:#fff;display:flex;align-items:center;justify-content:center;margin-bottom:16px"
+                class="body-5">จ</div><a href="#" class="sb" aria-label="home"><svg width="24" height="24"
+                    viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round"
+                    stroke-linejoin="round" aria-hidden="true">
+                    <path d="M40 216V120L128 40l88 80v96H152v-56h-48v56z" />
+                </svg></a><a href="#" class="sb" aria-label="bld"><svg width="24" height="24" viewBox="0 0 256 256"
+                    fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"
+                    aria-hidden="true">
+                    <path d="M40 216V72l88-48 88 48v144M24 216h208M96 216v-48h64v48" />
+                </svg></a><a href="#" class="sb" aria-label="box"><svg width="24" height="24" viewBox="0 0 256 256"
+                    fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"
+                    aria-hidden="true">
+                    <path d="M40 88l88-48 88 48v80l-88 48-88-48zM40 88l88 48 88-48M128 136v80" />
+                </svg></a><a href="#" class="sb on" aria-label="file"><svg width="24" height="24" viewBox="0 0 256 256"
+                    fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"
+                    aria-hidden="true">
+                    <path
+                        d="M200 224H56a8 8 0 01-8-8V40a8 8 0 018-8h96l56 56v128a8 8 0 01-8 8zM152 32v56h56M96 136h64M96 168h64" />
+                </svg></a><a href="#" class="sb" aria-label="clock"><svg width="24" height="24" viewBox="0 0 256 256"
+                    fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"
+                    aria-hidden="true">
+                    <path d="M128 24a104 104 0 100 208 104 104 0 000-208zM128 72v56l40 24" />
+                </svg></a><a href="#" class="sb" aria-label="bell"><svg width="24" height="24" viewBox="0 0 256 256"
+                    fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"
+                    aria-hidden="true">
+                    <path d="M56 192c8-12 16-32 16-64a56 56 0 01112 0c0 32 8 52 16 64zM104 208a24 24 0 0048 0" />
+                </svg></a><a href="#" class="sb" aria-label="tool"><svg width="24" height="24" viewBox="0 0 256 256"
+                    fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"
+                    aria-hidden="true">
+                    <path
+                        d="M226 80a56 56 0 01-70 54L80 210a24 24 0 01-34-34l76-76a56 56 0 0154-70l-34 34 8 24 24 8z" />
+                </svg></a><a href="#" class="sb" aria-label="shield"><svg width="24" height="24" viewBox="0 0 256 256"
+                    fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"
+                    aria-hidden="true">
+                    <path d="M40 114V56a8 8 0 018-8h160a8 8 0 018 8v58c0 70-54 98-88 110-34-12-88-40-88-110z" />
+                </svg></a><a href="#" class="sb" aria-label="user"><svg width="24" height="24" viewBox="0 0 256 256"
+                    fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"
+                    aria-hidden="true">
+                    <path
+                        d="M128 24a104 104 0 100 208 104 104 0 000-208zM128 136a32 32 0 100-64 32 32 0 000 64zM64 200c12-28 36-40 64-40s52 12 64 40" />
+                </svg></a>
+        </aside>
+        <main
+            style="flex:1;max-width:1200px;margin:0 auto;padding:16px 0 48px;display:flex;flex-direction:column;gap:24px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
+                <div>
+                    <h1 class="heading-6" style="margin:0">รายการยืมและคืนอุปกรณ์</h1>
+                    <p class="body-6 muted" style="margin:4px 0 0;max-width:680px">
+                        ติดตามสถานะและหลักฐานรูปภาพของแต่ละคำขอ เลือกรายการทางซ้ายเพื่อดูรายละเอียด</p>
+                </div><a href="#" class="btn button-md"><svg width="20" height="20" viewBox="0 0 256 256" fill="none"
+                        stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"
+                        aria-hidden="true">
+                        <path d="M40 128h176M128 40v176" />
+                    </svg>ยื่นขอยืมอุปกรณ์ใหม่</a>
+            </div>
+            <div
+                style="display:grid;grid-template-columns:minmax(280px,360px) minmax(0,1fr);gap:24px;align-items:start">
+                <section style="display:flex;flex-direction:column;gap:12px">
+                    <nav style="display:flex;gap:4px;flex-wrap:wrap"><a href="#" class="tab body-5">ที่กำลังใช้งาน
+                            (0)</a><a href="#" class="tab body-5">รอตรวจสอบ (0)</a><a href="#"
+                            class="tab body-5 on">ประวัติ (17)</a></nav>
+                    <div class="card" style="padding:8px 12px;display:flex;align-items:center;gap:8px;color:#475569">
+                        <svg width="18" height="18" viewBox="0 0 256 256" fill="none" stroke="currentColor"
+                            stroke-width="16" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M112 40a72 72 0 100 144 72 72 0 000-144zM168 168l48 48" />
+                        </svg><span class="body-6">ค้นหาเลขที่คำขอหรือชื่ออุปกรณ์</span></div><a href="#"
+                        class="row sel"><span class="ico"><svg width="20" height="20" viewBox="0 0 256 256" fill="none"
+                                stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"
+                                aria-hidden="true">
+                                <path
+                                    d="M226 80a56 56 0 01-70 54L80 210a24 24 0 01-34-34l76-76a56 56 0 0154-70l-34 34 8 24 24 8z" />
+                            </svg></span><span style="flex:1;display:flex;flex-direction:column"><span
+                                class="body-2">ไมโครโฟนไร้สาย</span><span class="caption-2 muted">BR-2569-0022 · 10 พ.ย.
+                                2569</span></span><span class="caption-4 ok">เสร็จสิ้น</span></a><a href="#"
+                        class="row"><span class="ico"><svg width="20" height="20" viewBox="0 0 256 256" fill="none"
+                                stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"
+                                aria-hidden="true">
+                                <path d="M40 216V72l88-48 88 48v144M24 216h208M96 216v-48h64v48" />
+                            </svg></span><span style="flex:1;display:flex;flex-direction:column"><span
+                                class="body-2">โต๊ะ และอุปกรณ์อื่น</span><span class="caption-2 muted">BR-2569-0019 · 16
+                                พ.ย. 2569</span></span><span class="caption-4 ok">เสร็จสิ้น</span></a><a href="#"
+                        class="row muted body-5" style="justify-content:center">แสดงอีก 15 รายการ</a>
+                </section>
+                <article class="card" style="padding:32px;display:flex;flex-direction:column;gap:24px">
+                    <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start">
+                        <div>
+                            <h2 class="heading-5" style="margin:0">ไมโครโฟนไร้สาย</h2>
+                            <div class="body-6 muted">เลขที่คำขอ BR-2569-0022 · รหัส e-103</div>
+                        </div><span class="caption-4 ok">เสร็จสิ้น</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:32px">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px 16px;align-content:start">
+                            <div>
+                                <div class="caption-2 muted">ผู้ยืม</div>
+                                <div class="body-2">นาย บังคิม</div>
+                            </div>
+                            <div>
+                                <div class="caption-2 muted">จำนวนรวม</div>
+                                <div class="body-2">1 ชิ้น</div>
+                            </div>
+                            <div>
+                                <div class="caption-2 muted">วันที่เริ่มยืม</div>
+                                <div class="body-2">10 พ.ย. 2569</div>
+                            </div>
+                            <div>
+                                <div class="caption-2 muted">วันครบกำหนดคืน</div>
+                                <div class="body-2">12 พ.ย. 2569</div>
+                            </div>
+                            <div style="grid-column:1/-1">
+                                <div>
+                                    <div class="caption-2 muted">รายการอุปกรณ์</div>
+                                    <div class="body-2">ไมโครโฟนไร้สาย (1 ชิ้น)</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="display:flex;gap:12px">
+                                <div style="display:flex;flex-direction:column;align-items:center"><span
+                                        style="width:24px;height:24px;border-radius:99px;background:#0F6B4C;color:#fff;display:flex;align-items:center;justify-content:center"><svg
+                                            width="14" height="14" viewBox="0 0 256 256" fill="none"
+                                            stroke="currentColor" stroke-width="16" stroke-linecap="round"
+                                            stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M40 128l56 56 120-120" />
+                                        </svg></span><span
+                                        style="flex:1;width:2px;background:#E2E8F0;min-height:16px"></span></div>
+                                <div style="padding-bottom:16px">
+                                    <div class="body-5">อนุมัติคำขอ</div>
+                                    <div class="caption-2 muted">9 พ.ย. 2569</div>
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:12px">
+                                <div style="display:flex;flex-direction:column;align-items:center"><span
+                                        style="width:24px;height:24px;border-radius:99px;background:#CBD5E1;color:#fff;display:flex;align-items:center;justify-content:center"></span><span
+                                        style="flex:1;width:2px;background:#E2E8F0;min-height:16px"></span></div>
+                                <div style="padding-bottom:16px">
+                                    <div class="body-5">รับมอบอุปกรณ์</div>
+                                    <div class="caption-2 muted">ไม่มีบันทึก</div>
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:12px">
+                                <div style="display:flex;flex-direction:column;align-items:center"><span
+                                        style="width:24px;height:24px;border-radius:99px;background:#0F6B4C;color:#fff;display:flex;align-items:center;justify-content:center"><svg
+                                            width="14" height="14" viewBox="0 0 256 256" fill="none"
+                                            stroke="currentColor" stroke-width="16" stroke-linecap="round"
+                                            stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M40 128l56 56 120-120" />
+                                        </svg></span><span
+                                        style="flex:1;width:2px;background:#E2E8F0;min-height:16px"></span></div>
+                                <div style="padding-bottom:16px">
+                                    <div class="body-5">ส่งคืนอุปกรณ์</div>
+                                    <div class="caption-2 muted">9 พ.ย. 2569</div>
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:12px">
+                                <div style="display:flex;flex-direction:column;align-items:center"><span
+                                        style="width:24px;height:24px;border-radius:99px;background:#0F6B4C;color:#fff;display:flex;align-items:center;justify-content:center"><svg
+                                            width="14" height="14" viewBox="0 0 256 256" fill="none"
+                                            stroke="currentColor" stroke-width="16" stroke-linecap="round"
+                                            stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M40 128l56 56 120-120" />
+                                        </svg></span><span
+                                        style="flex:1;width:2px;background:#E2E8F0;min-height:16px"></span></div>
+                                <div style="padding-bottom:16px">
+                                    <div class="body-5">ตรวจสอบเสร็จสิ้น</div>
+                                    <div class="caption-2 muted">9 พ.ย. 2569 · สุดา มีสุข</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div
+                        style="border:1px solid #E2E8F0;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px">
+                        <div style="display:flex;align-items:center;gap:8px"><span
+                                class="body-5">ผลการตรวจสภาพ:</span><span class="caption-4 ok">✓ ปกติ</span></div>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px">
+                            <div
+                                style="border:1px solid #E2E8F0;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:104px">
+                                <div class="body-5" style="display:flex;align-items:center;gap:8px"><span
+                                        style="width:8px;height:8px;border-radius:99px;background:#10B981"></span>รูปภาพก่อนใช้งาน
+                                    (0 รูป)</div><span class="caption-2 muted">ไม่มีรูปภาพ</span>
+                            </div>
+                            <div
+                                style="border:1px solid #E2E8F0;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:104px">
+                                <div class="body-5" style="display:flex;align-items:center;gap:8px"><span
+                                        style="width:8px;height:8px;border-radius:99px;background:#3B82F6"></span>รูปภาพหลังส่งคืน
+                                    (1 รูป)</div>
+                                <div
+                                    style="width:64px;height:64px;border-radius:8px;background:#E2E8F0;display:flex;align-items:center;justify-content:center;color:#64748B">
+                                    <svg width="24" height="24" viewBox="0 0 256 256" fill="none" stroke="currentColor"
+                                        stroke-width="16" stroke-linecap="round" stroke-linejoin="round"
+                                        aria-hidden="true">
+                                        <path
+                                            d="M200 224H56a8 8 0 01-8-8V40a8 8 0 018-8h96l56 56v128a8 8 0 01-8 8zM152 32v56h56M96 136h64M96 168h64" />
+                                    </svg></div>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </main>
+    </div>
+
+</body>
+
+</html>
