@@ -843,23 +843,33 @@ export default function BookingWizardPage() {
     >
       {/* Header สไตล์การ์ดเดี่ยวตามแบบที่ผู้ใช้อนุมัติ (ตัด Stepper 1-5 ออก) */}
       {step === 1 && (
-        <div className="jw-card p-3.5 sm:px-5 sm:py-4 mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
-              1
-            </span>
-            <div>
-              <b className="text-[15px] sm:text-[16px] text-ink block leading-tight">เลือกสถานที่ใช้งาน</b>
-              <p className="text-[12px] text-ink-mute mt-0.5">
-                เลือกสถานที่ที่ต้องการใช้งาน (สามารถเลือกได้มากกว่า 1 แห่งในคำขอเดียวกัน)
-              </p>
+        <div className="jw-card p-0 overflow-hidden mb-4 shadow-card border border-line">
+          <div className="p-3.5 sm:px-5 sm:py-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                1
+              </span>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <b className="text-[15px] sm:text-[16px] text-ink block leading-tight">เลือกสถานที่ใช้งาน</b>
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-mint text-brand border border-brand/20">
+                    ขั้นตอนที่ 1 จาก 5
+                  </span>
+                </div>
+                <p className="text-[12px] text-ink-mute mt-0.5">
+                  เลือกสถานที่ที่ต้องการใช้งาน (สามารถเลือกได้มากกว่า 1 แห่งในคำขอเดียวกัน)
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] font-semibold px-3 py-1.5 rounded-full bg-brand-mint text-brand border border-brand/20">
+                {selectedVenues.length > 0 ? `เลือกแล้ว ${selectedVenues.length} แห่ง` : 'ยังไม่ได้เลือกสถานที่'}
+              </span>
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-[12px] font-semibold px-3 py-1.5 rounded-full bg-brand-mint text-brand border border-brand/20">
-              {selectedVenues.length > 0 ? `เลือกแล้ว ${selectedVenues.length} แห่ง` : 'ยังไม่ได้เลือกสถานที่'}
-            </span>
+          <div className="w-full h-[3px] bg-line/30">
+            <div className="h-full bg-brand transition-all duration-300" style={{ width: '20%' }} />
           </div>
         </div>
       )}
@@ -1455,36 +1465,46 @@ export default function BookingWizardPage() {
           ) : (
             <div className="flex flex-col gap-4">
             {/* ส่วนหัวสลับโหมดในหน้าจองรายวัน */}
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-2xl border border-line shadow-card">
-              <div className="flex items-center gap-2">
-                <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm">
-                  2
-                </span>
-                <div>
-                  <b className="text-[15px] sm:text-[16px] text-ink">เลือกวันและเวลาใช้งาน</b>
-                  <p className="text-[12px] text-ink-mute">
-                    {selectedVenues.map((v) => v.name).join(', ')} · รูปแบบรายวัน (ช่วงวันไป-กลับ)
-                  </p>
+            <div className="bg-white rounded-2xl border border-line shadow-card overflow-hidden">
+              <div className="p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                    2
+                  </span>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <b className="text-[15px] sm:text-[16px] text-ink leading-tight">เลือกวันและเวลาใช้งาน</b>
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-mint text-brand border border-brand/20">
+                        ขั้นตอนที่ 2 จาก 5
+                      </span>
+                    </div>
+                    <p className="text-[12px] text-ink-mute mt-0.5">
+                      {selectedVenues.map((v) => v.name).join(', ')} · รูปแบบรายวัน (ช่วงวันไป-กลับ)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 bg-canvas p-1 rounded-full border border-line">
+                  <button
+                    type="button"
+                    onClick={() => setBookingMode('hourly')}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-medium text-ink-soft hover:text-ink hover:bg-hover transition"
+                    title="สลับไปโหมดรายชั่วโมง"
+                  >
+                    <Icon name="clock" className="w-3.5 h-3.5 text-ink-mute" />
+                    <span>รายชั่วโมง</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-semibold bg-brand text-white shadow-xs transition"
+                  >
+                    <Icon name="calendar" className="w-3.5 h-3.5 text-white" />
+                    <span>รายวัน</span>
+                  </button>
                 </div>
               </div>
-
-              <div className="flex items-center gap-1.5 bg-canvas p-1 rounded-full border border-line">
-                <button
-                  type="button"
-                  onClick={() => setBookingMode('hourly')}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-medium text-ink-soft hover:text-ink hover:bg-hover transition"
-                  title="สลับไปโหมดรายชั่วโมง"
-                >
-                  <Icon name="clock" className="w-3.5 h-3.5 text-ink-mute" />
-                  <span>รายชั่วโมง</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-semibold bg-brand text-white shadow-xs transition"
-                >
-                  <Icon name="calendar" className="w-3.5 h-3.5 text-white" />
-                  <span>รายวัน</span>
-                </button>
+              <div className="w-full h-[3px] bg-line/30">
+                <div className="h-full bg-brand transition-all duration-300" style={{ width: '40%' }} />
               </div>
             </div>
 
@@ -1659,36 +1679,46 @@ export default function BookingWizardPage() {
       {/* ================= STEP 3: เลือกอุปกรณ์เสริม ================= */}
       {step === 3 && (
         <div className="w-full flex flex-col gap-4">
-          <div className="jw-card p-4 sm:p-5 flex flex-col gap-2 bg-gradient-to-r from-soft to-white">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
-                  3
-                </span>
-                <div>
-                  <b className="text-[16px] text-ink block leading-tight">อุปกรณ์เสริมและสิ่งอำนวยความสะดวก</b>
-                  <span className="text-[12.5px] text-ink-mute mt-0.5">
-                    เลือกอุปกรณ์ที่ต้องการใช้ร่วมกับสถานที่ เช่น เครื่องเสียง ไมโครโฟน โปรเจกเตอร์ เต็นท์ หรือโต๊ะ-เก้าอี้
+          <div className="jw-card p-0 overflow-hidden bg-gradient-to-r from-soft to-white border border-line">
+            <div className="p-4 sm:p-5 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                    3
                   </span>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <b className="text-[16px] text-ink block leading-tight">อุปกรณ์เสริมและสิ่งอำนวยความสะดวก</b>
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-mint text-brand border border-brand/20">
+                        ขั้นตอนที่ 3 จาก 5
+                      </span>
+                    </div>
+                    <span className="text-[12.5px] text-ink-mute mt-0.5 block">
+                      เลือกอุปกรณ์ที่ต้องการใช้ร่วมกับสถานที่ เช่น เครื่องเสียง ไมโครโฟน โปรเจกเตอร์ เต็นท์ หรือโต๊ะ-เก้าอี้
+                    </span>
+                  </div>
                 </div>
+                {selectedExtraItems.length > 0 && (
+                  <span className="px-3 py-1 rounded-full text-[12px] font-bold bg-brand text-white shrink-0">
+                    เลือก {selectedExtraItems.reduce((acc, x) => acc + x.qty, 0)} ชิ้น
+                  </span>
+                )}
               </div>
-              {selectedExtraItems.length > 0 && (
-                <span className="px-3 py-1 rounded-full text-[12px] font-bold bg-brand text-white shrink-0">
-                  เลือก {selectedExtraItems.reduce((acc, x) => acc + x.qty, 0)} ชิ้น
-                </span>
+
+              {selectedVenues.length > 0 && (
+                <div className="pt-2 border-t border-line/60 flex flex-wrap items-center gap-2 text-[12.5px] text-ink-mute">
+                  <span>สำหรับสถานที่:</span>
+                  {selectedVenues.map((v) => (
+                    <span key={v.id} className="font-semibold text-brand bg-brand-mint px-2 py-0.5 rounded-full">
+                      {v.name}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
-
-            {selectedVenues.length > 0 && (
-              <div className="pt-2 border-t border-line/60 flex flex-wrap items-center gap-2 text-[12.5px] text-ink-mute">
-                <span>สำหรับสถานที่:</span>
-                {selectedVenues.map((v) => (
-                  <span key={v.id} className="font-semibold text-brand bg-brand-mint px-2 py-0.5 rounded-full">
-                    {v.name}
-                  </span>
-                ))}
-              </div>
-            )}
+            <div className="w-full h-[3px] bg-line/30">
+              <div className="h-full bg-brand transition-all duration-300" style={{ width: '60%' }} />
+            </div>
           </div>
 
           {/* ค้นหาและตัวกรอง */}
@@ -1952,7 +1982,12 @@ export default function BookingWizardPage() {
               4
             </span>
             <div>
-              <b className="text-[17px] text-ink block leading-tight">แบบขอใช้สถานที่ราชการ</b>
+              <div className="flex items-center gap-2 flex-wrap">
+                <b className="text-[17px] text-ink block leading-tight">แบบขอใช้สถานที่ราชการ</b>
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-mint text-brand border border-brand/20">
+                  ขั้นตอนที่ 4 จาก 5
+                </span>
+              </div>
               <span className="text-[12.5px] text-ink-mute">
                 เรื่อง ขออนุญาตใช้สถานที่ราชการ
               </span>
@@ -2319,15 +2354,25 @@ export default function BookingWizardPage() {
           )}
 
           {/* ส่วนหัวขั้นตอนที่ 5 */}
-          <div className="jw-card p-3.5 sm:px-5 sm:py-4 flex items-center gap-3">
-            <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
-              5
-            </span>
-            <div>
-              <b className="text-[15px] sm:text-[16px] text-ink block leading-tight">ลงนามและยืนยันส่งคำขอ</b>
-              <p className="text-[12px] text-ink-mute mt-0.5">
-                ตรวจสอบความถูกต้องของเอกสาร ลงลายมือชื่อดิจิทัล และส่งคำขอให้อบต.พิจารณา
-              </p>
+          <div className="jw-card p-0 overflow-hidden border border-line">
+            <div className="p-3.5 sm:px-5 sm:py-4 flex items-center gap-3">
+              <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                5
+              </span>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <b className="text-[15px] sm:text-[16px] text-ink block leading-tight">ลงนามและยืนยันส่งคำขอ</b>
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-mint text-brand border border-brand/20">
+                    ขั้นตอนที่ 5 จาก 5
+                  </span>
+                </div>
+                <p className="text-[12px] text-ink-mute mt-0.5">
+                  ตรวจสอบความถูกต้องของเอกสาร ลงลายมือชื่อดิจิทัล และส่งคำขอให้อบต.พิจารณา
+                </p>
+              </div>
+            </div>
+            <div className="w-full h-[3px] bg-line/30">
+              <div className="h-full bg-brand transition-all duration-300" style={{ width: '100%' }} />
             </div>
           </div>
 

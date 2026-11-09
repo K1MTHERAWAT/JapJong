@@ -585,27 +585,37 @@ export default function BorrowWizardPage() {
     >
       {/* Header สไตล์การ์ดเดี่ยวตามแบบที่ผู้ใช้อนุมัติ (ตัด Stepper 1-4 ออก) */}
       {step === 1 && (
-        <div className="jw-card p-3.5 sm:px-5 sm:py-4 mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
-              1
-            </span>
-            <div>
-              <b className="text-[15px] sm:text-[16px] text-ink block leading-tight">
-                เลือกอุปกรณ์ที่ต้องการยืม
-              </b>
-              <p className="text-[12px] text-ink-mute mt-0.5">
-                เลือกรายการอุปกรณ์และระบุจำนวนที่ต้องการยืม (สามารถเลือกได้หลายรายการในคำขอเดียวกัน)
-              </p>
+        <div className="jw-card p-0 overflow-hidden mb-4 shadow-card border border-line">
+          <div className="p-3.5 sm:px-5 sm:py-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                1
+              </span>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <b className="text-[15px] sm:text-[16px] text-ink block leading-tight">
+                    เลือกอุปกรณ์ที่ต้องการยืม
+                  </b>
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-mint text-brand border border-brand/20">
+                    ขั้นตอนที่ 1 จาก 4
+                  </span>
+                </div>
+                <p className="text-[12px] text-ink-mute mt-0.5">
+                  เลือกรายการอุปกรณ์และระบุจำนวนที่ต้องการยืม (สามารถเลือกได้หลายรายการในคำขอเดียวกัน)
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] font-semibold px-3 py-1.5 rounded-full bg-brand-mint text-brand border border-brand/20">
+                {selectedItems.length > 0
+                  ? `เลือกแล้ว ${selectedItems.length} รายการ (${totalSelectedUnits} ชิ้น)`
+                  : 'ยังไม่ได้เลือกอุปกรณ์'}
+              </span>
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-[12px] font-semibold px-3 py-1.5 rounded-full bg-brand-mint text-brand border border-brand/20">
-              {selectedItems.length > 0
-                ? `เลือกแล้ว ${selectedItems.length} รายการ (${totalSelectedUnits} ชิ้น)`
-                : 'ยังไม่ได้เลือกอุปกรณ์'}
-            </span>
+          <div className="w-full h-[3px] bg-line/30">
+            <div className="h-full bg-brand transition-all duration-300" style={{ width: '25%' }} />
           </div>
         </div>
       )}
@@ -1146,23 +1156,33 @@ export default function BorrowWizardPage() {
       {step === 2 && (
         <div className="flex flex-col gap-4">
           {/* ส่วนหัวแสดงโหมดรายวัน */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-2xl border border-line shadow-card">
-            <div className="flex items-center gap-2.5">
-              <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm">
-                2
-              </span>
-              <div>
-                <b className="text-[15px] sm:text-[16px] text-ink">เลือกกำหนดวันยืมและคืนอุปกรณ์ (รายวัน)</b>
-                <p className="text-[12px] text-ink-mute">
-                  {selectedItems.map((s) => s.eq.name).join(', ')} · รูปแบบรายวัน (วันรับ - วันคืน)
-                </p>
+          <div className="bg-white rounded-2xl border border-line shadow-card overflow-hidden">
+            <div className="p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                  2
+                </span>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <b className="text-[15px] sm:text-[16px] text-ink leading-tight">เลือกกำหนดวันยืมและคืนอุปกรณ์</b>
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-mint text-brand border border-brand/20">
+                      ขั้นตอนที่ 2 จาก 4
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-ink-mute mt-0.5">
+                    {selectedItems.map((s) => s.eq.name).join(', ')} · รูปแบบรายวัน (วันรับ - วันคืน)
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[12px] font-semibold text-brand bg-brand-mint px-3.5 py-1.5 rounded-full border border-brand/20">
+                  ยืม-คืนแบบรายวัน
+                </span>
               </div>
             </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-[12px] font-semibold text-brand bg-brand-mint px-3.5 py-1.5 rounded-full border border-brand/20">
-                ยืม-คืนแบบรายวัน
-              </span>
+            <div className="w-full h-[3px] bg-line/30">
+              <div className="h-full bg-brand transition-all duration-300" style={{ width: '50%' }} />
             </div>
           </div>
 
@@ -1368,7 +1388,12 @@ export default function BorrowWizardPage() {
                   3
                 </span>
                 <div>
-                  <b className="text-[17px] text-ink block leading-tight">แบบคำขอใช้อุปกรณ์ราชการ</b>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <b className="text-[17px] text-ink block leading-tight">แบบคำขอใช้อุปกรณ์ราชการ</b>
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-mint text-brand border border-brand/20">
+                      ขั้นตอนที่ 3 จาก 4
+                    </span>
+                  </div>
                   <span className="text-[12.5px] text-ink-mute">
                     เรื่อง ขออนุญาตใช้อุปกรณ์ของทางราชการ
                   </span>
@@ -1752,15 +1777,25 @@ export default function BorrowWizardPage() {
       {step === 4 && (
         <div className="w-full flex flex-col gap-4">
           {/* ส่วนหัวขั้นตอนที่ 4 */}
-          <div className="jw-card p-3.5 sm:px-5 sm:py-4 flex items-center gap-3">
-            <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
-              4
-            </span>
-            <div>
-              <b className="text-[15px] sm:text-[16px] text-ink block leading-tight">ลงนามและยืนยันส่งคำขอ</b>
-              <p className="text-[12px] text-ink-mute mt-0.5">
-                ตรวจสอบความถูกต้องของรายการอุปกรณ์ ลงลายมือชื่อดิจิทัล และส่งคำขอให้อบต.พิจารณา
-              </p>
+          <div className="jw-card p-0 overflow-hidden border border-line">
+            <div className="p-3.5 sm:px-5 sm:py-4 flex items-center gap-3">
+              <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                4
+              </span>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <b className="text-[15px] sm:text-[16px] text-ink block leading-tight">ลงนามและยืนยันส่งคำขอ</b>
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-mint text-brand border border-brand/20">
+                    ขั้นตอนที่ 4 จาก 4
+                  </span>
+                </div>
+                <p className="text-[12px] text-ink-mute mt-0.5">
+                  ตรวจสอบความถูกต้องของรายการอุปกรณ์ ลงลายมือชื่อดิจิทัล และส่งคำขอให้อบต.พิจารณา
+                </p>
+              </div>
+            </div>
+            <div className="w-full h-[3px] bg-line/30">
+              <div className="h-full bg-brand transition-all duration-300" style={{ width: '100%' }} />
             </div>
           </div>
 
