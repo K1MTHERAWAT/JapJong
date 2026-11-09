@@ -841,67 +841,26 @@ export default function BookingWizardPage() {
         )
       }
     >
-      {step === 1 ? (
-        <div className="jw-card p-3.5 sm:px-5 sm:py-4 mb-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
+      {/* Header สไตล์การ์ดเดี่ยวตามแบบที่ผู้ใช้อนุมัติ (ตัด Stepper 1-5 ออก) */}
+      {step === 1 && (
+        <div className="jw-card p-3.5 sm:px-5 sm:py-4 mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-brand-mint text-brand flex items-center justify-center shrink-0">
-              <Icon name="building" className="w-5 h-5" />
-            </div>
+            <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+              1
+            </span>
             <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-[16px] sm:text-[18px] font-bold text-ink">ขอใช้สถานที่ราชการ</h1>
-                <span className="text-[11.5px] font-semibold px-2.5 py-0.5 rounded-full bg-brand-mint text-brand">
-                  ขั้นตอนที่ {step} / {STEPS.length}
-                </span>
-              </div>
-              <p className="text-[12.5px] text-ink-mute mt-0.5">
+              <b className="text-[15px] sm:text-[16px] text-ink block leading-tight">เลือกสถานที่ใช้งาน</b>
+              <p className="text-[12px] text-ink-mute mt-0.5">
                 เลือกสถานที่ที่ต้องการใช้งาน (สามารถเลือกได้มากกว่า 1 แห่งในคำขอเดียวกัน)
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto py-0.5">
-            {STEPS.map((label, idx) => {
-              const num = idx + 1;
-              const active = num === step;
-              const done = num < step;
-              const isLast = idx === STEPS.length - 1;
-              return (
-                <React.Fragment key={label}>
-                  <button
-                    type="button"
-                    disabled={num > step}
-                    onClick={() => setStep(num)}
-                    className={`flex items-center gap-1.5 shrink-0 text-[12px] font-semibold transition ${
-                      active
-                        ? 'text-brand-ink font-bold'
-                        : done
-                        ? 'text-ink cursor-pointer hover:text-brand'
-                        : 'text-ink-mute opacity-65'
-                    }`}
-                  >
-                    <span
-                      className={`w-6 h-6 rounded-full text-[11.5px] font-bold flex items-center justify-center ${
-                        active
-                          ? 'bg-brand text-white ring-4 ring-brand/15'
-                          : done
-                          ? 'bg-brand text-white'
-                          : 'bg-soft border border-line text-ink-mute'
-                      }`}
-                    >
-                      {done ? <Icon name="check" className="w-3 h-3" strokeWidth={3} /> : num}
-                    </span>
-                    <span>{label}</span>
-                  </button>
-                  {!isLast && <div className="w-4 sm:w-6 h-[2px] bg-line shrink-0" />}
-                </React.Fragment>
-              );
-            })}
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] font-semibold px-3 py-1.5 rounded-full bg-brand-mint text-brand border border-brand/20">
+              {selectedVenues.length > 0 ? `เลือกแล้ว ${selectedVenues.length} แห่ง` : 'ยังไม่ได้เลือกสถานที่'}
+            </span>
           </div>
-        </div>
-      ) : (
-        <div className="w-full mb-5">
-          <Stepper steps={STEPS} current={step} onSelect={setStep} />
         </div>
       )}
 
@@ -1702,11 +1661,16 @@ export default function BookingWizardPage() {
         <div className="w-full flex flex-col gap-4">
           <div className="jw-card p-4 sm:p-5 flex flex-col gap-2 bg-gradient-to-r from-soft to-white">
             <div className="flex items-center justify-between">
-              <div>
-                <b className="text-[16px] text-ink block">อุปกรณ์เสริมและสิ่งอำนวยความสะดวก</b>
-                <span className="text-[13px] text-ink-mute">
-                  เลือกอุปกรณ์ที่ต้องการใช้ร่วมกับสถานที่ เช่น เครื่องเสียง ไมโครโฟน โปรเจกเตอร์ เต็นท์ หรือโต๊ะ-เก้าอี้
+              <div className="flex items-center gap-3">
+                <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                  3
                 </span>
+                <div>
+                  <b className="text-[16px] text-ink block leading-tight">อุปกรณ์เสริมและสิ่งอำนวยความสะดวก</b>
+                  <span className="text-[12.5px] text-ink-mute mt-0.5">
+                    เลือกอุปกรณ์ที่ต้องการใช้ร่วมกับสถานที่ เช่น เครื่องเสียง ไมโครโฟน โปรเจกเตอร์ เต็นท์ หรือโต๊ะ-เก้าอี้
+                  </span>
+                </div>
               </div>
               {selectedExtraItems.length > 0 && (
                 <span className="px-3 py-1 rounded-full text-[12px] font-bold bg-brand text-white shrink-0">
@@ -1983,11 +1947,16 @@ export default function BookingWizardPage() {
               <span>ยังขาด: {missingRequestFields.join(' · ')}</span>
             </div>
           )}
-          <div className="pb-3 border-b border-line">
-            <b className="text-[17px] text-ink block">แบบขอใช้สถานที่ราชการ</b>
-            <span className="text-[12.5px] text-ink-mute">
-              เรื่อง ขออนุญาตใช้สถานที่ราชการ
+          <div className="pb-3 border-b border-line flex items-center gap-3">
+            <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+              4
             </span>
+            <div>
+              <b className="text-[17px] text-ink block leading-tight">แบบขอใช้สถานที่ราชการ</b>
+              <span className="text-[12.5px] text-ink-mute">
+                เรื่อง ขออนุญาตใช้สถานที่ราชการ
+              </span>
+            </div>
           </div>
 
           {isStaff && (
@@ -2348,6 +2317,19 @@ export default function BookingWizardPage() {
               </button>
             </div>
           )}
+
+          {/* ส่วนหัวขั้นตอนที่ 5 */}
+          <div className="jw-card p-3.5 sm:px-5 sm:py-4 flex items-center gap-3">
+            <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+              5
+            </span>
+            <div>
+              <b className="text-[15px] sm:text-[16px] text-ink block leading-tight">ลงนามและยืนยันส่งคำขอ</b>
+              <p className="text-[12px] text-ink-mute mt-0.5">
+                ตรวจสอบความถูกต้องของเอกสาร ลงลายมือชื่อดิจิทัล และส่งคำขอให้อบต.พิจารณา
+              </p>
+            </div>
+          </div>
 
           {/* แสดงเอกสารจริงตามแบบขอใช้สถานที่ราชการ */}
           <OfficialGovFormDocument
