@@ -106,14 +106,20 @@ export default function BorrowWizardPage() {
   const [isEquipmentAvailable, setIsEquipmentAvailable] = useState(true);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
 
+  const selectedItemsKey = useMemo(
+    () => selectedItems.map((s) => `${s.eq.id}:${s.qty}`).join(','),
+    [selectedItems],
+  );
+
   useEffect(() => {
     if (selectedItems.length === 0 || !pickupDate || !returnDate) {
-      setEquipmentAvailability([]);
-      setEquipmentSummary([]);
+      setEquipmentAvailability((prev) => (prev.length === 0 ? prev : []));
+      setEquipmentSummary((prev) => (prev.length === 0 ? prev : []));
       setIsEquipmentAvailable(true);
       return;
     }
 
+    let active = true;
     setCheckingAvailability(true);
     api
       .checkEquipmentAvailability({
@@ -123,19 +129,26 @@ export default function BorrowWizardPage() {
         month,
       })
       .then((res) => {
+        if (!active) return;
         setEquipmentAvailability(res.dayAvailability);
         setEquipmentSummary(res.summary);
         setIsEquipmentAvailable(res.isAvailable);
       })
       .catch(() => {
-        setEquipmentAvailability([]);
-        setEquipmentSummary([]);
-        setIsEquipmentAvailable(true);
+        if (active) {
+          setEquipmentAvailability([]);
+          setEquipmentSummary([]);
+          setIsEquipmentAvailable(true);
+        }
       })
       .finally(() => {
-        setCheckingAvailability(false);
+        if (active) setCheckingAvailability(false);
       });
-  }, [selectedItems, pickupDate, returnDate, month]);
+
+    return () => {
+      active = false;
+    };
+  }, [selectedItemsKey, pickupDate, returnDate, month]);
 
   // Step 3: Form Fields State (ตามแบบคำขอใช้อุปกรณ์ราชการ)
   const parseTitleAndName = (rawName?: string) => {

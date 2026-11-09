@@ -1,5 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import {
   ACTIVE_BOOKING_STATUSES,
   Account,
@@ -206,6 +207,7 @@ export class ResourcesController {
 
   /** ปฏิทินความว่างรายเดือนของสถานที่ */
   @Public()
+  @SkipThrottle()
   @Get('availability')
   availability(@Query('venueIds') venueIdsParam = '', @Query('month') month?: string): DayAvailability[] {
     const targetMonth = month && /^\d{4}-\d{2}$/.test(month) ? month : new Date().toISOString().slice(0, 7);
@@ -243,6 +245,7 @@ export class ResourcesController {
 
   /** ตรวจสอบช่วงเวลาซ้อนทับ */
   @Public()
+  @SkipThrottle()
   @Post('check-conflicts')
   checkConflicts(@Body() body: { venueIds: string[]; periods: Period[]; excludeRequestId?: string }): {
     conflicts: ConflictInfo[];
@@ -278,6 +281,7 @@ export class ResourcesController {
 
   /** ตรวจสอบความพร้อมใช้งานและจำนวนติดจองของอุปกรณ์ (รองรับทั้งยืมอุปกรณ์และการใช้อุปกรณ์เสริมในสถานที่) */
   @Public()
+  @SkipThrottle()
   @Post('check-equipment-availability')
   checkEquipmentAvailability(
     @Body()

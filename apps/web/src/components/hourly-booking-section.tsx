@@ -129,9 +129,12 @@ export function HourlyBookingSection({
   const [bookedSlotIndices, setBookedSlotIndices] = useState<number[]>([]);
   const [checkingSlots, setCheckingSlots] = useState(false);
 
+  const venueIdsKey = useMemo(() => selectedVenues.map((v) => v.id).sort().join(','), [selectedVenues]);
+  const oneHourSlotsKey = useMemo(() => oneHourSlots.map((s) => `${s.start}-${s.end}`).join(','), [oneHourSlots]);
+
   useEffect(() => {
     if (!selectedDate || !selectedVenues.length || !oneHourSlots.length) {
-      setBookedSlotIndices([]);
+      setBookedSlotIndices((prev) => (prev.length === 0 ? prev : []));
       return;
     }
     const testPeriods: Period[] = oneHourSlots.map((s) => ({
@@ -139,6 +142,7 @@ export function HourlyBookingSection({
       end: `${selectedDate}T${s.end}:00+07:00`,
     }));
 
+    let active = true;
     setCheckingSlots(true);
     api
       .checkConflicts(
@@ -146,12 +150,26 @@ export function HourlyBookingSection({
         testPeriods,
       )
       .then((res) => {
+        if (!active) return;
         const booked = res.conflicts.map((c) => c.periodIndex);
-        setBookedSlotIndices(booked);
+        setBookedSlotIndices((prev) => {
+          if (prev.length === booked.length && prev.every((v, i) => v === booked[i])) {
+            return prev;
+          }
+          return booked;
+        });
       })
-      .catch(() => setBookedSlotIndices([]))
-      .finally(() => setCheckingSlots(false));
-  }, [selectedDate, selectedVenues, oneHourSlots]);
+      .catch(() => {
+        if (active) setBookedSlotIndices((prev) => (prev.length === 0 ? prev : []));
+      })
+      .finally(() => {
+        if (active) setCheckingSlots(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [selectedDate, venueIdsKey, oneHourSlotsKey]);
 
   // State สำหรับ Modal กำหนดเวลาเอง (Custom Time)
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);

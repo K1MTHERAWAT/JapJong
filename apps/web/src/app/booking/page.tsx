@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Clock3, Eye, FileText, Upload, X } from 'lucide-react';
@@ -294,24 +294,43 @@ export default function BookingWizardPage() {
     api.equipment().then(setEquipmentList).catch(() => {});
   }, []);
 
+  const selectedIdsKey = useMemo(() => selectedIds.slice().sort().join(','), [selectedIds]);
+  const periodsKey = useMemo(() => periods.map((p) => `${p.start}|${p.end}`).join(';'), [periods]);
+  const selectedVenues = useMemo(() => venues.filter((v) => selectedIds.includes(v.id)), [venues, selectedIds]);
+
   useEffect(() => {
     if (!selectedIds.length) return;
+    let active = true;
     api
       .availability(selectedIds, month)
-      .then(setAvailability)
+      .then((res) => {
+        if (active) setAvailability(res);
+      })
       .catch(() => {});
-  }, [selectedIds, month]);
+    return () => {
+      active = false;
+    };
+  }, [selectedIdsKey, month]);
 
   useEffect(() => {
     if (!selectedIds.length || !periods.length) {
-      setConflicts([]);
+      setConflicts((prev) => (prev.length === 0 ? prev : []));
       return;
     }
+    let active = true;
     api
       .checkConflicts(selectedIds, periods)
-      .then((res) => setConflicts(res.conflicts))
-      .catch(() => setConflicts([]));
-  }, [selectedIds, periods]);
+      .then((res) => {
+        if (!active) return;
+        setConflicts(res.conflicts);
+      })
+      .catch(() => {
+        if (active) setConflicts([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedIdsKey, periodsKey]);
 
   const toggleVenue = (v: Venue) => {
     if (v.status !== 'available' || !v.enabled) return;
@@ -326,7 +345,6 @@ export default function BookingWizardPage() {
     return true;
   });
 
-  const selectedVenues = venues.filter((v) => selectedIds.includes(v.id));
   const buildings = Array.from(new Set(venues.map((v) => v.building)));
 
   const [bookingMode, setBookingMode] = useState<'hourly' | 'daily'>('hourly');
@@ -359,7 +377,7 @@ export default function BookingWizardPage() {
         ]);
       }
     }
-  }, [selectedVenues, earliestBookableDate]);
+  }, [selectedIdsKey, earliestBookableDate]);
 
   // ตรวจสอบเงื่อนไขวันและเวลา (Real-time Validation)
   const periodValidationErrors = React.useMemo(() => {
@@ -372,12 +390,18 @@ export default function BookingWizardPage() {
   >({});
   const [checkingEquipmentStock, setCheckingEquipmentStock] = useState(false);
 
+  const equipmentQuantitiesKey = useMemo(
+    () => JSON.stringify(equipmentQuantities),
+    [equipmentQuantities],
+  );
+
   useEffect(() => {
     if (!periods.length || equipmentList.length === 0) return;
     const sortedStarts = periods.map((p) => p.start.slice(0, 10)).filter(Boolean).sort();
     const sortedEnds = periods.map((p) => p.end.slice(0, 10)).filter(Boolean).sort();
     if (!sortedStarts.length || !sortedEnds.length) return;
 
+    let active = true;
     setCheckingEquipmentStock(true);
     api
       .checkEquipmentAvailability({
@@ -391,6 +415,7 @@ export default function BookingWizardPage() {
         month,
       })
       .then((res) => {
+        if (!active) return;
         const map: Record<string, { availableQty: number; reservedQty: number; totalStock: number }> = {};
         for (const item of res.summary) {
           map[item.equipmentId] = {
@@ -405,9 +430,13 @@ export default function BookingWizardPage() {
         // กรณีเชื่อมต่อไม่ได้ ให้คงค่าสต๊อกเดิม
       })
       .finally(() => {
-        setCheckingEquipmentStock(false);
+        if (active) setCheckingEquipmentStock(false);
       });
-  }, [periods, equipmentList, month]);
+
+    return () => {
+      active = false;
+    };
+  }, [periodsKey, equipmentList.length, month, equipmentQuantitiesKey]);
 
   const setEquipmentQty = (id: string, max: number, next: number) => {
     const clamped = Math.max(0, Math.min(max, next));

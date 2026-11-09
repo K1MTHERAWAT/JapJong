@@ -954,6 +954,16 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
   async persistRequest(r: AnyRequest) {
     if (!this.dbAvailable) return;
+    const parseDateSafe = (val?: string | Date | null): Date | null => {
+      if (!val) return null;
+      if (val instanceof Date) return Number.isNaN(val.getTime()) ? null : val;
+      const str = String(val).trim();
+      if (!str) return null;
+      const iso = str.includes('T') ? str : `${str}T00:00:00.000Z`;
+      const d = new Date(iso);
+      return Number.isNaN(d.getTime()) ? null : d;
+    };
+
     const commonData = {
       code: r.code,
       type: r.type,
@@ -974,10 +984,10 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       activity: r.type === 'booking' ? r.activity : null,
       attendees: r.type === 'booking' ? r.attendees : null,
       attachments: Array.isArray(r.attachments) ? r.attachments : [],
-      pickupDate: r.type === 'borrow' ? new Date(`${r.pickupDate}T00:00:00.000Z`) : null,
-      returnDate: r.type === 'borrow' ? new Date(`${r.returnDate}T00:00:00.000Z`) : null,
-      returnRequestedAt: r.type === 'borrow' && r.returnRequestedAt ? new Date(r.returnRequestedAt) : null,
-      returnedAt: r.type === 'borrow' && r.returnedAt ? new Date(r.returnedAt) : null,
+      pickupDate: r.type === 'borrow' ? parseDateSafe(r.pickupDate) : null,
+      returnDate: r.type === 'borrow' ? parseDateSafe(r.returnDate) : null,
+      returnRequestedAt: r.type === 'borrow' ? parseDateSafe(r.returnRequestedAt) : null,
+      returnedAt: r.type === 'borrow' ? parseDateSafe(r.returnedAt) : null,
       repairBuilding: r.type === 'repair' ? r.building : null,
       repairFloor: r.type === 'repair' ? r.floor : null,
       repairLocation: r.type === 'repair' ? r.location : null,
@@ -988,20 +998,51 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       repairStaffSignature: r.type === 'repair' ? r.staffSignature ?? null : null,
       repairStaffSignerName: r.type === 'repair' ? r.staffSignerName ?? null : null,
       repairAcceptSignature: r.type === 'repair' ? r.acceptanceSignature ?? null : null,
-      repairAcceptedAt: r.type === 'repair' && r.acceptedAt ? new Date(r.acceptedAt) : null,
-      repairStartedAt: r.type === 'repair' && r.startedAt ? new Date(r.startedAt) : null,
-      repairFinishedAt: r.type === 'repair' && r.finishedAt ? new Date(r.finishedAt) : null,
-      repairAcceptedByReqAt:
-        r.type === 'repair' && r.acceptedByRequesterAt ? new Date(r.acceptedByRequesterAt) : null,
+      repairAcceptedAt: r.type === 'repair' ? parseDateSafe(r.acceptedAt) : null,
+      repairStartedAt: r.type === 'repair' ? parseDateSafe(r.startedAt) : null,
+      repairFinishedAt: r.type === 'repair' ? parseDateSafe(r.finishedAt) : null,
+      repairAcceptedByReqAt: r.type === 'repair' ? parseDateSafe(r.acceptedByRequesterAt) : null,
       createdByStaffId: r.createdByStaffId ?? null,
       createdByStaffSignature: r.createdByStaffSignature ?? null,
       rejectReason: r.rejectReason ?? null,
       approvalRound: r.approvalRound ?? 1,
-      createdAt: new Date(r.createdAt),
-      updatedAt: new Date(r.updatedAt),
+      createdAt: parseDateSafe(r.createdAt) || new Date(),
+      updatedAt: parseDateSafe(r.updatedAt) || new Date(),
     };
 
     await this.prisma.$transaction(async (tx: any) => {
+      // 1. ตรวจสอบว่า requesterId มีอยู่ในฐานข้อมูล Account หรือไม่ (ป้องกัน FK violation เช่น walk-in citizens)
+      if (r.requesterId) {
+        const accExists = await tx.account.findUnique({
+          where: { id: r.requesterId },
+          select: { id: true },
+        });
+        if (!accExists) {
+          const fallbackUser = this.accounts.find((a) => a.id === r.requesterId);
+          await tx.account.create({
+            data: {
+              id: r.requesterId,
+              username: fallbackUser?.username || `walkin_${r.code.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+              password: fallbackUser?.password || '-',
+              name: fallbackUser?.name || r.requesterName || 'ผู้มาติดต่อหน้าเคาน์เตอร์',
+              nickname: fallbackUser?.nickname || null,
+              initial: (fallbackUser?.name || r.requesterName || 'W').trim().slice(0, 2).toUpperCase(),
+              role: fallbackUser?.role || 'CITIZEN',
+              position: fallbackUser?.position || r.requesterPosition || 'ประชาชน/ผู้มาติดต่อ',
+              department: fallbackUser?.department || r.organization || 'ประชาชนทั่วไป',
+              phone: fallbackUser?.phone || r.requesterPhone || '-',
+              lineName: fallbackUser?.lineName || null,
+              permissions: (fallbackUser?.permissions as any) || {},
+              signature: fallbackUser?.signature || r.requesterSignature || null,
+              pin: fallbackUser?.pin || null,
+              isDemo: fallbackUser?.isDemo ?? false,
+              active: fallbackUser?.active ?? true,
+              createdAt: fallbackUser?.createdAt ? new Date(fallbackUser.createdAt) : new Date(r.createdAt),
+            },
+          });
+        }
+      }
+
       await tx.request.upsert({
         where: { id: r.id },
         create: { id: r.id, ...commonData },
@@ -1044,7 +1085,28 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       if (r.type === 'booking' || r.type === 'borrow') {
         await tx.requestItem.deleteMany({ where: { requestId: r.id } });
         const itemList = r.type === 'booking' ? r.extraItems : r.items;
-        if (itemList.length > 0) {
+        if (itemList && itemList.length > 0) {
+          // ตรวจสอบความถูกต้องของ equipmentId ในฐานข้อมูล ป้องกัน FK violation
+          for (const it of itemList) {
+            const eqExists = await tx.equipment.findUnique({
+              where: { id: it.equipmentId },
+              select: { id: true },
+            });
+            if (!eqExists) {
+              const memEq = this.equipment.find((e) => e.id === it.equipmentId);
+              if (memEq) {
+                await tx.equipment.create({
+                  data: {
+                    id: memEq.id,
+                    name: memEq.name,
+                    category: memEq.category,
+                    stock: memEq.stock,
+                    enabled: memEq.enabled,
+                  },
+                });
+              }
+            }
+          }
           await tx.requestItem.createMany({
             data: itemList.map((it) => ({
               requestId: r.id,

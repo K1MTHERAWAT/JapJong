@@ -5,6 +5,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  Logger,
   NotFoundException,
   Optional,
   Param,
@@ -69,6 +70,7 @@ class AsyncMutex {
 @ApiBearerAuth('bearer')
 @Controller('requests')
 export class RequestsController {
+  private readonly logger = new Logger(RequestsController.name);
   private readonly bookingMutex = new AsyncMutex();
 
   constructor(
@@ -343,6 +345,21 @@ export class RequestsController {
       throw new ForbiddenException('บริการขอใช้สถานที่ถูกปิดใช้งานชั่วคราวโดยผู้ดูแลระบบ');
     }
     return this.bookingMutex.runExclusive(async () => {
+      const requesterSig = requireDrawnSignature(body.requesterSignature, 'ผู้ขอใช้สถานที่');
+
+      const isWalkIn =
+        Boolean(body.createdByStaffSignature) ||
+        Boolean(body.requesterId && body.requesterId !== user.id);
+      if (isWalkIn && !hasPermission(user, 'walkIn')) {
+        throw new ForbiddenException(
+          'ไม่มีสิทธิ์กรอกคำขอแทนผู้มาติดต่อ (Walk-in): ต้องเปิดสิทธิ์ "กรอกคำขอแทนผู้มาติดต่อหน้าเคาน์เตอร์"',
+        );
+      }
+      if (isWalkIn && body.requesterId && !this.db.accounts.some((a) => a.id === body.requesterId)) {
+        throw new BadRequestException('ไม่พบผู้ใช้ที่ระบุ');
+      }
+      const staffSig = isWalkIn && body.createdByStaffSignature ? requireDrawnSignature(body.createdByStaffSignature, 'เจ้าหน้าที่ผู้กรอกแทน') : undefined;
+
       const venueIds = Array.isArray(body.venueIds) ? body.venueIds : [];
       const periods = Array.isArray(body.periods) ? body.periods : [];
       this.validatePeriodsAndVenues(venueIds, periods);
@@ -356,22 +373,6 @@ export class RequestsController {
           );
         }
       }
-
-      const requesterSig = requireDrawnSignature(body.requesterSignature, 'ผู้ขอใช้สถานที่');
-
-      const isWalkIn =
-        Boolean(body.createdByStaffSignature) ||
-        Boolean(body.requesterId && body.requesterId !== user.id) ||
-        Boolean((user.role === 'STAFF' || user.role === 'ADMIN') && body.requesterName && body.requesterName.trim() !== user.name);
-      if (isWalkIn && !hasPermission(user, 'walkIn')) {
-        throw new ForbiddenException(
-          'ไม่มีสิทธิ์กรอกคำขอแทนผู้มาติดต่อ (Walk-in): ต้องเปิดสิทธิ์ "กรอกคำขอแทนผู้มาติดต่อหน้าเคาน์เตอร์"',
-        );
-      }
-      if (isWalkIn && body.requesterId && !this.db.accounts.some((a) => a.id === body.requesterId)) {
-        throw new BadRequestException('ไม่พบผู้ใช้ที่ระบุ');
-      }
-      const staffSig = isWalkIn && body.createdByStaffSignature ? requireDrawnSignature(body.createdByStaffSignature, 'เจ้าหน้าที่ผู้กรอกแทน') : undefined;
 
       const extraItems = this.sanitizeItems(body.extraItems);
       if (extraItems.length > 0) {
@@ -423,8 +424,8 @@ export class RequestsController {
             }))
           : undefined,
       };
-      this.db.requests.unshift(req);
       await this.db.persistRequest(req);
+      this.db.requests.unshift(req);
       if (this.notificationEvents) {
         await this.notificationEvents.onBookingCreated(req);
       } else {
@@ -448,79 +449,83 @@ export class RequestsController {
       throw new ForbiddenException('บริการยืม-คืนอุปกรณ์ถูกปิดใช้งานชั่วคราวโดยผู้ดูแลระบบ');
     }
     return this.bookingMutex.runExclusive(async () => {
-      const items = this.sanitizeItems(body.items);
-      if (!items.length) throw new BadRequestException('กรุณาเลือกอุปกรณ์อย่างน้อย 1 รายการ');
-      const pickupDate = String(body.pickupDate ?? '').slice(0, 10);
-      const returnDate = String(body.returnDate ?? '').slice(0, 10);
-      this.validateBorrowInventory(items, pickupDate, returnDate);
+      try {
+        const items = this.sanitizeItems(body.items);
+        if (!items.length) throw new BadRequestException('กรุณาเลือกอุปกรณ์อย่างน้อย 1 รายการ');
+        const pickupDate = String(body.pickupDate ?? '').slice(0, 10);
+        const returnDate = String(body.returnDate ?? '').slice(0, 10);
+        this.validateBorrowInventory(items, pickupDate, returnDate);
 
-      const isWalkIn =
-        Boolean(body.createdByStaffSignature) ||
-        Boolean(body.requesterId && body.requesterId !== user.id) ||
-        Boolean((user.role === 'STAFF' || user.role === 'ADMIN') && body.requesterName && body.requesterName.trim() !== user.name);
+        const isWalkIn =
+          Boolean(body.createdByStaffSignature) ||
+          Boolean(body.requesterId && body.requesterId !== user.id);
 
-      if (isWalkIn && !hasPermission(user, 'walkIn')) {
-        throw new ForbiddenException('ไม่มีสิทธิ์กรอกคำขอแทนที่เคาน์เตอร์');
+        if (isWalkIn && !hasPermission(user, 'walkIn')) {
+          throw new ForbiddenException('ไม่มีสิทธิ์กรอกคำขอแทนที่เคาน์เตอร์');
+        }
+
+        const requesterSig = requireDrawnSignature(body.requesterSignature, 'ผู้ขอยืม');
+        const staffSig = isWalkIn && body.createdByStaffSignature ? requireDrawnSignature(body.createdByStaffSignature, 'เจ้าหน้าที่ผู้กรอกแทน') : undefined;
+
+        const now = new Date().toISOString();
+        const code = await this.db.nextCode('BR');
+
+        // ตรวจสอบสต็อกซ้ำอีกครั้งก่อนบันทึกแบบ atomic
+        this.validateBorrowInventory(items, pickupDate, returnDate);
+
+        const walkInRequesterId = `u-walkin-${code.toLowerCase()}`;
+        const req: BorrowRequest = {
+          id: `r-${code.toLowerCase()}`,
+          code,
+          type: 'borrow',
+          status: 'pending_staff',
+          approvalRound: 1,
+          requesterId: isWalkIn ? body.requesterId || walkInRequesterId : user.id,
+          requesterName: body.requesterName?.trim() || user.name,
+          requesterPhone: body.requesterPhone ? String(body.requesterPhone).trim().slice(0, 40) : (isWalkIn ? undefined : user.phone),
+          requesterSignature: requesterSig,
+          organization: String(body.organization ?? '').slice(0, 200) || user.department,
+          createdAt: now,
+          updatedAt: now,
+          createdByStaffId: isWalkIn ? user.id : undefined,
+          createdByStaffSignature: staffSig,
+          items,
+          pickupDate: String(body.pickupDate).slice(0, 10),
+          returnDate: String(body.returnDate).slice(0, 10),
+          purpose: String(body.purpose ?? '').trim().slice(0, 1000),
+          attachments: (body.attachments ?? []).slice(0, 10).map((a) => String(a).slice(0, 200)),
+          signatures: [],
+          writtenAt: body.writtenAt ? String(body.writtenAt).slice(0, 150) : '',
+          requesterPosition: body.requesterPosition ? String(body.requesterPosition).slice(0, 100) : (user.position || ''),
+          addressHouseNo: body.addressHouseNo ? String(body.addressHouseNo).slice(0, 40) : (user.addressHouseNo ?? ''),
+          addressMoo: body.addressMoo ? String(body.addressMoo).slice(0, 20) : (user.addressMoo ?? ''),
+          addressSubdistrict: body.addressSubdistrict ? String(body.addressSubdistrict).slice(0, 80) : (user.addressSubdistrict ?? ''),
+          addressDistrict: body.addressDistrict ? String(body.addressDistrict).slice(0, 80) : (user.addressDistrict ?? ''),
+          addressProvince: body.addressProvince ? String(body.addressProvince).slice(0, 80) : (user.addressProvince ?? ''),
+          purposeItems: Array.isArray(body.purposeItems)
+            ? body.purposeItems.slice(0, 20).map((pi) => ({
+                item: String(pi?.item ?? '').slice(0, 200),
+                forWhat: String(pi?.forWhat ?? '').slice(0, 300),
+              }))
+            : undefined,
+        };
+        await this.db.persistRequest(req);
+        this.db.requests.unshift(req);
+        if (this.notificationEvents) {
+          await this.notificationEvents.onBorrowCreated(req);
+        } else {
+          this.db.notifyRole('STAFF', 'มีคำขอยืมครุภัณฑ์ใหม่', `${req.code} · ${req.requesterName}`, `/staff/review?id=${req.id}`);
+        }
+        await this.db.log('request', `ส่งคำขอยืม ${req.code}`, req.requesterName, {
+          id: user.id,
+          name: user.name,
+          role: user.role,
+        });
+        return this.enrich(req);
+      } catch (err: any) {
+        this.logger.error(`Error in createBorrow: ${err?.message}`, err?.stack);
+        throw err;
       }
-
-      const requesterSig = requireDrawnSignature(body.requesterSignature, 'ผู้ขอยืม');
-      const staffSig = isWalkIn && body.createdByStaffSignature ? requireDrawnSignature(body.createdByStaffSignature, 'เจ้าหน้าที่ผู้กรอกแทน') : undefined;
-
-      const now = new Date().toISOString();
-      const code = await this.db.nextCode('BR');
-
-      // ตรวจสอบสต็อกซ้ำอีกครั้งก่อนบันทึกแบบ atomic
-      this.validateBorrowInventory(items, pickupDate, returnDate);
-
-      const walkInRequesterId = `u-walkin-${code.toLowerCase()}`;
-      const req: BorrowRequest = {
-        id: `r-${code.toLowerCase()}`,
-        code,
-        type: 'borrow',
-        status: 'pending_staff',
-        approvalRound: 1,
-        requesterId: isWalkIn ? body.requesterId || walkInRequesterId : user.id,
-        requesterName: body.requesterName?.trim() || user.name,
-        requesterPhone: body.requesterPhone ? String(body.requesterPhone).trim().slice(0, 40) : (isWalkIn ? undefined : user.phone),
-        requesterSignature: requesterSig,
-        organization: String(body.organization ?? '').slice(0, 200) || user.department,
-        createdAt: now,
-        updatedAt: now,
-        createdByStaffId: isWalkIn ? user.id : undefined,
-        createdByStaffSignature: staffSig,
-        items,
-        pickupDate: String(body.pickupDate).slice(0, 10),
-        returnDate: String(body.returnDate).slice(0, 10),
-        purpose: String(body.purpose ?? '').trim().slice(0, 1000),
-        attachments: (body.attachments ?? []).slice(0, 10).map((a) => String(a).slice(0, 200)),
-        signatures: [],
-        writtenAt: body.writtenAt ? String(body.writtenAt).slice(0, 150) : '',
-        requesterPosition: body.requesterPosition ? String(body.requesterPosition).slice(0, 100) : (user.position || ''),
-        addressHouseNo: body.addressHouseNo ? String(body.addressHouseNo).slice(0, 40) : (user.addressHouseNo ?? ''),
-        addressMoo: body.addressMoo ? String(body.addressMoo).slice(0, 20) : (user.addressMoo ?? ''),
-        addressSubdistrict: body.addressSubdistrict ? String(body.addressSubdistrict).slice(0, 80) : (user.addressSubdistrict ?? ''),
-        addressDistrict: body.addressDistrict ? String(body.addressDistrict).slice(0, 80) : (user.addressDistrict ?? ''),
-        addressProvince: body.addressProvince ? String(body.addressProvince).slice(0, 80) : (user.addressProvince ?? ''),
-        purposeItems: Array.isArray(body.purposeItems)
-          ? body.purposeItems.slice(0, 20).map((pi) => ({
-              item: String(pi?.item ?? '').slice(0, 200),
-              forWhat: String(pi?.forWhat ?? '').slice(0, 300),
-            }))
-          : undefined,
-      };
-      this.db.requests.unshift(req);
-      await this.db.persistRequest(req);
-      if (this.notificationEvents) {
-        await this.notificationEvents.onBorrowCreated(req);
-      } else {
-        this.db.notifyRole('STAFF', 'มีคำขอยืมครุภัณฑ์ใหม่', `${req.code} · ${req.requesterName}`, `/staff/review?id=${req.id}`);
-      }
-      await this.db.log('request', `ส่งคำขอยืม ${req.code}`, req.requesterName, {
-        id: user.id,
-        name: user.name,
-        role: user.role,
-      });
-      return this.enrich(req);
     });
   }
 
@@ -536,8 +541,7 @@ export class RequestsController {
 
     const isWalkIn =
       Boolean(body.createdByStaffSignature) ||
-      Boolean(body.requesterId && body.requesterId !== user.id) ||
-      Boolean(body.requesterName && body.requesterName.trim() !== user.name);
+      Boolean(body.requesterId && body.requesterId !== user.id);
 
     if (isWalkIn && !hasPermission(user, 'walkIn')) {
       throw new ForbiddenException('ไม่มีสิทธิ์กรอกคำขอแทนที่เคาน์เตอร์');
@@ -580,8 +584,8 @@ export class RequestsController {
       photos: photosCount,
       attachments,
     };
-    this.db.requests.unshift(req);
     await this.db.persistRequest(req);
+    this.db.requests.unshift(req);
     if (this.notificationEvents) {
       await this.notificationEvents.onRepairCreated(req);
     } else {
