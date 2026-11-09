@@ -1502,26 +1502,30 @@ export default function BookingWizardPage() {
                   2
                 </span>
                 <div>
-                  <b className="text-[15px] sm:text-[16px] text-ink">เลือกวันและเวลาใช้งาน (จองรายวัน)</b>
+                  <b className="text-[15px] sm:text-[16px] text-ink">เลือกวันและเวลาใช้งาน</b>
                   <p className="text-[12px] text-ink-mute">
-                    {selectedVenues.map((v) => v.name).join(', ')} · รูปแบบดั้งเดิม (ช่วงวันไป-กลับ)
+                    {selectedVenues.map((v) => v.name).join(', ')} · รูปแบบรายวัน (ช่วงวันไป-กลับ)
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-canvas p-1 rounded-full border border-line">
                 <button
                   type="button"
                   onClick={() => setBookingMode('hourly')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] text-brand hover:text-brand-dark hover:bg-brand-mint border border-brand/30 transition font-semibold"
-                  title="สลับไปใช้งานแบบเลือกรอบรายชั่วโมง (ค่าเริ่มต้น)"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-medium text-ink-soft hover:text-ink hover:bg-hover transition"
+                  title="สลับไปโหมดรายชั่วโมง"
                 >
-                  <Icon name="clock" className="w-3.5 h-3.5" />
-                  <span>สลับไปจองรายชั่วโมง</span>
+                  <Icon name="clock" className="w-3.5 h-3.5 text-ink-mute" />
+                  <span>รายชั่วโมง</span>
                 </button>
-                <span className="text-[12px] font-semibold text-ink-soft bg-soft px-3 py-1.5 rounded-full border border-line">
-                  จองรายวัน
-                </span>
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-semibold bg-brand text-white shadow-xs transition"
+                >
+                  <Icon name="calendar" className="w-3.5 h-3.5 text-white" />
+                  <span>รายวัน</span>
+                </button>
               </div>
             </div>
 
