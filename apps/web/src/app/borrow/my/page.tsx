@@ -72,7 +72,7 @@ export default function MyBorrowsPage() {
     try {
       const [eqs, reqs] = await Promise.all([
         api.equipment().catch(() => [] as Equipment[]),
-        api.listRequests({ mine: !isStaffOrAdmin, type: 'borrow' }),
+        api.listRequests({ mine: true, type: 'borrow' }),
       ]);
       setEquipmentList(eqs);
       const borrowReqs = (reqs as ExtendedBorrowRequest[]) || [];
@@ -82,7 +82,7 @@ export default function MyBorrowsPage() {
     } finally {
       setLoading(false);
     }
-  }, [isStaffOrAdmin]);
+  }, []);
 
   useEffect(() => {
     load();
