@@ -491,82 +491,92 @@ export default function StaffHomePage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2.5">
                 <Link
                   href="/staff/resources"
-                  className="p-3 rounded-xl border border-line hover:border-brand hover:bg-brand-tint/20 transition flex items-center gap-3 group"
+                  className="p-3 rounded-xl border border-line hover:border-emerald-500 hover:bg-emerald-50/50 transition flex items-center gap-3 group"
                 >
-                  <div className="size-10 rounded-xl bg-brand-tint text-brand flex items-center justify-center shrink-0 group-hover:bg-brand group-hover:text-white transition">
+                  <div className="size-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition">
                     <Building2 className="size-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <b className="text-[13.5px] text-ink block truncate">จัดการสถานที่และอุปกรณ์</b>
+                    <b className="text-[13.5px] text-ink block truncate group-hover:text-emerald-800 transition">
+                      จัดการสถานที่และอุปกรณ์
+                    </b>
                     <span className="text-[11.5px] text-ink-mute block truncate">
                       เพิ่ม/แก้ไข/เปิด-ปิดทรัพยากรและแบบฟอร์ม
                     </span>
                   </div>
-                  <ArrowRight className="size-4 text-ink-mute group-hover:text-brand shrink-0" />
+                  <ArrowRight className="size-4 text-ink-mute group-hover:text-emerald-700 shrink-0 transition" />
                 </Link>
 
                 <Link
                   href="/staff/resources?tab=forms"
-                  className="p-3 rounded-xl border border-line hover:border-brand hover:bg-brand-tint/20 transition flex items-center gap-3 group"
+                  className="p-3 rounded-xl border border-line hover:border-indigo-500 hover:bg-indigo-50/50 transition flex items-center gap-3 group"
                 >
-                  <div className="size-10 rounded-xl bg-brand-tint text-brand flex items-center justify-center shrink-0 group-hover:bg-brand group-hover:text-white transition">
+                  <div className="size-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition">
                     <FileText className="size-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <b className="text-[13.5px] text-ink block truncate">ตั้งค่าแม่แบบฟอร์มราชการ</b>
+                    <b className="text-[13.5px] text-ink block truncate group-hover:text-indigo-800 transition">
+                      ตั้งค่าแม่แบบฟอร์มราชการ
+                    </b>
                     <span className="text-[11.5px] text-ink-mute block truncate">
                       ปรับแต่งหัวกระดาษและช่องลงนาม
                     </span>
                   </div>
-                  <ArrowRight className="size-4 text-ink-mute group-hover:text-brand shrink-0" />
+                  <ArrowRight className="size-4 text-ink-mute group-hover:text-indigo-700 shrink-0 transition" />
                 </Link>
 
                 <Link
                   href="/booking"
-                  className="p-3 rounded-xl border border-line hover:border-brand hover:bg-brand-tint/20 transition flex items-center gap-3 group"
+                  className="p-3 rounded-xl border border-line hover:border-teal-500 hover:bg-teal-50/50 transition flex items-center gap-3 group"
                 >
-                  <div className="size-10 rounded-xl bg-surface-muted text-ink flex items-center justify-center shrink-0 group-hover:bg-brand group-hover:text-white transition">
+                  <div className="size-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center shrink-0 group-hover:bg-teal-600 group-hover:text-white transition">
                     <Building2 className="size-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <b className="text-[13.5px] text-ink block truncate">ยื่นคำขอใช้สถานที่</b>
+                    <b className="text-[13.5px] text-ink block truncate group-hover:text-teal-800 transition">
+                      ยื่นคำขอใช้สถานที่
+                    </b>
                     <span className="text-[11.5px] text-ink-mute block truncate">
                       จองห้องประชุม ศาลา สนามกีฬา
                     </span>
                   </div>
-                  <ArrowRight className="size-4 text-ink-mute group-hover:text-brand shrink-0" />
+                  <ArrowRight className="size-4 text-ink-mute group-hover:text-teal-700 shrink-0 transition" />
                 </Link>
 
                 <Link
                   href="/borrow"
-                  className="p-3 rounded-xl border border-line hover:border-brand hover:bg-brand-tint/20 transition flex items-center gap-3 group"
+                  className="p-3 rounded-xl border border-line hover:border-amber-500 hover:bg-amber-50/50 transition flex items-center gap-3 group"
                 >
-                  <div className="size-10 rounded-xl bg-surface-muted text-ink flex items-center justify-center shrink-0 group-hover:bg-brand group-hover:text-white transition">
+                  <div className="size-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 group-hover:bg-amber-600 group-hover:text-white transition">
                     <Package className="size-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <b className="text-[13.5px] text-ink block truncate">ยื่นคำขอยืม–คืนอุปกรณ์</b>
+                    <b className="text-[13.5px] text-ink block truncate group-hover:text-amber-800 transition">
+                      ยื่นคำขอยืม–คืนอุปกรณ์
+                    </b>
                     <span className="text-[11.5px] text-ink-mute block truncate">
                       เบิกยืมเครื่องเสียง เต็นท์ โต๊ะ เก้าอี้
                     </span>
                   </div>
-                  <ArrowRight className="size-4 text-ink-mute group-hover:text-brand shrink-0" />
+                  <ArrowRight className="size-4 text-ink-mute group-hover:text-amber-700 shrink-0 transition" />
                 </Link>
 
                 <Link
                   href="/history"
-                  className="p-3 rounded-xl border border-line hover:border-brand hover:bg-brand-tint/20 transition flex items-center gap-3 group"
+                  className="p-3 rounded-xl border border-line hover:border-blue-500 hover:bg-blue-50/50 transition flex items-center gap-3 group"
                 >
-                  <div className="size-10 rounded-xl bg-surface-muted text-ink flex items-center justify-center shrink-0 group-hover:bg-brand group-hover:text-white transition">
+                  <div className="size-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0 group-hover:bg-blue-600 group-hover:text-white transition">
                     <History className="size-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <b className="text-[13.5px] text-ink block truncate">ประวัติคำขอทั้งหมดในระบบ</b>
+                    <b className="text-[13.5px] text-ink block truncate group-hover:text-blue-800 transition">
+                      ประวัติคำขอทั้งหมดในระบบ
+                    </b>
                     <span className="text-[11.5px] text-ink-mute block truncate">
                       ค้นหาและดูเอกสารใบอนุญาตย้อนหลัง
                     </span>
                   </div>
-                  <ArrowRight className="size-4 text-ink-mute group-hover:text-brand shrink-0" />
+                  <ArrowRight className="size-4 text-ink-mute group-hover:text-blue-700 shrink-0 transition" />
                 </Link>
               </div>
             </div>

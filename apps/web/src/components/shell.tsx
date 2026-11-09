@@ -46,6 +46,7 @@ export interface AppShellProps {
 }
 
 export function AppShell({
+  maxWidth,
   footer,
   children,
 }: AppShellProps) {
@@ -183,8 +184,8 @@ export function AppShell({
               </div>
             </Card>
           ) : (
-            <div className="flex-1 flex flex-col justify-between gap-6">
-              <div>{children}</div>
+            <div className={`flex-1 flex flex-col justify-between gap-6 w-full ${maxWidth && maxWidth !== 'max-w-none' ? `${maxWidth} mx-auto` : ''}`}>
+              <div className="w-full">{children}</div>
               {footer && (
                 <div className="print:hidden sticky bottom-3 z-20 mt-2 rounded-card bg-surface/95 backdrop-blur-md border border-line shadow-float px-4 py-3 flex items-center justify-end">
                   {footer}

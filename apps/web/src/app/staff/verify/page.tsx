@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   DocumentScanLog,
+  RequestStatus,
+  STATUS_META,
   StaffVerificationResult,
   VERIFICATION_DOC_TYPE_LABEL,
   VERIFICATION_STATUS_LABEL,
@@ -659,7 +661,13 @@ export default function StaffVerifyPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <b className="text-[18px] text-ink">{VERIFICATION_STATUS_LABEL[status]}</b>
-                    <Chip tone={tone}>{status}</Chip>
+                    <Chip tone={tone}>
+                      {status === 'VALID'
+                        ? 'เอกสารสมบูรณ์'
+                        : status === 'REVOKED'
+                        ? 'ยกเลิกแล้ว'
+                        : 'ไม่ถูกต้อง'}
+                    </Chip>
                   </div>
                   <span className="text-[13px] text-ink-mute">
                     {result.message}
@@ -739,7 +747,15 @@ export default function StaffVerifyPage() {
                     </div>
                     <div className="flex justify-between py-1 border-b border-soft">
                       <span className="text-ink-mute">สถานะคำขอ:</span>
-                      <Chip tone="green">{result.requestStatus || 'อนุมัติแล้ว'}</Chip>
+                      {(() => {
+                        const statusKey = result.requestStatus as RequestStatus | undefined;
+                        const meta = statusKey ? STATUS_META[statusKey] : undefined;
+                        return (
+                          <Chip tone={meta?.tone || 'green'}>
+                            {meta?.label || result.requestStatus || 'อนุมัติแล้ว'}
+                          </Chip>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
