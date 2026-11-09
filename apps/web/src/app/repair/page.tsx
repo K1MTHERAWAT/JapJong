@@ -119,14 +119,17 @@ export default function RepairPage() {
     api
       .listRequests({ mine: true, type: 'repair' })
       .then((list) => {
-        const typed = list as (RequestWithTimeline & RepairRequest)[];
+        let typed = list as (RequestWithTimeline & RepairRequest)[];
+        if (account?.id) {
+          typed = typed.filter((r) => r.requesterId === account.id);
+        }
         setRepairs(typed);
         if (typed.length && !typed.some((x) => x.id === activeId)) {
           setActiveId(typed[0].id);
         }
       })
       .catch(() => {});
-  }, [activeId]);
+  }, [activeId, account?.id]);
 
   useEffect(() => {
     loadRepairs();

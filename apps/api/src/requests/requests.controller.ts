@@ -387,8 +387,8 @@ export class RequestsController {
     let items = [...this.db.requests];
 
     if (mine === '1') {
-      // ของใครของมัน: แสดงเฉพาะคำขอของผู้ใช้งานที่เข้าสู่ระบบเท่านั้น
-      items = items.filter((r) => r.requesterId === user.id || r.createdByStaffId === user.id);
+      // ของใครของมัน: แสดงเฉพาะคำขอของผู้ใช้งานที่เข้าสู่ระบบเท่านั้น (บัญชีใครบัญชีมัน)
+      items = items.filter((r) => r.requesterId === user.id);
     } else if (user.role === 'USER') {
       items = items.filter((r) => r.requesterId === user.id);
     }

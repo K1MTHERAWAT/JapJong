@@ -75,14 +75,16 @@ export default function MyBorrowsPage() {
         api.listRequests({ mine: true, type: 'borrow' }),
       ]);
       setEquipmentList(eqs);
-      const borrowReqs = (reqs as ExtendedBorrowRequest[]) || [];
+      const borrowReqs = ((reqs as ExtendedBorrowRequest[]) || []).filter(
+        (r) => !account?.id || r.requesterId === account.id,
+      );
       setItems(borrowReqs);
     } catch (err: unknown) {
       setErrorMsg((err as Error).message || 'ไม่สามารถดึงข้อมูลรายการยืม–คืนอุปกรณ์ได้');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [account?.id]);
 
   useEffect(() => {
     load();

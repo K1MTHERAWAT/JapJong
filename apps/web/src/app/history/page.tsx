@@ -51,6 +51,7 @@ export default function RequestHistoryPage() {
   }, [account]);
 
   const filtered = requests.filter((r) => {
+    if (account?.id && r.requesterId !== account.id) return false;
     if (typeFilter !== 'all' && r.type !== typeFilter) return false;
     if (statusFilter === 'pending' && !PENDING_STATUSES.includes(r.status)) return false;
     if (statusFilter === 'approved' && !APPROVED_STATUSES.includes(r.status)) return false;
