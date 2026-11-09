@@ -13,7 +13,11 @@ import {
   Period,
   Venue,
   VenueType,
+  getThaiDistricts,
+  getThaiProvinces,
+  getThaiSubdistricts,
   overlaps,
+  validateThaiAddressHierarchy,
 } from '@japjong/shared';
 import { CurrentUser, Permissions, Public } from '../auth/auth.guard';
 import { DbService } from '../db/db.service';
@@ -472,5 +476,60 @@ export class ResourcesController {
       dayAvailability,
       summary,
     };
+  }
+
+  // ===================== Thai Administrative Divisions (Province -> District -> Subdistrict) =====================
+
+  @Public()
+  @SkipThrottle()
+  @Get('thai-address/provinces')
+  listThaiProvinces(@Query('q') q?: string) {
+    const provinces = getThaiProvinces();
+    if (!q?.trim()) return provinces;
+    const kw = q.trim().toLowerCase();
+    return provinces.filter((p) => p.nameTh.toLowerCase().includes(kw) || p.id === kw);
+  }
+
+  @Public()
+  @SkipThrottle()
+  @Get('thai-address/districts')
+  listThaiDistricts(@Query('province') province?: string, @Query('q') q?: string) {
+    const districts = getThaiDistricts(province);
+    if (!q?.trim()) return districts;
+    const kw = q.trim().toLowerCase();
+    return districts.filter((d) => d.nameTh.toLowerCase().includes(kw) || d.id === kw);
+  }
+
+  @Public()
+  @SkipThrottle()
+  @Get('thai-address/subdistricts')
+  listThaiSubdistricts(
+    @Query('province') province?: string,
+    @Query('district') district?: string,
+    @Query('q') q?: string,
+  ) {
+    const subdistricts = getThaiSubdistricts(province, district);
+    if (!q?.trim()) return subdistricts;
+    const kw = q.trim().toLowerCase();
+    return subdistricts.filter(
+      (s) => s.nameTh.toLowerCase().includes(kw) || s.zipCode.includes(kw) || s.id === kw,
+    );
+  }
+
+  @Public()
+  @SkipThrottle()
+  @Post('thai-address/validate')
+  validateThaiAddress(
+    @Body()
+    body: {
+      province?: string;
+      district?: string;
+      subdistrict?: string;
+      provinceId?: string;
+      districtId?: string;
+      subdistrictId?: string;
+    },
+  ) {
+    return validateThaiAddressHierarchy(body || {});
   }
 }

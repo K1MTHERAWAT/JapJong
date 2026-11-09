@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Equipment, PublicAccount, REPAIR_CATEGORIES, RepairRequest, RequestWithTimeline, Venue } from '@japjong/shared';
+import { Equipment, PublicAccount, REPAIR_CATEGORIES, RepairRequest, RequestWithTimeline, sanitizePhoneInput, validateThaiPhone, Venue } from '@japjong/shared';
 import { roleHomePath, useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
+import { Phone10DigitInput } from '@/components/thai-address-select';
 import { Chip, StatusChip, Tabs, Timeline } from '@/components/ui';
 import { api, formatThaiDateTime, readAndCompressImages } from '@/lib/api';
 
@@ -63,7 +64,7 @@ export default function RepairPage() {
   useEffect(() => {
     if (account && !isWalkIn) {
       setRequesterName(account.name);
-      setRequesterPhone(account.phone || '');
+      setRequesterPhone(sanitizePhoneInput(account.phone || ''));
       setOrganization(account.department || '');
     }
   }, [account, isWalkIn]);
@@ -78,7 +79,7 @@ export default function RepairPage() {
       setOrganization('');
     } else if (account) {
       setRequesterName(account.name);
-      setRequesterPhone(account.phone || '');
+      setRequesterPhone(sanitizePhoneInput(account.phone || ''));
       setOrganization(account.department || '');
     }
   };
@@ -96,12 +97,12 @@ export default function RepairPage() {
     if (match) {
       setFoundUser(match);
       setRequesterName(match.name);
-      setRequesterPhone(match.phone || '');
+      setRequesterPhone(sanitizePhoneInput(match.phone || ''));
       setOrganization(match.department || '');
     } else {
       setFoundUser(null);
       if (digits.length >= 9) {
-        setRequesterPhone(walkInQuery.trim());
+        setRequesterPhone(sanitizePhoneInput(walkInQuery.trim()));
       } else {
         setRequesterName(walkInQuery.trim());
       }
@@ -164,6 +165,11 @@ export default function RepairPage() {
   const handleSubmit = async () => {
     const resolvedLocation = getResolvedLocation();
     if (!resolvedLocation || !detail.trim()) return;
+    const phoneCheck = validateThaiPhone(requesterPhone || account?.phone || '');
+    if (!phoneCheck.valid) {
+      alert(phoneCheck.error || 'กรุณากรอกเบอร์โทรศัพท์เป็นตัวเลข 10 หลัก');
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -180,7 +186,7 @@ export default function RepairPage() {
         attachments: images,
         requesterId: isWalkIn && foundUser ? foundUser.id : undefined,
         requesterName: requesterName.trim() || undefined,
-        requesterPhone: requesterPhone.trim() || undefined,
+        requesterPhone: phoneCheck.normalized,
         organization: organization.trim() || undefined,
       });
 
@@ -366,16 +372,12 @@ export default function RepairPage() {
                   className="jw-in"
                 />
               </div>
-              <div>
-                <label className="jw-lbl">เบอร์โทรศัพท์ติดต่อ</label>
-                <input
-                  type="tel"
-                  value={requesterPhone}
-                  onChange={(e) => setRequesterPhone(e.target.value)}
-                  placeholder="เช่น 081-234-5678"
-                  className="jw-in"
-                />
-              </div>
+              <Phone10DigitInput
+                label="เบอร์โทรศัพท์ติดต่อ (ตัวเลข 10 หลัก)"
+                required
+                value={requesterPhone}
+                onChange={setRequesterPhone}
+              />
             </div>
 
             {/* เลือกหมวดหมู่ของสิ่งที่ชำรุด */}

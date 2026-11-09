@@ -28,8 +28,12 @@ import {
   SIGN_LEVEL_TITLE,
   SignLevel,
   canSignRequest,
+  checkBorrowReceiveEligibility,
   hasPermission,
   overlaps,
+  sanitizePhoneInput,
+  validateThaiAddressHierarchy,
+  validateThaiPhone,
   withTimeline,
 } from '@japjong/shared';
 import {
@@ -91,6 +95,118 @@ export class RequestsController {
         throw new BadRequestException(`จำนวนอุปกรณ์ "${eq.name}" ต้องอยู่ระหว่าง 1 ถึง ${eq.stock}`);
       }
       cleaned.push({ equipmentId: eq.id, qty });
+    }
+    return cleaned;
+  }
+
+  private resolveAndValidatePhone(rawPhone: unknown, fallbackPhone?: string): string | undefined {
+    if (typeof rawPhone === 'string' && rawPhone.trim() !== '') {
+      const check = validateThaiPhone(rawPhone);
+      if (!check.valid) {
+        throw new BadRequestException(check.error || 'เบอร์โทรศัพท์ต้องเป็นตัวเลข 10 หลัก (0-9)');
+      }
+      return check.value;
+    }
+    if (fallbackPhone) {
+      const cleaned = sanitizePhoneInput(fallbackPhone, 10);
+      return cleaned || fallbackPhone;
+    }
+    return undefined;
+  }
+
+  private resolveAndValidateAddress(
+    body: {
+      addressSubdistrict?: string;
+      addressDistrict?: string;
+      addressProvince?: string;
+      addressSubdistrictId?: string;
+      addressDistrictId?: string;
+      addressProvinceId?: string;
+    },
+    user: Account,
+  ) {
+    const hasExplicitAddress =
+      Boolean(body.addressProvince?.trim()) ||
+      Boolean(body.addressDistrict?.trim()) ||
+      Boolean(body.addressSubdistrict?.trim()) ||
+      Boolean(body.addressProvinceId?.trim()) ||
+      Boolean(body.addressDistrictId?.trim()) ||
+      Boolean(body.addressSubdistrictId?.trim());
+
+    if (hasExplicitAddress) {
+      const check = validateThaiAddressHierarchy({
+        province: body.addressProvince,
+        district: body.addressDistrict,
+        subdistrict: body.addressSubdistrict,
+        provinceId: body.addressProvinceId,
+        districtId: body.addressDistrictId,
+        subdistrictId: body.addressSubdistrictId,
+      });
+      if (!check.valid) {
+        throw new BadRequestException(check.error || 'ข้อมูลที่อยู่ (จังหวัด/อำเภอ/ตำบล) ไม่ถูกต้อง');
+      }
+      return {
+        addressProvince: check.provinceName || '',
+        addressDistrict: check.districtName || '',
+        addressSubdistrict: check.subdistrictName || '',
+        addressProvinceId: check.provinceId,
+        addressDistrictId: check.districtId,
+        addressSubdistrictId: check.subdistrictId,
+      };
+    }
+
+    return {
+      addressProvince: user.addressProvince ?? '',
+      addressDistrict: user.addressDistrict ?? '',
+      addressSubdistrict: user.addressSubdistrict ?? '',
+      addressProvinceId: user.addressProvinceId,
+      addressDistrictId: user.addressDistrictId,
+      addressSubdistrictId: user.addressSubdistrictId,
+    };
+  }
+
+  private validatePhotoList(
+    photos: unknown,
+    options: { required: boolean; maxCount: number; fieldLabel: string },
+  ): string[] {
+    if (!Array.isArray(photos)) {
+      if (options.required) {
+        throw new BadRequestException(`กรุณาอัปโหลด${options.fieldLabel}อย่างน้อย 1 รูป`);
+      }
+      return [];
+    }
+    const cleaned: string[] = [];
+    for (const item of photos) {
+      if (typeof item !== 'string') continue;
+      const trimmed = item.trim();
+      if (!trimmed) continue;
+
+      if (trimmed.startsWith('data:')) {
+        if (!/^data:image\/(jpeg|jpg|png|webp);base64,/i.test(trimmed)) {
+          throw new BadRequestException(
+            `${options.fieldLabel}รองรับเฉพาะไฟล์รูปภาพนามสกุล JPG, JPEG, PNG หรือ WEBP เท่านั้น`,
+          );
+        }
+        // Approx 10 MB base64 limit (~13.7M chars)
+        if (trimmed.length > 14_000_000) {
+          throw new BadRequestException(`${options.fieldLabel}มีขนาดใหญ่เกินกำหนด (สูงสุด 10 MB ต่อรูป)`);
+        }
+      } else if (
+        !trimmed.startsWith('/api/storage/files/') &&
+        !trimmed.startsWith('http://') &&
+        !trimmed.startsWith('https://')
+      ) {
+        throw new BadRequestException(`รูปแบบ URL ของ${options.fieldLabel}ไม่ถูกต้อง`);
+      }
+
+      cleaned.push(trimmed);
+    }
+
+    if (options.required && cleaned.length === 0) {
+      throw new BadRequestException(`กรุณาอัปโหลด${options.fieldLabel}อย่างน้อย 1 รูป`);
+    }
+    if (cleaned.length > options.maxCount) {
+      throw new BadRequestException(`อัปโหลด${options.fieldLabel}ได้สูงสุด ${options.maxCount} รูป`);
     }
     return cleaned;
   }
@@ -386,6 +502,12 @@ export class RequestsController {
       // ตรวจสอบความซ้ำซ้อนอีกครั้งก่อนบันทึกแบบ atomic
       this.validatePeriodsAndVenues(venueIds, periods);
 
+      const validatedPhone = this.resolveAndValidatePhone(
+        body.requesterPhone,
+        isWalkIn ? undefined : user.phone,
+      );
+      const resolvedAddr = this.resolveAndValidateAddress(body, user);
+
       const walkInRequesterId = `u-walkin-${code.toLowerCase()}`;
       const req: BookingRequest = {
         id: `r-${code.toLowerCase()}`,
@@ -395,7 +517,7 @@ export class RequestsController {
         approvalRound: 1,
         requesterId: isWalkIn ? body.requesterId || walkInRequesterId : user.id,
         requesterName: body.requesterName?.trim() || user.name,
-        requesterPhone: body.requesterPhone ? String(body.requesterPhone).trim().slice(0, 40) : (isWalkIn ? undefined : user.phone),
+        requesterPhone: validatedPhone,
         requesterSignature: requesterSig,
         organization: String(body.organization ?? '').slice(0, 200) || user.department,
         createdAt: now,
@@ -414,9 +536,12 @@ export class RequestsController {
         requesterPosition: body.requesterPosition ? String(body.requesterPosition).slice(0, 120) : (user.position || ''),
         addressHouseNo: body.addressHouseNo ? String(body.addressHouseNo).slice(0, 40) : '',
         addressMoo: body.addressMoo ? String(body.addressMoo).slice(0, 20) : '',
-        addressSubdistrict: body.addressSubdistrict ? String(body.addressSubdistrict).slice(0, 80) : '',
-        addressDistrict: body.addressDistrict ? String(body.addressDistrict).slice(0, 80) : '',
-        addressProvince: body.addressProvince ? String(body.addressProvince).slice(0, 80) : '',
+        addressSubdistrict: resolvedAddr.addressSubdistrict,
+        addressDistrict: resolvedAddr.addressDistrict,
+        addressProvince: resolvedAddr.addressProvince,
+        addressSubdistrictId: resolvedAddr.addressSubdistrictId,
+        addressDistrictId: resolvedAddr.addressDistrictId,
+        addressProvinceId: resolvedAddr.addressProvinceId,
         purposeItems: Array.isArray(body.purposeItems)
           ? body.purposeItems.slice(0, 20).map((pi) => ({
               item: String(pi?.item ?? '').slice(0, 200),
@@ -473,6 +598,12 @@ export class RequestsController {
         // ตรวจสอบสต็อกซ้ำอีกครั้งก่อนบันทึกแบบ atomic
         this.validateBorrowInventory(items, pickupDate, returnDate);
 
+        const validatedPhone = this.resolveAndValidatePhone(
+          body.requesterPhone,
+          isWalkIn ? undefined : user.phone,
+        );
+        const resolvedAddr = this.resolveAndValidateAddress(body, user);
+
         const walkInRequesterId = `u-walkin-${code.toLowerCase()}`;
         const req: BorrowRequest = {
           id: `r-${code.toLowerCase()}`,
@@ -482,7 +613,7 @@ export class RequestsController {
           approvalRound: 1,
           requesterId: isWalkIn ? body.requesterId || walkInRequesterId : user.id,
           requesterName: body.requesterName?.trim() || user.name,
-          requesterPhone: body.requesterPhone ? String(body.requesterPhone).trim().slice(0, 40) : (isWalkIn ? undefined : user.phone),
+          requesterPhone: validatedPhone,
           requesterSignature: requesterSig,
           organization: String(body.organization ?? '').slice(0, 200) || user.department,
           createdAt: now,
@@ -499,9 +630,12 @@ export class RequestsController {
           requesterPosition: body.requesterPosition ? String(body.requesterPosition).slice(0, 100) : (user.position || ''),
           addressHouseNo: body.addressHouseNo ? String(body.addressHouseNo).slice(0, 40) : (user.addressHouseNo ?? ''),
           addressMoo: body.addressMoo ? String(body.addressMoo).slice(0, 20) : (user.addressMoo ?? ''),
-          addressSubdistrict: body.addressSubdistrict ? String(body.addressSubdistrict).slice(0, 80) : (user.addressSubdistrict ?? ''),
-          addressDistrict: body.addressDistrict ? String(body.addressDistrict).slice(0, 80) : (user.addressDistrict ?? ''),
-          addressProvince: body.addressProvince ? String(body.addressProvince).slice(0, 80) : (user.addressProvince ?? ''),
+          addressSubdistrict: resolvedAddr.addressSubdistrict,
+          addressDistrict: resolvedAddr.addressDistrict,
+          addressProvince: resolvedAddr.addressProvince,
+          addressSubdistrictId: resolvedAddr.addressSubdistrictId,
+          addressDistrictId: resolvedAddr.addressDistrictId,
+          addressProvinceId: resolvedAddr.addressProvinceId,
           purposeItems: Array.isArray(body.purposeItems)
             ? body.purposeItems.slice(0, 20).map((pi) => ({
                 item: String(pi?.item ?? '').slice(0, 200),
@@ -560,6 +694,10 @@ export class RequestsController {
       attachments.length > 0
         ? attachments.length
         : Math.max(0, Math.min(3, Math.floor(Number(body.photos ?? 0)) || 0));
+    const validatedRepairPhone = this.resolveAndValidatePhone(
+      body.requesterPhone,
+      isWalkIn ? undefined : user.phone,
+    );
     const walkInRequesterId = `u-walkin-${code.toLowerCase()}`;
     const req: RepairRequest = {
       id: `r-${code.toLowerCase()}`,
@@ -569,7 +707,7 @@ export class RequestsController {
       approvalRound: 1,
       requesterId: isWalkIn ? body.requesterId || walkInRequesterId : user.id,
       requesterName: (isWalkIn ? body.requesterName?.trim() : body.requesterName?.trim()) || user.name,
-      requesterPhone: body.requesterPhone ? String(body.requesterPhone).trim().slice(0, 40) : (isWalkIn ? undefined : user.phone),
+      requesterPhone: validatedRepairPhone,
       requesterSignature: requesterSig,
       organization: String(body.organization ?? '').slice(0, 200) || user.department,
       createdAt: now,
@@ -693,14 +831,25 @@ export class RequestsController {
         this.db.notifyRole('APPROVER_L1', `รออนุมัติ ${req.code}`, req.requesterName, `/approver/sign/${req.id}`);
       }
     } else {
-      req.status = req.type === 'borrow' ? 'borrowing' : 'approved';
+      // เมื่อผ่านการอนุมัติครบ 3 ระดับ (L1 นายก อบต.):
+      // ทั้งคำขอสถานที่ (booking) และคำขอยืมอุปกรณ์ (borrow) เปลี่ยนเป็น 'approved' (สำหรับ borrow คือสถานะ "รอรับมอบ")
+      req.status = 'approved';
       if (!this.notificationEvents) {
-        this.db.notify(
-          req.requesterId,
-          `คำขอ ${req.code} อนุมัติแล้ว`,
-          'ดาวน์โหลดเอกสารใบอนุญาต (PDF) ได้แล้ว',
-          `/approver/permit/${req.id}`,
-        );
+        if (req.type === 'borrow') {
+          this.db.notify(
+            req.requesterId,
+            `คำขอยืมอุปกรณ์ ${req.code} อนุมัติครบแล้ว (รอรับมอบ)`,
+            `เอกสารผ่านการอนุมัติครบ 3 ระดับแล้ว กรุณากดยืนยันรับมอบครุภัณฑ์ล่วงหน้าอย่างน้อย 1 วันก่อนวันรับ (${req.pickupDate}) ที่เมนูยืม–คืนของฉัน`,
+            `/borrow/my`,
+          );
+        } else {
+          this.db.notify(
+            req.requesterId,
+            `คำขอ ${req.code} อนุมัติแล้ว`,
+            'ดาวน์โหลดเอกสารใบอนุญาต (PDF) ได้แล้ว',
+            `/approver/permit/${req.id}`,
+          );
+        }
       }
     }
 
@@ -725,7 +874,8 @@ export class RequestsController {
       if (req.requesterId !== user.id && !hasPermission(user, 'review')) {
         throw new ForbiddenException('เฉพาะเจ้าของคำขอ หรือเจ้าหน้าที่ผู้รับผิดชอบเท่านั้นที่สามารถขอเลื่อนวันได้');
       }
-      if (!['pending_staff', 'pending_l2'].includes(req.status)) {
+      const isBorrowApproved = req.type === 'borrow' && req.status === 'approved';
+      if (!['pending_staff', 'pending_l2'].includes(req.status) && !isBorrowApproved) {
         if (['pending_l1', 'approved'].includes(req.status)) {
           throw new BadRequestException('ไม่สามารถขอเลื่อนวันหรือแก้ไขได้ เนื่องจากคำขอผ่านการลงนามโดยปลัดหรือนายกแล้ว');
         }
@@ -763,10 +913,15 @@ export class RequestsController {
         throw new BadRequestException('คำขอประเภทนี้ไม่รองรับการขอเลื่อนวัน');
       }
 
-      req.status = 'pending_staff';
-      // รอบการอนุมัติใหม่ (Immutable Audit Trail: รักษาประวัติลายเซ็นรอบเก่าไว้ใน DB)
-      req.approvalRound = (req.approvalRound || 1) + 1;
-      req.signatures = [];
+      const preserveApprovedForBorrow =
+        isBorrowApproved && body.keepApproved !== false;
+
+      if (!preserveApprovedForBorrow) {
+        req.status = 'pending_staff';
+        // รอบการอนุมัติใหม่ (Immutable Audit Trail: รักษาประวัติลายเซ็นรอบเก่าไว้ใน DB)
+        req.approvalRound = (req.approvalRound || 1) + 1;
+        req.signatures = [];
+      }
       req.updatedAt = new Date().toISOString();
       await this.db.persistRequest(req);
       if (this.notificationEvents) {
@@ -829,7 +984,7 @@ export class RequestsController {
     return this.enrich(req);
   }
 
-  /** ผู้ยืมยืนยันรับมอบอุปกรณ์ (พร้อมรูปภาพและรายละเอียด) */
+  /** ผู้ยืมยืนยันรับมอบอุปกรณ์ (พร้อมรูปภาพสภาพก่อนใช้งานและรายละเอียด) */
   @Post(':id/receive')
   async receiveEquipment(
     @CurrentUser() user: Account,
@@ -842,15 +997,40 @@ export class RequestsController {
       throw new ForbiddenException('เฉพาะผู้ยืมหรือเจ้าหน้าที่เท่านั้นที่สามารถยืนยันรับมอบอุปกรณ์ได้');
     }
     if (req.status !== 'approved') {
-      throw new BadRequestException('คำขอยืมต้องผ่านการอนุมัติครบและอยู่ในสถานะอนุมัติแล้วเท่านั้นจึงจะรับมอบได้');
+      throw new BadRequestException('คำขอยืมต้องผ่านการอนุมัติครบและอยู่ในสถานะอนุมัติแล้ว (รอรับมอบ) เท่านั้นจึงจะรับมอบได้');
     }
+
+    // ตรวจสอบเงื่อนไขวันรับมอบครุภัณฑ์: ต้องกดยืนยันรับมอบล่วงหน้าอย่างน้อย 1 วันก่อนถึงวันรับครุภัณฑ์ (pickupDate)
+    const eligibility = checkBorrowReceiveEligibility(req.pickupDate);
+    if (!eligibility.allowed) {
+      throw new BadRequestException(
+        eligibility.reason ||
+          `ไม่สามารถยืนยันรับมอบได้ เนื่องจากต้องยืนยันล่วงหน้าอย่างน้อย 1 วันก่อนวันรับครุภัณฑ์ (${req.pickupDate}) กรุณาติดต่อเจ้าหน้าที่`,
+      );
+    }
+
+    const cleanedPhotos = this.validatePhotoList(body.photos, {
+      required: true,
+      maxCount: 10,
+      fieldLabel: 'รูปภาพสภาพอุปกรณ์ก่อนใช้งาน',
+    });
+
     const now = new Date().toISOString();
     req.status = 'borrowing';
     req.receivedAt = now;
-    req.receivePhotos = Array.isArray(body.photos) ? body.photos.slice(0, 10) : [];
-    req.receiveNote = String(body.note ?? '').slice(0, 1000);
+    req.receivedById = user.id;
+    req.receivedByName = user.name;
+    req.receivePhotos = cleanedPhotos;
+    req.receiveNote = String(body.note ?? '').trim().slice(0, 1000);
     req.updatedAt = now;
     await this.db.persistRequest(req);
+
+    await this.db.log(
+      'request',
+      `ยืนยันรับมอบอุปกรณ์ ${req.code}`,
+      `${user.name} ยืนยันรับมอบพร้อมแนบรูปก่อนใช้งาน ${cleanedPhotos.length} รูป`,
+      { id: user.id, name: user.name, role: user.role },
+    );
 
     this.db.notifyRole(
       'STAFF',
@@ -862,7 +1042,7 @@ export class RequestsController {
     return this.enrich(req);
   }
 
-  /** ผู้ยืมยืนยันส่งคืนอุปกรณ์ (พร้อมรูปภาพและรายละเอียด) */
+  /** ผู้ยืมยืนยันส่งคืนอุปกรณ์ (บันทึกหมายเหตุโดยไม่มีการอัปโหลดรูปภาพจากฝั่งผู้ยืม) */
   @Post(':id/return-submit')
   async submitReturn(
     @CurrentUser() user: Account,
@@ -877,14 +1057,29 @@ export class RequestsController {
     if (req.status !== 'borrowing') {
       throw new BadRequestException('รายการต้องอยู่ในสถานะกำลังใช้งานจึงจะส่งคืนได้');
     }
+    if (Array.isArray(body.photos) && body.photos.length > 0) {
+      throw new BadRequestException(
+        'ผู้ยืมไม่สามารถอัปโหลดรูปภาพในขั้นตอนการส่งคืนอุปกรณ์ได้ (เฉพาะเจ้าหน้าที่ผู้ตรวจรับคืนเท่านั้น)',
+      );
+    }
+
     const now = new Date().toISOString();
     req.status = 'return_inspect';
     req.returnSubmittedAt = now;
     req.returnRequestedAt = now;
-    req.returnPhotos = Array.isArray(body.photos) ? body.photos.slice(0, 10) : [];
-    req.returnNote = String(body.note ?? '').slice(0, 1000);
+    req.returnSubmittedById = user.id;
+    req.returnSubmittedByName = user.name;
+    req.returnPhotos = [];
+    req.returnNote = String(body.note ?? '').trim().slice(0, 1000);
     req.updatedAt = now;
     await this.db.persistRequest(req);
+
+    await this.db.log(
+      'request',
+      `แจ้งส่งคืนอุปกรณ์ ${req.code}`,
+      `${user.name} กดยืนยันส่งคืนอุปกรณ์ รอเจ้าหน้าที่ตรวจสอบ`,
+      { id: user.id, name: user.name, role: user.role },
+    );
 
     this.db.notifyRole(
       'STAFF',
@@ -896,7 +1091,7 @@ export class RequestsController {
     return this.enrich(req);
   }
 
-  /** เจ้าหน้าที่ตรวจสอบสภาพอุปกรณ์และยืนยันรับคืน */
+  /** เจ้าหน้าที่ตรวจสอบสภาพอุปกรณ์หลังส่งคืน (อัปโหลดรูปภาพหลังส่งคืน + บันทึกหมายเหตุความเสียหาย) */
   @Post(':id/inspect-return')
   async inspectReturn(
     @CurrentUser() user: Account,
@@ -911,6 +1106,13 @@ export class RequestsController {
     if (req.status !== 'return_inspect') {
       throw new BadRequestException('คำขอนี้ไม่ได้อยู่ในสถานะรอตรวจสภาพ');
     }
+
+    const cleanedInspectPhotos = this.validatePhotoList(body.photos, {
+      required: true,
+      maxCount: 10,
+      fieldLabel: 'รูปภาพสภาพอุปกรณ์หลังส่งคืน',
+    });
+
     const now = new Date().toISOString();
     req.status = 'returned';
     req.returnedAt = now;
@@ -918,16 +1120,23 @@ export class RequestsController {
     req.inspectorId = user.id;
     req.inspectorName = user.name;
     req.inspectResult = body.result || 'normal';
-    req.inspectNote = String(body.note ?? '').slice(0, 1000);
-    req.inspectPhotos = Array.isArray(body.photos) ? body.photos.slice(0, 10) : [];
+    req.inspectNote = String(body.note ?? '').trim().slice(0, 1000);
+    req.inspectPhotos = cleanedInspectPhotos;
     req.updatedAt = now;
     await this.db.persistRequest(req);
 
     const resultLabel = body.result === 'normal' ? 'สภาพปกติ' : body.result === 'damaged' ? 'ชำรุดเสียหาย' : 'อุปกรณ์ไม่ครบถ้วน';
+    await this.db.log(
+      'request',
+      `ตรวจสอบรับคืนอุปกรณ์ ${req.code} (${resultLabel})`,
+      `ตรวจโดย ${user.name} · รูปหลังส่งคืน ${cleanedInspectPhotos.length} รูป${req.inspectNote ? ` · ${req.inspectNote}` : ''}`,
+      { id: user.id, name: user.name, role: user.role },
+    );
+
     await this.db.notify(
       req.requesterId,
       `ตรวจสอบการส่งคืนอุปกรณ์เรียบร้อยแล้ว (${req.code})`,
-      `เจ้าหน้าที่ (${user.name}) ตรวจสอบเรียบร้อยแล้ว ผลการตรวจ: ${resultLabel}`,
+      `เจ้าหน้าที่ (${user.name}) ตรวจสอบเรียบร้อยแล้ว ผลการตรวจ: ${resultLabel}${req.inspectNote ? ` (${req.inspectNote})` : ''}`,
       `/borrow/my`,
     );
 

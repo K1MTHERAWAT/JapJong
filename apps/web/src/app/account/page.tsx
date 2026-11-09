@@ -16,9 +16,16 @@ import {
   LineAuthStatusResponse,
   ROLE_LABEL,
   ROLE_TONE,
+  sanitizePhoneInput,
+  validateThaiAddressHierarchy,
+  validateThaiPhone,
 } from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
+import {
+  Phone10DigitInput,
+  ThaiAddressSelect,
+} from '@/components/thai-address-select';
 import {
   Button,
   Card,
@@ -53,6 +60,9 @@ export default function AccountPage() {
   const [email, setEmail] = useState('');
   const [addressHouseNo, setAddressHouseNo] = useState('');
   const [addressMoo, setAddressMoo] = useState('');
+  const [addressProvinceId, setAddressProvinceId] = useState('');
+  const [addressDistrictId, setAddressDistrictId] = useState('');
+  const [addressSubdistrictId, setAddressSubdistrictId] = useState('');
   const [addressSubdistrict, setAddressSubdistrict] = useState('');
   const [addressDistrict, setAddressDistrict] = useState('');
   const [addressProvince, setAddressProvince] = useState('');
@@ -134,10 +144,13 @@ export default function AccountPage() {
       setName(account.name || '');
       setNickname(account.nickname || '');
       setDepartment(account.department || '');
-      setPhone(account.phone || '');
+      setPhone(sanitizePhoneInput(account.phone || ''));
       setEmail(account.email || '');
       setAddressHouseNo(account.addressHouseNo || '');
       setAddressMoo(account.addressMoo || '');
+      setAddressProvinceId(account.addressProvinceId || '');
+      setAddressDistrictId(account.addressDistrictId || '');
+      setAddressSubdistrictId(account.addressSubdistrictId || '');
       setAddressSubdistrict(account.addressSubdistrict || '');
       setAddressDistrict(account.addressDistrict || '');
       setAddressProvince(account.addressProvince || '');
@@ -157,9 +170,31 @@ export default function AccountPage() {
       setProfileErr('กรุณาระบุหน่วยงาน / ชุมชน / สังกัด');
       return;
     }
-    if (!phone.trim()) {
-      setProfileErr('กรุณากรอกเบอร์โทรศัพท์');
+    const phoneCheck = validateThaiPhone(phone);
+    if (!phoneCheck.valid) {
+      setProfileErr(phoneCheck.error || 'กรุณากรอกเบอร์โทรศัพท์เป็นตัวเลข 10 หลัก');
       return;
+    }
+    if (
+      addressProvinceId ||
+      addressDistrictId ||
+      addressSubdistrictId ||
+      addressProvince ||
+      addressDistrict ||
+      addressSubdistrict
+    ) {
+      const addrCheck = validateThaiAddressHierarchy({
+        provinceId: addressProvinceId,
+        districtId: addressDistrictId,
+        subdistrictId: addressSubdistrictId,
+        provinceName: addressProvince,
+        districtName: addressDistrict,
+        subdistrictName: addressSubdistrict,
+      });
+      if (!addrCheck.valid) {
+        setProfileErr(addrCheck.error || 'ข้อมูลที่อยู่ไม่ครบถ้วน');
+        return;
+      }
     }
 
     setSavingProfile(true);
@@ -168,10 +203,13 @@ export default function AccountPage() {
         name: name.trim(),
         nickname: nickname.trim(),
         department: department.trim(),
-        phone: phone.trim(),
+        phone: phoneCheck.normalized,
         email: email.trim(),
         addressHouseNo: addressHouseNo.trim(),
         addressMoo: addressMoo.trim(),
+        addressProvinceId: addressProvinceId || undefined,
+        addressDistrictId: addressDistrictId || undefined,
+        addressSubdistrictId: addressSubdistrictId || undefined,
         addressSubdistrict: addressSubdistrict.trim(),
         addressDistrict: addressDistrict.trim(),
         addressProvince: addressProvince.trim(),
@@ -191,9 +229,12 @@ export default function AccountPage() {
     setName(account.name || '');
     setNickname(account.nickname || '');
     setDepartment(account.department || '');
-    setPhone(account.phone || '');
+    setPhone(sanitizePhoneInput(account.phone || ''));
     setAddressHouseNo(account.addressHouseNo || '');
     setAddressMoo(account.addressMoo || '');
+    setAddressProvinceId(account.addressProvinceId || '');
+    setAddressDistrictId(account.addressDistrictId || '');
+    setAddressSubdistrictId(account.addressSubdistrictId || '');
     setAddressSubdistrict(account.addressSubdistrict || '');
     setAddressDistrict(account.addressDistrict || '');
     setAddressProvince(account.addressProvince || '');
@@ -383,12 +424,11 @@ export default function AccountPage() {
                     placeholder="ระบุหน่วยงาน ชุมชน หรือกลุ่มของคุณ"
                     required
                   />
-                  <Input
-                    label="เบอร์โทรศัพท์ *"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="เช่น 081-234-5678"
+                  <Phone10DigitInput
+                    label="เบอร์โทรศัพท์ (ตัวเลข 10 หลัก)"
                     required
+                    value={phone}
+                    onChange={setPhone}
                   />
                   <Input
                     label="อีเมล (สำหรับรับรหัส OTP ยืนยันการลงนาม)"
@@ -404,10 +444,10 @@ export default function AccountPage() {
                   <div>
                     <b className="text-body font-bold text-ink block">ที่อยู่ (สำหรับแบบคำขอราชการ)</b>
                     <span className="text-caption text-muted">
-                      ข้อมูลที่อยู่นี้จะถูกดึงไปกรอกในแบบขอใช้สถานที่ราชการอัตโนมัติ
+                      ข้อมูลที่อยู่นี้จะถูกดึงไปกรอกในแบบขอใช้สถานที่และขอยืมอุปกรณ์อัตโนมัติ
                     </span>
                   </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Input
                       label="อยู่บ้านเลขที่"
                       value={addressHouseNo}
@@ -420,27 +460,23 @@ export default function AccountPage() {
                       onChange={(e) => setAddressMoo(e.target.value)}
                       placeholder="หมู่ที่"
                     />
-                    <Input
-                      label="ตำบล / แขวง"
-                      value={addressSubdistrict}
-                      onChange={(e) => setAddressSubdistrict(e.target.value)}
-                      placeholder="ตำบล / แขวง"
-                    />
-                    <Input
-                      label="อำเภอ / เขต"
-                      value={addressDistrict}
-                      onChange={(e) => setAddressDistrict(e.target.value)}
-                      placeholder="อำเภอ / เขต"
-                    />
-                    <div className="sm:col-span-2 xl:col-span-1">
-                      <Input
-                        label="จังหวัด"
-                        value={addressProvince}
-                        onChange={(e) => setAddressProvince(e.target.value)}
-                        placeholder="ระบุจังหวัด"
-                      />
-                    </div>
                   </div>
+                  <ThaiAddressSelect
+                    province={addressProvince}
+                    district={addressDistrict}
+                    subdistrict={addressSubdistrict}
+                    provinceId={addressProvinceId}
+                    districtId={addressDistrictId}
+                    subdistrictId={addressSubdistrictId}
+                    onChange={(val) => {
+                      setAddressProvinceId(val.provinceId || '');
+                      setAddressDistrictId(val.districtId || '');
+                      setAddressSubdistrictId(val.subdistrictId || '');
+                      setAddressProvince(val.province);
+                      setAddressDistrict(val.district);
+                      setAddressSubdistrict(val.subdistrict);
+                    }}
+                  />
                 </div>
 
                 <div className="pt-2 border-t border-line-soft flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-surface-muted p-4 border border-line">

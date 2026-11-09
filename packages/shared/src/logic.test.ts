@@ -2,13 +2,22 @@ import { describe, expect, it } from 'vitest';
 import {
   canAccessRoute,
   canSignRequest,
+  checkBorrowReceiveEligibility,
   computeTimeline,
   describeRequest,
   hasPermission,
   overlaps,
   periodDurationText,
+  sanitizePhoneInput,
+  validateThaiPhone,
   withTimeline,
 } from './logic';
+import {
+  getThaiDistricts,
+  getThaiProvinces,
+  getThaiSubdistricts,
+  validateThaiAddressHierarchy,
+} from './thai-address';
 import { Account, BookingRequest, BorrowRequest, Equipment, RepairRequest, Venue } from './types';
 
 describe('Logic & Permissions Unit Tests', () => {
@@ -521,6 +530,139 @@ describe('Logic & Permissions Unit Tests', () => {
       const full = withTimeline(bookingReq, dummyVenues, dummyEquipment);
       expect(full.timeline).toBeDefined();
       expect(full.title).toBeDefined();
+    });
+  });
+
+  describe('checkBorrowReceiveEligibility() — 1-day advance pickup rule', () => {
+    it('allows confirming receipt when current date is before pickupDate - 1 day', () => {
+      const res = checkBorrowReceiveEligibility('2026-11-15', '2026-11-10');
+      expect(res.allowed).toBe(true);
+      expect(res.lastAllowedReceiveDate).toBe('2026-11-14');
+    });
+
+    it('allows confirming receipt on the exact last allowed day (pickupDate - 1 day)', () => {
+      const res = checkBorrowReceiveEligibility('2026-11-15', '2026-11-14');
+      expect(res.allowed).toBe(true);
+      expect(res.lastAllowedReceiveDate).toBe('2026-11-14');
+    });
+
+    it('blocks confirming receipt on the pickupDate itself', () => {
+      const res = checkBorrowReceiveEligibility('2026-11-15', '2026-11-15');
+      expect(res.allowed).toBe(false);
+      expect(res.lastAllowedReceiveDate).toBe('2026-11-14');
+      expect(res.reason).toContain('อย่างน้อย 1 วันก่อนวันรับครุภัณฑ์');
+    });
+
+    it('blocks confirming receipt after the pickupDate has passed', () => {
+      const res = checkBorrowReceiveEligibility('2026-11-15', '2026-11-16');
+      expect(res.allowed).toBe(false);
+      expect(res.reason).toContain('เลยกำหนดวันรับครุภัณฑ์');
+    });
+
+    it('dynamically recalculates eligibility when pickupDate is rescheduled to a future date', () => {
+      const beforeReschedule = checkBorrowReceiveEligibility('2026-11-15', '2026-11-15');
+      expect(beforeReschedule.allowed).toBe(false);
+
+      const afterReschedule = checkBorrowReceiveEligibility('2026-11-18', '2026-11-15');
+      expect(afterReschedule.allowed).toBe(true);
+      expect(afterReschedule.lastAllowedReceiveDate).toBe('2026-11-17');
+    });
+  });
+
+  describe('validateThaiPhone() & sanitizePhoneInput() — 10-digit numeric rule', () => {
+    it('accepts valid 10-digit numeric phone number and preserves leading zero', () => {
+      const res = validateThaiPhone('0812345678');
+      expect(res.valid).toBe(true);
+      expect(res.normalized).toBe('0812345678');
+      expect(res.normalized.startsWith('0')).toBe(true);
+    });
+
+    it('rejects phone numbers with fewer than 10 digits', () => {
+      const res = validateThaiPhone('081234567');
+      expect(res.valid).toBe(false);
+      expect(res.error).toContain('น้อยกว่า 10 หลัก');
+    });
+
+    it('rejects phone numbers with more than 10 digits', () => {
+      const res = validateThaiPhone('08123456789');
+      expect(res.valid).toBe(false);
+      expect(res.error).toContain('เกิน 10 หลัก');
+    });
+
+    it('rejects phone numbers containing letters, dashes, spaces, or special characters', () => {
+      expect(validateThaiPhone('081-234-5678').valid).toBe(false);
+      expect(validateThaiPhone('081 234 5678').valid).toBe(false);
+      expect(validateThaiPhone('081234567a').valid).toBe(false);
+      expect(validateThaiPhone('+668123456').valid).toBe(false);
+    });
+
+    it('sanitizes input by stripping non-digits and clamping to 10 digits', () => {
+      expect(sanitizePhoneInput('081-234-567899')).toBe('0812345678');
+      expect(sanitizePhoneInput('abc089 111 2222xyz')).toBe('0891112222');
+    });
+  });
+
+  describe('Thai Address 3-Level Cascading Hierarchy (Province -> District -> Subdistrict)', () => {
+    it('loads all 77 provinces of Thailand', () => {
+      const provinces = getThaiProvinces();
+      expect(provinces.length).toBe(77);
+    });
+
+    it('filters districts by province and subdistricts by district accurately', () => {
+      const phrae = getThaiProvinces().find((p) => p.nameTh === 'แพร่');
+      expect(phrae).toBeDefined();
+
+      const districts = getThaiDistricts(phrae!.id);
+      expect(districts.length).toBeGreaterThan(0);
+      const mueangPhrae = districts.find((d) => d.nameTh === 'เมืองแพร่');
+      expect(mueangPhrae).toBeDefined();
+
+      const subdistricts = getThaiSubdistricts(mueangPhrae!.id);
+      expect(subdistricts.length).toBeGreaterThan(0);
+      const namCham = subdistricts.find((s) => s.nameTh === 'น้ำชำ');
+      expect(namCham).toBeDefined();
+    });
+
+    it('validates a matching 3-level hierarchy by IDs or Thai names', () => {
+      const byIds = validateThaiAddressHierarchy({
+        provinceId: '42',
+        districtId: '5401',
+        subdistrictId: '540103',
+      });
+      expect(byIds.valid).toBe(true);
+      expect(byIds.province?.nameTh).toBe('แพร่');
+      expect(byIds.district?.nameTh).toBe('เมืองแพร่');
+      expect(byIds.subdistrict?.nameTh).toBe('น้ำชำ');
+
+      const byNames = validateThaiAddressHierarchy({
+        provinceName: 'แพร่',
+        districtName: 'เมืองแพร่',
+        subdistrictName: 'น้ำชำ',
+      });
+      expect(byNames.valid).toBe(true);
+      expect(byNames.province?.id).toBe('42');
+      expect(byNames.district?.id).toBe('5401');
+      expect(byNames.subdistrict?.id).toBe('540103');
+    });
+
+    it('rejects mismatched district-province or subdistrict-district relationships', () => {
+      // District 5401 (เมืองแพร่) does not belong to Province 1 (กรุงเทพมหานคร)
+      const badDistrict = validateThaiAddressHierarchy({
+        provinceId: '1',
+        districtId: '5401',
+        subdistrictId: '540103',
+      });
+      expect(badDistrict.valid).toBe(false);
+
+      // Subdistrict from another district does not belong to District 5401
+      const otherDistrict = getThaiDistricts('42').find((d) => d.id !== '5401');
+      const otherSub = getThaiSubdistricts(otherDistrict!.id)[0];
+      const badSub = validateThaiAddressHierarchy({
+        provinceId: '42',
+        districtId: '5401',
+        subdistrictId: otherSub.id,
+      });
+      expect(badSub.valid).toBe(false);
     });
   });
 });

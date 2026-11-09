@@ -671,6 +671,7 @@ describe('RequestsController Unit Tests', () => {
 
       expect(updated.status).toBe('borrowing');
       expect((updated as any).receivedAt).toBeDefined();
+      expect((updated as any).receivedById).toBe(citizen.id);
       expect((updated as any).receivePhotos).toHaveLength(1);
       expect((updated as any).receiveNote).toBe('อุปกรณ์ครบถ้วน ใช้งานได้ปกติ');
       expect(mockDb.notifyRole).toHaveBeenCalledWith(
@@ -681,7 +682,47 @@ describe('RequestsController Unit Tests', () => {
       );
     });
 
-    it('submits return of equipment and transitions status to return_inspect', async () => {
+    it('blocks receiveEquipment when current date is on or after pickupDate, and allows after rescheduling pickupDate', async () => {
+      const now = new Date().toISOString();
+      const borrowReq = {
+        id: 'r-br-late',
+        code: 'BR-2569-0095',
+        type: 'borrow' as const,
+        status: 'approved' as const,
+        requesterId: citizen.id,
+        requesterName: citizen.name,
+        items: [{ equipmentId: 'e-01', qty: 1 }],
+        pickupDate: '2020-01-01', // Past pickup date
+        returnDate: '2020-01-05',
+        purpose: 'ทดสอบเงื่อนไขวันรับครุภัณฑ์',
+        attachments: [],
+        signatures: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+      mockDb.requests.push(borrowReq);
+
+      await expect(
+        controller.receiveEquipment(citizen, 'r-br-late', {
+          photos: ['data:image/jpeg;base64,mock1'],
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      // Reschedule pickupDate to a future date (2029-12-20)
+      await controller.reschedule(citizen, 'r-br-late', {
+        pickupDate: '2029-12-20',
+        returnDate: '2029-12-25',
+      });
+
+      const received = await controller.receiveEquipment(citizen, 'r-br-late', {
+        photos: ['data:image/png;base64,mock-valid-png'],
+        note: 'เลื่อนวันรับครุภัณฑ์และยืนยันรับมอบสำเร็จ',
+      });
+      expect(received.status).toBe('borrowing');
+      expect((received as any).receivedAt).toBeDefined();
+    });
+
+    it('submits return of equipment without borrower photos and rejects if borrower attempts to upload photos', async () => {
       const now = new Date().toISOString();
       const borrowReq = {
         id: 'r-br-return',
@@ -693,6 +734,7 @@ describe('RequestsController Unit Tests', () => {
         items: [{ equipmentId: 'e-01', qty: 2 }],
         pickupDate: '2026-11-20',
         returnDate: '2026-11-25',
+        receivePhotos: ['data:image/jpeg;base64,pre-use-photo'],
         purpose: 'จัดงานอบรม',
         attachments: [],
         signatures: [],
@@ -701,14 +743,22 @@ describe('RequestsController Unit Tests', () => {
       };
       mockDb.requests.push(borrowReq);
 
+      // Borrower attempting to upload return photos must be rejected
+      await expect(
+        controller.submitReturn(citizen, 'r-br-return', {
+          photos: ['data:image/jpeg;base64,mock-return'],
+          note: 'พยายามอัปโหลดรูปฝั่งผู้ยืม',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      // Borrower submitting return without photos succeeds
       const updated = await controller.submitReturn(citizen, 'r-br-return', {
-        photos: ['data:image/jpeg;base64,mock-return'],
         note: 'นำอุปกรณ์มาส่งคืนครบถ้วน สภาพดี',
       });
 
       expect(updated.status).toBe('return_inspect');
       expect((updated as any).returnSubmittedAt).toBeDefined();
-      expect((updated as any).returnPhotos).toHaveLength(1);
+      expect((updated as any).receivePhotos).toEqual(['data:image/jpeg;base64,pre-use-photo']);
       expect(mockDb.notifyRole).toHaveBeenCalledWith(
         'STAFF',
         expect.stringContaining('ผู้ยืมส่งคืนอุปกรณ์แล้ว รอตรวจสภาพ'),
@@ -717,7 +767,7 @@ describe('RequestsController Unit Tests', () => {
       );
     });
 
-    it('staff inspects returned equipment and transitions status to returned', async () => {
+    it('staff inspects returned equipment, preserves pre-use receivePhotos, and stores post-return inspectPhotos separately', async () => {
       const now = new Date().toISOString();
       const borrowReq = {
         id: 'r-br-inspect',
@@ -729,6 +779,7 @@ describe('RequestsController Unit Tests', () => {
         items: [{ equipmentId: 'e-01', qty: 2 }],
         pickupDate: '2026-11-20',
         returnDate: '2026-11-25',
+        receivePhotos: ['data:image/jpeg;base64,borrower-pre-use-1'],
         purpose: 'จัดงานอบรม',
         attachments: [],
         signatures: [],
@@ -747,12 +798,61 @@ describe('RequestsController Unit Tests', () => {
       expect((updated as any).inspectedAt).toBeDefined();
       expect((updated as any).inspectorName).toBe(staff.name);
       expect((updated as any).inspectResult).toBe('normal');
+      // Verify strict separation of Type 1 (receivePhotos) and Type 2 (inspectPhotos)
+      expect((updated as any).receivePhotos).toEqual(['data:image/jpeg;base64,borrower-pre-use-1']);
+      expect((updated as any).inspectPhotos).toEqual(['data:image/jpeg;base64,mock-staff-inspect']);
       expect(mockDb.notify).toHaveBeenCalledWith(
         citizen.id,
         expect.stringContaining('ตรวจสอบการส่งคืนอุปกรณ์เรียบร้อยแล้ว'),
         expect.stringContaining('สภาพปกติ'),
         '/borrow/my',
       );
+    });
+
+    it('validates 10-digit phone number and 3-level Thai address hierarchy on createBorrow', async () => {
+      // Invalid phone (contains dashes)
+      await expect(
+        controller.createBorrow(citizen, {
+          items: [{ equipmentId: 'e-01', qty: 1 }],
+          purpose: 'ทดสอบเบอร์ผิด',
+          pickupDate: '2026-11-20',
+          returnDate: '2026-11-22',
+          requesterPhone: '081-234-5678',
+          requesterSignature: citizen.signature!,
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      // Invalid Thai address hierarchy (Mueang Phrae district under Bangkok province)
+      await expect(
+        controller.createBorrow(citizen, {
+          items: [{ equipmentId: 'e-01', qty: 1 }],
+          purpose: 'ทดสอบที่อยู่ไม่สัมพันธ์กัน',
+          pickupDate: '2026-11-20',
+          returnDate: '2026-11-22',
+          requesterPhone: '0812345678',
+          addressProvinceId: '1',
+          addressDistrictId: '5401',
+          addressSubdistrictId: '540103',
+          requesterSignature: citizen.signature!,
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      // Valid 10-digit phone + valid 3-level Thai address hierarchy
+      const created = await controller.createBorrow(citizen, {
+        items: [{ equipmentId: 'e-01', qty: 1 }],
+        purpose: 'ทดสอบที่อยู่และเบอร์โทรถูกต้อง',
+        pickupDate: '2026-11-20',
+        returnDate: '2026-11-22',
+        requesterPhone: '0812345678',
+        addressProvinceId: '42',
+        addressDistrictId: '5401',
+        addressSubdistrictId: '540103',
+        requesterSignature: citizen.signature!,
+      });
+      expect(created.requesterPhone).toBe('0812345678');
+      expect(created.addressProvince).toBe('แพร่');
+      expect(created.addressDistrict).toBe('เมืองแพร่');
+      expect(created.addressSubdistrict).toBe('น้ำชำ');
     });
   });
 });

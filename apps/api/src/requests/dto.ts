@@ -93,6 +93,18 @@ export class CreateBookingDto {
   addressProvince?: string;
 
   @IsOptional()
+  @IsString()
+  addressSubdistrictId?: string;
+
+  @IsOptional()
+  @IsString()
+  addressDistrictId?: string;
+
+  @IsOptional()
+  @IsString()
+  addressProvinceId?: string;
+
+  @IsOptional()
   @IsArray()
   purposeItems?: { item: string; forWhat: string }[];
 }
@@ -169,6 +181,18 @@ export class CreateBorrowDto {
   @IsOptional()
   @IsString()
   addressProvince?: string;
+
+  @IsOptional()
+  @IsString()
+  addressSubdistrictId?: string;
+
+  @IsOptional()
+  @IsString()
+  addressDistrictId?: string;
+
+  @IsOptional()
+  @IsString()
+  addressProvinceId?: string;
 
   @IsOptional()
   @IsArray()
@@ -259,6 +283,9 @@ export class RescheduleDto {
   @IsOptional()
   @IsString()
   returnDate?: string;
+
+  @IsOptional()
+  keepApproved?: boolean;
 }
 
 export class HandoverDto {

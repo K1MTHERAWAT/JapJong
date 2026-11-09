@@ -503,3 +503,177 @@ export function canAccessServiceRoute(
   return canAccessRoute(account, pathname);
 }
 
+// ===== Phone Validation (10-digit numeric string 0-9) =====
+
+export interface PhoneValidationResult {
+  valid: boolean;
+  value: string;
+  normalized: string;
+  error?: string;
+}
+
+export function sanitizePhoneInput(raw: unknown, maxLength = 10): string {
+  if (typeof raw !== 'string' && typeof raw !== 'number') return '';
+  return String(raw).replace(/\D+/g, '').slice(0, maxLength);
+}
+
+export function validateThaiPhone(phone: unknown): PhoneValidationResult {
+  if (typeof phone !== 'string') {
+    return {
+      valid: false,
+      value: '',
+      normalized: '',
+      error: 'กรุณากรอกเบอร์โทรศัพท์เป็นตัวเลข 10 หลัก (0-9)',
+    };
+  }
+  const trimmed = phone.trim();
+  if (!trimmed) {
+    return {
+      valid: false,
+      value: '',
+      normalized: '',
+      error: 'กรุณากรอกเบอร์โทรศัพท์ 10 หลัก',
+    };
+  }
+  if (/[^0-9]/.test(trimmed)) {
+    return {
+      valid: false,
+      value: trimmed,
+      normalized: trimmed,
+      error: 'เบอร์โทรศัพท์ต้องเป็นตัวเลข 0-9 เท่านั้น ห้ามมีขีด เว้นวรรค หรือตัวอักษร',
+    };
+  }
+  if (trimmed.length < 10) {
+    return {
+      valid: false,
+      value: trimmed,
+      normalized: trimmed,
+      error: `เบอร์โทรศัพท์ต้องครบ 10 หลัก (น้อยกว่า 10 หลัก: กรอกแล้ว ${trimmed.length} หลัก)`,
+    };
+  }
+  if (trimmed.length > 10) {
+    return {
+      valid: false,
+      value: trimmed,
+      normalized: trimmed,
+      error: 'เบอร์โทรศัพท์ต้องไม่เกิน 10 หลัก',
+    };
+  }
+  return {
+    valid: true,
+    value: trimmed,
+    normalized: trimmed,
+  };
+}
+
+// ===== Borrow Equipment Pickup Date Eligibility (Asia/Bangkok) =====
+
+export interface BorrowReceiveEligibility {
+  allowed: boolean;
+  todayBkk: string;
+  pickupDate: string;
+  lastAllowedReceiveDate: string;
+  daysUntilPickup: number;
+  isOnPickupDate: boolean;
+  isAfterPickupDate: boolean;
+  isPastDeadline: boolean;
+  reason?: string;
+}
+
+/**
+ * Returns YYYY-MM-DD in Asia/Bangkok (UTC+7) timezone.
+ */
+export function getBangkokDateString(input?: Date | string | number): string {
+  if (typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.trim())) {
+    return input.trim();
+  }
+  const d = input !== undefined ? new Date(input) : new Date();
+  if (Number.isNaN(d.getTime())) {
+    const fallback = new Date(Date.now() + 7 * 3600000);
+    return fallback.toISOString().slice(0, 10);
+  }
+  // Shift UTC timestamp by +7 hours to get exact Bangkok calendar date
+  const bkkTime = new Date(d.getTime() + 7 * 3600000);
+  return bkkTime.toISOString().slice(0, 10);
+}
+
+function normalizeDateYmd(dateStr: string): string | null {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const trimmed = dateStr.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+  return getBangkokDateString(trimmed);
+}
+
+function addDaysYmd(ymd: string, deltaDays: number): string {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const utc = Date.UTC(y, (m || 1) - 1, (d || 1) + deltaDays);
+  return new Date(utc).toISOString().slice(0, 10);
+}
+
+function diffDaysYmd(targetYmd: string, baseYmd: string): number {
+  const [ty, tm, td] = targetYmd.split('-').map(Number);
+  const [by, bm, bd] = baseYmd.split('-').map(Number);
+  const tUtc = Date.UTC(ty, (tm || 1) - 1, td || 1);
+  const bUtc = Date.UTC(by, (bm || 1) - 1, bd || 1);
+  return Math.round((tUtc - bUtc) / 86400000);
+}
+
+/**
+ * Checks whether a borrower can confirm equipment receipt on `now` given `pickupDate`.
+ * Rule: Borrower must confirm receipt AT LEAST 1 day before `pickupDate` (i.e. todayBkk <= pickupDate - 1 day).
+ * Example: If pickupDate is 2026-11-15, lastAllowedReceiveDate is 2026-11-14.
+ * Confirming on 2026-11-14 or earlier is allowed; confirming on 2026-11-15 or later is rejected.
+ */
+export function checkBorrowReceiveEligibility(
+  pickupDate: string,
+  now?: Date | string | number,
+): BorrowReceiveEligibility {
+  const pickupYmd = normalizeDateYmd(pickupDate);
+  const todayBkk = getBangkokDateString(now);
+
+  if (!pickupYmd) {
+    return {
+      allowed: false,
+      todayBkk,
+      pickupDate: String(pickupDate || ''),
+      lastAllowedReceiveDate: '',
+      daysUntilPickup: -1,
+      isOnPickupDate: false,
+      isAfterPickupDate: false,
+      isPastDeadline: true,
+      reason: 'ไม่พบข้อมูลวันรับครุภัณฑ์ที่ถูกต้อง',
+    };
+  }
+
+  const lastAllowedReceiveDate = addDaysYmd(pickupYmd, -1);
+  const daysUntilPickup = diffDaysYmd(pickupYmd, todayBkk);
+  const isOnPickupDate = todayBkk === pickupYmd;
+  const isAfterPickupDate = todayBkk > pickupYmd;
+  const isPastDeadline = todayBkk >= pickupYmd;
+  const allowed = todayBkk <= lastAllowedReceiveDate;
+
+  let reason: string | undefined;
+  if (!allowed) {
+    if (isOnPickupDate) {
+      reason = `เลยกำหนดยืนยันรับมอบครุภัณฑ์ (ต้องกดยืนยันล่วงหน้าอย่างน้อย 1 วันก่อนวันรับครุภัณฑ์ ${pickupYmd} คือภายในวันที่ ${lastAllowedReceiveDate}) กรุณาติดต่อเจ้าหน้าที่หรือเลื่อนวันรับครุภัณฑ์`;
+    } else {
+      reason = `เลยกำหนดวันรับครุภัณฑ์ (${pickupYmd}) แล้ว (ต้องกดยืนยันรับมอบภายในวันที่ ${lastAllowedReceiveDate}) กรุณาติดต่อเจ้าหน้าที่เพื่อดำเนินการหรือกำหนดวันรับใหม่`;
+    }
+  }
+
+  return {
+    allowed,
+    todayBkk,
+    pickupDate: pickupYmd,
+    lastAllowedReceiveDate,
+    daysUntilPickup,
+    isOnPickupDate,
+    isAfterPickupDate,
+    isPastDeadline,
+    reason,
+  };
+}
+
+

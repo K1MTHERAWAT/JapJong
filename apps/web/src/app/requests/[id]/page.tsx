@@ -93,11 +93,16 @@ export default function RequestDetailPage() {
                   ขอเลื่อนวัน / แก้ไข
                 </Link>
               )}
-            {req.type === 'borrow' && req.status === 'borrowing' && (
-              <Link href="/borrow/my" className="jw-btn flex-1 sm:w-48">
-                ไปหน้าแจ้งคืนอุปกรณ์
-              </Link>
-            )}
+            {req.type === 'borrow' &&
+              (req.status === 'approved' || req.status === 'borrowing' || req.status === 'return_inspect') && (
+                <Link href="/borrow/my" className="jw-btn flex-1 sm:w-56">
+                  {req.status === 'approved'
+                    ? 'ไปหน้ายืนยันรับมอบอุปกรณ์'
+                    : req.status === 'borrowing'
+                    ? 'ไปหน้าแจ้งคืนอุปกรณ์'
+                    : 'ไปหน้าตรวจสอบการคืน'}
+                </Link>
+              )}
             {isFullyApproved && (
               <Link href={`/approver/permit/${req.id}`} className="jw-btn-sec flex-1 sm:w-48">
                 ดูใบอนุญาต (PDF)
@@ -155,12 +160,22 @@ export default function RequestDetailPage() {
             </div>
           )}
           {req.type === 'borrow' && (
-            <div className="flex gap-2">
-              <b className="w-24 shrink-0 text-ink-mute">ช่วงขอใช้</b>
-              <span>
-                {formatThaiDate(req.pickupDate, false)}–{formatThaiDate(req.returnDate, true)}
-              </span>
-            </div>
+            <>
+              <div className="flex gap-2">
+                <b className="w-24 shrink-0 text-ink-mute">ช่วงขอใช้</b>
+                <span>
+                  {formatThaiDate(req.pickupDate, false)}–{formatThaiDate(req.returnDate, true)}
+                </span>
+              </div>
+              {req.receivedAt && (
+                <div className="flex gap-2">
+                  <b className="w-24 shrink-0 text-ink-mute">วันที่รับมอบ</b>
+                  <span className="font-semibold text-brand">
+                    {formatThaiDate(req.receivedAt, true)} ({formatThaiDateTime(req.receivedAt)})
+                  </span>
+                </div>
+              )}
+            </>
           )}
           <div className="flex gap-2">
             <b className="w-24 shrink-0 text-ink-mute">ผู้ขอ</b>

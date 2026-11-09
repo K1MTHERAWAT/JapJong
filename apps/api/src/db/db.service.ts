@@ -183,6 +183,9 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
            ADD COLUMN IF NOT EXISTS "address_subdistrict" TEXT,
            ADD COLUMN IF NOT EXISTS "address_district" TEXT,
            ADD COLUMN IF NOT EXISTS "address_province" TEXT,
+           ADD COLUMN IF NOT EXISTS "address_subdistrict_id" TEXT,
+           ADD COLUMN IF NOT EXISTS "address_district_id" TEXT,
+           ADD COLUMN IF NOT EXISTS "address_province_id" TEXT,
            ADD COLUMN IF NOT EXISTS "email" TEXT,
            ADD COLUMN IF NOT EXISTS "email_verified" BOOLEAN NOT NULL DEFAULT false`,
         `ALTER TABLE "venues"
@@ -190,7 +193,44 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         `ALTER TABLE "equipments"
            ADD COLUMN IF NOT EXISTS "images" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]`,
         `ALTER TABLE "requests"
-           ADD COLUMN IF NOT EXISTS "requester_phone" TEXT`,
+           ADD COLUMN IF NOT EXISTS "requester_phone" TEXT,
+           ADD COLUMN IF NOT EXISTS "address_subdistrict_id" TEXT,
+           ADD COLUMN IF NOT EXISTS "address_district_id" TEXT,
+           ADD COLUMN IF NOT EXISTS "address_province_id" TEXT,
+           ADD COLUMN IF NOT EXISTS "received_at" TIMESTAMPTZ(3),
+           ADD COLUMN IF NOT EXISTS "received_by_id" TEXT,
+           ADD COLUMN IF NOT EXISTS "received_by_name" TEXT,
+           ADD COLUMN IF NOT EXISTS "receive_photos" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+           ADD COLUMN IF NOT EXISTS "receive_note" TEXT,
+           ADD COLUMN IF NOT EXISTS "return_submitted_at" TIMESTAMPTZ(3),
+           ADD COLUMN IF NOT EXISTS "return_submitted_by_id" TEXT,
+           ADD COLUMN IF NOT EXISTS "return_submitted_by_name" TEXT,
+           ADD COLUMN IF NOT EXISTS "return_photos" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+           ADD COLUMN IF NOT EXISTS "return_note" TEXT,
+           ADD COLUMN IF NOT EXISTS "inspected_at" TIMESTAMPTZ(3),
+           ADD COLUMN IF NOT EXISTS "inspector_id" TEXT,
+           ADD COLUMN IF NOT EXISTS "inspector_name" TEXT,
+           ADD COLUMN IF NOT EXISTS "inspect_result" TEXT,
+           ADD COLUMN IF NOT EXISTS "inspect_note" TEXT,
+           ADD COLUMN IF NOT EXISTS "inspect_photos" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]`,
+        `CREATE TABLE IF NOT EXISTS "thai_provinces" (
+           "id" TEXT PRIMARY KEY,
+           "name_th" TEXT NOT NULL
+         )`,
+        `CREATE TABLE IF NOT EXISTS "thai_districts" (
+           "id" TEXT PRIMARY KEY,
+           "province_id" TEXT NOT NULL REFERENCES "thai_provinces"("id") ON DELETE CASCADE,
+           "name_th" TEXT NOT NULL
+         )`,
+        `CREATE TABLE IF NOT EXISTS "thai_subdistricts" (
+           "id" TEXT PRIMARY KEY,
+           "district_id" TEXT NOT NULL REFERENCES "thai_districts"("id") ON DELETE CASCADE,
+           "province_id" TEXT NOT NULL,
+           "name_th" TEXT NOT NULL,
+           "zip_code" TEXT NOT NULL DEFAULT ''
+         )`,
+        `CREATE INDEX IF NOT EXISTS "thai_districts_province_id_idx" ON "thai_districts"("province_id")`,
+        `CREATE INDEX IF NOT EXISTS "thai_subdistricts_district_id_idx" ON "thai_subdistricts"("district_id")`,
         `DO $$ BEGIN
            CREATE TYPE "VerificationStatus" AS ENUM ('VALID', 'REVOKED', 'INVALID');
          EXCEPTION
@@ -861,6 +901,9 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
             "address_subdistrict" = ${a.addressSubdistrict ?? null},
             "address_district" = ${a.addressDistrict ?? null},
             "address_province" = ${a.addressProvince ?? null},
+            "address_subdistrict_id" = ${a.addressSubdistrictId ?? null},
+            "address_district_id" = ${a.addressDistrictId ?? null},
+            "address_province_id" = ${a.addressProvinceId ?? null},
             "email" = ${a.email ?? null},
             "email_verified" = ${a.emailVerified ?? false}
         WHERE "id" = ${a.id}
@@ -1156,9 +1199,47 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       }
     });
 
+    const receivedAtDate = r.type === 'borrow' ? parseDateSafe(r.receivedAt) : null;
+    const receivedById = r.type === 'borrow' ? (r.receivedById ?? null) : null;
+    const receivedByName = r.type === 'borrow' ? (r.receivedByName ?? null) : null;
+    const receivePhotos = r.type === 'borrow' && Array.isArray(r.receivePhotos) ? r.receivePhotos.filter(Boolean) : [];
+    const receiveNote = r.type === 'borrow' ? (r.receiveNote ?? null) : null;
+    const returnSubmittedAtDate = r.type === 'borrow' ? parseDateSafe(r.returnSubmittedAt) : null;
+    const returnSubmittedById = r.type === 'borrow' ? (r.returnSubmittedById ?? null) : null;
+    const returnSubmittedByName = r.type === 'borrow' ? (r.returnSubmittedByName ?? null) : null;
+    const returnPhotos = r.type === 'borrow' && Array.isArray(r.returnPhotos) ? r.returnPhotos.filter(Boolean) : [];
+    const returnNote = r.type === 'borrow' ? (r.returnNote ?? null) : null;
+    const inspectedAtDate = r.type === 'borrow' ? parseDateSafe(r.inspectedAt) : null;
+    const inspectorId = r.type === 'borrow' ? (r.inspectorId ?? null) : null;
+    const inspectorName = r.type === 'borrow' ? (r.inspectorName ?? null) : null;
+    const inspectResult = r.type === 'borrow' ? (r.inspectResult ?? null) : null;
+    const inspectNote = r.type === 'borrow' ? (r.inspectNote ?? null) : null;
+    const inspectPhotos = r.type === 'borrow' && Array.isArray(r.inspectPhotos) ? r.inspectPhotos.filter(Boolean) : [];
+
     await this.prisma.$executeRaw`
-      UPDATE "requests" SET "requester_phone" = ${r.requesterPhone ?? null} WHERE "id" = ${r.id}
-    `.catch(() => {});
+      UPDATE "requests"
+      SET "requester_phone" = ${r.requesterPhone ?? null},
+          "address_subdistrict_id" = ${r.addressSubdistrictId ?? null},
+          "address_district_id" = ${r.addressDistrictId ?? null},
+          "address_province_id" = ${r.addressProvinceId ?? null},
+          "received_at" = ${receivedAtDate},
+          "received_by_id" = ${receivedById},
+          "received_by_name" = ${receivedByName},
+          "receive_photos" = ${receivePhotos}::text[],
+          "receive_note" = ${receiveNote},
+          "return_submitted_at" = ${returnSubmittedAtDate},
+          "return_submitted_by_id" = ${returnSubmittedById},
+          "return_submitted_by_name" = ${returnSubmittedByName},
+          "return_photos" = ${returnPhotos}::text[],
+          "return_note" = ${returnNote},
+          "inspected_at" = ${inspectedAtDate},
+          "inspector_id" = ${inspectorId},
+          "inspector_name" = ${inspectorName},
+          "inspect_result" = ${inspectResult},
+          "inspect_note" = ${inspectNote},
+          "inspect_photos" = ${inspectPhotos}::text[]
+      WHERE "id" = ${r.id}
+    `.catch((err) => this.logger.warn('Failed to persist extra request columns', err));
   }
 
   async persistHandover(h: HandoverRecord) {
@@ -2483,7 +2564,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     const [dbAccounts, accountAddresses, dbVenues, dbEquipment, dbRequests, dbNotifications, dbActivities, dbHandovers] =
       await Promise.all([
         this.prisma.account.findMany({ orderBy: { createdAt: 'asc' } }),
-        (this.prisma.$queryRaw`SELECT "id", "address_house_no", "address_moo", "address_subdistrict", "address_district", "address_province", "email", "email_verified" FROM "accounts"` as Promise<
+        (this.prisma.$queryRaw`SELECT "id", "address_house_no", "address_moo", "address_subdistrict", "address_district", "address_province", "address_subdistrict_id", "address_district_id", "address_province_id", "email", "email_verified" FROM "accounts"` as Promise<
           {
             id: string;
             address_house_no: string | null;
@@ -2491,6 +2572,9 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
             address_subdistrict: string | null;
             address_district: string | null;
             address_province: string | null;
+            address_subdistrict_id: string | null;
+            address_district_id: string | null;
+            address_province_id: string | null;
             email: string | null;
             email_verified: boolean | null;
           }[]
@@ -2535,6 +2619,9 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         addressSubdistrict: addr?.address_subdistrict ?? undefined,
         addressDistrict: addr?.address_district ?? undefined,
         addressProvince: addr?.address_province ?? undefined,
+        addressSubdistrictId: addr?.address_subdistrict_id ?? undefined,
+        addressDistrictId: addr?.address_district_id ?? undefined,
+        addressProvinceId: addr?.address_province_id ?? undefined,
         permissions:
           a.permissions && typeof a.permissions === 'object'
             ? (a.permissions as Record<PermissionKey, boolean>)
@@ -2549,16 +2636,40 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
     let venueImagesMap = new Map<string, string[]>();
     let equipmentImagesMap = new Map<string, string[]>();
-    let reqPhoneMap = new Map<string, string>();
+    let reqExtraMap = new Map<string, any>();
     try {
-      const [vRows, eRows, rPhoneRows] = await Promise.all([
+      const [vRows, eRows, rExtraRows] = await Promise.all([
         this.prisma.$queryRaw<{ id: string; images: string[] | null }[]>`SELECT "id", "images" FROM "venues"`,
         this.prisma.$queryRaw<{ id: string; images: string[] | null }[]>`SELECT "id", "images" FROM "equipments"`,
-        this.prisma.$queryRaw<{ id: string; requester_phone: string | null }[]>`SELECT "id", "requester_phone" FROM "requests"`,
+        this.prisma.$queryRaw<any[]>`
+          SELECT
+            "id",
+            "requester_phone",
+            "address_subdistrict_id",
+            "address_district_id",
+            "address_province_id",
+            "received_at",
+            "received_by_id",
+            "received_by_name",
+            "receive_photos",
+            "receive_note",
+            "return_submitted_at",
+            "return_submitted_by_id",
+            "return_submitted_by_name",
+            "return_photos",
+            "return_note",
+            "inspected_at",
+            "inspector_id",
+            "inspector_name",
+            "inspect_result",
+            "inspect_note",
+            "inspect_photos"
+          FROM "requests"
+        `,
       ]);
       venueImagesMap = new Map((vRows || []).map((r) => [r.id, Array.isArray(r.images) ? r.images : []]));
       equipmentImagesMap = new Map((eRows || []).map((r) => [r.id, Array.isArray(r.images) ? r.images : []]));
-      reqPhoneMap = new Map((rPhoneRows || []).filter((r) => r.requester_phone).map((r) => [r.id, r.requester_phone as string]));
+      reqExtraMap = new Map((rExtraRows || []).map((r) => [r.id, r]));
     } catch {
       // ignore if column not yet migrated
     }
@@ -2592,13 +2703,14 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     }));
 
     this.requests = (dbRequests || []).map((r: any): AnyRequest => {
+      const extra = reqExtraMap.get(r.id);
       const base = {
         id: r.id,
         code: r.code,
         status: r.status,
         requesterId: r.requesterId,
         requesterName: r.requesterName,
-        requesterPhone: reqPhoneMap.get(r.id) ?? undefined,
+        requesterPhone: extra?.requester_phone ?? undefined,
         organization: r.organization,
         createdAt: r.createdAt.toISOString(),
         updatedAt: r.updatedAt.toISOString(),
@@ -2614,6 +2726,9 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         addressSubdistrict: r.addressSubdistrict ?? undefined,
         addressDistrict: r.addressDistrict ?? undefined,
         addressProvince: r.addressProvince ?? undefined,
+        addressSubdistrictId: extra?.address_subdistrict_id ?? undefined,
+        addressDistrictId: extra?.address_district_id ?? undefined,
+        addressProvinceId: extra?.address_province_id ?? undefined,
         purposeItems: Array.isArray(r.purposeItems)
           ? (r.purposeItems as unknown as OfficialFormPurposeItem[])
           : undefined,
@@ -2670,6 +2785,22 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
           signatures,
           returnRequestedAt: r.returnRequestedAt ? r.returnRequestedAt.toISOString() : undefined,
           returnedAt: r.returnedAt ? r.returnedAt.toISOString() : undefined,
+          receivedAt: extra?.received_at ? new Date(extra.received_at).toISOString() : undefined,
+          receivedById: extra?.received_by_id ?? undefined,
+          receivedByName: extra?.received_by_name ?? undefined,
+          receivePhotos: Array.isArray(extra?.receive_photos) && extra.receive_photos.length > 0 ? extra.receive_photos : undefined,
+          receiveNote: extra?.receive_note ?? undefined,
+          returnSubmittedAt: extra?.return_submitted_at ? new Date(extra.return_submitted_at).toISOString() : undefined,
+          returnSubmittedById: extra?.return_submitted_by_id ?? undefined,
+          returnSubmittedByName: extra?.return_submitted_by_name ?? undefined,
+          returnPhotos: Array.isArray(extra?.return_photos) && extra.return_photos.length > 0 ? extra.return_photos : undefined,
+          returnNote: extra?.return_note ?? undefined,
+          inspectedAt: extra?.inspected_at ? new Date(extra.inspected_at).toISOString() : undefined,
+          inspectorId: extra?.inspector_id ?? undefined,
+          inspectorName: extra?.inspector_name ?? undefined,
+          inspectResult: extra?.inspect_result ?? undefined,
+          inspectNote: extra?.inspect_note ?? undefined,
+          inspectPhotos: Array.isArray(extra?.inspect_photos) && extra.inspect_photos.length > 0 ? extra.inspect_photos : undefined,
         };
         return borrow;
       }

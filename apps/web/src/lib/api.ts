@@ -178,6 +178,9 @@ export const api = {
     lineName?: string;
     addressHouseNo?: string;
     addressMoo?: string;
+    addressProvinceId?: string;
+    addressDistrictId?: string;
+    addressSubdistrictId?: string;
     addressSubdistrict?: string;
     addressDistrict?: string;
     addressProvince?: string;
@@ -297,6 +300,9 @@ export const api = {
     requesterPosition?: string;
     addressHouseNo?: string;
     addressMoo?: string;
+    addressProvinceId?: string;
+    addressDistrictId?: string;
+    addressSubdistrictId?: string;
     addressSubdistrict?: string;
     addressDistrict?: string;
     addressProvince?: string;
@@ -318,6 +324,9 @@ export const api = {
     requesterPosition?: string;
     addressHouseNo?: string;
     addressMoo?: string;
+    addressProvinceId?: string;
+    addressDistrictId?: string;
+    addressSubdistrictId?: string;
     addressSubdistrict?: string;
     addressDistrict?: string;
     addressProvince?: string;

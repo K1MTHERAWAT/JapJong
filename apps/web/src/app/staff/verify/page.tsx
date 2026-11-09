@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   DocumentScanLog,
@@ -14,6 +14,21 @@ import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
 import { Chip } from '@/components/ui';
 import { api, formatThaiDateTime } from '@/lib/api';
+import {
+  applyCameraTorch,
+  applyCameraZoom,
+  CameraHardwareCapabilities,
+  computeResponsiveQrBox,
+   decodeUploadedQrImageFile,
+  DEFAULT_CAMERA_CAPABILITIES,
+  getActiveVideoTrack,
+  getOptimalVideoConstraints,
+  getScannerGuidanceMessage,
+  inspectTrackCapabilities,
+  QrDuplicateGuard,
+  triggerCameraRefocus,
+  tryEnhancedVideoFrameDecode,
+} from '@/lib/qr-scanner-engine';
 
 export default function StaffVerifyPage() {
   const { account } = useAuth();
@@ -26,23 +41,38 @@ export default function StaffVerifyPage() {
   const [history, setHistory] = useState<DocumentScanLog[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  // Advanced scanner controls state
+  const [continuousMode, setContinuousMode] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1.0);
+  const [usingDigitalZoom, setUsingDigitalZoom] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [capabilities, setCapabilities] = useState<CameraHardwareCapabilities>(
+    DEFAULT_CAMERA_CAPABILITIES,
+  );
+  const [scanElapsedSec, setScanElapsedSec] = useState(0);
+  const [enhancePassCount, setEnhancePassCount] = useState(0);
+  const [lastScannedBanner, setLastScannedBanner] = useState('');
+
   const qrScannerRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const duplicateGuardRef = useRef<QrDuplicateGuard>(new QrDuplicateGuard(4000));
+  const continuousModeRef = useRef<boolean>(continuousMode);
+  continuousModeRef.current = continuousMode;
 
-  const loadHistory = () => {
+  const loadHistory = useCallback(() => {
     setHistoryLoading(true);
     api
       .staffVerifyHistory(20)
       .then(setHistory)
       .catch(() => {})
       .finally(() => setHistoryLoading(false));
-  };
+  }, []);
 
   useEffect(() => {
     loadHistory();
-  }, []);
+  }, [loadHistory]);
 
-  const stopCamera = async () => {
+  const stopCamera = useCallback(async () => {
     if (qrScannerRef.current) {
       try {
         await qrScannerRef.current.stop();
@@ -53,11 +83,49 @@ export default function StaffVerifyPage() {
       qrScannerRef.current = null;
     }
     setScanning(false);
-  };
+    setTorchOn(false);
+    setScanElapsedSec(0);
+  }, []);
 
-  const startCamera = async () => {
+  // ประมวลผลการตรวจสอบพร้อมป้องกันการสแกนซ้ำซ้อน
+  const handleVerify = useCallback(
+    async (queryText: string, fromCamera = false) => {
+      const cleaned = (queryText || '').trim();
+      if (!cleaned) return;
+
+      if (fromCamera) {
+        const acquired = duplicateGuardRef.current.tryAcquire(cleaned);
+        if (!acquired) return;
+      }
+
+      if (fromCamera && !continuousModeRef.current) {
+        await stopCamera();
+      }
+
+      setVerifying(true);
+      setLastScannedBanner(`ตรวจพบรหัส: ${cleaned.slice(0, 32)}${cleaned.length > 32 ? '...' : ''}`);
+      try {
+        const res = await api.staffVerify(cleaned);
+        setResult(res);
+        loadHistory();
+      } catch {
+        setResult({
+          status: 'INVALID',
+          message: 'เกิดข้อผิดพลาดในการตรวจสอบเอกสาร',
+        });
+      } finally {
+        setVerifying(false);
+        duplicateGuardRef.current.release();
+      }
+    },
+    [loadHistory, stopCamera],
+  );
+
+  const startCamera = useCallback(async () => {
     setCameraError('');
     setScanning(true);
+    setScanElapsedSec(0);
+    setEnhancePassCount(0);
 
     try {
       const { Html5Qrcode } = await import('html5-qrcode');
@@ -65,24 +133,56 @@ export default function StaffVerifyPage() {
       // เคลียร์ scanner เดิมหากมี
       await stopCamera();
 
-      const scanner = new Html5Qrcode('qr-reader');
+      const scanner = new Html5Qrcode('qr-reader', {
+        verbose: false,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true,
+        },
+      });
       qrScannerRef.current = scanner;
+      setScanning(true);
 
-      await scanner.start(
-        { facingMode: 'environment' },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0,
-        },
-        async (decodedText) => {
-          await stopCamera();
-          handleVerify(decodedText);
-        },
-        () => {
-          // ไม่ต้องแสดง error ทุกเฟรมที่ยังไม่พบ QR
-        },
-      );
+      const videoConstraints = getOptimalVideoConstraints();
+
+      try {
+        await scanner.start(
+          videoConstraints,
+          {
+            fps: 15,
+            qrbox: computeResponsiveQrBox,
+            aspectRatio: 1.0,
+            disableFlip: false,
+          },
+          (decodedText) => {
+            handleVerify(decodedText, true);
+          },
+          () => {
+            // ไม่ต้องแสดง error ทุกเฟรมที่ยังไม่พบ QR
+          },
+        );
+      } catch {
+        // Fallback กรณีอุปกรณ์บางรุ่นไม่รองรับ advanced constraints
+        await scanner.start(
+          { facingMode: 'environment' },
+          {
+            fps: 15,
+            qrbox: computeResponsiveQrBox,
+            aspectRatio: 1.0,
+          },
+          (decodedText) => {
+            handleVerify(decodedText, true);
+          },
+          () => {},
+        );
+      }
+
+      // ตรวจสอบความสามารถของกล้อง (Hardware Zoom, Torch, Continuous Focus)
+      setTimeout(() => {
+        const track = getActiveVideoTrack('qr-reader');
+        const caps = inspectTrackCapabilities(track);
+        setCapabilities(caps);
+        triggerCameraRefocus(track);
+      }, 450);
     } catch (err: any) {
       setCameraError(
         err?.message?.includes('NotAllowedError') || err?.name === 'NotAllowedError'
@@ -91,39 +191,87 @@ export default function StaffVerifyPage() {
       );
       setScanning(false);
     }
-  };
+  }, [handleVerify, stopCamera]);
 
-  // จัดการเปิด/ปิดกล้องตาม mode
+  // จัดการเปิด/ปิดกล้องตาม mode และสถานะการสแกนต่อเนื่อง
   useEffect(() => {
-    if (mode === 'camera' && !result) {
+    const shouldRunCamera =
+      mode === 'camera' && (!result || continuousMode);
+    if (shouldRunCamera && !qrScannerRef.current) {
       startCamera();
-    } else {
+    } else if (!shouldRunCamera && qrScannerRef.current) {
       stopCamera();
     }
+  }, [mode, result, continuousMode, startCamera, stopCamera]);
+
+  useEffect(() => {
     return () => {
       stopCamera();
     };
-  }, [mode, result]);
+  }, [stopCamera]);
 
-  // ประมวลผลการตรวจสอบ
-  const handleVerify = async (queryText: string) => {
-    if (!queryText.trim()) return;
-    setVerifying(true);
-    try {
-      const res = await api.staffVerify(queryText);
-      setResult(res);
-      loadHistory();
-    } catch {
-      setResult({
-        status: 'INVALID',
-        message: 'เกิดข้อผิดพลาดในการตรวจสอบเอกสาร',
-      });
-    } finally {
-      setVerifying(false);
+  // Background Multi-Pass Image Preprocessing Loop สำหรับภาพเบลอ / อยู่ไกล / แสงน้อย / เอียง
+  useEffect(() => {
+    if (!scanning || mode !== 'camera') return;
+
+    let passIdx = 0;
+    let active = true;
+
+    const elapsedTimer = setInterval(() => {
+      setScanElapsedSec((prev) => prev + 1);
+    }, 1000);
+
+    const enhanceTimer = setInterval(async () => {
+      if (!active || duplicateGuardRef.current.isLocked()) return;
+      const currentPass = passIdx++;
+      setEnhancePassCount(currentPass + 1);
+
+      // ทุกๆ 6 รอบ ให้กระตุ้น Continuous Focus ใหม่อัตโนมัติ
+      if (currentPass % 6 === 0) {
+        const track = getActiveVideoTrack('qr-reader');
+        triggerCameraRefocus(track);
+      }
+
+      const decoded = await tryEnhancedVideoFrameDecode('qr-reader', currentPass);
+      if (active && decoded) {
+        handleVerify(decoded, true);
+      }
+    }, 650);
+
+    return () => {
+      active = false;
+      clearInterval(elapsedTimer);
+      clearInterval(enhanceTimer);
+    };
+  }, [scanning, mode, handleVerify]);
+
+  // ปรับระดับการซูม (Hardware Zoom หรือ Digital Zoom Fallback)
+  const handleZoomChange = async (newZoom: number) => {
+    const clamped = Math.round(Math.max(1, Math.min(3, newZoom)) * 10) / 10;
+    setZoomLevel(clamped);
+    const track = getActiveVideoTrack('qr-reader');
+    const appliedHardware = await applyCameraZoom(track, clamped, capabilities);
+    setUsingDigitalZoom(!appliedHardware && clamped > 1);
+  };
+
+  // เปิด/ปิดไฟฉาย (Torch)
+  const handleToggleTorch = async () => {
+    const track = getActiveVideoTrack('qr-reader');
+    const nextState = !torchOn;
+    const ok = await applyCameraTorch(track, nextState);
+    if (ok) {
+      setTorchOn(nextState);
     }
   };
 
-  // ตรวจสอบจากไฟล์รูปภาพ
+  // แตะเพื่อโฟกัสใหม่
+  const handleManualRefocus = async () => {
+    const track = getActiveVideoTrack('qr-reader');
+    await triggerCameraRefocus(track);
+    setScanElapsedSec(0);
+  };
+
+  // ตรวจสอบจากไฟล์รูปภาพด้วย Multi-pass Preprocessing
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -132,12 +280,15 @@ export default function StaffVerifyPage() {
     setCameraError('');
 
     try {
-      const { Html5Qrcode } = await import('html5-qrcode');
-      const scanner = new Html5Qrcode('qr-reader-hidden');
-      const decodedText = await scanner.scanFile(file, true);
-      handleVerify(decodedText);
+      const decodedText = await decodeUploadedQrImageFile(
+        file,
+        'qr-reader-hidden',
+      );
+      await handleVerify(decodedText, false);
     } catch {
-      setCameraError('ไม่พบ QR Code ในรูปภาพที่อัปโหลด กรุณาถ่ายภาพให้เห็น QR Code ชัดเจน');
+      setCameraError(
+        'ไม่พบ QR Code ในรูปภาพที่อัปโหลด (ระบบได้ทดลองปรับความคมชัด ขยายภาพ และหมุนองศาแล้ว) กรุณาถ่ายภาพให้เห็นกรอบ QR Code ครบถ้วน',
+      );
       setVerifying(false);
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -145,16 +296,25 @@ export default function StaffVerifyPage() {
   };
 
   const handleResetScan = () => {
+    duplicateGuardRef.current.reset();
     setResult(null);
     setManualQuery('');
     setCameraError('');
-    if (mode === 'camera') {
+    setLastScannedBanner('');
+    setScanElapsedSec(0);
+    if (mode === 'camera' && !qrScannerRef.current) {
       startCamera();
     }
   };
 
   const status = result?.status || 'NOT_FOUND';
   const tone = VERIFICATION_STATUS_TONE[status];
+  const guidanceText = getScannerGuidanceMessage(
+    scanElapsedSec,
+    zoomLevel,
+    torchOn,
+    capabilities.supportsTorch,
+  );
 
   return (
     <AppShell
@@ -163,17 +323,36 @@ export default function StaffVerifyPage() {
       maxWidth="max-w-[840px]"
     >
       <div className="flex flex-col gap-5">
-        {/* แถบโหมดการสแกน */}
-        {!result && (
+        {/* แถบโหมดการสแกน (แสดงเสมอเมื่อยังไม่พบผลลัพธ์ หรือเมื่อเปิดโหมดสแกนต่อเนื่อง) */}
+        {(!result || continuousMode) && (
           <div className="jw-card p-4 sm:p-5 flex flex-col gap-4">
-            <div className="flex items-center justify-between border-b border-line pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
               <div>
                 <b className="text-[16px] text-ink block">สแกนตรวจสอบเอกสารทางราชการ</b>
                 <span className="text-[12.5px] text-ink-mute">
-                  ตรวจความถูกต้อง ลายมือชื่อ และสถานะการอนุญาตของเอกสาร อบต.
+                  ตรวจความถูกต้อง ลายมือชื่อ และสถานะการอนุญาตของเอกสาร อบต. (รองรับภาพเบลอ อยู่ไกล แสงน้อย หรือเอียง)
                 </span>
               </div>
-              <Chip tone="blue">เจ้าหน้าที่: {account?.name}</Chip>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setContinuousMode((v) => !v)}
+                  className={`h-8 px-3 rounded-full border text-[12px] font-semibold flex items-center gap-1.5 transition ${
+                    continuousMode
+                      ? 'bg-brand text-white border-brand'
+                      : 'bg-white text-ink-mute border-line hover:border-brand'
+                  }`}
+                  title="เปิดกล้องค้างไว้เพื่อสแกนเอกสารหลายใบต่อเนื่องโดยไม่ต้องเปิดกล้องใหม่"
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      continuousMode ? 'bg-white animate-ping' : 'bg-ink-mute/50'
+                    }`}
+                  />
+                  สแกนต่อเนื่อง: {continuousMode ? 'เปิด' : 'ปิด'}
+                </button>
+                <Chip tone="blue">เจ้าหน้าที่: {account?.name}</Chip>
+              </div>
             </div>
 
             {/* ปุ่มสลับโหมด */}
@@ -233,28 +412,153 @@ export default function StaffVerifyPage() {
               onChange={handleFileUpload}
             />
 
-            {/* กล่องแสดงกล้องสแกน */}
+            {/* กล่องแสดงกล้องสแกนพร้อมระบบ Zoom / Torch / Auto-Focus / AI Preprocessing */}
             {mode === 'camera' && (
-              <div className="flex flex-col items-center gap-3">
-                <div className="relative w-full max-w-[380px] aspect-square rounded-2xl overflow-hidden bg-black/90 border-2 border-brand/50 shadow-md flex items-center justify-center">
-                  <div id="qr-reader" className="w-full h-full"></div>
-                  {/* กรอบเล็งสแกนจำลอง */}
-                  <div className="absolute inset-8 pointer-events-none border-2 border-brand/80 rounded-2xl flex flex-col justify-between p-3 animate-pulse">
+              <div className="flex flex-col items-center gap-3.5">
+                <div
+                  onClick={handleManualRefocus}
+                  title="แตะที่ภาพเพื่อปรับโฟกัสอัตโนมัติใหม่"
+                  className="relative w-full max-w-[420px] aspect-square rounded-2xl overflow-hidden bg-black/95 border-2 border-brand/60 shadow-md flex items-center justify-center cursor-pointer"
+                >
+                  <div
+                    id="qr-reader"
+                    className="w-full h-full transition-transform duration-200 ease-out"
+                    style={
+                      usingDigitalZoom && zoomLevel > 1
+                        ? {
+                            transform: `scale(${zoomLevel})`,
+                            transformOrigin: 'center center',
+                          }
+                        : undefined
+                    }
+                  ></div>
+
+                  {/* กรอบเล็งสแกนขนาดใหญ่ รองรับ QR Code เอียงหรืออยู่ห่าง */}
+                  <div className="absolute inset-6 pointer-events-none border-2 border-brand/70 rounded-2xl flex flex-col justify-between p-3">
                     <div className="flex justify-between">
-                      <div className="w-4 h-4 border-t-4 border-l-4 border-brand"></div>
-                      <div className="w-4 h-4 border-t-4 border-r-4 border-brand"></div>
+                      <div className="w-6 h-6 border-t-4 border-l-4 border-brand rounded-tl-md"></div>
+                      <div className="w-6 h-6 border-t-4 border-r-4 border-brand rounded-tr-md"></div>
                     </div>
+                    <div className="w-full border-t border-brand/40 animate-pulse" />
                     <div className="flex justify-between">
-                      <div className="w-4 h-4 border-b-4 border-l-4 border-brand"></div>
-                      <div className="w-4 h-4 border-b-4 border-r-4 border-brand"></div>
+                      <div className="w-6 h-6 border-b-4 border-l-4 border-brand rounded-bl-md"></div>
+                      <div className="w-6 h-6 border-b-4 border-r-4 border-brand rounded-br-md"></div>
                     </div>
+                  </div>
+
+                  {/* แถบสถานะ AI Preprocessing มุมบน */}
+                  <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none text-[11px]">
+                    <span className="px-2.5 py-1 rounded-full bg-black/65 text-white font-medium backdrop-blur-xs">
+                      Auto-Focus · ซูม {zoomLevel.toFixed(1)}x
+                    </span>
+                    {enhancePassCount > 0 && (
+                      <span className="px-2.5 py-1 rounded-full bg-brand/85 text-white font-semibold backdrop-blur-xs">
+                        ปรับคมชัดอัตโนมัติ (รอบที่ {enhancePassCount})
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <span className="text-[12.5px] text-ink-mute flex items-center gap-1.5">
-                  <Icon name="shield-check" className="w-3.5 h-3.5 text-brand" />
-                  ส่องกล้องไปที่ QR Code บนเอกสาร PDF หรือเอกสารกระดาษ
-                </span>
+                {/* แถบควบคุมการซูม (Zoom Slider & Quick Presets) + ไฟฉาย + โฟกัส */}
+                <div className="w-full max-w-[420px] rounded-2xl border border-line bg-canvas p-3.5 flex flex-col gap-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[12.5px] font-semibold text-ink">
+                      ระดับการซูมกล้อง (สำหรับ QR ขนาดเล็กหรืออยู่ไกล):
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {[1, 1.5, 2, 3].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => handleZoomChange(preset)}
+                          className={`px-2 py-0.5 rounded-lg text-[11.5px] font-bold border transition ${
+                            Math.abs(zoomLevel - preset) < 0.08
+                              ? 'bg-brand text-white border-brand'
+                              : 'bg-white text-ink border-line hover:border-brand'
+                          }`}
+                        >
+                          {preset}x
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleZoomChange(zoomLevel - 0.2)}
+                      className="w-8 h-8 rounded-lg border border-line bg-white text-ink font-bold hover:border-brand"
+                      aria-label="ลดการซูม"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="range"
+                      min={1}
+                      max={3}
+                      step={0.1}
+                      value={zoomLevel}
+                      onChange={(e) => handleZoomChange(parseFloat(e.target.value))}
+                      className="flex-1 accent-brand cursor-pointer"
+                      aria-label="แถบเลื่อนซูมกล้อง"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleZoomChange(zoomLevel + 0.2)}
+                      className="w-8 h-8 rounded-lg border border-line bg-white text-ink font-bold hover:border-brand"
+                      aria-label="เพิ่มการซูม"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-line/60">
+                    <button
+                      type="button"
+                      onClick={handleManualRefocus}
+                      className="px-3 py-1.5 rounded-xl border border-line bg-white hover:bg-soft text-[12px] font-semibold text-ink flex items-center gap-1.5"
+                    >
+                      <Icon name="search" className="w-3.5 h-3.5 text-brand" />
+                      แตะเพื่อปรับโฟกัสใหม่
+                    </button>
+
+                    {capabilities.supportsTorch && (
+                      <button
+                        type="button"
+                        onClick={handleToggleTorch}
+                        className={`px-3 py-1.5 rounded-xl border text-[12px] font-semibold flex items-center gap-1.5 transition ${
+                          torchOn
+                            ? 'bg-amber-500 text-white border-amber-500'
+                            : 'bg-white text-ink border-line hover:bg-soft'
+                        }`}
+                      >
+                        <Icon name="eye" className="w-3.5 h-3.5" />
+                        {torchOn ? 'ปิดไฟฉาย' : 'เปิดไฟฉาย (แสงน้อย)'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* ข้อความแนะนำอัจฉริยะแบบเรียลไทม์ */}
+                <div
+                  className={`w-full max-w-[420px] rounded-xl px-3.5 py-2.5 text-[12.5px] flex items-start gap-2 border ${
+                    scanElapsedSec >= 4
+                      ? 'bg-amber-50/80 border-amber-200 text-amber-900'
+                      : 'bg-brand-mint/30 border-brand/20 text-ink'
+                  }`}
+                >
+                  <Icon
+                    name="shield-check"
+                    className="w-4 h-4 text-brand shrink-0 mt-0.5"
+                  />
+                  <span>{guidanceText}</span>
+                </div>
+
+                {lastScannedBanner && (
+                  <div className="text-[12px] font-semibold text-brand">
+                    {lastScannedBanner}
+                  </div>
+                )}
               </div>
             )}
 
@@ -268,7 +572,9 @@ export default function StaffVerifyPage() {
                   <Icon name="upload" className="w-6 h-6" />
                 </div>
                 <b className="text-[14.5px] text-ink">เลือกรูปภาพที่มี QR Code จากเครื่อง</b>
-                <span className="text-[12.5px] text-ink-mute">รองรับไฟล์ JPG, PNG หรือภาพหน้าจอเอกสาร</span>
+                <span className="text-[12.5px] text-ink-mute">
+                  รองรับไฟล์ JPG, PNG, WEBP หรือภาพถ่ายเอกสารที่ไม่คมชัด/เอียง (ระบบจะปรับความคมชัดและหมุนหาองศาอัตโนมัติ)
+                </span>
               </div>
             )}
 
@@ -277,7 +583,7 @@ export default function StaffVerifyPage() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  handleVerify(manualQuery);
+                  handleVerify(manualQuery, false);
                 }}
                 className="flex flex-col gap-3"
               >

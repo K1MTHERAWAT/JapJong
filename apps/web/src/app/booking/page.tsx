@@ -17,10 +17,14 @@ import {
   Venue,
   VenueType,
   periodDurationText,
+  sanitizePhoneInput,
+  validateThaiAddressHierarchy,
+  validateThaiPhone,
 } from '@japjong/shared';
 import { roleHomePath, useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
+import { Phone10DigitInput, ThaiAddressSelect } from '@/components/thai-address-select';
 import {
   CalendarC4,
   Chip,
@@ -168,7 +172,7 @@ export default function BookingWizardPage() {
   const [requesterTitle, setRequesterTitle] = useState(() => parseTitleAndName(account?.name).title);
   const [requesterName, setRequesterName] = useState(() => parseTitleAndName(account?.name).name);
   const fullRequesterName = requesterName.trim() ? `${requesterTitle} ${requesterName.trim()}` : '';
-  const [requesterPhone, setRequesterPhone] = useState(account?.phone || '');
+  const [requesterPhone, setRequesterPhone] = useState(() => sanitizePhoneInput(account?.phone || '', 10));
   const [requesterPosition, setRequesterPosition] = useState(
     account?.position && account.position !== 'ประชาชน'
       ? account.position
@@ -179,6 +183,9 @@ export default function BookingWizardPage() {
   const [addressSubdistrict, setAddressSubdistrict] = useState(account?.addressSubdistrict || '');
   const [addressDistrict, setAddressDistrict] = useState(account?.addressDistrict || '');
   const [addressProvince, setAddressProvince] = useState(account?.addressProvince || '');
+  const [addressSubdistrictId, setAddressSubdistrictId] = useState(account?.addressSubdistrictId || '');
+  const [addressDistrictId, setAddressDistrictId] = useState(account?.addressDistrictId || '');
+  const [addressProvinceId, setAddressProvinceId] = useState(account?.addressProvinceId || '');
   const [organization, setOrganization] = useState(
     account?.department || '',
   );
@@ -198,21 +205,35 @@ export default function BookingWizardPage() {
     return () => URL.revokeObjectURL(attachmentPreview.url);
   }, [attachmentPreview]);
 
+  const phoneValidation = validateThaiPhone(requesterPhone);
+  const addressValidation =
+    addressProvince.trim() && addressDistrict.trim() && addressSubdistrict.trim()
+      ? validateThaiAddressHierarchy({
+          province: addressProvince,
+          district: addressDistrict,
+          subdistrict: addressSubdistrict,
+          provinceId: addressProvinceId,
+          districtId: addressDistrictId,
+          subdistrictId: addressSubdistrictId,
+        })
+      : null;
+
   const missingRequestFields = [
     ...[
       ['สถานที่เขียนคำขอ', writtenAt],
       ['ชื่อ-นามสกุลผู้ยื่นคำขอ', requesterName],
-      ['เบอร์โทรศัพท์ติดต่อ', requesterPhone],
       ['ตำแหน่ง', requesterPosition],
       ['บ้านเลขที่', addressHouseNo],
       ['หมู่ที่', addressMoo],
-      ['ตำบล / แขวง', addressSubdistrict],
-      ['อำเภอ / เขต', addressDistrict],
       ['จังหวัด', addressProvince],
+      ['อำเภอ / เขต', addressDistrict],
+      ['ตำบล / แขวง', addressSubdistrict],
       ['หน่วยงาน / ชุมชน', organization],
     ]
       .filter(([, value]) => !String(value).trim())
       .map(([label]) => label),
+    ...(!phoneValidation.valid ? [phoneValidation.error || 'เบอร์โทรศัพท์ติดต่อ (ต้องเป็นตัวเลข 10 หลัก)'] : []),
+    ...(addressValidation && !addressValidation.valid && addressValidation.error ? [addressValidation.error] : []),
     ...(attachmentFiles.length === 0 ? ['สำเนาบัตรประชาชนหรือเอกสารประกอบคำขอ'] : []),
     ...purposeItems.flatMap((item, index) => [
       ...(!item.item.trim() ? [`รายการที่ ${index + 1}`] : []),
@@ -231,7 +252,7 @@ export default function BookingWizardPage() {
     const { title, name } = parseTitleAndName(acc?.name);
     setRequesterTitle(title);
     setRequesterName(name);
-    setRequesterPhone(acc?.phone || '');
+    setRequesterPhone(sanitizePhoneInput(acc?.phone || '', 10));
     setRequesterPosition(acc?.position && acc.position !== 'ประชาชน' ? acc.position : '');
     setOrganization(acc?.department || '');
     setAddressHouseNo(acc?.addressHouseNo || '');
@@ -239,6 +260,9 @@ export default function BookingWizardPage() {
     setAddressSubdistrict(acc?.addressSubdistrict || '');
     setAddressDistrict(acc?.addressDistrict || '');
     setAddressProvince(acc?.addressProvince || '');
+    setAddressSubdistrictId(acc?.addressSubdistrictId || '');
+    setAddressDistrictId(acc?.addressDistrictId || '');
+    setAddressProvinceId(acc?.addressProvinceId || '');
   };
 
   const handleToggleWalkIn = (walkInMode: boolean) => {
@@ -572,7 +596,7 @@ export default function BookingWizardPage() {
         extraItems: selectedExtraItems.map((s) => ({ equipmentId: s.eq.id, qty: s.qty })),
         requesterId: isWalkIn && foundUser ? foundUser.id : undefined,
         requesterName: fullRequesterName || requesterName,
-        requesterPhone,
+        requesterPhone: sanitizePhoneInput(requesterPhone, 10),
         requesterSignature: signature,
         createdByStaffSignature: isWalkIn && staffSignature.trim() ? staffSignature : undefined,
         writtenAt,
@@ -582,8 +606,11 @@ export default function BookingWizardPage() {
         addressSubdistrict,
         addressDistrict,
         addressProvince,
+        addressSubdistrictId: addressSubdistrictId || undefined,
+        addressDistrictId: addressDistrictId || undefined,
+        addressProvinceId: addressProvinceId || undefined,
         purposeItems: purposeItems.filter((pi) => pi.item.trim() || pi.forWhat.trim()),
-      });
+      } as any);
       router.push(`/requests/${created.id}`);
     } catch (err: any) {
       const errorMsg =
@@ -1540,13 +1567,10 @@ export default function BookingWizardPage() {
               />
             </div>
             <div className="lg:col-span-2">
-              <label className="jw-lbl">เบอร์โทรศัพท์ติดต่อ<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
-              <input
-                type="tel"
+              <Phone10DigitInput
                 value={requesterPhone}
-                onChange={(e) => setRequesterPhone(e.target.value)}
-                className="jw-in"
-                placeholder="เช่น 081-234-5678"
+                onChange={setRequesterPhone}
+                label="เบอร์โทรศัพท์ติดต่อ"
                 required
               />
             </div>
@@ -1563,7 +1587,7 @@ export default function BookingWizardPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <div>
               <label className="jw-lbl">อยู่บ้านเลขที่<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
               <input
@@ -1586,39 +1610,19 @@ export default function BookingWizardPage() {
                 required
               />
             </div>
-            <div>
-              <label className="jw-lbl">ตำบล / แขวง<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
-              <input
-                type="text"
-                value={addressSubdistrict}
-                onChange={(e) => setAddressSubdistrict(e.target.value)}
-                className="jw-in"
-                placeholder="ตำบล / แขวง"
-                required
-              />
-            </div>
-            <div>
-              <label className="jw-lbl">อำเภอ / เขต<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
-              <input
-                type="text"
-                value={addressDistrict}
-                onChange={(e) => setAddressDistrict(e.target.value)}
-                className="jw-in"
-                placeholder="อำเภอ / เขต"
-                required
-              />
-            </div>
-            <div className="col-span-2 sm:col-span-1">
-              <label className="jw-lbl">จังหวัด<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
-              <input
-                type="text"
-                value={addressProvince}
-                onChange={(e) => setAddressProvince(e.target.value)}
-                className="jw-in"
-                placeholder="ระบุจังหวัด"
-                required
-              />
-            </div>
+            <ThaiAddressSelect
+              province={addressProvince}
+              district={addressDistrict}
+              subdistrict={addressSubdistrict}
+              onChange={(next) => {
+                setAddressProvince(next.province);
+                setAddressDistrict(next.district);
+                setAddressSubdistrict(next.subdistrict);
+                setAddressProvinceId(next.provinceId || '');
+                setAddressDistrictId(next.districtId || '');
+                setAddressSubdistrictId(next.subdistrictId || '');
+              }}
+            />
           </div>
 
           <div>

@@ -31,6 +31,9 @@ export interface Account {
   addressSubdistrict?: string;
   addressDistrict?: string;
   addressProvince?: string;
+  addressSubdistrictId?: string;
+  addressDistrictId?: string;
+  addressProvinceId?: string;
   permissions: Record<PermissionKey, boolean>;
   /** ข้อความ/ภาพลายเซ็น (data URL) — null = ยังไม่ตั้งค่า */
   signature: string | null;
@@ -175,6 +178,9 @@ interface BaseRequest {
   addressSubdistrict?: string;
   addressDistrict?: string;
   addressProvince?: string;
+  addressSubdistrictId?: string;
+  addressDistrictId?: string;
+  addressProvinceId?: string;
   purposeItems?: OfficialFormPurposeItem[];
 }
 
@@ -203,15 +209,23 @@ export interface BorrowRequest extends BaseRequest {
   returnedAt?: string;
   /** วันที่และเวลารับมอบอุปกรณ์ */
   receivedAt?: string;
-  /** รูปภาพสภาพอุปกรณ์ก่อนรับมอบ */
+  /** รหัสผู้ยืมที่กดยืนยันรับมอบ */
+  receivedById?: string;
+  /** ชื่อผู้ยืมที่กดยืนยันรับมอบ */
+  receivedByName?: string;
+  /** รูปภาพสภาพอุปกรณ์ก่อนรับมอบ (อัปโหลดโดยผู้ยืม) */
   receivePhotos?: string[];
   /** รายละเอียดจากผู้ยืมตอนรับมอบ */
   receiveNote?: string;
   /** วันที่และเวลาที่ผู้ยืมกดยืนยันส่งคืน */
   returnSubmittedAt?: string;
-  /** รูปภาพสภาพอุปกรณ์ก่อนส่งคืน */
+  /** รหัสผู้ยืมที่กดยืนยันส่งคืน */
+  returnSubmittedById?: string;
+  /** ชื่อผู้ยืมที่กดยืนยันส่งคืน */
+  returnSubmittedByName?: string;
+  /** รูปภาพสภาพอุปกรณ์ก่อนส่งคืน (สำรองเพื่อความเข้ากันได้ย้อนหลัง) */
   returnPhotos?: string[];
-  /** รายละเอียดจากผู้ยืมตอนส่งคืน (สภาพ, ตำหนิ/ความเสียหาย, รายละเอียดเพิ่มเติม) */
+  /** รายละเอียดจากผู้ยืมตอนส่งคืน */
   returnNote?: string;
   /** วันที่และเวลาที่เจ้าหน้าที่ตรวจสอบรับคืน */
   inspectedAt?: string;
@@ -223,7 +237,7 @@ export interface BorrowRequest extends BaseRequest {
   inspectResult?: 'normal' | 'damaged' | 'incomplete';
   /** หมายเหตุหรือบันทึกตำหนิ/ความเสียหายจากเจ้าหน้าที่ */
   inspectNote?: string;
-  /** รูปภาพประกอบการตรวจสอบสภาพอุปกรณ์จากเจ้าหน้าที่ */
+  /** รูปภาพประกอบการตรวจสอบสภาพอุปกรณ์หลังส่งคืน (อัปโหลดโดยเจ้าหน้าที่) */
   inspectPhotos?: string[];
 }
 

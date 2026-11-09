@@ -2,7 +2,13 @@ import { BadRequestException, Body, ConflictException, Controller, ForbiddenExce
 import { ApiTags } from '@nestjs/swagger';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import * as crypto from 'crypto';
-import { DEFAULT_PERMISSIONS, Account, DemoAccountSummary } from '@japjong/shared';
+import {
+  DEFAULT_PERMISSIONS,
+  Account,
+  DemoAccountSummary,
+  validateThaiAddressHierarchy,
+  validateThaiPhone,
+} from '@japjong/shared';
 import { DbService } from '../db/db.service';
 import { EmailService } from './email.service';
 import {
@@ -303,18 +309,18 @@ export class AuthController {
       user.department = department;
     }
     if (body.phone !== undefined) {
-      const phone = String(body.phone).trim().slice(0, 20);
-      const digits = phone.replace(/\D/g, '');
-      if (!/^0\d{8,9}$/.test(digits)) {
-        throw new BadRequestException('เบอร์โทรศัพท์ไม่ถูกต้อง');
+      const phoneCheck = validateThaiPhone(body.phone);
+      if (!phoneCheck.valid) {
+        throw new BadRequestException(phoneCheck.error || 'เบอร์โทรศัพท์ต้องเป็นตัวเลข 10 หลัก (0-9)');
       }
+      const digits = phoneCheck.value;
       const duplicate = this.db.accounts.some(
         (a) => a.id !== user.id && a.phone.replace(/\D/g, '') === digits,
       );
       if (duplicate) {
         throw new ConflictException('เบอร์โทรศัพท์นี้ถูกใช้งานโดยบัญชีอื่นแล้ว');
       }
-      user.phone = phone;
+      user.phone = digits;
     }
     if (body.lineName !== undefined) {
       user.lineName = String(body.lineName).trim().slice(0, 50) || undefined;
@@ -325,14 +331,46 @@ export class AuthController {
     if (body.addressMoo !== undefined) {
       user.addressMoo = String(body.addressMoo).trim().slice(0, 20) || undefined;
     }
-    if (body.addressSubdistrict !== undefined) {
-      user.addressSubdistrict = String(body.addressSubdistrict).trim().slice(0, 100) || undefined;
-    }
-    if (body.addressDistrict !== undefined) {
-      user.addressDistrict = String(body.addressDistrict).trim().slice(0, 100) || undefined;
-    }
-    if (body.addressProvince !== undefined) {
-      user.addressProvince = String(body.addressProvince).trim().slice(0, 100) || undefined;
+    const hasAddressInput =
+      body.addressProvince !== undefined ||
+      body.addressDistrict !== undefined ||
+      body.addressSubdistrict !== undefined ||
+      body.addressProvinceId !== undefined ||
+      body.addressDistrictId !== undefined ||
+      body.addressSubdistrictId !== undefined;
+    if (hasAddressInput) {
+      const provVal = body.addressProvince ?? user.addressProvince ?? '';
+      const distVal = body.addressDistrict ?? user.addressDistrict ?? '';
+      const subVal = body.addressSubdistrict ?? user.addressSubdistrict ?? '';
+      const provId = body.addressProvinceId ?? user.addressProvinceId ?? '';
+      const distId = body.addressDistrictId ?? user.addressDistrictId ?? '';
+      const subId = body.addressSubdistrictId ?? user.addressSubdistrictId ?? '';
+      if (provVal || distVal || subVal || provId || distId || subId) {
+        const addrCheck = validateThaiAddressHierarchy({
+          province: provVal,
+          district: distVal,
+          subdistrict: subVal,
+          provinceId: provId,
+          districtId: distId,
+          subdistrictId: subId,
+        });
+        if (!addrCheck.valid) {
+          throw new BadRequestException(addrCheck.error || 'ข้อมูลที่อยู่ (จังหวัด/อำเภอ/ตำบล) ไม่ถูกต้อง');
+        }
+        user.addressProvince = addrCheck.provinceName;
+        user.addressDistrict = addrCheck.districtName;
+        user.addressSubdistrict = addrCheck.subdistrictName;
+        user.addressProvinceId = addrCheck.provinceId;
+        user.addressDistrictId = addrCheck.districtId;
+        user.addressSubdistrictId = addrCheck.subdistrictId;
+      } else {
+        user.addressProvince = undefined;
+        user.addressDistrict = undefined;
+        user.addressSubdistrict = undefined;
+        user.addressProvinceId = undefined;
+        user.addressDistrictId = undefined;
+        user.addressSubdistrictId = undefined;
+      }
     }
     if (body.email !== undefined) {
       const emailStr = String(body.email).trim().toLowerCase();

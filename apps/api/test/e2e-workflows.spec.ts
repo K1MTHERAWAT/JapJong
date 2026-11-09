@@ -259,7 +259,7 @@ describe('End-to-End System Workflows (E2E)', () => {
       borrowId = res.body.id;
     });
 
-    it('Step 2: 3-Level approvals complete and request status transitions to borrowing', async () => {
+    it('Step 2: 3-Level approvals complete and request status transitions to approved (รอรับมอบ)', async () => {
       // Level 1: Staff
       await establishSigningOtpSession(staffToken, staffId);
       await request(app.getHttpServer())
@@ -282,7 +282,7 @@ describe('End-to-End System Workflows (E2E)', () => {
         .send({ decision: 'approve', pin: '123456', signature: validSignature });
 
       expect(approveRes.status).toBe(201);
-      expect(approveRes.body.status).toBe('borrowing');
+      expect(approveRes.body.status).toBe('approved');
     });
 
     it('Step 3: Staff records Handover Before Pickup (phase: before)', async () => {

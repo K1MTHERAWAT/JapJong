@@ -129,6 +129,18 @@ export class UpdateProfileDto {
 
   @IsOptional()
   @IsString()
+  addressSubdistrictId?: string;
+
+  @IsOptional()
+  @IsString()
+  addressDistrictId?: string;
+
+  @IsOptional()
+  @IsString()
+  addressProvinceId?: string;
+
+  @IsOptional()
+  @IsString()
   email?: string;
 }
 
