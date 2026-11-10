@@ -51,6 +51,8 @@ export default function StaffVerifyPage() {
   const [capabilities, setCapabilities] = useState<CameraHardwareCapabilities>(
     DEFAULT_CAMERA_CAPABILITIES,
   );
+  const [availableCameras, setAvailableCameras] = useState<Array<{ id: string; label: string }>>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string>('');
   const [scanElapsedSec, setScanElapsedSec] = useState(0);
   const [enhancePassCount, setEnhancePassCount] = useState(0);
   const [lastScannedBanner, setLastScannedBanner] = useState('');
@@ -124,17 +126,33 @@ export default function StaffVerifyPage() {
     [loadHistory, stopCamera],
   );
 
-  const startCamera = useCallback(async () => {
+  const startCamera = useCallback(async (targetCamId?: string) => {
     setCameraError('');
     setScanning(true);
     setScanElapsedSec(0);
     setEnhancePassCount(0);
 
     try {
+      // 1. ตรวจสอบความปลอดภัย Secure Context (เบราว์เซอร์ไม่อนุญาตให้เปิดกล้องผ่าน HTTP บน IP ภายนอก)
+      if (typeof window !== 'undefined') {
+        if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+          throw new Error('SECURE_CONTEXT_REQUIRED');
+        }
+        if (!navigator?.mediaDevices?.getUserMedia) {
+          throw new Error('MEDIA_DEVICES_NOT_SUPPORTED');
+        }
+      }
+
       const { Html5Qrcode } = await import('html5-qrcode');
 
       // เคลียร์ scanner เดิมหากมี
       await stopCamera();
+
+      // ตรวจสอบให้แน่ใจว่า DOM container มีอยู่จริง
+      const container = document.getElementById('qr-reader');
+      if (!container) {
+        throw new Error('CONTAINER_NOT_FOUND');
+      }
 
       const scanner = new Html5Qrcode('qr-reader', {
         verbose: false,
@@ -143,41 +161,79 @@ export default function StaffVerifyPage() {
         },
       });
       qrScannerRef.current = scanner;
-      setScanning(true);
 
-      const videoConstraints = getOptimalVideoConstraints();
-
+      // ค้นหารายการกล้องทั้งหมดบนอุปกรณ์
+      let cameras: Array<{ id: string; label: string }> = [];
       try {
-        await scanner.start(
-          videoConstraints,
-          {
-            fps: 15,
-            qrbox: computeResponsiveQrBox,
-            aspectRatio: 1.0,
-            disableFlip: false,
-          },
-          (decodedText) => {
-            handleVerify(decodedText, true);
-          },
-          () => {
-            // ไม่ต้องแสดง error ทุกเฟรมที่ยังไม่พบ QR
-          },
-        );
-      } catch {
-        // Fallback กรณีอุปกรณ์บางรุ่นไม่รองรับ advanced constraints
-        await scanner.start(
-          { facingMode: 'environment' },
-          {
-            fps: 15,
-            qrbox: computeResponsiveQrBox,
-            aspectRatio: 1.0,
-          },
-          (decodedText) => {
-            handleVerify(decodedText, true);
-          },
-          () => {},
-        );
+        cameras = await Html5Qrcode.getCameras();
+      } catch (e) {
+        console.warn('Could not enumerate cameras:', e);
       }
+      setAvailableCameras(cameras);
+
+      const activeCamId = targetCamId || selectedCameraId;
+      const backCam = cameras.find((c) =>
+        /back|rear|environment|หลัง|world/i.test(c.label),
+      );
+      const preferredCamId = activeCamId || (backCam ? backCam.id : cameras[0]?.id);
+
+      const scanConfig = {
+        fps: 15,
+        qrbox: computeResponsiveQrBox,
+        aspectRatio: 1.0,
+        disableFlip: false,
+      };
+
+      const onScanSuccess = (decodedText: string) => {
+        handleVerify(decodedText, true);
+      };
+      const onScanFailure = () => {};
+
+      let started = false;
+
+      // Tier 1: เริ่มต้นด้วย Camera ID ที่เจาะจง (กล้องหลัง หรือกล้องที่เคยเลือก)
+      if (preferredCamId) {
+        try {
+          await scanner.start(preferredCamId, scanConfig, onScanSuccess, onScanFailure);
+          started = true;
+          if (!selectedCameraId) setSelectedCameraId(preferredCamId);
+        } catch (err) {
+          console.warn('Tier 1 camera start failed, fallback to constraints...', err);
+        }
+      }
+
+      // Tier 2: ลอง facingMode: 'environment' (กล้องหลังบนมือถือ)
+      if (!started) {
+        try {
+          await scanner.start({ facingMode: 'environment' }, scanConfig, onScanSuccess, onScanFailure);
+          started = true;
+        } catch (err) {
+          console.warn('Tier 2 environment camera start failed, fallback to user...', err);
+        }
+      }
+
+      // Tier 3: ลอง facingMode: 'user' (สำหรับโน้ตบุ๊ก, คอมพิวเตอร์, เว็บแคม)
+      if (!started) {
+        try {
+          await scanner.start({ facingMode: 'user' }, scanConfig, onScanSuccess, onScanFailure);
+          started = true;
+        } catch (err) {
+          console.warn('Tier 3 user camera start failed, fallback to any...', err);
+        }
+      }
+
+      // Tier 4: ลองเปิดกล้องตัวแรกสุดหรือค่าว่างใดๆ
+      if (!started) {
+        if (cameras.length > 0) {
+          await scanner.start(cameras[0].id, scanConfig, onScanSuccess, onScanFailure);
+          started = true;
+        } else {
+          await scanner.start({} as any, scanConfig, onScanSuccess, onScanFailure);
+          started = true;
+        }
+      }
+
+      setScanning(true);
 
       // ตรวจสอบความสามารถของกล้อง (Hardware Zoom, Torch, Continuous Focus)
       setTimeout(() => {
@@ -187,14 +243,43 @@ export default function StaffVerifyPage() {
         triggerCameraRefocus(track);
       }, 450);
     } catch (err: any) {
-      setCameraError(
-        err?.message?.includes('NotAllowedError') || err?.name === 'NotAllowedError'
-          ? 'กรุณาอนุญาตให้เบราว์เซอร์เข้าถึงกล้อง เพื่อสแกน QR Code'
-          : 'ไม่สามารถเปิดกล้องได้ หรืออุปกรณ์ไม่รองรับการเปิดกล้อง กรุณาใช้วิธีอัปโหลดภาพหรือกรอกเลขที่เอกสาร',
-      );
+      console.error('Camera start error:', err);
+      const errMsg = err?.message || '';
+      const errName = err?.name || '';
+
+      if (errMsg === 'SECURE_CONTEXT_REQUIRED' || (typeof window !== 'undefined' && !window.isSecureContext && window.location.hostname !== 'localhost')) {
+        setCameraError(
+          'ความปลอดภัยของเบราว์เซอร์: การเปิดกล้องบนมือถือผ่าน HTTP บน IP เครือข่าย (เช่น http://192.168.x.x:3000) ถูกจำกัดโดยระบบปฏิบัติการมือถือ (ต้องใช้ผ่าน HTTPS หรือ localhost) แนะนำให้ใช้ปุ่ม "อัปโหลดภาพ QR" หรือ "พิมพ์ค้นหา" ด้านบนแทนได้ทันทีครับ',
+        );
+      } else if (errName === 'NotAllowedError' || errMsg.includes('NotAllowedError') || errName === 'PermissionDeniedError') {
+        setCameraError(
+          'เบราว์เซอร์ถูกปฏิเสธการเข้าถึงกล้อง: กรุณากดที่ไอคอนกุญแจ/การตั้งค่าเว็บตรงแถบ URL ด้านบน แล้วเลือก "อนุญาต (Allow)" ให้เข้าถึงกล้อง แล้วกดปุ่มลองใหม่อีกครั้ง',
+        );
+      } else if (errName === 'NotFoundError' || errMsg.includes('NotFoundError') || errMsg === 'NO_CAMERA_FOUND') {
+        setCameraError(
+          'ไม่พบอุปกรณ์กล้องบนเครื่องนี้: หากใช้คอมพิวเตอร์ตั้งโต๊ะ กรุณาเชื่อมต่อเว็บแคม หรือใช้วิธีอัปโหลดรูปภาพ / พิมพ์รหัสเอกสารแทน',
+        );
+      } else if (errName === 'NotReadableError' || errMsg.includes('NotReadableError') || errName === 'TrackStartError') {
+        setCameraError(
+          'กล้องกำลังถูกใช้งานโดยแอปพลิเคชันอื่น: กรุณาปิดโปรแกรมอื่นที่เปิดกล้องค้างไว้ (เช่น Zoom, Google Meet, Teams) แล้วกดลองใหม่อีกครั้ง',
+        );
+      } else {
+        setCameraError(
+          `ไม่สามารถเปิดกล้องได้ (${errName || 'Error'}: ${errMsg || 'อุปกรณ์ไม่รองรับ'}) กรุณาลองใหม่อีกครั้ง หรือสลับไปใช้วิธีอัปโหลดรูปภาพ`,
+        );
+      }
       setScanning(false);
     }
-  }, [handleVerify, stopCamera]);
+  }, [handleVerify, selectedCameraId, stopCamera]);
+
+  const handleSwitchCamera = useCallback(async () => {
+    if (availableCameras.length <= 1) return;
+    const currentIdx = availableCameras.findIndex((c) => c.id === selectedCameraId);
+    const nextIdx = (currentIdx + 1) % availableCameras.length;
+    const nextCam = availableCameras[nextIdx];
+    setSelectedCameraId(nextCam.id);
+    await startCamera(nextCam.id);
+  }, [availableCameras, selectedCameraId, startCamera]);
 
   // จัดการเปิด/ปิดกล้องตาม mode และสถานะการสแกนต่อเนื่อง
   useEffect(() => {
@@ -525,6 +610,18 @@ export default function StaffVerifyPage() {
                       แตะเพื่อปรับโฟกัสใหม่
                     </button>
 
+                    {availableCameras.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={handleSwitchCamera}
+                        className="px-3 py-1.5 rounded-xl border border-line bg-white hover:bg-soft text-[12px] font-semibold text-ink flex items-center gap-1.5 cursor-pointer"
+                        title="สลับกล้องหน้า/หลัง"
+                      >
+                        <Icon name="rotate-cw" className="w-3.5 h-3.5 text-brand" />
+                        สลับกล้อง ({availableCameras.length})
+                      </button>
+                    )}
+
                     {capabilities.supportsTorch && (
                       <button
                         type="button"
@@ -612,9 +709,35 @@ export default function StaffVerifyPage() {
             )}
 
             {cameraError && (
-              <div className="p-3.5 rounded-xl bg-[#FFF2F2] border border-[#F9C2C2] text-status-crit text-[13px] flex items-start gap-2">
-                <Icon name="alert-triangle" className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{cameraError}</span>
+              <div className="p-4 rounded-2xl bg-[#FFF2F2] dark:bg-status-crit/15 border border-[#F9C2C2] dark:border-status-crit/30 text-status-crit text-[13px] flex flex-col gap-3">
+                <div className="flex items-start gap-2.5">
+                  <Icon name="alert-triangle" className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span className="leading-relaxed text-ink">{cameraError}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[#F9C2C2]/60 dark:border-status-crit/20">
+                  <button
+                    type="button"
+                    onClick={() => startCamera()}
+                    className="px-3.5 py-1.5 rounded-xl bg-brand text-white text-[12px] font-semibold hover:opacity-90 transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                  >
+                    <Icon name="rotate-cw" className="w-3.5 h-3.5" />
+                    ลองเปิดกล้องอีกครั้ง
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode('upload')}
+                    className="px-3.5 py-1.5 rounded-xl border border-line bg-white text-ink text-[12px] font-semibold hover:bg-soft transition cursor-pointer"
+                  >
+                    📁 สลับไปอัปโหลดภาพ QR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode('manual')}
+                    className="px-3.5 py-1.5 rounded-xl border border-line bg-white text-ink text-[12px] font-semibold hover:bg-soft transition cursor-pointer"
+                  >
+                    ⌨️ กรอกรหัสเอกสาร
+                  </button>
+                </div>
               </div>
             )}
           </div>

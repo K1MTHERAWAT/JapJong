@@ -266,7 +266,7 @@ export function AppShell({
             - Edge-to-edge notch/landscape support
             ======================================================== */}
         <main
-          className="flex-1 w-full max-w-none p-3.5 sm:p-5 lg:px-6 lg:py-6 min-w-0 print:p-0 print:max-w-none flex flex-col pl-[max(0.875rem,env(safe-area-inset-left,0px))] pr-[max(0.875rem,env(safe-area-inset-right,0px))]"
+          className={`flex-1 w-full max-w-none p-3.5 sm:p-5 lg:px-6 lg:py-6 ${footer ? 'pb-24 sm:pb-28 lg:pb-28' : ''} min-w-0 print:p-0 print:max-w-none flex flex-col pl-[max(0.875rem,env(safe-area-inset-left,0px))] pr-[max(0.875rem,env(safe-area-inset-right,0px))]`}
         >
           {loading ? (
             <Card className="p-8 max-w-[480px] mx-auto my-8 text-center text-body text-muted flex flex-col items-center justify-center gap-3">
@@ -357,14 +357,14 @@ export function AppShell({
         </main>
 
         {/* ========================================================
-            UNIFIED FIXED / DOCKED FOOTER
+            UNIFIED FIXED / DOCKED FOOTER (ตรึงแถบล่างไว้เสมอ)
             - Mobile (< lg): Docked cleanly at bottom, minimal height
               with safe-area-inset-bottom support for home bar
-            - Desktop (>= lg): Floating pill card
+            - Desktop (>= lg): Pinned floating card above bottom edge
             ======================================================== */}
         {footer && (
-          <div className="print:hidden w-full sticky bottom-0 z-20 bg-surface/98 backdrop-blur-md border-t border-line shadow-[0_-4px_16px_rgba(20,35,31,0.06)] px-3.5 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom,0px))] lg:static lg:bg-transparent lg:backdrop-blur-none lg:border-none lg:shadow-none lg:p-0 transition-colors">
-            <div className={`w-full ${maxWidth && maxWidth !== 'max-w-none' ? `${maxWidth} mx-auto` : ''} lg:sticky lg:bottom-3 lg:z-20 lg:rounded-card lg:bg-surface/95 lg:backdrop-blur-md lg:border lg:border-line lg:shadow-float lg:px-4 lg:py-3 lg:flex lg:items-center lg:justify-end`}>
+          <div className="print:hidden w-full sticky bottom-0 z-30 bg-surface/98 backdrop-blur-md border-t border-line shadow-[0_-4px_16px_rgba(20,35,31,0.06)] px-3.5 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom,0px))] lg:bg-transparent lg:backdrop-blur-none lg:border-none lg:shadow-none lg:px-6 lg:pb-3 lg:pt-0 lg:pointer-events-none transition-colors">
+            <div className={`w-full ${maxWidth && maxWidth !== 'max-w-none' ? `${maxWidth} mx-auto` : ''} lg:pointer-events-auto lg:rounded-card lg:bg-surface/95 lg:backdrop-blur-md lg:border lg:border-line lg:shadow-float lg:px-4 lg:py-3 lg:flex lg:items-center lg:justify-end`}>
               {footer}
             </div>
           </div>

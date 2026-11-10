@@ -314,3 +314,21 @@
     page-break-inside: avoid;
   }
 }
+
+/* QR Code Scanner video container fixes */
+#qr-reader {
+  width: 100% !important;
+  height: 100% !important;
+  border: none !important;
+  position: relative !important;
+  background: #000000 !important;
+}
+#qr-reader video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: 1rem !important;
+}
+#qr-reader img[alt="Info icon"] {
+  display: none !important;
+}

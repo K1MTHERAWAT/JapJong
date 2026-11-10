@@ -587,39 +587,41 @@ export default function BorrowWizardPage() {
         )
       }
     >
-      {/* Header สไตล์การ์ดเดี่ยวสำหรับคอมพิวเตอร์ (มือถือใช้ Unified Progress Header ด้านบน) */}
+      {/* Header สไตล์การ์ดเดี่ยวสำหรับคอมพิวเตอร์ (มือถือใช้ Unified Progress Header ด้านบน) - ตรึงไว้ด้านบน (Sticky Header) */}
       {step === 1 && (
-        <div className="hidden md:block jw-card p-0 overflow-hidden mb-4 shadow-card border border-line">
-          <div className="p-3.5 sm:px-5 sm:py-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
-                1
-              </span>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <b className="text-[15px] sm:text-[16px] text-ink block leading-tight">
-                    เลือกอุปกรณ์ที่ต้องการยืม
-                  </b>
-                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-mint text-brand border border-brand/20">
-                    ขั้นตอนที่ 1 จาก 4
-                  </span>
+        <div className="hidden md:block sticky top-0 md:top-[48px] lg:top-0 z-20 pt-1 pb-3 -mt-1 bg-background/95 backdrop-blur-md">
+          <div className="jw-card p-0 overflow-hidden shadow-card border border-line bg-surface">
+            <div className="p-3.5 sm:px-5 sm:py-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                  1
+                </span>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <b className="text-[15px] sm:text-[16px] text-ink block leading-tight">
+                      เลือกอุปกรณ์ที่ต้องการยืม
+                    </b>
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-mint text-brand border border-brand/20">
+                      ขั้นตอนที่ 1 จาก 4
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-ink-mute mt-0.5">
+                    เลือกรายการอุปกรณ์และระบุจำนวนที่ต้องการยืม (สามารถเลือกได้หลายรายการในคำขอเดียวกัน)
+                  </p>
                 </div>
-                <p className="text-[12px] text-ink-mute mt-0.5">
-                  เลือกรายการอุปกรณ์และระบุจำนวนที่ต้องการยืม (สามารถเลือกได้หลายรายการในคำขอเดียวกัน)
-                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[12px] font-semibold px-3 py-1.5 rounded-full bg-brand-mint text-brand border border-brand/20">
+                  {selectedItems.length > 0
+                    ? `เลือกแล้ว ${selectedItems.length} รายการ (${totalSelectedUnits} ชิ้น)`
+                    : 'ยังไม่ได้เลือกอุปกรณ์'}
+                </span>
               </div>
             </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-[12px] font-semibold px-3 py-1.5 rounded-full bg-brand-mint text-brand border border-brand/20">
-                {selectedItems.length > 0
-                  ? `เลือกแล้ว ${selectedItems.length} รายการ (${totalSelectedUnits} ชิ้น)`
-                  : 'ยังไม่ได้เลือกอุปกรณ์'}
-              </span>
+            <div className="w-full h-[3px] bg-line/30">
+              <div className="h-full bg-brand transition-all duration-300" style={{ width: '25%' }} />
             </div>
-          </div>
-          <div className="w-full h-[3px] bg-line/30">
-            <div className="h-full bg-brand transition-all duration-300" style={{ width: '25%' }} />
           </div>
         </div>
       )}
