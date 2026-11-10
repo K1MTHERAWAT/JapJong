@@ -122,11 +122,16 @@ export function getOptimalVideoConstraints(): MediaTrackConstraints {
  * Extracts active MediaStreamTrack from a container element ID.
  */
 export function getActiveVideoTrack(
-  containerId = 'qr-reader',
+  target: string | HTMLVideoElement | null = 'qr-reader',
 ): MediaStreamTrack | null {
   if (typeof document === 'undefined') return null;
-  const container = document.getElementById(containerId);
-  const video = container?.querySelector('video') as HTMLVideoElement | null;
+  let video: HTMLVideoElement | null = null;
+  if (typeof target === 'string') {
+    const el = document.getElementById(target);
+    video = el instanceof HTMLVideoElement ? el : (el?.querySelector('video') as HTMLVideoElement | null);
+  } else if (target instanceof HTMLVideoElement) {
+    video = target;
+  }
   if (!video || !video.srcObject) return null;
   const stream = video.srcObject as MediaStream;
   const tracks = stream.getVideoTracks?.() || [];
@@ -511,9 +516,8 @@ export function renderPreprocessedCanvas(
  */
 async function decodeCanvasElement(
   canvas: HTMLCanvasElement,
-  html5Scanner?: any,
 ): Promise<string | null> {
-  // 1. Try native BarcodeDetector first (very fast & supports rotated barcodes well)
+  // 1. Try native BarcodeDetector first (GPU accelerated)
   if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
     try {
       const Detector = (window as any).BarcodeDetector;
@@ -523,25 +527,23 @@ async function decodeCanvasElement(
         return String(results[0].rawValue).trim();
       }
     } catch {
-      // Fall through to Html5Qrcode
+      // Fall through to QrScanner
     }
   }
 
-  // 2. Fallback to Html5Qrcode scanFile
-  if (html5Scanner && typeof html5Scanner.scanFile === 'function') {
-    try {
-      const blob: Blob | null = await new Promise((resolve) =>
-        canvas.toBlob((b) => resolve(b), 'image/png'),
-      );
-      if (!blob) return null;
-      const file = new File([blob], 'qr-preprocessed.png', { type: 'image/png' });
-      const decoded = await html5Scanner.scanFile(file, false);
-      if (decoded && String(decoded).trim()) {
-        return String(decoded).trim();
-      }
-    } catch {
-      return null;
+  // 2. Fallback to QrScanner.scanImage (Nimiq WASM/Worker)
+  try {
+    const QrScanner = (await import('qr-scanner')).default;
+    const res = await QrScanner.scanImage(canvas, {
+      alsoTryWithoutScanRegion: true,
+      returnDetailedScanResult: true,
+    });
+    const text = typeof res === 'object' && res?.data ? res.data : String(res || '');
+    if (text && text.trim()) {
+      return text.trim();
     }
+  } catch {
+    // ignore
   }
 
   return null;
@@ -552,12 +554,17 @@ async function decodeCanvasElement(
  * Runs when standard frame scanning hasn't caught a blurry, distant, low-light, or tilted QR code.
  */
 export async function tryEnhancedVideoFrameDecode(
-  containerId = 'qr-reader',
+  target: string | HTMLVideoElement | null = 'qr-reader',
   passIndex = 0,
 ): Promise<string | null> {
   if (typeof document === 'undefined') return null;
-  const container = document.getElementById(containerId);
-  const video = container?.querySelector('video') as HTMLVideoElement | null;
+  let video: HTMLVideoElement | null = null;
+  if (typeof target === 'string') {
+    const container = document.getElementById(target);
+    video = container instanceof HTMLVideoElement ? container : (container?.querySelector('video') as HTMLVideoElement | null);
+  } else if (target instanceof HTMLVideoElement) {
+    video = target;
+  }
   if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
     return null;
   }
@@ -587,20 +594,7 @@ export async function tryEnhancedVideoFrameDecode(
   );
   if (!canvas) return null;
 
-  // Use BarcodeDetector if available, or hidden Html5Qrcode instance
-  let hiddenScanner: any = null;
-  if (typeof window !== 'undefined' && !('BarcodeDetector' in window)) {
-    try {
-      const { Html5Qrcode } = await import('html5-qrcode');
-      if (document.getElementById('qr-reader-hidden')) {
-        hiddenScanner = new Html5Qrcode('qr-reader-hidden');
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  return decodeCanvasElement(canvas, hiddenScanner);
+  return decodeCanvasElement(canvas);
 }
 
 /**
@@ -610,15 +604,18 @@ export async function tryEnhancedVideoFrameDecode(
  */
 export async function decodeUploadedQrImageFile(
   file: File,
-  hiddenElementId = 'qr-reader-hidden',
+  _hiddenElementId = 'qr-reader-hidden',
 ): Promise<string> {
-  const { Html5Qrcode } = await import('html5-qrcode');
-  const scanner = new Html5Qrcode(hiddenElementId);
+  const QrScanner = (await import('qr-scanner')).default;
 
-  // Pass 0: Direct scan
+  // Pass 0: Direct scan with QrScanner
   try {
-    const direct = await scanner.scanFile(file, false);
-    if (direct && direct.trim()) return direct.trim();
+    const res = await QrScanner.scanImage(file, {
+      alsoTryWithoutScanRegion: true,
+      returnDetailedScanResult: true,
+    });
+    const text = typeof res === 'object' && res?.data ? res.data : String(res || '');
+    if (text && text.trim()) return text.trim();
   } catch {
     // Continue to enhanced preprocessing passes
   }
@@ -657,7 +654,7 @@ export async function decodeUploadedQrImageFile(
     for (const pass of candidatePasses) {
       const canvas = renderPreprocessedCanvas(img, w, h, pass);
       if (!canvas) continue;
-      const decoded = await decodeCanvasElement(canvas, scanner);
+      const decoded = await decodeCanvasElement(canvas);
       if (decoded) {
         return decoded;
       }

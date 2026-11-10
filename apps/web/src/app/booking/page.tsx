@@ -669,7 +669,7 @@ export default function BookingWizardPage() {
     <AppShell
       title={
         step === 1
-          ? 'เลือกสถานที่ที่ใช้งาน'
+          ? 'เลือกสถานที่ใช้งาน'
           : step === 2
           ? 'เลือกวัน-เวลา'
           : step === 3
@@ -1082,7 +1082,7 @@ export default function BookingWizardPage() {
                 </span>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <b className="text-[15px] sm:text-[16px] text-ink block leading-tight">เลือกสถานที่ที่ใช้งาน</b>
+                    <b className="text-[15px] sm:text-[16px] text-ink block leading-tight">เลือกสถานที่ใช้งาน</b>
                     <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-mint text-brand border border-brand/20">
                       ขั้นตอนที่ 1 จาก 5
                     </span>

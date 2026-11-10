@@ -58,6 +58,7 @@ export default function StaffVerifyPage() {
   const [lastScannedBanner, setLastScannedBanner] = useState('');
   const [copiedHash, setCopiedHash] = useState(false);
 
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const qrScannerRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const duplicateGuardRef = useRef<QrDuplicateGuard>(new QrDuplicateGuard(4000));
@@ -80,8 +81,8 @@ export default function StaffVerifyPage() {
   const stopCamera = useCallback(async () => {
     if (qrScannerRef.current) {
       try {
-        await qrScannerRef.current.stop();
-        qrScannerRef.current.clear();
+        qrScannerRef.current.stop();
+        qrScannerRef.current.destroy();
       } catch {
         // ignore
       }
@@ -143,29 +144,24 @@ export default function StaffVerifyPage() {
         }
       }
 
-      const { Html5Qrcode } = await import('html5-qrcode');
+      const QrScanner = (await import('qr-scanner')).default;
 
       // เคลียร์ scanner เดิมหากมี
       await stopCamera();
 
-      // ตรวจสอบให้แน่ใจว่า DOM container มีอยู่จริง
-      const container = document.getElementById('qr-reader');
-      if (!container) {
+      // รอ DOM mount เล็กน้อยเพื่อให้ videoRef พร้อมใช้งาน
+      if (!videoRef.current) {
+        await new Promise((r) => setTimeout(r, 60));
+      }
+      const videoEl = videoRef.current;
+      if (!videoEl) {
         throw new Error('CONTAINER_NOT_FOUND');
       }
 
-      const scanner = new Html5Qrcode('qr-reader', {
-        verbose: false,
-        experimentalFeatures: {
-          useBarCodeDetectorIfSupported: true,
-        },
-      });
-      qrScannerRef.current = scanner;
-
-      // ค้นหารายการกล้องทั้งหมดบนอุปกรณ์
+      // ค้นหารายการกล้องทั้งหมดบนอุปกรณ์ด้วย QrScanner
       let cameras: Array<{ id: string; label: string }> = [];
       try {
-        cameras = await Html5Qrcode.getCameras();
+        cameras = await QrScanner.listCameras(true);
       } catch (e) {
         console.warn('Could not enumerate cameras:', e);
       }
@@ -177,67 +173,39 @@ export default function StaffVerifyPage() {
       );
       const preferredCamId = activeCamId || (backCam ? backCam.id : cameras[0]?.id);
 
-      const scanConfig = {
-        fps: 15,
-        qrbox: computeResponsiveQrBox,
-        aspectRatio: 1.0,
-        disableFlip: false,
-      };
+      const scanner = new QrScanner(
+        videoEl,
+        (result) => {
+          const text = typeof result === 'object' && result?.data ? result.data : String(result || '');
+          if (text) {
+            handleVerify(text, true);
+          }
+        },
+        {
+          onDecodeError: () => {},
+          preferredCamera: preferredCamId || 'environment',
+          maxScansPerSecond: 25,
+          highlightScanRegion: false,
+          highlightCodeOutline: true,
+          returnDetailedScanResult: true,
+        },
+      );
 
-      const onScanSuccess = (decodedText: string) => {
-        handleVerify(decodedText, true);
-      };
-      const onScanFailure = () => {};
+      // ตรวจจับทั้ง QR ขาว-ดำปกติ และแบบ Invert (ขาวบนพื้นดำ)
+      scanner.setInversionMode('both');
 
-      let started = false;
+      await scanner.start();
+      qrScannerRef.current = scanner;
 
-      // Tier 1: เริ่มต้นด้วย Camera ID ที่เจาะจง (กล้องหลัง หรือกล้องที่เคยเลือก)
-      if (preferredCamId) {
-        try {
-          await scanner.start(preferredCamId, scanConfig, onScanSuccess, onScanFailure);
-          started = true;
-          if (!selectedCameraId) setSelectedCameraId(preferredCamId);
-        } catch (err) {
-          console.warn('Tier 1 camera start failed, fallback to constraints...', err);
-        }
-      }
-
-      // Tier 2: ลอง facingMode: 'environment' (กล้องหลังบนมือถือ)
-      if (!started) {
-        try {
-          await scanner.start({ facingMode: 'environment' }, scanConfig, onScanSuccess, onScanFailure);
-          started = true;
-        } catch (err) {
-          console.warn('Tier 2 environment camera start failed, fallback to user...', err);
-        }
-      }
-
-      // Tier 3: ลอง facingMode: 'user' (สำหรับโน้ตบุ๊ก, คอมพิวเตอร์, เว็บแคม)
-      if (!started) {
-        try {
-          await scanner.start({ facingMode: 'user' }, scanConfig, onScanSuccess, onScanFailure);
-          started = true;
-        } catch (err) {
-          console.warn('Tier 3 user camera start failed, fallback to any...', err);
-        }
-      }
-
-      // Tier 4: ลองเปิดกล้องตัวแรกสุดหรือค่าว่างใดๆ
-      if (!started) {
-        if (cameras.length > 0) {
-          await scanner.start(cameras[0].id, scanConfig, onScanSuccess, onScanFailure);
-          started = true;
-        } else {
-          await scanner.start({} as any, scanConfig, onScanSuccess, onScanFailure);
-          started = true;
-        }
+      if (preferredCamId && !selectedCameraId) {
+        setSelectedCameraId(preferredCamId);
       }
 
       setScanning(true);
 
       // ตรวจสอบความสามารถของกล้อง (Hardware Zoom, Torch, Continuous Focus)
       setTimeout(() => {
-        const track = getActiveVideoTrack('qr-reader');
+        const track = getActiveVideoTrack(videoEl);
         const caps = inspectTrackCapabilities(track);
         setCapabilities(caps);
         triggerCameraRefocus(track);
@@ -278,6 +246,17 @@ export default function StaffVerifyPage() {
     const nextIdx = (currentIdx + 1) % availableCameras.length;
     const nextCam = availableCameras[nextIdx];
     setSelectedCameraId(nextCam.id);
+    if (qrScannerRef.current?.setCamera) {
+      try {
+        await qrScannerRef.current.setCamera(nextCam.id);
+        const track = getActiveVideoTrack(videoRef.current);
+        const caps = inspectTrackCapabilities(track);
+        setCapabilities(caps);
+        return;
+      } catch (err) {
+        console.warn('Fast camera switch failed, restarting scanner...', err);
+      }
+    }
     await startCamera(nextCam.id);
   }, [availableCameras, selectedCameraId, startCamera]);
 
@@ -316,11 +295,11 @@ export default function StaffVerifyPage() {
 
       // ทุกๆ 6 รอบ ให้กระตุ้น Continuous Focus ใหม่อัตโนมัติ
       if (currentPass % 6 === 0) {
-        const track = getActiveVideoTrack('qr-reader');
+        const track = getActiveVideoTrack(videoRef.current || 'qr-reader');
         triggerCameraRefocus(track);
       }
 
-      const decoded = await tryEnhancedVideoFrameDecode('qr-reader', currentPass);
+      const decoded = await tryEnhancedVideoFrameDecode(videoRef.current || 'qr-reader', currentPass);
       if (active && decoded) {
         handleVerify(decoded, true);
       }
@@ -337,14 +316,23 @@ export default function StaffVerifyPage() {
   const handleZoomChange = async (newZoom: number) => {
     const clamped = Math.round(Math.max(1, Math.min(3, newZoom)) * 10) / 10;
     setZoomLevel(clamped);
-    const track = getActiveVideoTrack('qr-reader');
+    const track = getActiveVideoTrack(videoRef.current || 'qr-reader');
     const appliedHardware = await applyCameraZoom(track, clamped, capabilities);
     setUsingDigitalZoom(!appliedHardware && clamped > 1);
   };
 
   // เปิด/ปิดไฟฉาย (Torch)
   const handleToggleTorch = async () => {
-    const track = getActiveVideoTrack('qr-reader');
+    if (qrScannerRef.current?.hasFlash && qrScannerRef.current.hasFlash()) {
+      try {
+        await qrScannerRef.current.toggleFlash();
+        setTorchOn(Boolean(qrScannerRef.current.isFlashOn()));
+        return;
+      } catch {
+        // Fallback to track
+      }
+    }
+    const track = getActiveVideoTrack(videoRef.current || 'qr-reader');
     const nextState = !torchOn;
     const ok = await applyCameraTorch(track, nextState);
     if (ok) {
@@ -354,7 +342,7 @@ export default function StaffVerifyPage() {
 
   // แตะเพื่อโฟกัสใหม่
   const handleManualRefocus = async () => {
-    const track = getActiveVideoTrack('qr-reader');
+    const track = getActiveVideoTrack(videoRef.current || 'qr-reader');
     await triggerCameraRefocus(track);
     setScanElapsedSec(0);
   };
@@ -510,7 +498,7 @@ export default function StaffVerifyPage() {
                 >
                   <div
                     id="qr-reader"
-                    className="w-full h-full transition-transform duration-200 ease-out"
+                    className="w-full h-full relative overflow-hidden transition-transform duration-200 ease-out"
                     style={
                       usingDigitalZoom && zoomLevel > 1
                         ? {
@@ -519,7 +507,14 @@ export default function StaffVerifyPage() {
                           }
                         : undefined
                     }
-                  ></div>
+                  >
+                    <video
+                      ref={videoRef}
+                      className="w-full h-full object-cover"
+                      playsInline
+                      muted
+                    />
+                  </div>
 
                   {/* กรอบเล็งสแกนขนาดใหญ่ รองรับ QR Code เอียงหรืออยู่ห่าง */}
                   <div className="absolute inset-6 pointer-events-none border-2 border-brand/70 rounded-2xl flex flex-col justify-between p-3">
