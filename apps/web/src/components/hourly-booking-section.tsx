@@ -358,9 +358,10 @@ export function HourlyBookingSection({
   return (
     <div className="flex flex-col gap-5">
       {/* ================= แถบสลับโหมด: รายชั่วโมง (Default) & รายวัน (Secondary) ================= */}
-      <div className="bg-white rounded-2xl border border-line shadow-card overflow-hidden">
-        <div className="p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+      <div className="bg-surface rounded-2xl border border-line shadow-card overflow-hidden">
+        <div className="p-3 sm:p-4 flex flex-wrap items-center justify-between gap-2.5">
+          {/* ซ้าย: แสดงเฉพาะบนคอมพิวเตอร์ (มือถือมี Unified Progress Header ด้านบนอยู่แล้ว) */}
+          <div className="hidden md:flex items-center gap-3">
             <div className="flex items-center gap-2">
               <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
                 2
@@ -379,29 +380,32 @@ export function HourlyBookingSection({
             </div>
           </div>
 
-          {/* ปุ่มสลับโหมด */}
-          <div className="flex items-center gap-1.5 bg-canvas p-1 rounded-full border border-line">
-            <button
-              type="button"
-              aria-pressed={bookingMode === 'hourly'}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-semibold bg-brand text-white shadow-xs transition"
-            >
-              <Icon name="clock" className="w-3.5 h-3.5 text-white" />
-              <span>รายชั่วโมง</span>
-            </button>
+          {/* ขวา / มือถือ: ปุ่มสลับโหมด แสดงทั้งบนมือถือและคอมพิวเตอร์ */}
+          <div className="w-full md:w-auto flex items-center justify-between md:justify-end gap-2">
+            <span className="text-[13px] font-semibold text-ink md:hidden">รูปแบบการจอง:</span>
+            <div className="flex items-center gap-1 bg-surface-muted p-1 rounded-full border border-line">
+              <button
+                type="button"
+                aria-pressed={bookingMode === 'hourly'}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-semibold bg-brand text-white shadow-xs transition"
+              >
+                <Icon name="clock" className="w-3.5 h-3.5 text-white" />
+                <span>รายชั่วโมง</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={onSwitchToDaily}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-medium text-ink-soft hover:text-ink hover:bg-hover transition"
-              title="สลับไปโหมดรายวัน"
-            >
-              <Icon name="calendar" className="w-3.5 h-3.5 text-ink-mute" />
-              <span>รายวัน</span>
-            </button>
+              <button
+                type="button"
+                onClick={onSwitchToDaily}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-medium text-ink-soft hover:text-ink hover:bg-hover transition cursor-pointer"
+                title="สลับไปโหมดรายวัน"
+              >
+                <Icon name="calendar" className="w-3.5 h-3.5 text-ink-mute" />
+                <span>รายวัน</span>
+              </button>
+            </div>
           </div>
         </div>
-        <div className="w-full h-[3px] bg-line/30">
+        <div className="hidden md:block w-full h-[3px] bg-line/30">
           <div className="h-full bg-brand transition-all duration-300" style={{ width: '40%' }} />
         </div>
       </div>

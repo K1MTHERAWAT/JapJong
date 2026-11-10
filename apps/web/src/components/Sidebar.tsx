@@ -3,27 +3,53 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LogIn, LogOut, Menu, X } from 'lucide-react';
+import { LogIn, LogOut, Menu, Moon, Sun, X } from 'lucide-react';
+import { useTheme } from './theme-provider';
 import { useAuth } from './auth-context';
 import type { NavItem } from './nav';
 import { ROLE_META } from '@japjong/shared';
 
-export function Sidebar({ items }: { items: NavItem[] }) {
+export function Sidebar({
+  items,
+  mobileDrawerOpen,
+  onMobileDrawerChange,
+  hideDefaultMobileTrigger = false,
+}: {
+  items: NavItem[];
+  mobileDrawerOpen?: boolean;
+  onMobileDrawerChange?: (open: boolean) => void;
+  hideDefaultMobileTrigger?: boolean;
+}) {
   const path = usePathname();
   const { account, logout, unreadCount } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [hovered, setHovered] = useState(false);
-  const [drawer, setDrawer] = useState(false);
+  const [internalDrawer, setInternalDrawer] = useState(false);
+
+  const isControlled = typeof mobileDrawerOpen === 'boolean';
+  const drawer = isControlled ? mobileDrawerOpen : internalDrawer;
+  const setDrawer = useCallback(
+    (next: boolean) => {
+      if (isControlled) {
+        onMobileDrawerChange?.(next);
+      } else {
+        setInternalDrawer(next);
+      }
+    },
+    [isControlled, onMobileDrawerChange],
+  );
+
   const open = hovered || drawer;
   const openBtn = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setDrawer(false);
-  }, [path]);
+  }, [path, setDrawer]);
 
   const closeDrawer = useCallback(() => {
     setDrawer(false);
     openBtn.current?.focus();
-  }, []);
+  }, [setDrawer]);
 
   useEffect(() => {
     if (!drawer) return;
@@ -48,15 +74,19 @@ export function Sidebar({ items }: { items: NavItem[] }) {
 
   return (
     <>
-      <button
-        ref={openBtn}
-        onClick={() => setDrawer(true)}
-        aria-label="เปิดเมนู"
-        className="fixed left-3 top-3 z-30 grid size-11 place-items-center rounded-control bg-surface border border-line text-ink-soft hover:bg-hover lg:hidden shadow-xs print:hidden"
-      >
-        <Menu className="size-5" />
-      </button>
+      {/* Floating button only if not controlled or not hidden by parent shell */}
+      {!hideDefaultMobileTrigger && (
+        <button
+          ref={openBtn}
+          onClick={() => setDrawer(true)}
+          aria-label="เปิดเมนู"
+          className="fixed left-3 top-[max(0.75rem,env(safe-area-inset-top,0px))] z-30 grid size-11 place-items-center rounded-control bg-surface border border-line text-ink-soft hover:bg-hover lg:hidden shadow-xs print:hidden cursor-pointer"
+        >
+          <Menu className="size-5" />
+        </button>
+      )}
 
+      {/* Backdrop for Mobile Drawer */}
       {drawer && (
         <div
           onClick={closeDrawer}
@@ -64,15 +94,20 @@ export function Sidebar({ items }: { items: NavItem[] }) {
         />
       )}
 
+      {/* Sidebar / Drawer */}
       <aside
         aria-label="เมนูหลัก"
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         className={[
           'print:hidden',
-          'fixed inset-y-0 left-0 z-50 flex w-drawer flex-col justify-between bg-[#FBFCFA] p-3 shadow-pop lg:flex-none',
-          'transition-[width] duration-300 ease-in-out',
+          'fixed inset-y-0 left-0 z-50 flex w-drawer max-w-[85vw] flex-col justify-between bg-[#FBFCFA] p-3 shadow-pop lg:flex-none',
+          'transition-[transform,width] duration-300 ease-in-out',
           drawer ? 'translate-x-0' : '-translate-x-full',
+          'pt-[max(env(safe-area-inset-top,0px),0.75rem)]',
+          'pb-[max(env(safe-area-inset-bottom,0px),0.75rem)]',
+          'pl-[max(env(safe-area-inset-left,0px),0.75rem)]',
+          'lg:pt-3 lg:pb-3 lg:pl-3',
           'lg:sticky lg:top-3 lg:z-auto lg:m-3 lg:h-[calc(100dvh-24px)] lg:translate-x-0',
           'lg:rounded-float lg:border lg:border-line-soft lg:shadow-float overflow-hidden',
           open ? 'lg:w-sidebar' : 'lg:w-[72px]',
@@ -101,7 +136,7 @@ export function Sidebar({ items }: { items: NavItem[] }) {
             <button
               onClick={closeDrawer}
               aria-label="ปิดเมนู"
-              className="grid size-11 place-items-center rounded-control hover:bg-hover text-ink-soft lg:hidden"
+              className="grid size-10 place-items-center rounded-control hover:bg-hover text-ink-soft lg:hidden cursor-pointer"
             >
               <X className="size-5" />
             </button>
@@ -146,8 +181,32 @@ export function Sidebar({ items }: { items: NavItem[] }) {
           </nav>
         </div>
 
-        {/* Footer / User Profile */}
-        <div className={`border-t border-line-soft pt-3 mt-2 flex flex-col gap-1 shrink-0 ${open ? '' : 'lg:items-center'}`}>
+        {/* Footer / Theme toggle & User Profile */}
+        <div className={`border-t border-line-soft pt-2.5 mt-2 flex flex-col gap-1.5 shrink-0 ${open ? '' : 'lg:items-center'}`}>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด'}
+            aria-label={theme === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด'}
+            className={`flex h-10 items-center gap-2.5 rounded-control text-ink-soft hover:bg-hover transition-colors font-medium text-caption cursor-pointer ${open ? 'w-full px-2.5 justify-between' : 'justify-center px-0 lg:size-11'}`}
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              {theme === 'dark' ? (
+                <Sun className="size-4 shrink-0 text-amber-400" />
+              ) : (
+                <Moon className="size-4 shrink-0 text-brand" />
+              )}
+              <span className={open ? 'text-ink font-medium' : 'lg:sr-only'}>
+                {theme === 'dark' ? 'โหมดมืด (Dark)' : 'โหมดสว่าง (Light)'}
+              </span>
+            </div>
+            {open && (
+              <span className="text-[11px] text-muted px-2 py-0.5 rounded-md bg-surface-muted border border-line-soft">
+                สลับโหมด
+              </span>
+            )}
+          </button>
+
           {account ? (
             <>
               <div className={`flex items-center justify-between gap-2 p-1.5 rounded-control bg-surface-muted ${open ? 'w-full' : 'lg:w-11 lg:justify-center lg:bg-transparent'}`}>
@@ -172,7 +231,7 @@ export function Sidebar({ items }: { items: NavItem[] }) {
                     onClick={logout}
                     title="ออกจากระบบ"
                     aria-label="ออกจากระบบ"
-                    className="size-8 grid place-items-center rounded-control hover:bg-hover text-ink-soft hover:text-danger-fg shrink-0"
+                    className="size-8 grid place-items-center rounded-control hover:bg-hover text-ink-soft hover:text-danger-fg shrink-0 cursor-pointer"
                   >
                     <LogOut className="size-4" />
                   </button>
@@ -184,7 +243,7 @@ export function Sidebar({ items }: { items: NavItem[] }) {
                   onClick={logout}
                   title="ออกจากระบบ"
                   aria-label="ออกจากระบบ"
-                  className="hidden lg:grid size-11 place-items-center rounded-control text-danger-fg hover:bg-[#FDE7E7]"
+                  className="hidden lg:grid size-11 place-items-center rounded-control text-danger-fg hover:bg-[#FDE7E7] cursor-pointer"
                 >
                   <LogOut className="size-5" />
                 </button>

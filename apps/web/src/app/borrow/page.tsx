@@ -413,34 +413,38 @@ export default function BorrowWizardPage() {
     <AppShell
       title={
         step === 1
-          ? 'อุปกรณ์'
+          ? 'เลือกอุปกรณ์'
           : step === 2
           ? 'วันยืม-คืน'
           : step === 3
           ? 'แบบคำขอยืมอุปกรณ์'
           : 'ลงนามและส่งคำขอ'
       }
+      step={step}
+      totalSteps={4}
       backHref={step === 1 ? (account ? roleHomePath(account.role) : '/') : undefined}
       onBack={step > 1 ? () => setStep((s) => s - 1) : undefined}
       maxWidth="max-w-[1360px]"
       footer={
         step === 1 ? (
-          <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-10 h-10 rounded-xl bg-brand text-white font-bold text-[15px] flex items-center justify-center shrink-0 shadow-xs">
+          <div className="w-full flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-brand text-white font-bold text-[14px] sm:text-[15px] flex items-center justify-center shrink-0 shadow-xs">
                 {selectedItems.length}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[14px] font-bold text-ink">อุปกรณ์ที่เลือกไว้</span>
-                  <span className="text-[11.5px] px-2.5 py-0.5 rounded-full bg-brand-mint text-brand font-semibold">
-                    {totalSelectedUnits > 0 ? `รวมทั้งหมด ${totalSelectedUnits} ชุด` : 'ระบุจำนวนที่ต้องการยืม'}
+                <div className="flex items-center gap-2">
+                  <span className="text-[13.5px] sm:text-[14px] font-bold text-ink truncate">
+                    {totalSelectedUnits > 0 ? `${totalSelectedUnits} ชุด` : 'ยังไม่ได้เลือก'}
+                  </span>
+                  <span className="text-[11px] sm:text-[11.5px] px-2 py-0.5 rounded-full bg-brand-mint text-brand font-semibold shrink-0">
+                    {selectedItems.length} รายการ
                   </span>
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                <div className="hidden sm:flex flex-wrap items-center gap-1.5 mt-1">
                   {selectedItems.length === 0 ? (
                     <span className="text-[12.5px] text-ink-mute">
-                      ยังไม่ได้เลือกอุปกรณ์ (ระบุจำนวนที่ต้องการยืมจากการ์ดด้านบน)
+                      ระบุจำนวนที่ต้องการยืมจากการ์ดด้านบน
                     </span>
                   ) : (
                     selectedItems.map(({ eq, qty }) => (
@@ -484,29 +488,29 @@ export default function BorrowWizardPage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               {selectedItems.length > 0 && (
                 <button
                   type="button"
                   onClick={() => setQuantities({})}
-                  className="h-10 px-3.5 rounded-xl border border-line bg-surface text-[12.5px] font-semibold text-ink-mute hover:text-status-crit hover:bg-soft transition"
+                  className="hidden sm:inline-flex h-10 px-3.5 rounded-xl border border-line bg-surface text-[12.5px] font-semibold text-ink-mute hover:text-status-crit hover:bg-soft transition"
                 >
                   ล้างทั้งหมด
                 </button>
               )}
               <Link
                 href="/borrow/my"
-                className="h-10 px-3.5 rounded-xl border border-line bg-surface text-[12.5px] font-semibold text-ink hover:bg-soft transition inline-flex items-center justify-center"
+                className="hidden md:inline-flex h-10 px-3.5 rounded-xl border border-line bg-surface text-[12.5px] font-semibold text-ink hover:bg-soft transition items-center justify-center"
               >
-                รายการอุปกรณ์ของฉัน
+                รายการของฉัน
               </Link>
               <button
                 type="button"
                 disabled={selectedItems.length === 0}
                 onClick={() => setStep(2)}
-                className="jw-btn h-10 px-5 rounded-xl text-[13.5px] w-full sm:w-auto"
+                className="jw-btn h-11 px-4 sm:px-5 rounded-control text-body font-semibold flex items-center gap-2 shadow-sm whitespace-nowrap"
               >
-                <span>ถัดไป · วันยืม-คืน ({selectedItems.length} รายการ)</span>
+                <span>ถัดไป · วันยืม-คืน</span>
                 <Icon name="chevron-right" className="w-4 h-4" />
               </button>
             </div>
@@ -583,9 +587,9 @@ export default function BorrowWizardPage() {
         )
       }
     >
-      {/* Header สไตล์การ์ดเดี่ยวตามแบบที่ผู้ใช้อนุมัติ (ตัด Stepper 1-4 ออก) */}
+      {/* Header สไตล์การ์ดเดี่ยวสำหรับคอมพิวเตอร์ (มือถือใช้ Unified Progress Header ด้านบน) */}
       {step === 1 && (
-        <div className="jw-card p-0 overflow-hidden mb-4 shadow-card border border-line">
+        <div className="hidden md:block jw-card p-0 overflow-hidden mb-4 shadow-card border border-line">
           <div className="p-3.5 sm:px-5 sm:py-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
@@ -1156,7 +1160,7 @@ export default function BorrowWizardPage() {
       {step === 2 && (
         <div className="flex flex-col gap-4">
           {/* ส่วนหัวแสดงโหมดรายวัน */}
-          <div className="bg-white rounded-2xl border border-line shadow-card overflow-hidden">
+          <div className="hidden md:block bg-surface rounded-2xl border border-line shadow-card overflow-hidden">
             <div className="p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
@@ -1382,7 +1386,7 @@ export default function BorrowWizardPage() {
       {step === 3 && (
         <div className="w-full flex flex-col gap-4">
           <div className="jw-card p-5 sm:p-7 flex flex-col gap-4">
-            <div className="pb-3 border-b border-line flex flex-wrap items-center justify-between gap-2">
+            <div className="hidden md:flex pb-3 border-b border-line flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-3">
                 <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
                   3
@@ -1777,7 +1781,7 @@ export default function BorrowWizardPage() {
       {step === 4 && (
         <div className="w-full flex flex-col gap-4">
           {/* ส่วนหัวขั้นตอนที่ 4 */}
-          <div className="jw-card p-0 overflow-hidden border border-line">
+          <div className="hidden md:block jw-card p-0 overflow-hidden border border-line">
             <div className="p-3.5 sm:px-5 sm:py-4 flex items-center gap-3">
               <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
                 4

@@ -669,7 +669,7 @@ export default function BookingWizardPage() {
     <AppShell
       title={
         step === 1
-          ? 'สถานที่'
+          ? 'เลือกสถานที่ที่ใช้งาน'
           : step === 2
           ? 'เลือกวัน-เวลา'
           : step === 3
@@ -678,77 +678,114 @@ export default function BookingWizardPage() {
           ? 'แบบคำขอใช้สถานที่'
           : 'ลงนามและส่งคำขอ'
       }
+      step={step}
+      totalSteps={5}
       backHref={step === 1 ? (account ? roleHomePath(account.role) : '/') : undefined}
       onBack={step > 1 ? () => setStep((s) => s - 1) : undefined}
       rightLabel={account?.name}
       maxWidth="max-w-[1440px]"
       footer={
         step === 1 ? (
-          <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-10 h-10 rounded-xl bg-brand text-white font-bold text-[15px] flex items-center justify-center shrink-0 shadow-xs">
-                {selectedVenues.length}
+          <>
+            {/* มือถือ (< md): แถบล่างค้างไว้ โทนสีเดียวกับระบบ (เหมือนเพื่อน) */}
+            <div className="w-full flex md:hidden items-center justify-between gap-4">
+              <div className="flex items-baseline gap-1.5 shrink-0">
+                <span className="text-[26px] font-bold text-brand leading-none">
+                  {selectedVenues.length}
+                </span>
+                <span className="text-[12px] font-medium text-ink-mute">แห่งที่เลือก</span>
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[14px] font-bold text-ink">สถานที่ที่เลือกไว้</span>
-                  <span className="text-[11.5px] px-2.5 py-0.5 rounded-full bg-brand-mint text-brand font-semibold">
-                    {selectedVenues.length > 0 && minAdvanceDays > 0
-                      ? `ต้องจองล่วงหน้าอย่างน้อย ${minAdvanceDays} วัน`
-                      : 'เลือกได้มากกว่า 1 แห่ง'}
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                  {selectedVenues.length === 0 ? (
-                    <span className="text-[12.5px] text-ink-mute">
-                      ยังไม่ได้เลือกสถานที่ (คลิกเลือกจากการ์ดด้านบน)
-                    </span>
-                  ) : (
-                    selectedVenues.map((v) => (
-                      <span
-                        key={v.id}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-semibold bg-brand-mint text-brand border border-brand/20"
-                      >
-                        <span className="truncate max-w-[160px] sm:max-w-[220px]">{v.name}</span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleVenue(v);
-                          }}
-                          className="w-4 h-4 rounded-full hover:bg-brand/15 flex items-center justify-center text-brand hover:text-status-crit transition"
-                          title="นำออก"
-                        >
-                          <Icon name="x" className="w-3 h-3" />
-                        </button>
-                      </span>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              {selectedVenues.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedIds([])}
-                  className="h-10 px-3.5 rounded-xl border border-line bg-surface text-[12.5px] font-semibold text-ink-mute hover:text-status-crit hover:bg-soft transition"
-                >
-                  ล้างทั้งหมด
-                </button>
-              )}
               <button
                 type="button"
                 disabled={selectedIds.length === 0}
                 onClick={() => setStep(2)}
-                className="jw-btn h-10 px-5 rounded-xl text-[13.5px] w-full sm:w-auto"
+                className="flex-1 h-12 rounded-control bg-brand hover:opacity-90 disabled:opacity-40 text-white font-semibold text-body inline-flex items-center justify-center gap-2 transition cursor-pointer disabled:cursor-not-allowed shadow-sm"
               >
-                <span>ถัดไป · เลือกวัน-เวลา ({selectedIds.length} รายการ)</span>
-                <Icon name="chevron-right" className="w-4 h-4" />
+                <span>ถัดไป · เลือกวัน-เวลา</span>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                  <polyline points="12 5 19 12 12 19" />
+                </svg>
               </button>
             </div>
-          </div>
+
+            {/* คอมพิวเตอร์ (>= md): แถบล่างแสดงชิปสถานที่ที่เลือก */}
+            <div className="w-full hidden md:flex flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="w-10 h-10 rounded-xl bg-brand text-white font-bold text-[15px] flex items-center justify-center shrink-0 shadow-xs">
+                  {selectedVenues.length}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[14px] font-bold text-ink">สถานที่ที่เลือกไว้</span>
+                    <span className="text-[11.5px] px-2.5 py-0.5 rounded-full bg-brand-mint text-brand font-semibold">
+                      {selectedVenues.length > 0 && minAdvanceDays > 0
+                        ? `ต้องจองล่วงหน้าอย่างน้อย ${minAdvanceDays} วัน`
+                        : 'เลือกได้มากกว่า 1 แห่ง'}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                    {selectedVenues.length === 0 ? (
+                      <span className="text-[12.5px] text-ink-mute">
+                        ยังไม่ได้เลือกสถานที่ (คลิกเลือกจากการ์ดด้านบน)
+                      </span>
+                    ) : (
+                      selectedVenues.map((v) => (
+                        <span
+                          key={v.id}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-semibold bg-brand-mint text-brand border border-brand/20"
+                        >
+                          <span className="truncate max-w-[160px] sm:max-w-[220px]">{v.name}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleVenue(v);
+                            }}
+                            className="w-4 h-4 rounded-full hover:bg-brand/15 flex items-center justify-center text-brand hover:text-status-crit transition"
+                            title="นำออก"
+                          >
+                            <Icon name="x" className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {selectedVenues.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIds([])}
+                    className="h-10 px-3.5 rounded-xl border border-line bg-surface text-[12.5px] font-semibold text-ink-mute hover:text-status-crit hover:bg-soft transition"
+                  >
+                    ล้างทั้งหมด
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={selectedIds.length === 0}
+                  onClick={() => setStep(2)}
+                  className="jw-btn h-10 px-5 rounded-xl text-[13.5px] w-auto"
+                >
+                  <span>ถัดไป · เลือกวัน-เวลา ({selectedIds.length} รายการ)</span>
+                  <Icon name="chevron-right" className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </>
         ) : step === 2 ? (
           <div className="flex w-full sm:w-auto gap-2.5">
             <button type="button" onClick={() => setStep(1)} className="jw-btn-sec flex-1 sm:w-36">
@@ -841,9 +878,202 @@ export default function BookingWizardPage() {
         )
       }
     >
-      {/* Header สไตล์การ์ดเดี่ยวตามแบบที่ผู้ใช้อนุมัติ (ตัด Stepper 1-5 ออก) */}
+      {/* ================= STEP 1 MOBILE (< md): รายการกะทัดรัดจัดกลุ่มตามประเภท (Header รวมอยู่ในแถบบนแล้ว) ================= */}
       {step === 1 && (
-        <div className="jw-card p-0 overflow-hidden mb-4 shadow-card border border-line">
+        <div className="flex md:hidden flex-col gap-3.5 pb-4">
+          {/* คำอธิบาย */}
+          <p className="text-body text-ink-soft leading-relaxed px-0.5">
+            เลือกสถานที่ที่ต้องการใช้งาน (สามารถเลือกได้มากกว่า 1 แห่งในคำขอเดียวกัน)
+          </p>
+
+          {/* 3) กล่องข้อมูลรวม (สีโทนเดียวกับระบบ) */}
+          <div className="bg-brand-tint border border-brand/20 text-brand-ink rounded-control px-3.5 py-2.5 flex items-center gap-2.5 text-caption font-medium leading-snug">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="shrink-0 text-brand"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            <span>ทุกแห่งเปิด 08:00–17:00 น. และจองล่วงหน้าได้ 3 วัน</span>
+          </div>
+
+          {/* 4) ช่องค้นหา (สีโทนเดียวกับระบบ) */}
+          <div className="relative w-full">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-mute pointer-events-none">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </span>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ค้นหาชื่อสถานที่ อาคาร หรือสิ่งอำนวยความสะดวก"
+              aria-label="ค้นหาชื่อสถานที่ อาคาร หรือสิ่งอำนวยความสะดวก"
+              className="w-full h-12 pl-11 pr-10 rounded-control border border-line-input bg-surface text-body text-ink placeholder:text-ink-ph focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand-tint transition"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                aria-label="ล้างคำค้นหา"
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-surface-muted text-ink-mute hover:text-ink flex items-center justify-center transition"
+              >
+                <Icon name="x" className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* 5) รายการจัดกลุ่มตามประเภท: ห้องประชุม -> สนามกีฬา -> ศาลา -> ลานกิจกรรม -> ห้องอบรม */}
+          {(() => {
+            const mobileSearchFiltered = venues.filter((v) => {
+              if (!search.trim()) return true;
+              const q = search.trim().toLowerCase();
+              const facText = (v.facilities || []).map((f) => formatFacilityLabel(f)).join(' ').toLowerCase();
+              const typeLabel = (VENUE_TYPE_LABEL[v.type] || '').toLowerCase();
+              return (
+                v.name.toLowerCase().includes(q) ||
+                (v.building || '').toLowerCase().includes(q) ||
+                (v.floor || '').toLowerCase().includes(q) ||
+                typeLabel.includes(q) ||
+                facText.includes(q)
+              );
+            });
+
+            if (mobileSearchFiltered.length === 0) {
+              return (
+                <div className="border-[1.5px] border-dashed border-[#c0cbca] rounded-[16px] p-8 text-center bg-white text-[#4a5853] text-[14px] flex flex-col items-center gap-2">
+                  <b className="text-[#14231f]">ไม่พบสถานที่ที่ตรงกับการค้นหา</b>
+                  <span className="text-[12.5px]">โปรดลองค้นหาด้วยคำอื่น หรือกดล้างการค้นหา</span>
+                </div>
+              );
+            }
+
+            const orderedCategories: VenueType[] = ['meeting', 'field', 'pavilion', 'yard', 'training'];
+
+            return (
+              <div className="flex flex-col gap-4 mt-1">
+                {orderedCategories.map((cat) => {
+                  const groupVenues = mobileSearchFiltered.filter((v) => v.type === cat);
+                  if (groupVenues.length === 0) return null;
+
+                  return (
+                    <section key={cat} className="flex flex-col gap-2" aria-label={`หมวด${VENUE_TYPE_LABEL[cat]}`}>
+                      <div className="flex items-center justify-between px-0.5">
+                        <h2 className="text-body font-bold text-ink">{VENUE_TYPE_LABEL[cat]}</h2>
+                        <span className="text-caption font-medium text-ink-mute">{groupVenues.length} แห่ง</span>
+                      </div>
+
+                      <div className="bg-surface border border-line rounded-card overflow-hidden divide-y divide-line-soft shadow-xs">
+                        {groupVenues.map((v) => {
+                          const isSelected = selectedIds.includes(v.id);
+                          const disabled = v.status !== 'available' || !v.enabled;
+                          const facLabels = (v.facilities || []).map((f) => formatFacilityLabel(f));
+                          const firstTwo = facLabels.slice(0, 2).join(' · ');
+                          const extraCount = facLabels.length - 2;
+
+                          return (
+                            <div
+                              key={v.id}
+                              className={`min-h-[64px] flex items-stretch transition ${
+                                isSelected ? 'bg-brand-tint/40' : 'bg-surface'
+                              } ${disabled ? 'opacity-60' : ''}`}
+                            >
+                              <label
+                                htmlFor={`mob-chk-${v.id}`}
+                                className="flex-1 min-w-0 flex items-center gap-3 py-3 pl-4 pr-1.5 cursor-pointer select-none"
+                              >
+                                <input
+                                  id={`mob-chk-${v.id}`}
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  disabled={disabled}
+                                  onChange={() => toggleVenue(v)}
+                                  className="w-5 h-5 rounded-[6px] accent-brand shrink-0 cursor-pointer"
+                                />
+                                <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                                  <div className="text-body font-semibold text-ink leading-snug">
+                                    {v.name}
+                                  </div>
+                                  <div className="text-caption font-medium text-ink-soft leading-snug">
+                                    {v.building}
+                                    {v.floor ? ` · ${v.floor}` : ''} · {v.capacity} คน
+                                  </div>
+                                  <div className="text-[12px] text-ink-mute leading-snug flex flex-wrap items-center gap-1">
+                                    {facLabels.length === 0 ? (
+                                      <span>ไม่มีสิ่งอำนวยความสะดวกเพิ่มเติม</span>
+                                    ) : (
+                                      <>
+                                        <span>{firstTwo}</span>
+                                        {extraCount > 0 && (
+                                          <span className="text-[11px] font-semibold bg-surface-muted border border-line-soft text-ink-soft px-1.5 py-0.2 rounded">
+                                            +{extraCount}
+                                          </span>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </label>
+                              <button
+                                type="button"
+                                aria-label={`รายละเอียด ${v.name}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setInspectedVenue(v);
+                                }}
+                                className="w-[52px] min-h-[44px] shrink-0 flex items-center justify-center text-ink-mute hover:text-brand transition cursor-pointer"
+                              >
+                                <svg
+                                  width="18"
+                                  height="18"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2.2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  aria-hidden="true"
+                                >
+                                  <polyline points="9 18 15 12 9 6" />
+                                </svg>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Header สไตล์การ์ดเดี่ยวตามแบบที่ผู้ใช้อนุมัติ สำหรับคอมพิวเตอร์ (>= md) */}
+      {step === 1 && (
+        <div className="hidden md:block jw-card p-0 overflow-hidden mb-4 shadow-card border border-line">
           <div className="p-3.5 sm:px-5 sm:py-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
@@ -851,7 +1081,7 @@ export default function BookingWizardPage() {
               </span>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <b className="text-[15px] sm:text-[16px] text-ink block leading-tight">เลือกสถานที่ใช้งาน</b>
+                  <b className="text-[15px] sm:text-[16px] text-ink block leading-tight">เลือกสถานที่ที่ใช้งาน</b>
                   <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-mint text-brand border border-brand/20">
                     ขั้นตอนที่ 1 จาก 5
                   </span>
@@ -874,9 +1104,9 @@ export default function BookingWizardPage() {
         </div>
       )}
 
-      {/* ================= STEP 1: เลือกสถานที่ (Layout B) ================= */}
+      {/* ================= STEP 1 DESKTOP (>= md): เลือกสถานที่ (Layout B) ================= */}
       {step === 1 && (
-        <div className="flex flex-col gap-4">
+        <div className="hidden md:flex flex-col gap-4">
           {/* แถบค้นหาและตัวกรองแบบรวมศูนย์ (Unified Search & Filter Control Bar - Single Row) */}
           <div className="jw-card p-3.5 sm:p-4">
             <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2.5">
@@ -1279,7 +1509,12 @@ export default function BookingWizardPage() {
             </div>
           )}
 
-          {/* หน้าต่างแสดงรายละเอียดสถานที่ (Detail Modal - ขนาดใหญ่ 75% Viewport) */}
+        </div>
+      )}
+
+      {/* หน้าต่างแสดงรายละเอียดสถานที่ (Detail Modal - รองรับทั้งมือถือและคอมพิวเตอร์) */}
+      {step === 1 && (
+        <div>
           {inspectedVenue && (
             <div
               className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
@@ -1464,10 +1699,11 @@ export default function BookingWizardPage() {
             />
           ) : (
             <div className="flex flex-col gap-4">
-            {/* ส่วนหัวสลับโหมดในหน้าจองรายวัน */}
-            <div className="bg-white rounded-2xl border border-line shadow-card overflow-hidden">
-              <div className="p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
+            {/* ส่วนหัวสลับโหมดในหน้าจองรายวัน (แสดงปุ่มสลับโหมดทั้งบนมือถือและคอมพิวเตอร์) */}
+            <div className="bg-surface rounded-2xl border border-line shadow-card overflow-hidden">
+              <div className="p-3 sm:p-4 flex flex-wrap items-center justify-between gap-2.5">
+                {/* ซ้าย: แสดงเฉพาะบนคอมพิวเตอร์ (มือถือมี Unified Progress Header ด้านบนอยู่แล้ว) */}
+                <div className="hidden md:flex items-center gap-2">
                   <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
                     2
                   </span>
@@ -1484,26 +1720,30 @@ export default function BookingWizardPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 bg-canvas p-1 rounded-full border border-line">
-                  <button
-                    type="button"
-                    onClick={() => setBookingMode('hourly')}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-medium text-ink-soft hover:text-ink hover:bg-hover transition"
-                    title="สลับไปโหมดรายชั่วโมง"
-                  >
-                    <Icon name="clock" className="w-3.5 h-3.5 text-ink-mute" />
-                    <span>รายชั่วโมง</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-semibold bg-brand text-white shadow-xs transition"
-                  >
-                    <Icon name="calendar" className="w-3.5 h-3.5 text-white" />
-                    <span>รายวัน</span>
-                  </button>
+                {/* ขวา / มือถือ: ปุ่มสลับโหมด แสดงทั้งบนมือถือและคอมพิวเตอร์ */}
+                <div className="w-full md:w-auto flex items-center justify-between md:justify-end gap-2">
+                  <span className="text-[13px] font-semibold text-ink md:hidden">รูปแบบการจอง:</span>
+                  <div className="flex items-center gap-1 bg-surface-muted p-1 rounded-full border border-line">
+                    <button
+                      type="button"
+                      onClick={() => setBookingMode('hourly')}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-medium text-ink-soft hover:text-ink hover:bg-hover transition cursor-pointer"
+                      title="สลับไปโหมดรายชั่วโมง"
+                    >
+                      <Icon name="clock" className="w-3.5 h-3.5 text-ink-mute" />
+                      <span>รายชั่วโมง</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12.5px] font-semibold bg-brand text-white shadow-xs transition"
+                    >
+                      <Icon name="calendar" className="w-3.5 h-3.5 text-white" />
+                      <span>รายวัน</span>
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div className="w-full h-[3px] bg-line/30">
+              <div className="hidden md:block w-full h-[3px] bg-line/30">
                 <div className="h-full bg-brand transition-all duration-300" style={{ width: '40%' }} />
               </div>
             </div>
@@ -1679,7 +1919,7 @@ export default function BookingWizardPage() {
       {/* ================= STEP 3: เลือกอุปกรณ์เสริม ================= */}
       {step === 3 && (
         <div className="w-full flex flex-col gap-4">
-          <div className="jw-card p-0 overflow-hidden bg-gradient-to-r from-soft to-white border border-line">
+          <div className="hidden md:block jw-card p-0 overflow-hidden bg-gradient-to-r from-soft to-white border border-line">
             <div className="p-4 sm:p-5 flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -1977,7 +2217,7 @@ export default function BookingWizardPage() {
               <span>ยังขาด: {missingRequestFields.join(' · ')}</span>
             </div>
           )}
-          <div className="pb-3 border-b border-line flex items-center gap-3">
+          <div className="hidden md:flex pb-3 border-b border-line items-center gap-3">
             <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
               4
             </span>
@@ -2354,7 +2594,7 @@ export default function BookingWizardPage() {
           )}
 
           {/* ส่วนหัวขั้นตอนที่ 5 */}
-          <div className="jw-card p-0 overflow-hidden border border-line">
+          <div className="hidden md:block jw-card p-0 overflow-hidden border border-line">
             <div className="p-3.5 sm:px-5 sm:py-4 flex items-center gap-3">
               <span className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
                 5

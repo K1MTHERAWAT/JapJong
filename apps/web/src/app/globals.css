@@ -6,6 +6,92 @@
 
 :root {
   --font-noto-thai: 'Noto Sans Thai', ui-sans-serif, system-ui, sans-serif;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+
+  /* Light Theme RGB values for Tailwind alpha-value support */
+  --rgb-bg: 248 247 243;
+  --rgb-ground: 243 242 237;
+  --rgb-surface: 255 255 255;
+  --rgb-surface-muted: 244 244 241;
+  --rgb-hover: 240 240 236;
+  --rgb-line: 228 228 224;
+  --rgb-line-soft: 239 239 234;
+  --rgb-line-input: 208 213 221;
+  --rgb-ink: 16 24 40;
+  --rgb-ink-soft: 52 64 84;
+  --rgb-ink-mute: 102 112 133;
+  --rgb-ink-ph: 152 162 179;
+  --rgb-brand: 30 125 90;
+  --rgb-brand-ink: 23 101 72;
+  --rgb-brand-tint: 232 242 237;
+  --rgb-brand-mint: 232 242 237;
+  --rgb-brand-cal-range: 212 233 223;
+  --rgb-brand-surface: 250 249 242;
+
+  --color-bg: rgb(var(--rgb-bg));
+  --color-ground: rgb(var(--rgb-ground));
+  --color-surface: rgb(var(--rgb-surface));
+  --color-surface-muted: rgb(var(--rgb-surface-muted));
+  --color-hover: rgb(var(--rgb-hover));
+  --color-line: rgb(var(--rgb-line));
+  --color-line-soft: rgb(var(--rgb-line-soft));
+  --color-line-input: rgb(var(--rgb-line-input));
+  --color-ink: rgb(var(--rgb-ink));
+  --color-ink-soft: rgb(var(--rgb-ink-soft));
+  --color-ink-mute: rgb(var(--rgb-ink-mute));
+  --color-ink-ph: rgb(var(--rgb-ink-ph));
+  --color-brand: rgb(var(--rgb-brand));
+  --color-brand-ink: rgb(var(--rgb-brand-ink));
+  --color-brand-tint: rgb(var(--rgb-brand-tint));
+  --color-brand-mint: rgb(var(--rgb-brand-mint));
+  --color-brand-cal-range: rgb(var(--rgb-brand-cal-range));
+  --color-brand-surface: rgb(var(--rgb-brand-surface));
+}
+
+.dark {
+  color-scheme: dark;
+
+  /* Dark Theme RGB values (Deep forest-slate with high accessibility) */
+  --rgb-bg: 15 22 20;
+  --rgb-ground: 19 28 25;
+  --rgb-surface: 24 36 32;
+  --rgb-surface-muted: 31 45 40;
+  --rgb-hover: 38 56 50;
+  --rgb-line: 43 62 55;
+  --rgb-line-soft: 35 52 46;
+  --rgb-line-input: 56 78 70;
+  --rgb-ink: 240 253 247;
+  --rgb-ink-soft: 200 222 213;
+  --rgb-ink-mute: 139 168 157;
+  --rgb-ink-ph: 89 115 104;
+  --rgb-brand: 16 185 129;
+  --rgb-brand-ink: 110 231 183;
+  --rgb-brand-tint: 20 53 43;
+  --rgb-brand-mint: 20 53 43;
+  --rgb-brand-cal-range: 27 71 57;
+  --rgb-brand-surface: 20 34 29;
+
+  --color-bg: rgb(var(--rgb-bg));
+  --color-ground: rgb(var(--rgb-ground));
+  --color-surface: rgb(var(--rgb-surface));
+  --color-surface-muted: rgb(var(--rgb-surface-muted));
+  --color-hover: rgb(var(--rgb-hover));
+  --color-line: rgb(var(--rgb-line));
+  --color-line-soft: rgb(var(--rgb-line-soft));
+  --color-line-input: rgb(var(--rgb-line-input));
+  --color-ink: rgb(var(--rgb-ink));
+  --color-ink-soft: rgb(var(--rgb-ink-soft));
+  --color-ink-mute: rgb(var(--rgb-ink-mute));
+  --color-ink-ph: rgb(var(--rgb-ink-ph));
+  --color-brand: rgb(var(--rgb-brand));
+  --color-brand-ink: rgb(var(--rgb-brand-ink));
+  --color-brand-tint: rgb(var(--rgb-brand-tint));
+  --color-brand-mint: rgb(var(--rgb-brand-mint));
+  --color-brand-cal-range: rgb(var(--rgb-brand-cal-range));
+  --color-brand-surface: rgb(var(--rgb-brand-surface));
 }
 
 @layer base {
@@ -14,9 +100,38 @@
     font-family: 'Noto Sans Thai', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   }
   body {
-    @apply font-sans text-ink bg-bg antialiased;
+    @apply font-sans antialiased;
+    background-color: var(--color-bg);
+    color: var(--color-ink);
     min-height: 100vh;
+    min-height: 100dvh;
     background-image: radial-gradient(ellipse at 92% 0%, rgba(30, 125, 90, .045), transparent 34rem);
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .dark body {
+    background-image: radial-gradient(ellipse at 92% 0%, rgba(16, 185, 129, .06), transparent 34rem);
+  }
+}
+
+@layer utilities {
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pl-safe {
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+  .pr-safe {
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  .top-safe {
+    top: env(safe-area-inset-top, 0px);
+  }
+  .bottom-safe {
+    bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 
@@ -25,15 +140,26 @@
     background: #1E7D5A;
   }
   .jw-card {
-    @apply bg-surface rounded-card border border-line shadow-card;
+    @apply rounded-card border shadow-card transition-colors;
+    background-color: var(--color-surface);
+    border-color: var(--color-line);
     box-shadow: 0 3px 12px rgba(16, 24, 40, .045);
+  }
+  .dark .jw-card {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .28);
   }
   .jw-btn {
     @apply h-11 px-4 rounded-control bg-brand text-white font-semibold text-body inline-flex items-center justify-center gap-2 transition hover:bg-brand-ink disabled:opacity-50 disabled:pointer-events-none;
     box-shadow: 0 1px 2px rgba(16, 24, 40, .12);
   }
   .jw-btn-sec {
-    @apply h-11 px-4 rounded-control bg-surface text-ink border border-line-input font-semibold text-body inline-flex items-center justify-center gap-2 transition hover:bg-hover disabled:opacity-50 disabled:pointer-events-none;
+    @apply h-11 px-4 rounded-control font-semibold text-body inline-flex items-center justify-center gap-2 transition disabled:opacity-50 disabled:pointer-events-none;
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    border: 1px solid var(--color-line-input);
+  }
+  .jw-btn-sec:hover {
+    background-color: var(--color-hover);
   }
   .jw-btn-red {
     @apply h-11 px-4 rounded-control bg-danger-fg text-white font-semibold text-body inline-flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:pointer-events-none;
@@ -42,14 +168,64 @@
     @apply h-9 px-3 text-caption;
   }
   .jw-in {
-    @apply h-11 w-full bg-surface border border-line-input rounded-control px-3.5 text-body text-ink placeholder:text-ink-ph focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/25 transition;
+    @apply h-11 w-full rounded-control px-3.5 text-body placeholder:text-ink-ph focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/25 transition;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-line-input);
+    color: var(--color-ink);
   }
   textarea.jw-in {
     @apply rounded-control py-2.5;
   }
   .jw-lbl {
-    @apply block font-semibold text-body text-ink mb-1;
+    @apply block font-semibold text-body mb-1;
+    color: var(--color-ink);
   }
+
+  /* Dark mode automatic fallbacks for explicit classes */
+  .dark .bg-white,
+  .dark .bg-\[\#ffffff\] {
+    background-color: var(--color-surface) !important;
+  }
+  .dark .bg-\[\#f6f5f0\],
+  .dark .bg-\[\#FBFCFA\],
+  .dark .bg-\[\#F8F7F3\],
+  .dark .bg-\[\#f8f7f3\] {
+    background-color: var(--color-bg) !important;
+  }
+  .dark .bg-\[\#e1efe9\],
+  .dark .bg-\[\#f1f8f5\],
+  .dark .bg-\[\#f1f5f3\],
+  .dark .bg-\[\#eef2f0\] {
+    background-color: var(--color-brand-tint) !important;
+  }
+  .dark .text-\[\#14231f\],
+  .dark .text-\[\#000000\],
+  .dark .text-black {
+    color: var(--color-ink) !important;
+  }
+  .dark .text-\[\#4a5853\],
+  .dark .text-\[\#56625d\],
+  .dark .text-\[\#64746e\],
+  .dark .text-\[\#5d6d67\] {
+    color: var(--color-ink-mute) !important;
+  }
+  .dark .text-\[\#074d41\],
+  .dark .text-\[\#0b6b5c\],
+  .dark .text-\[\#0b2545\] {
+    color: #34d399 !important;
+  }
+  .dark .border-\[\#e3e1d8\],
+  .dark .border-\[\#eceae2\],
+  .dark .border-\[\#d7deda\],
+  .dark .border-\[\#c8d4cf\],
+  .dark .divide-\[\#eceae2\] > :not([hidden]) ~ :not([hidden]) {
+    border-color: var(--color-line) !important;
+  }
+  .dark .border-\[\#87928d\] {
+    border-color: var(--color-line-input) !important;
+  }
+
+  /* Document form paper */
   .gov-form-paper {
     border: none !important;
     box-shadow: none !important;
@@ -81,7 +257,10 @@
   }
 
   html,
-  body {
+  body,
+  .dark,
+  .dark body {
+    color-scheme: light !important;
     background: #ffffff !important;
     color: #000000 !important;
     width: 100% !important;

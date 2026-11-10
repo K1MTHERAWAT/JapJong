@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DemoAccountSummary, ROLE_LABEL, ROLE_TONE } from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
+import { useTheme } from '@/components/theme-provider';
+import { Moon, Sun } from 'lucide-react';
 import { roleHomePath } from '@/components/shell';
 import { Icon } from '@/components/icons';
 import { Chip } from '@/components/ui';
@@ -46,6 +48,7 @@ function GovIcon({ className = 'w-5 h-5' }: { className?: string }) {
 export default function LoginPage() {
   const router = useRouter();
   const { loginWithCredentials, loginWithDemo, refreshMe } = useAuth();
+  const { actualTheme, toggleTheme } = useTheme();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -239,7 +242,21 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#f6f5f0] text-[#14231f] flex flex-col lg:flex-row font-sans">
+    <div className="min-h-screen w-full bg-[#f6f5f0] text-[#14231f] flex flex-col lg:flex-row font-sans relative">
+      {/* Floating Theme Toggle (top-right, safe-area aware) */}
+      <button
+        type="button"
+        onClick={toggleTheme}
+        aria-label={actualTheme === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด'}
+        title={actualTheme === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด'}
+        className="fixed top-[max(0.75rem,env(safe-area-inset-top,0px))] right-[max(0.75rem,env(safe-area-inset-right,0px))] z-50 size-9 sm:size-10 rounded-full bg-white/80 dark:bg-[#182420]/85 backdrop-blur-md border border-[#e3e1d8] dark:border-[#2b3e37] shadow-sm flex items-center justify-center text-ink hover:bg-hover active:scale-95 transition cursor-pointer"
+      >
+        {actualTheme === 'dark' ? (
+          <Sun className="size-4.5 text-amber-400" />
+        ) : (
+          <Moon className="size-4.5 text-ink-mute" />
+        )}
+      </button>
       
       {/* ========================================================
           DESKTOP (>= lg): Left Brand Sidebar (แบบ A)
