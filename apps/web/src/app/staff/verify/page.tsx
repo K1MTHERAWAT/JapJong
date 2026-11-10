@@ -1,3 +1,24 @@
+/**
+ * หน้าตรวจสอบความถูกต้องของเอกสารทางราชการสำหรับเจ้าหน้าที่ (Staff Document Verification)
+ * 
+ * ฟังก์ชันการทำงานหลัก:
+ * 1. ระบบสแกน QR Code ผ่านกล้องสด (WebRTC & QrScanner)
+ *    - ระบบประมวลผลภาพขั้นสูงในพื้นหลัง (Multi-pass Preprocessing): ปรับคอนทราสต์, เพิ่มความคมชัด (Sharpen 3x3),
+ *      ปรับระดับแสงแบบปรับตัวตามพื้นที่ (Adaptive Threshold) และกลับสี (Invert) สำหรับภาพเบลอ หลุดโฟกัส หรือแสงน้อย
+ *    - ระบบควบคุมกล้อง: ซูมฮาร์ดแวร์/ดิจิทัล (1x - 3x), เปิด/ปิดไฟฉาย (Torch), แตะหน้าจอเพื่อโฟกัสใหม่ (Continuous Focus)
+ *    - สลับกล้องหน้า/หลังอัตโนมัติ พร้อมตรวจจับความพร้อมใช้งานของฮาร์ดแวร์
+ *    - ข้อความแนะนำอัจฉริยะแบบเรียลไทม์ตามระยะเวลาที่สแกน
+ * 2. โหมดอัปโหลดรูปภาพ (Upload QR Image File)
+ *    - หมุนภาพ ชดเชยองศาเอียง และประมวลผลหลายระดับอัตโนมัติหากภาพไม่ชัด
+ * 3. โหมดพิมพ์ค้นหาด้วยเลขที่เอกสารหรือรหัสยืนยัน (Manual Query)
+ * 4. ระบบป้องกันการสแกนซ้ำซ้อน (QrDuplicateGuard) ป้องกันการส่งคำขอซ้ำระหว่างรอผลหรือในระยะคูลดาวน์
+ * 5. โหมดสแกนต่อเนื่อง (Continuous Mode) สำหรับการตรวจเอกสารหลายฉบับติดต่อกันโดยไม่ต้องเปิดกล้องใหม่
+ * 6. แสดงผลการตรวจสอบอย่างเป็นทางการ:
+ *    - ข้อมูลคำขอ, ผู้ยื่น, วัตถุประสงค์, วันที่ออก, สถานะเอกสาร
+ *    - ลายมือชื่อและการอนุมัติดิจิทัลครบทั้ง 3 ระดับ (ผู้ตรวจทาน -> นิติกร -> นายก อบต.)
+ *    - รหัสลายพิมพ์ดิจิทัล SHA-256 Hash พร้อมปุ่มคัดลอก
+ *    - บันทึกและแสดงประวัติการสแกนล่าสุดของเจ้าหน้าที่
+ */
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -43,7 +64,7 @@ export default function StaffVerifyPage() {
   const [history, setHistory] = useState<DocumentScanLog[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  // Advanced scanner controls state
+  // สถานะระบบควบคุมกล้องขั้นสูง (ซูม, ไฟฉาย, กล้องที่เลือก, โหมดสแกนต่อเนื่อง)
   const [continuousMode, setContinuousMode] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1.0);
   const [usingDigitalZoom, setUsingDigitalZoom] = useState(false);
@@ -84,7 +105,7 @@ export default function StaffVerifyPage() {
         qrScannerRef.current.stop();
         qrScannerRef.current.destroy();
       } catch {
-        // ignore
+        // ละเว้นข้อผิดพลาดขณะหยุดกล้อง
       }
       qrScannerRef.current = null;
     }
@@ -254,7 +275,7 @@ export default function StaffVerifyPage() {
         setCapabilities(caps);
         return;
       } catch (err) {
-        console.warn('Fast camera switch failed, restarting scanner...', err);
+        console.warn('สลับกล้องด่วนไม่สำเร็จ กำลังรีสตาร์ทตัวสแกนใหม่...', err);
       }
     }
     await startCamera(nextCam.id);
@@ -277,7 +298,7 @@ export default function StaffVerifyPage() {
     };
   }, [stopCamera]);
 
-  // Background Multi-Pass Image Preprocessing Loop สำหรับภาพเบลอ / อยู่ไกล / แสงน้อย / เอียง
+  // ลูปประมวลผลภาพขั้นสูงในพื้นหลัง (Multi-Pass Image Preprocessing) สำหรับกรณีภาพเบลอ / อยู่ไกล / แสงน้อย / วางเอียง
   useEffect(() => {
     if (!scanning || mode !== 'camera') return;
 
@@ -329,7 +350,7 @@ export default function StaffVerifyPage() {
         setTorchOn(Boolean(qrScannerRef.current.isFlashOn()));
         return;
       } catch {
-        // Fallback to track
+        // หากสั่งผ่านตัวสแกนไม่ได้ ให้สั่งตรงที่แทร็ก MediaStreamTrack
       }
     }
     const track = getActiveVideoTrack(videoRef.current || 'qr-reader');
@@ -738,7 +759,7 @@ export default function StaffVerifyPage() {
           </div>
         )}
 
-        {/* กล่องซ่อนสำหรับ Html5Qrcode decode image */}
+        {/* กล่องซ่อนสำหรับประมวลผลรูปภาพ */}
         <div id="qr-reader-hidden" className="hidden"></div>
 
         {/* กำลังตรวจสอบ */}
@@ -749,10 +770,10 @@ export default function StaffVerifyPage() {
           </div>
         )}
 
-        {/* แสดงผลการตรวจสอบ (Result Screen - Layout Option 1: Clean Official Card) */}
+        {/* แสดงผลการตรวจสอบ (การ์ดรายละเอียดเอกสารแบบทางการ) */}
         {result && !verifying && (
           <div className="jw-card p-0 overflow-hidden flex flex-col shadow-xs border border-line">
-            {/* Header แสดงสถานะ สไตล์ Option 1 */}
+            {/* ส่วนหัวแสดงสถานะผลการตรวจสอบ */}
             <div
               className={`p-4 sm:p-5 relative ${
                 status === 'VALID'
@@ -803,7 +824,7 @@ export default function StaffVerifyPage() {
             <div className="p-4 sm:p-5 flex flex-col gap-4">
               {status !== 'NOT_FOUND' && (
                 <>
-                  {/* ข้อมูลเอกสารและผู้ยื่นคำขอ (Grid Auto-wrap ไม่ล้นจอ) */}
+                  {/* ข้อมูลเอกสารและผู้ยื่นคำขอ (จัดวางแบบ Grid อัตโนมัติ ไม่ล้นหน้าจอ) */}
                   <div className="bg-slate-50/80 rounded-xl border border-line p-3.5 space-y-2.5 text-xs sm:text-[13px]">
                     <div className="text-ink font-bold text-xs flex items-center gap-1.5 border-b border-line pb-2">
                       <Icon name="file-text" className="w-3.5 h-3.5 text-brand" />
@@ -886,7 +907,7 @@ export default function StaffVerifyPage() {
                     </div>
                   </div>
 
-                  {/* ลายมือชื่อและการอนุมัติดิจิทัล (3 ระดับ - Responsive ปลอดภัยไม่ล้นจอ) */}
+                  {/* ลายมือชื่อและการอนุมัติดิจิทัล (3 ระดับ - แสดงผลยืดหยุ่น ปลอดภัยไม่ล้นจอ) */}
                   {result.signatures && result.signatures.length > 0 && (
                     <div className="rounded-xl border border-line p-3.5 space-y-2.5">
                       <div className="flex items-center justify-between border-b border-line pb-2">
@@ -932,7 +953,7 @@ export default function StaffVerifyPage() {
                     </div>
                   )}
 
-                  {/* Cryptographic SHA-256 Hash Box พร้อมปุ่มคัดลอก */}
+                  {/* กล่องแสดงรหัสแฮชเข้ารหัส SHA-256 พร้อมปุ่มคัดลอก */}
                   {result.documentHash && (
                     <div className="rounded-xl bg-slate-50 border border-line p-2.5 space-y-1">
                       <div className="flex items-center justify-between text-[11px]">

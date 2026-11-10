@@ -1,11 +1,11 @@
 /**
- * Advanced QR Scanner Engine for GFMS (JapJong)
- * Handles:
- * 1. Optimal camera constraints (Continuous Auto-Focus, High Resolution, FPS)
- * 2. Hardware & Digital Zoom (1x - 3x+) + Torch/Flashlight control
- * 3. Multi-pass Image Preprocessing (Contrast Stretch, 3x3 Sharpen Convolution, Integral-Image Adaptive Threshold, Invert)
- * 4. Multi-scale cropping & Rotation compensation for distant, small, blurry, or tilted QR codes
- * 5. Duplicate scan & in-flight processing cooldown guard
+ * เครื่องยนต์สแกนและประมวลผล QR Code ขั้นสูงสำหรับระบบจับจอง (JapJong)
+ * หน้าที่หลัก:
+ * 1. กำหนดค่ากล้องที่เหมาะสมที่สุด (โฟกัสอัตโนมัติต่อเนื่อง, ความละเอียดสูง, อัตราเฟรมเรตลื่นไหล)
+ * 2. ควบคุมระดับการซูมทั้งแบบฮาร์ดแวร์และดิจิทัล (1x - 3x+) พร้อมระบบเปิด/ปิดไฟฉาย (Torch)
+ * 3. ประมวลผลภาพล่วงหน้าหลายระดับ (Multi-pass Image Preprocessing: ปรับความเปรียบต่าง, ฟิลเตอร์เพิ่มความคมชัด 3x3, ปรับค่าขีดแบ่งแสงแบบปรับตัวตามพื้นที่, กลับสีภาพ)
+ * 4. ครอปภาพหลายระยะและชดเชยการหมุนเอียง สำหรับ QR Code ที่มีขนาดเล็ก อยู่ไกล เบลอ หรือเอียง
+ * 5. ป้องกันการสแกนซ้ำซ้อนและระงับการทำงานซ้ำระหว่างที่กำลังส่งคำขอตรวจสอบไปยังเซิร์ฟเวอร์
  */
 
 export type PreprocessMode =
@@ -33,8 +33,8 @@ export const DEFAULT_CAMERA_CAPABILITIES: CameraHardwareCapabilities = {
 };
 
 /**
- * Prevents duplicate scans of the same QR code within a cooldown window
- * and locks scanning while a verification request is in-flight.
+ * ระบบป้องกันการสแกน QR Code ซ้ำซ้อนภายในช่วงเวลาคูลดาวน์ที่กำหนด
+ * และล็อกการสแกนขณะที่คำขอกำลังประมวลผล (in-flight)
  */
 export class QrDuplicateGuard {
   private lastToken = '';
@@ -47,8 +47,8 @@ export class QrDuplicateGuard {
   }
 
   /**
-   * Returns true if the decoded text should be accepted and processed.
-   * Automatically marks the guard as in-flight when accepted.
+   * คืนค่า true หากข้อความที่ถอดรหัสได้ควรได้รับการยอมรับและนำไปประมวลผลต่อ
+   * จะทำการตั้งค่าสถานะล็อก inFlight เป็น true ให้อัตโนมัติเมื่อยอมรับ
    */
   tryAcquire(rawText: string, now = Date.now()): boolean {
     const cleaned = (rawText || '').trim();
@@ -85,8 +85,8 @@ export class QrDuplicateGuard {
 }
 
 /**
- * Computes a responsive QR detection box (78% of the shorter viewport dimension)
- * so users don't have to align the QR code into a tiny box.
+ * คำนวณขนาดกรอบสแกน QR Code ที่ยืดหยุ่นตามขนาดหน้าจอ (78% ของด้านที่สั้นกว่าของช่องมอง)
+ * เพื่อให้ผู้ใช้ไม่ต้องเล็ง QR Code ให้ตรงกับกล่องขนาดเล็กเกินไป
  */
 export function computeResponsiveQrBox(
   viewfinderWidth: number,
@@ -101,7 +101,7 @@ export function computeResponsiveQrBox(
 }
 
 /**
- * Returns optimal MediaTrackConstraints for QR scanning in challenging environments.
+ * คืนค่าเงื่อนไขการทำงานของกล้อง (MediaTrackConstraints) ที่เหมาะสมที่สุดสำหรับสภาพแวดล้อมที่ท้าทาย
  */
 export function getOptimalVideoConstraints(): MediaTrackConstraints {
   return {
@@ -109,7 +109,7 @@ export function getOptimalVideoConstraints(): MediaTrackConstraints {
     width: { min: 640, ideal: 1920, max: 2560 },
     height: { min: 480, ideal: 1080, max: 1440 },
     frameRate: { ideal: 24, max: 30 },
-    // Advanced continuous auto-focus & exposure for mobile/webcam drivers
+    // ตั้งค่าโฟกัสอัตโนมัติต่อเนื่องและชดเชยแสงสำหรับไดรเวอร์กล้องมือถือ/เว็บแคม
     advanced: [
       { focusMode: 'continuous' } as any,
       { exposureMode: 'continuous' } as any,
@@ -119,7 +119,7 @@ export function getOptimalVideoConstraints(): MediaTrackConstraints {
 }
 
 /**
- * Extracts active MediaStreamTrack from a container element ID.
+ * ดึงแทร็กวิดีโอ (MediaStreamTrack) ที่กำลังทำงานอยู่จากอิลิเมนต์เป้าหมายหรือไอดีคอนเทนเนอร์
  */
 export function getActiveVideoTrack(
   target: string | HTMLVideoElement | null = 'qr-reader',
@@ -139,7 +139,7 @@ export function getActiveVideoTrack(
 }
 
 /**
- * Inspects hardware zoom, torch, and focus capabilities of the active camera track.
+ * ตรวจสอบความสามารถของฮาร์ดแวร์กล้อง เช่น การซูม, ไฟฉาย และระบบโฟกัสอัตโนมัติต่อเนื่อง
  */
 export function inspectTrackCapabilities(
   track: MediaStreamTrack | null,
@@ -173,8 +173,8 @@ export function inspectTrackCapabilities(
 }
 
 /**
- * Applies hardware zoom if supported; returns true if hardware zoom was applied,
- * or false if the caller should use CSS digital zoom fallback.
+ * ปรับระดับการซูมด้วยฮาร์ดแวร์กล้อง (หากฮาร์ดแวร์รองรับ)
+ * คืนค่า true หากปรับซูมระดับฮาร์ดแวร์สำเร็จ หรือ false หากควรใช้การซูมแบบดิจิทัล (CSS Zoom) ทดแทน
  */
 export async function applyCameraZoom(
   track: MediaStreamTrack | null,
@@ -194,7 +194,7 @@ export async function applyCameraZoom(
 }
 
 /**
- * Toggles hardware torch / flashlight if supported.
+ * เปิดหรือปิดไฟฉาย (Torch) ของกล้องหากฮาร์ดแวร์รองรับ
  */
 export async function applyCameraTorch(
   track: MediaStreamTrack | null,
@@ -212,8 +212,8 @@ export async function applyCameraTorch(
 }
 
 /**
- * Re-triggers continuous focus on the active video track when the user taps to focus
- * or when scanning takes longer than expected.
+ * สั่งกระตุ้นระบบโฟกัสอัตโนมัติต่อเนื่องใหม่อีกครั้งเมื่อผู้ใช้แตะที่หน้าจอเพื่อโฟกัส
+ * หรือเมื่อระบบตรวจพบว่าการสแกนใช้เวลานานกว่าปกติ
  */
 export async function triggerCameraRefocus(
   track: MediaStreamTrack | null,
@@ -224,17 +224,17 @@ export async function triggerCameraRefocus(
       advanced: [{ focusMode: 'continuous' } as any],
     });
   } catch {
-    // Ignore if device driver rejects focusMode constraint
+    // ละเว้นหากไดรเวอร์ของอุปกรณ์ไม่รองรับคำสั่ง focusMode
   }
 }
 
 /* ========================================================================== */
-/* Pure Pixel-Buffer Preprocessing Algorithms (Testable in Node & Browser)    */
+/* อัลกอริทึมประมวลผลพิกเซลบัฟเฟอร์ภาพโดยตรง (ทดสอบได้ทั้งบน Node.js และเบราว์เซอร์) */
 /* ========================================================================== */
 
 /**
- * Step 1: Grayscale conversion + Histogram Contrast Stretching (2% - 98% range).
- * Dramatically improves low-light, faded print, and glare/washed-out QR codes.
+ * ขั้นตอนที่ 1: แปลงภาพเป็นโทนสีเทา (Grayscale) พร้อมยืดความเปรียบต่างของฮิสโตแกรม (Histogram Contrast Stretching ช่วง 2% - 98%)
+ * ช่วยให้อ่าน QR Code ในที่แสงน้อย ซีดจาง หรือมีแสงสะท้อนจ้าบนหน้าจอ/กระดาษมันได้ดียิ่งขึ้นอย่างมาก
  */
 export function grayscaleAndContrastStretch(
   rgba: Uint8ClampedArray,
@@ -249,7 +249,7 @@ export function grayscaleAndContrastStretch(
   const hist = new Uint32Array(256);
 
   for (let i = 0, p = 0; i < rgba.length; i += 4, p++) {
-    // Rec. 601 luma
+    // คำนวณความสว่างตามมาตรฐาน Rec. 601 Luma
     const y = (rgba[i] * 77 + rgba[i + 1] * 150 + rgba[i + 2] * 29) >> 8;
     lum[p] = y;
     hist[y]++;
@@ -295,8 +295,8 @@ export function grayscaleAndContrastStretch(
 }
 
 /**
- * Step 2: 3x3 Sharpening Convolution Filter ([0, -1, 0, -1, 5, -1, 0, -1, 0])
- * Enhances edges of blurry, out-of-focus, or slightly shaky QR codes.
+ * ขั้นตอนที่ 2: ฟิลเตอร์สังเคราะห์ความคมชัดขนาด 3x3 ([0, -1, 0, -1, 5, -1, 0, -1, 0])
+ * เพิ่มความคมชัดตามแนวขอบ สำหรับ QR Code ที่ภาพเบลอ หลุดโฟกัส หรือมีการสั่นไหวเล็กน้อย
  */
 export function sharpenPixelBuffer(
   rgba: Uint8ClampedArray,
@@ -307,7 +307,7 @@ export function sharpenPixelBuffer(
   const out = new Uint8ClampedArray(stretched.length);
   if (width < 3 || height < 3) return stretched;
 
-  // Copy borders
+  // คัดลอกพิกเซลบริเวณขอบภาพ
   out.set(stretched);
 
   for (let y = 1; y < height - 1; y++) {
@@ -335,8 +335,8 @@ export function sharpenPixelBuffer(
 }
 
 /**
- * Step 3: Fast Integral-Image Adaptive Thresholding (Bradley-Roth algorithm).
- * Resolves uneven illumination, shadows, reflections on glossy paper or phone screens.
+ * ขั้นตอนที่ 3: ปรับค่าขีดแบ่งแสงแบบปรับตัวตามพื้นที่ความสว่างอย่างรวดเร็ว (อัลกอริทึม Bradley-Roth ผ่านภาพอินทิกรัล)
+ * แก้ไขปัญหาแสงตกกระทบไม่สม่ำเสมอ เงาบัง หรือแสงสะท้อนบนหน้าจอมือถือและกระดาษมัน
  */
 export function adaptiveThresholdPixelBuffer(
   rgba: Uint8ClampedArray,
@@ -391,7 +391,7 @@ export function adaptiveThresholdPixelBuffer(
 }
 
 /**
- * Step 4: Invert pixel buffer for white-on-dark QR codes.
+ * ขั้นตอนที่ 4: กลับสีพิกเซลบัฟเฟอร์ (Invert) สำหรับ QR Code แบบสว่างบนพื้นหลังมืด
  */
 export function invertPixelBuffer(
   rgba: Uint8ClampedArray,
@@ -411,7 +411,7 @@ export function invertPixelBuffer(
 }
 
 /**
- * Unified entry point for pixel buffer preprocessing.
+ * ฟังก์ชันหลักรวมศูนย์สำหรับการประมวลผลพิกเซลบัฟเฟอร์ตามโหมดที่เลือก
  */
 export function preprocessPixelBuffer(
   rgba: Uint8ClampedArray,
@@ -433,20 +433,20 @@ export function preprocessPixelBuffer(
 }
 
 /* ========================================================================== */
-/* Canvas Multi-Pass Decoder for Live Video Frames & Uploaded Images          */
+/* ตัวถอดรหัสภาพผ่าน Canvas แบบหลายรอบ (Multi-Pass) สำหรับวิดีโอสดและไฟล์อัปโหลด  */
 /* ========================================================================== */
 
 /**
- * Renders a source image/video onto a canvas with optional center-crop scale and rotation,
- * then applies the requested pixel preprocessing filter.
+ * วาดภาพหรือเฟรมวิดีโอต้นทางลงบน Canvas พร้อมรองรับการครอปขยายตรงกลางและการหมุนภาพ
+ * จากนั้นนำฟิลเตอร์ประมวลผลพิกเซลที่ต้องการมาปรับแต่งภาพ
  */
 export function renderPreprocessedCanvas(
   source: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement,
   sourceWidth: number,
   sourceHeight: number,
   options: {
-    cropRatio?: number; // 1.0 = full frame, 0.65 = zoomed center crop, 0.45 = tight center crop
-    angleDeg?: number;  // 0, -15, 15, etc.
+    cropRatio?: number; // 1.0 = เต็มเฟรม, 0.65 = ครอปขยายตรงกลาง, 0.45 = ครอปเจาะจงเฉพาะจุดกึ่งกลาง
+    angleDeg?: number;  // องศาการหมุนภาพ เช่น 0, -15, 15 องศา
     mode?: PreprocessMode;
     targetSize?: number;
   } = {},
@@ -468,7 +468,7 @@ export function renderPreprocessedCanvas(
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
-  // Fill white background for rotated bounds
+  // เติมพื้นหลังสีขาวรองรับส่วนขอบที่มีการหมุนภาพ
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, targetSize, targetSize);
 
@@ -511,13 +511,13 @@ export function renderPreprocessedCanvas(
 }
 
 /**
- * Attempts to decode a canvas using native BarcodeDetector if available,
- * otherwise converts canvas to File and uses Html5Qrcode.scanFile.
+ * พยายามถอดรหัส QR Code จากอิลิเมนต์ Canvas ด้วย Native BarcodeDetector (GPU เร่งความเร็ว)
+ * หากไม่สำเร็จจะสลับไปใช้ตัวถอดรหัสของ QrScanner (WebAssembly / Web Worker)
  */
 async function decodeCanvasElement(
   canvas: HTMLCanvasElement,
 ): Promise<string | null> {
-  // 1. Try native BarcodeDetector first (GPU accelerated)
+  // 1. ลองใช้ Native BarcodeDetector เป็นลำดับแรก (ประมวลผลผ่าน GPU โดยตรง รวดเร็วมาก)
   if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
     try {
       const Detector = (window as any).BarcodeDetector;
@@ -527,11 +527,11 @@ async function decodeCanvasElement(
         return String(results[0].rawValue).trim();
       }
     } catch {
-      // Fall through to QrScanner
+      // หากไม่พบ ให้สลับไปใช้ตัวถอดรหัสของ QrScanner ต่อไป
     }
   }
 
-  // 2. Fallback to QrScanner.scanImage (Nimiq WASM/Worker)
+  // 2. ตัวถอดรหัสสำรอง QrScanner.scanImage (Nimiq WebAssembly / Worker)
   try {
     const QrScanner = (await import('qr-scanner')).default;
     const res = await QrScanner.scanImage(canvas, {
@@ -543,15 +543,15 @@ async function decodeCanvasElement(
       return text.trim();
     }
   } catch {
-    // ignore
+    // ละเว้นข้อผิดพลาดหากไม่พบรหัสในรอบนี้
   }
 
   return null;
 }
 
 /**
- * Multi-pass fallback decoder for a live <video> element.
- * Runs when standard frame scanning hasn't caught a blurry, distant, low-light, or tilted QR code.
+ * ตัวถอดรหัสสำรองแบบหลายรอบสำหรับแท็ก <video> สด
+ * ทำงานเมื่อการสแกนเฟรมปกติยังตรวจไม่พบ QR Code ที่เบลอ อยู่ไกล แสงน้อย หรือวางเอียง
  */
 export async function tryEnhancedVideoFrameDecode(
   target: string | HTMLVideoElement | null = 'qr-reader',
@@ -569,20 +569,20 @@ export async function tryEnhancedVideoFrameDecode(
     return null;
   }
 
-  // Cycle through complementary passes on each tick so the UI stays 60fps smooth
+  // สลับรอบการประมวลผลภาพในแต่ละรอบเพื่อรักษาความลื่นไหลของหน้าจอที่ 60fps
   const passes: Array<{
     cropRatio: number;
     angleDeg: number;
     mode: PreprocessMode;
   }> = [
     { cropRatio: 0.85, angleDeg: 0, mode: 'contrast_sharpen' },
-    { cropRatio: 0.58, angleDeg: 0, mode: 'contrast_sharpen' }, // Distant / small QR
-    { cropRatio: 0.85, angleDeg: 0, mode: 'adaptive_threshold' }, // Low-light / glare
-    { cropRatio: 0.42, angleDeg: 0, mode: 'contrast_sharpen' }, // Very small QR
-    { cropRatio: 0.8, angleDeg: 15, mode: 'contrast_sharpen' }, // Tilted QR (+15 deg)
-    { cropRatio: 0.8, angleDeg: -15, mode: 'contrast_sharpen' }, // Tilted QR (-15 deg)
-    { cropRatio: 0.55, angleDeg: 0, mode: 'adaptive_threshold' }, // Distant + low light
-    { cropRatio: 0.85, angleDeg: 0, mode: 'invert' }, // Inverted QR
+    { cropRatio: 0.58, angleDeg: 0, mode: 'contrast_sharpen' }, // QR ขนาดเล็กหรืออยู่ไกล
+    { cropRatio: 0.85, angleDeg: 0, mode: 'adaptive_threshold' }, // ในที่แสงน้อยหรือมีแสงสะท้อน
+    { cropRatio: 0.42, angleDeg: 0, mode: 'contrast_sharpen' }, // QR ขนาดเล็กมาก
+    { cropRatio: 0.8, angleDeg: 15, mode: 'contrast_sharpen' }, // QR วางเอียงขวา (+15 องศา)
+    { cropRatio: 0.8, angleDeg: -15, mode: 'contrast_sharpen' }, // QR วางเอียงซ้าย (-15 องศา)
+    { cropRatio: 0.55, angleDeg: 0, mode: 'adaptive_threshold' }, // อยู่ไกล + แสงน้อย
+    { cropRatio: 0.85, angleDeg: 0, mode: 'invert' }, // QR แบบกลับสี (สว่างบนพื้นมืด)
   ];
 
   const chosen = passes[passIndex % passes.length];
@@ -598,9 +598,8 @@ export async function tryEnhancedVideoFrameDecode(
 }
 
 /**
- * Multi-pass decoder for an uploaded image File.
- * Tries original scan first, then systematically runs multi-scale crops,
- * contrast+sharpening, adaptive thresholding, and rotation compensation.
+ * ตัวถอดรหัสแบบหลายรอบสำหรับไฟล์รูปภาพที่อัปโหลด
+ * เริ่มต้นด้วยการสแกนตรง หากไม่พบจะทำการครอปหลายระยะ ปรับความคมชัด ปรับแสง และหมุนภาพอย่างเป็นระบบ
  */
 export async function decodeUploadedQrImageFile(
   file: File,
@@ -608,7 +607,7 @@ export async function decodeUploadedQrImageFile(
 ): Promise<string> {
   const QrScanner = (await import('qr-scanner')).default;
 
-  // Pass 0: Direct scan with QrScanner
+  // รอบที่ 0: สแกนโดยตรงด้วย QrScanner ทันที
   try {
     const res = await QrScanner.scanImage(file, {
       alsoTryWithoutScanRegion: true,
@@ -617,10 +616,10 @@ export async function decodeUploadedQrImageFile(
     const text = typeof res === 'object' && res?.data ? res.data : String(res || '');
     if (text && text.trim()) return text.trim();
   } catch {
-    // Continue to enhanced preprocessing passes
+    // หากสแกนตรงไม่พบ ให้ดำเนินการต่อด้วยฟิลเตอร์ปรับแต่งภาพขั้นสูง
   }
 
-  // Load image into HTMLImageElement
+  // โหลดรูปภาพเข้าสู่อิลิเมนต์ HTMLImageElement เพื่อนำมาประมวลผล
   const imgUrl = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -667,7 +666,7 @@ export async function decodeUploadedQrImageFile(
 }
 
 /**
- * Generates contextual Thai guidance messages when scanning takes more than a few seconds.
+ * สร้างข้อความแนะนำเป็นภาษาไทยตามสถานการณ์จริงเมื่อการสแกนใช้เวลามากกว่าปกติ
  */
 export function getScannerGuidanceMessage(
   elapsedSeconds: number,

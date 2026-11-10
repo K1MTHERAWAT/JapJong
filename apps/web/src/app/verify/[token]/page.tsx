@@ -1,3 +1,13 @@
+/**
+ * หน้าตรวจสอบความถูกต้องของเอกสารทางราชการแบบสาธารณะ (Public Verification Page)
+ * สำหรับประชาชนหรือบุคคลภายนอกที่สแกน QR Code บนเอกสารใบอนุญาต/หนังสือรับรองของ อบต.
+ * 
+ * คุณสมบัติหลัก:
+ * 1. ตรวจสอบสถานะเอกสารผ่านโทเค็น (Public Verification Token) แบบเรียลไทม์กับฐานข้อมูลกลาง
+ * 2. คุ้มครองข้อมูลส่วนบุคคล (PDPA) โดยไม่เปิดเผยเลขบัตรประชาชนหรือเบอร์โทรศัพท์
+ * 3. แสดงรหัสลายพิมพ์ดิจิทัล (SHA-256 Hash) เพื่อเทียบความถูกต้องกับเอกสารฉบับพิมพ์
+ * 4. แจ้งเตือนสถานะความถูกต้องอย่างชัดเจน: เอกสารสมบูรณ์ (VALID), ถูกยกเลิก (REVOKED), หรือไม่ถูกต้อง (INVALID/NOT_FOUND)
+ */
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -16,9 +26,12 @@ import { api, formatThaiDateTime } from '@/lib/api';
 
 export default function PublicVerifyPage() {
   const params = useParams<{ token: string }>();
+  // สถานะการโหลดข้อมูลผลการตรวจสอบจากเซิร์ฟเวอร์
   const [loading, setLoading] = useState(true);
+  // ผลลัพธ์การตรวจสอบเอกสารสาธารณะ
   const [result, setResult] = useState<PublicVerificationResult | null>(null);
 
+  // ดึงข้อมูลการตรวจสอบเอกสารทันทีที่ได้รับ token จาก URL
   useEffect(() => {
     if (!params.token) return;
     setLoading(true);

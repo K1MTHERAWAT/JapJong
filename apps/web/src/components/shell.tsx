@@ -116,7 +116,7 @@ export function AppShell({
 
   return (
     <div className="flex min-h-dvh bg-ground text-ink font-sans selection:bg-brand-tint selection:text-brand-ink print:bg-white print:block transition-colors duration-200">
-      {/* Responsive Sidebar (Desktop floating sidebar & Mobile off-canvas drawer) */}
+      {/* แถบเมนูด้านข้างแบบตอบสนองทุกขนาดหน้าจอ (แถบข้างลอยบนเดสก์ท็อป และลิ้นชักเมนูบนมือถือ) */}
       <Sidebar
         items={visibleNav}
         mobileDrawerOpen={mobileDrawerOpen}
@@ -126,16 +126,16 @@ export function AppShell({
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* ========================================================
-            UNIFIED MOBILE HEADER (< lg)
-            - Fixed/Sticky at top, compact height
-            - Native Notch / Camera Punch-hole support (pt-safe)
-            - Back or Menu trigger, Title & Step Subtitle, Theme Toggle & Notifications
-            - Integrated Progress Bar strip at bottom when step & totalSteps provided
+            แถบส่วนหัวรวมบนมือถือ (Unified Mobile Header ขนาดหน้าจอ < lg)
+            - ตรึงไว้ด้านบน (Sticky), ความสูงกะทัดรัด
+            - รองรับรอยบากหน้าจอและรูกล้องหน้า (pt-safe)
+            - ปุ่มย้อนกลับ/เปิดเมนู, หัวข้อหน้าและชื่อขั้นตอนย่อย, ปุ่มสลับธีม และการแจ้งเตือน
+            - รวมแถบความคืบหน้า (Multi-Segment Progress Bar) ไว้ที่ขอบล่างอัตโนมัติเมื่อระบุขั้นตอน
             ======================================================== */}
         <header className="lg:hidden sticky top-0 z-30 w-full bg-surface/95 backdrop-blur-md border-b border-line shadow-xs pt-[env(safe-area-inset-top,0px)] print:hidden transition-colors">
           <div className="h-12 px-2.5 flex items-center justify-between gap-2">
             
-            {/* Left Controls */}
+            {/* ปุ่มควบคุมฝั่งซ้าย (ย้อนกลับ หรือ เปิดเมนูหลัก) */}
             <div className="flex items-center gap-1 shrink-0 w-[76px]">
               {onBack ? (
                 <button
@@ -166,7 +166,7 @@ export function AppShell({
               )}
             </div>
 
-            {/* Center: Title / Logo / Step info */}
+            {/* ตรงกลาง: หัวข้อหน้า / โลโก้ / ข้อมูลขั้นตอน */}
             <div className="min-w-0 flex-1 flex flex-col items-center justify-center text-center px-1 overflow-hidden">
               {step && totalSteps ? (
                 <>
@@ -192,9 +192,9 @@ export function AppShell({
               )}
             </div>
 
-            {/* Right Controls */}
+            {/* ปุ่มควบคุมฝั่งขวา (สลับธีม สว่าง/มืด, เมนูหลัก, แจ้งเตือน) */}
             <div className="flex items-center justify-end gap-1 shrink-0 w-[76px]">
-              {/* Sun / Moon Theme Toggle Button */}
+              {/* ปุ่มสลับธีม โหมดสว่าง / โหมดมืด (ดวงอาทิตย์ / ดวงจันทร์) */}
               <button
                 type="button"
                 onClick={toggleTheme}
@@ -210,7 +210,7 @@ export function AppShell({
               </button>
 
               {hasBackAction ? (
-                /* When on a subpage with back button, show hamburger menu on the right */
+                /* เมื่ออยู่ในหน้าย่อยที่มีปุ่มย้อนกลับ ให้แสดงปุ่มเมนูหลักไว้ทางขวามือ */
                 <button
                   type="button"
                   onClick={() => setMobileDrawerOpen(true)}
@@ -238,7 +238,7 @@ export function AppShell({
             </div>
           </div>
 
-          {/* Integrated Multi-Segment Progress Bar Strip */}
+          {/* แถบขีดความคืบหน้าแบบหลายท่อนในตัว (Integrated Progress Bar) */}
           {Boolean(step && totalSteps) && (
             <div
               className="flex items-center gap-1 px-3 pb-2 pt-0.5 w-full"
@@ -261,9 +261,9 @@ export function AppShell({
         </header>
 
         {/* ========================================================
-            MAIN CONTENT AREA
-            - Clean padding across screen sizes
-            - Edge-to-edge notch/landscape support
+            พื้นที่เนื้อหาหลัก (Main Content Area)
+            - จัดระยะขอบสะอาดตารองรับทุกขนาดหน้าจอ
+            - รองรับรอยบากหน้าจอและการหมุนแนวนอน (Safe-area Inset)
             ======================================================== */}
         <main
           className={`flex-1 w-full max-w-none p-3.5 sm:p-5 lg:px-6 lg:py-6 ${footer ? 'pb-24 sm:pb-28 lg:pb-28' : ''} min-w-0 print:p-0 print:max-w-none flex flex-col pl-[max(0.875rem,env(safe-area-inset-left,0px))] pr-[max(0.875rem,env(safe-area-inset-right,0px))]`}
@@ -357,10 +357,9 @@ export function AppShell({
         </main>
 
         {/* ========================================================
-            UNIFIED FIXED / DOCKED FOOTER (ตรึงแถบล่างไว้เสมอ)
-            - Mobile (< lg): Docked cleanly at bottom, minimal height
-              with safe-area-inset-bottom support for home bar
-            - Desktop (>= lg): Pinned floating card above bottom edge
+            แถบท้ายหน้าเว็บรวมศูนย์ (Unified Footer - ตรึงแถบล่างไว้เสมอ)
+            - มือถือ (< lg): ตรึงแนบสนิทที่ขอบล่าง พร้อมเว้นระยะปลอดภัยสำหรับ Home Bar
+            - เดสก์ท็อป (>= lg): การ์ดลอยเหนือขอบล่างอย่างสวยงาม
             ======================================================== */}
         {footer && (
           <div className="print:hidden w-full sticky bottom-0 z-30 bg-surface/98 backdrop-blur-md border-t border-line shadow-[0_-4px_16px_rgba(20,35,31,0.06)] px-3.5 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom,0px))] lg:bg-transparent lg:backdrop-blur-none lg:border-none lg:shadow-none lg:px-6 lg:pb-3 lg:pt-0 lg:pointer-events-none transition-colors">
