@@ -1146,7 +1146,7 @@ export function OfficialGovFormDocument({
   );
 
   return (
-    <div className="gov-form-paper bg-white p-5 sm:p-8 text-black text-[13.5px] sm:text-[14.5px] leading-[1.65] relative">
+    <div className="gov-form-paper bg-white p-6 sm:p-10 text-black text-[13.5px] sm:text-[14.5px] leading-[1.65] relative w-full max-w-[820px] mx-auto shadow-md sm:shadow-xl rounded-sm sm:rounded-md border border-line-soft/80 select-text">
       <div>
         {customFields?.logoUrl && (
           <div className="text-center mb-3">

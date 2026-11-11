@@ -34,6 +34,19 @@ const themeInitScript = `
       document.documentElement.classList.remove('dark');
     }
   } catch (e) {}
+
+  // ซ่อน Header และ Footer อัตโนมัติของเบราว์เซอร์ (วันที่, หัวเรื่องหน้าเว็บ, URL) ระหว่างสั่งพิมพ์
+  try {
+    window.addEventListener('beforeprint', function() {
+      window._japjong_saved_title = document.title;
+      document.title = '';
+    });
+    window.addEventListener('afterprint', function() {
+      if (typeof window._japjong_saved_title === 'string') {
+        document.title = window._japjong_saved_title;
+      }
+    });
+  } catch (e) {}
 })();
 `;
 

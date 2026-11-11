@@ -225,11 +225,104 @@
     border-color: var(--color-line-input) !important;
   }
 
-  /* Document form paper */
-  .gov-form-paper {
-    border: none !important;
-    box-shadow: none !important;
+  /* ========================================================
+     กระดาษเอกสารราชการ (Official Government Paper)
+     - โทนสว่างเสมอ (Pure Light Paper) แม้ระบบจะอยู่ในโหมดมืด (Dark Mode)
+     - ป้องกันการถูก Invert สีจากกฎ .dark อัตโนมัติ
+     ======================================================== */
+  .gov-form-paper,
+  .dark .gov-form-paper,
+  #official-doc-print-area,
+  .dark #official-doc-print-area,
+  #a4-editor-page,
+  .dark #a4-editor-page {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    color-scheme: light !important;
   }
+
+  .gov-form-paper *,
+  .dark .gov-form-paper *,
+  #official-doc-print-area *,
+  .dark #official-doc-print-area *,
+  #a4-editor-page *,
+  .dark #a4-editor-page * {
+    color-scheme: light !important;
+  }
+
+  .dark .gov-form-paper .bg-white,
+  .dark .gov-form-paper [class*="bg-white"],
+  .dark #official-doc-print-area .bg-white,
+  .dark #a4-editor-page .bg-white {
+    background-color: #ffffff !important;
+  }
+
+  .dark .gov-form-paper .text-black,
+  .dark .gov-form-paper h1,
+  .dark .gov-form-paper h2,
+  .dark .gov-form-paper h3,
+  .dark .gov-form-paper b,
+  .dark .gov-form-paper strong,
+  .dark .gov-form-paper span,
+  .dark .gov-form-paper div,
+  .dark #official-doc-print-area .text-black,
+  .dark #official-doc-print-area h1,
+  .dark #official-doc-print-area h2,
+  .dark #official-doc-print-area b,
+  .dark #a4-editor-page .text-black,
+  .dark #a4-editor-page h1,
+  .dark #a4-editor-page h2,
+  .dark #a4-editor-page b {
+    color: #000000 !important;
+  }
+
+  .dark .gov-form-paper .text-\[\#0B2545\],
+  .dark .gov-form-paper .text-\[\#0b2545\],
+  .dark .gov-form-paper [class*="0B2545"],
+  .dark .gov-form-paper [class*="0b2545"] {
+    color: #0B2545 !important;
+  }
+
+  .dark .gov-form-paper .text-\[\#2C3E50\],
+  .dark .gov-form-paper .text-\[\#2c3e50\],
+  .dark .gov-form-paper [class*="2C3E50"],
+  .dark .gov-form-paper [class*="2c3e50"] {
+    color: #2C3E50 !important;
+  }
+
+  .dark .gov-form-paper .text-\[\#475569\],
+  .dark .gov-form-paper [class*="475569"] {
+    color: #475569 !important;
+  }
+
+  .dark .gov-form-paper .text-\[\#64748B\],
+  .dark .gov-form-paper .text-\[\#64748b\],
+  .dark .gov-form-paper [class*="64748B"],
+  .dark .gov-form-paper [class*="64748b"] {
+    color: #64748B !important;
+  }
+
+  .dark .gov-form-paper .border-\[\#4A4A4A\],
+  .dark .gov-form-paper .border-\[\#4a4a4a\],
+  .dark .gov-form-paper [class*="4A4A4A"],
+  .dark .gov-form-paper [class*="4a4a4a"] {
+    border-color: #4A4A4A !important;
+  }
+
+  .dark .gov-form-paper .border-\[\#8A8A8A\],
+  .dark .gov-form-paper .border-\[\#8a8a8a\],
+  .dark .gov-form-paper [class*="8A8A8A"],
+  .dark .gov-form-paper [class*="8a8a8a"] {
+    border-color: #8A8A8A !important;
+  }
+
+  .dark .gov-form-paper .border-\[\#CBD5E1\],
+  .dark .gov-form-paper .border-\[\#cbd5e1\],
+  .dark .gov-form-paper [class*="CBD5E1"],
+  .dark .gov-form-paper [class*="cbd5e1"] {
+    border-color: #CBD5E1 !important;
+  }
+
   .gov-form-paper .gov-form-date-line,
   .gov-form-paper .gov-form-address,
   .gov-form-paper .gov-form-purpose,
@@ -251,67 +344,131 @@
 }
 
 @media print {
+  /* กำหนดขนาดหน้ากระดาษ A4 แนวตั้ง และลบ margin ออกทั้งหมด (margin: 0)
+     เพื่อซ่อน Header และ Footer ของเบราว์เซอร์อัตโนมัติ (วันที่, หัวเรื่องหน้าเว็บ, URL) */
   @page {
     size: A4 portrait;
-    margin: 12mm 20mm;
+    margin: 0 !important;
+  }
+
+  *, *::before, *::after {
+    color-scheme: light !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   html,
-  body,
-  .dark,
-  .dark body {
-    color-scheme: light !important;
-    background: #ffffff !important;
-    color: #000000 !important;
-    width: 100% !important;
-    height: auto !important;
-    min-height: 0 !important;
+  body {
+    width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
     margin: 0 !important;
     padding: 0 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: hidden !important;
   }
 
+  /* ล้างพื้นหลังสีเข้มของ wrapper ทั้งหมดเมื่อสั่งพิมพ์จากโหมดมืด */
+  .dark,
+  .dark body,
+  .dark div,
+  .dark main,
+  .dark section,
+  .dark article,
+  div,
+  main,
+  section,
+  article,
+  [class*="bg-"] {
+    background-color: transparent !important;
+    background-image: none !important;
+  }
+
+  /* ซ่อนองค์ประกอบ UI ที่ไม่เกี่ยวกับเนื้อหาเอกสาร */
   aside,
   header,
   footer,
   nav,
-  .no-print {
+  .no-print,
+  button,
+  .jw-btn,
+  .jw-btn-sec,
+  [class*="print:hidden"],
+  [class*="sticky"] {
     display: none !important;
   }
 
+  /* บังคับให้โครงสร้างหลักแสดงผลแบบ block ไม่บีบขนาด */
+  body > div,
+  main,
+  [class*="min-h-dvh"],
+  [class*="max-w-"] {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* ปรับแบบฟอร์มเอกสารราชการ (.gov-form-paper) ให้เต็มแผ่น A4 พอดี 1 หน้า */
   .gov-form-paper {
-    width: 170mm !important;
-    height: auto !important;
-    min-height: 0 !important;
+    width: 210mm !important;
+    max-width: 210mm !important;
+    min-width: 210mm !important;
+    height: 296.5mm !important;
+    min-height: 296.5mm !important;
+    max-height: 296.5mm !important;
     box-sizing: border-box !important;
+    margin: 0 auto !important;
+    padding: 18mm 20mm 14mm 24mm !important; /* ขอบกระดาษมาตรฐานราชการ (ซ้าย 2.4 ซม. เผื่อเข้าแฟ้ม, บน 1.8 ซม., ขวา 2 ซม., ล่าง 1.4 ซม.) */
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    background: #ffffff !important;
+    color: #000000 !important;
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    font-family: 'TH Sarabun New', var(--font-noto-thai), sans-serif !important;
-    font-size: 16px !important;
-    line-height: 1.48 !important;
-    overflow: visible !important;
-    break-inside: avoid;
-    page-break-inside: avoid;
+    font-family: 'TH Sarabun New', var(--font-noto-thai), 'Sarabun', sans-serif !important;
+    font-size: 15.5px !important;
+    line-height: 1.62 !important;
+    overflow: hidden !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-after: avoid !important;
+    page-break-after: avoid !important;
   }
 
   .gov-form-paper h2 {
-    font-size: 22px !important;
+    font-size: 21px !important;
     letter-spacing: 0 !important;
-    margin-bottom: 10px !important;
+    margin-bottom: 8px !important;
+    color: #000000 !important;
   }
 
   .gov-form-paper .gov-form-requester-signature {
-    margin-bottom: 10px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .gov-form-paper .gov-form-date-line,
+  .gov-form-paper .gov-form-address,
+  .gov-form-paper .gov-form-purpose,
+  .gov-form-paper .gov-form-requester-signature,
+  .gov-form-paper .gov-form-staff-signature,
+  .gov-form-paper .gov-form-approver-signature {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   .gov-form-paper > div > div:last-child,
   .gov-form-paper > div > div:last-child > div:first-child {
-    break-inside: avoid;
-    page-break-inside: avoid;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 }
 
