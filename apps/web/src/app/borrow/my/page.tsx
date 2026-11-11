@@ -400,43 +400,43 @@ export default function MyBorrowsPage() {
     switch (status) {
       case 'approved':
         return (
-          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shrink-0">
             รอรับมอบ
           </span>
         );
       case 'borrowing':
         return (
-          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30 shrink-0">
             กำลังใช้งาน
           </span>
         );
       case 'return_inspect':
         return (
-          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-purple-50 text-purple-700 border border-purple-200 shrink-0">
+          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 shrink-0">
             รอตรวจสอบ
           </span>
         );
       case 'returned':
         return (
-          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-[#E6F4EC] text-[#0F6B4C] border border-[#BFE3CF] shrink-0">
+          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shrink-0">
             เสร็จสิ้น
           </span>
         );
       case 'rejected':
         return (
-          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-red-50 text-red-700 border border-red-200 shrink-0">
+          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 shrink-0">
             ไม่อนุมัติ
           </span>
         );
       case 'cancelled':
         return (
-          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-slate-100 text-slate-600 border border-slate-300 shrink-0">
+          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-500/15 text-slate-700 dark:text-slate-300 border border-slate-500/30 shrink-0">
             ยกเลิกคำขอ
           </span>
         );
       default:
         return (
-          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-500/15 text-slate-700 dark:text-slate-300 border border-slate-500/30 shrink-0">
             รอดำเนินการ
           </span>
         );
@@ -447,28 +447,28 @@ export default function MyBorrowsPage() {
 
   return (
     <AppShell title="รายการยืม–คืนอุปกรณ์" backHref="/" maxWidth="max-w-none">
-      <div className="flex flex-col gap-6 pb-8 text-[#0F172A] w-full">
-        {/* ==================== PAGE HEADER (from borrow-split.html) ==================== */}
+      <div className="flex flex-col gap-6 pb-8 text-ink w-full">
+        {/* ==================== PAGE HEADER ==================== */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-[20px] leading-[28px] font-semibold text-[#0F172A] m-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-ink tracking-tight m-0">
               รายการยืม–คืนอุปกรณ์
             </h1>
-            <p className="text-[14px] leading-[20px] font-normal text-[#475569] mt-1">
+            <p className="text-sm text-ink-mute mt-1 leading-relaxed">
               ติดตามสถานะและหลักฐานรูปภาพของแต่ละคำขอ เลือกรายการทางซ้ายเพื่อดูรายละเอียด
             </p>
           </div>
           <Link
             href="/borrow"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-[8px] bg-[#0F6B4C] text-white text-[16px] leading-[24px] font-semibold transition hover:opacity-90 hover:-translate-y-px active:scale-[0.98]"
+            className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-brand text-white text-sm font-semibold transition hover:bg-brand-ink shadow-xs active:scale-[0.98]"
           >
             <svg
-              width="20"
-              height="20"
+              width="18"
+              height="18"
               viewBox="0 0 256 256"
               fill="none"
               stroke="currentColor"
-              strokeWidth="16"
+              strokeWidth="20"
               strokeLinecap="round"
               strokeLinejoin="round"
               aria-hidden="true"
@@ -481,15 +481,15 @@ export default function MyBorrowsPage() {
 
         {/* ==================== ALERTS (Success / Error) ==================== */}
         {successMsg && (
-          <div className="bg-[#E6F4EC] border border-[#BFE3CF] rounded-[16px] p-4 flex items-center justify-between gap-3 text-[#0F6B4C] text-[14px] leading-[20px]">
+          <div className="bg-emerald-500/15 border border-emerald-500/30 rounded-2xl p-4 flex items-center justify-between gap-3 text-emerald-800 dark:text-emerald-200 text-sm">
             <div className="flex items-center gap-2.5">
-              <Icon name="check" className="w-5 h-5 text-[#0F6B4C] shrink-0" />
+              <Icon name="check" className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span className="font-medium">{successMsg}</span>
             </div>
             <button
               type="button"
               onClick={() => setSuccessMsg('')}
-              className="text-[#0F6B4C]/80 hover:text-[#0F6B4C] text-[12px] font-semibold px-2 py-1 rounded-[6px] hover:bg-white/50 transition"
+              className="text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 text-xs font-semibold px-2 py-1 rounded-lg hover:bg-emerald-500/10 transition"
             >
               ปิด
             </button>
@@ -497,23 +497,23 @@ export default function MyBorrowsPage() {
         )}
 
         {errorMsg && (
-          <div className="bg-red-50 border border-red-200 rounded-[16px] p-4 flex items-center justify-between gap-3 text-red-700 text-[14px] leading-[20px]">
+          <div className="bg-rose-500/15 border border-rose-500/30 rounded-2xl p-4 flex items-center justify-between gap-3 text-rose-800 dark:text-rose-200 text-sm">
             <div className="flex items-center gap-2.5">
-              <Icon name="alert-triangle" className="w-5 h-5 text-red-600 shrink-0" />
+              <Icon name="alert-triangle" className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
               <span className="font-medium">{errorMsg}</span>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={load}
-                className="text-red-700 hover:bg-red-100 text-[12px] font-semibold px-2.5 py-1 rounded-[6px] border border-red-200 transition"
+                className="text-rose-700 dark:text-rose-300 hover:bg-rose-500/10 text-xs font-semibold px-2.5 py-1 rounded-lg border border-rose-500/30 transition"
               >
                 ลองใหม่
               </button>
               <button
                 type="button"
                 onClick={() => setErrorMsg('')}
-                className="text-red-500 hover:text-red-800 text-[12px] font-semibold px-2 py-1"
+                className="text-rose-600 dark:text-rose-400 hover:text-rose-800 text-xs font-semibold px-2 py-1"
               >
                 ปิด
               </button>
@@ -526,7 +526,7 @@ export default function MyBorrowsPage() {
           {/* -------------------- LEFT COLUMN: MASTER LIST -------------------- */}
           <section className="flex flex-col gap-3 min-w-0">
             {/* 3 Category Pill Tabs */}
-            <nav className="flex flex-wrap gap-1" aria-label="หมวดหมู่รายการยืมและคืนอุปกรณ์">
+            <nav className="flex flex-wrap gap-1 p-1 bg-surface-muted/60 border border-line rounded-2xl" aria-label="หมวดหมู่รายการยืมและคืนอุปกรณ์">
               <button
                 type="button"
                 onClick={() => {
@@ -535,10 +535,10 @@ export default function MyBorrowsPage() {
                   setErrorMsg('');
                   setSuccessMsg('');
                 }}
-                className={`px-3 py-2 rounded-[8px] text-[14px] leading-[20px] font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                   tab === 'borrowing'
-                    ? 'bg-[#0F172A] text-white'
-                    : 'text-[#475569] hover:bg-[#F1F5F9]'
+                    ? 'bg-brand text-white shadow-xs'
+                    : 'text-ink-mute hover:text-ink hover:bg-hover'
                 }`}
               >
                 ที่กำลังใช้งาน ({borrowingItems.length})
@@ -551,10 +551,10 @@ export default function MyBorrowsPage() {
                   setErrorMsg('');
                   setSuccessMsg('');
                 }}
-                className={`px-3 py-2 rounded-[8px] text-[14px] leading-[20px] font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                   tab === 'inspect'
-                    ? 'bg-[#0F172A] text-white'
-                    : 'text-[#475569] hover:bg-[#F1F5F9]'
+                    ? 'bg-brand text-white shadow-xs'
+                    : 'text-ink-mute hover:text-ink hover:bg-hover'
                 }`}
               >
                 รอตรวจสอบ ({inspectItems.length})
@@ -567,10 +567,10 @@ export default function MyBorrowsPage() {
                   setErrorMsg('');
                   setSuccessMsg('');
                 }}
-                className={`px-3 py-2 rounded-[8px] text-[14px] leading-[20px] font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                   tab === 'history'
-                    ? 'bg-[#0F172A] text-white'
-                    : 'text-[#475569] hover:bg-[#F1F5F9]'
+                    ? 'bg-brand text-white shadow-xs'
+                    : 'text-ink-mute hover:text-ink hover:bg-hover'
                 }`}
               >
                 ประวัติ ({historyItems.length})
@@ -578,18 +578,18 @@ export default function MyBorrowsPage() {
             </nav>
 
             {/* Search Input Card */}
-            <div className="bg-white border border-[#E2E8F0] rounded-[16px] px-3 py-2 flex items-center gap-2 text-[#475569] focus-within:border-[#0F6B4C] transition-colors">
+            <div className="bg-surface border border-line rounded-xl px-3.5 py-2.5 flex items-center gap-2.5 text-ink-mute focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 transition-all shadow-xs">
               <svg
                 width="18"
                 height="18"
                 viewBox="0 0 256 256"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="16"
+                strokeWidth="18"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 aria-hidden="true"
-                className="shrink-0"
+                className="shrink-0 text-ink-mute"
               >
                 <path d="M112 40a72 72 0 100 144 72 72 0 000-144zM168 168l48 48" />
               </svg>
@@ -600,15 +600,15 @@ export default function MyBorrowsPage() {
                   setSearchQuery(e.target.value);
                   setVisibleCount(INITIAL_VISIBLE_COUNT);
                 }}
-                placeholder="ค้นหาเลขที่คำขอหรือชื่ออุปกรณ์"
+                placeholder="ค้นหาเลขที่คำขอหรือชื่ออุปกรณ์..."
                 aria-label="ค้นหาเลขที่คำขอหรือชื่ออุปกรณ์"
-                className="w-full bg-transparent border-none outline-none text-[14px] leading-[20px] text-[#0F172A] placeholder:text-[#475569]"
+                className="w-full bg-transparent border-none outline-none text-sm text-ink placeholder:text-ink-ph"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="text-[#475569] hover:text-[#0F172A] p-0.5 rounded-full"
+                  className="text-ink-mute hover:text-ink p-1 rounded-full hover:bg-hover transition"
                   aria-label="ล้างคำค้นหา"
                 >
                   <Icon name="x" className="w-3.5 h-3.5" />
@@ -618,19 +618,19 @@ export default function MyBorrowsPage() {
 
             {/* Master List Rows */}
             {loading ? (
-              <div className="bg-white border border-[#E2E8F0] rounded-[16px] p-8 text-center flex flex-col items-center justify-center gap-3 text-[#475569]">
-                <div className="size-6 border-2 border-[#0F6B4C] border-t-transparent rounded-full animate-spin" />
-                <span className="text-[14px] leading-[20px]">กำลังโหลดรายการ...</span>
+              <div className="bg-surface border border-line rounded-2xl p-8 text-center flex flex-col items-center justify-center gap-3 text-ink-mute shadow-xs">
+                <div className="size-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm">กำลังโหลดรายการ...</span>
               </div>
             ) : filtered.length === 0 ? (
-              <div className="bg-white border border-[#E2E8F0] rounded-[16px] p-8 text-center flex flex-col items-center justify-center gap-2 text-[#475569]">
-                <span className="w-10 h-10 rounded-[8px] bg-[#F1F5F9] text-[#475569] flex items-center justify-center">
+              <div className="bg-surface border border-line rounded-2xl p-8 text-center flex flex-col items-center justify-center gap-2 text-ink-mute shadow-xs">
+                <span className="w-10 h-10 rounded-xl bg-surface-muted text-ink-mute flex items-center justify-center">
                   <Icon name="package" className="w-5 h-5" />
                 </span>
-                <span className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+                <span className="text-sm font-semibold text-ink">
                   {searchQuery ? 'ไม่พบรายการที่ค้นหา' : 'ไม่มีรายการในหมวดนี้'}
                 </span>
-                <span className="text-[12px] leading-[16px] text-[#475569]">
+                <span className="text-xs text-ink-mute leading-relaxed">
                   {searchQuery
                     ? 'ลองเปลี่ยนคำค้นหาหรือตรวจสอบในหมวดอื่น'
                     : tab === 'borrowing'
@@ -641,7 +641,7 @@ export default function MyBorrowsPage() {
                 </span>
               </div>
             ) : (
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-2">
                 {visibleItems.map((r, idx) => {
                   const eqInfo = getEquipmentInfo(r);
                   const isSelected = selectedRequest?.id === r.id;
@@ -659,14 +659,14 @@ export default function MyBorrowsPage() {
                           });
                         }
                       }}
-                      className={`w-full text-left flex items-center gap-3 p-3 rounded-[12px] border transition-colors ${
+                      className={`w-full text-left flex items-center gap-3 p-3.5 rounded-xl border transition-all ${
                         isSelected
-                          ? 'bg-white border-[#0F6B4C] shadow-xs'
-                          : 'border-transparent hover:bg-[#F1F5F9]'
+                          ? 'bg-surface border-brand shadow-xs ring-1 ring-brand/30'
+                          : 'bg-surface/80 border-line hover:border-brand/40 hover:bg-hover'
                       }`}
                     >
-                      {/* Icon Box (40x40px rounded-8px #F1F5F9) */}
-                      <span className="w-10 h-10 rounded-[8px] bg-[#F1F5F9] text-[#475569] flex items-center justify-center shrink-0 overflow-hidden">
+                      {/* Icon Box */}
+                      <span className="w-10 h-10 rounded-xl bg-surface-muted text-ink-mute flex items-center justify-center shrink-0 overflow-hidden border border-line-soft">
                         {idx % 2 === 0 ? (
                           <svg
                             width="20"
@@ -700,10 +700,10 @@ export default function MyBorrowsPage() {
 
                       {/* Title & Code · Date */}
                       <span className="flex-1 min-w-0 flex flex-col">
-                        <span className="text-[16px] leading-[24px] font-medium text-[#0F172A] truncate">
+                        <span className="text-sm sm:text-base font-semibold text-ink leading-snug truncate">
                           {eqInfo.name}
                         </span>
-                        <span className="text-[14px] leading-[20px] font-normal text-[#475569] truncate">
+                        <span className="text-xs text-ink-mute leading-normal truncate mt-0.5">
                           {r.code} · {formatThaiDate(r.pickupDate)}
                         </span>
                       </span>
@@ -714,12 +714,12 @@ export default function MyBorrowsPage() {
                   );
                 })}
 
-                {/* Expand More Button (from borrow-split.html) */}
+                {/* Expand More Button */}
                 {filtered.length > visibleCount && (
                   <button
                     type="button"
                     onClick={() => setVisibleCount((prev) => prev + 10)}
-                    className="w-full flex items-center justify-center p-3 rounded-[12px] border border-transparent hover:bg-[#F1F5F9] text-[14px] leading-[20px] font-medium text-[#475569] transition-colors"
+                    className="w-full flex items-center justify-center p-3 rounded-xl border border-line bg-surface hover:bg-hover text-xs sm:text-sm font-semibold text-ink-mute hover:text-ink transition"
                   >
                     แสดงอีก {filtered.length - visibleCount} รายการ
                   </button>
@@ -731,24 +731,24 @@ export default function MyBorrowsPage() {
           {/* -------------------- RIGHT COLUMN: DETAIL VIEW CARD -------------------- */}
           <article
             ref={detailPaneRef}
-            className="bg-white border border-[#E2E8F0] rounded-[16px] p-5 sm:p-8 flex flex-col gap-6 min-w-0"
+            className="bg-surface border border-line rounded-2xl p-5 sm:p-7 flex flex-col gap-6 min-w-0 shadow-card"
           >
             {loading ? (
-              <div className="py-16 text-center flex flex-col items-center justify-center gap-3 text-[#475569]">
-                <div className="size-7 border-2 border-[#0F6B4C] border-t-transparent rounded-full animate-spin" />
-                <span className="text-[14px] leading-[20px]">
+              <div className="py-16 text-center flex flex-col items-center justify-center gap-3 text-ink-mute">
+                <div className="size-7 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm">
                   กำลังโหลดรายละเอียดคำขอยืม–คืนอุปกรณ์...
                 </span>
               </div>
             ) : !selectedRequest ? (
-              <div className="py-16 text-center flex flex-col items-center justify-center gap-3 text-[#475569]">
-                <div className="w-12 h-12 rounded-[12px] bg-[#F1F5F9] text-[#475569] flex items-center justify-center">
+              <div className="py-16 text-center flex flex-col items-center justify-center gap-3 text-ink-mute">
+                <div className="w-12 h-12 rounded-xl bg-surface-muted text-ink-mute flex items-center justify-center">
                   <Icon name="package" className="w-6 h-6" />
                 </div>
-                <div className="text-[16px] leading-[24px] font-medium text-[#0F172A]">
+                <div className="text-base sm:text-lg font-semibold text-ink">
                   เลือกรายการทางซ้ายเพื่อดูรายละเอียด
                 </div>
-                <p className="text-[14px] leading-[20px] text-[#475569] max-w-md">
+                <p className="text-sm text-ink-mute max-w-md leading-relaxed">
                   เมื่อมีรายการยืม–คืนในหมวดที่เลือก รายละเอียดของคำขอ ไทม์ไลน์สถานะ และรูปภาพเปรียบเทียบก่อน–หลังใช้งานจะแสดงในพื้นที่นี้
                 </p>
               </div>
@@ -785,23 +785,23 @@ export default function MyBorrowsPage() {
                 return (
                   <>
                     {/* 1. Detail Header */}
-                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div className="flex items-start justify-between gap-4 flex-wrap border-b border-line pb-4">
                       <div>
-                        <h2 className="text-[24px] leading-[32px] font-semibold text-[#0F172A] m-0">
+                        <h2 className="text-xl sm:text-2xl font-bold text-ink tracking-tight m-0">
                           {eqInfo.name}
                         </h2>
-                        <div className="text-[14px] leading-[20px] font-normal text-[#475569] mt-0.5">
-                          เลขที่คำขอ {selectedRequest.code} · รหัส {eqInfo.code}
+                        <div className="text-xs sm:text-sm font-medium text-ink-mute mt-1">
+                          เลขที่คำขอ <span className="font-mono text-ink">{selectedRequest.code}</span> · รหัสครุภัณฑ์ <span className="font-mono text-ink">{eqInfo.code}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
                         {isOverdue && (
-                          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-red-100 text-red-700 border border-red-200">
+                          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
                             เกินกำหนดส่งคืน
                           </span>
                         )}
                         {isDueToday && (
-                          <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-amber-100 text-amber-800 border border-amber-200">
+                          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
                             ครบกำหนดคืนวันนี้
                           </span>
                         )}
@@ -812,38 +812,38 @@ export default function MyBorrowsPage() {
                     {/* 2. Two-Column Grid: Metadata (Left) + Vertical 4-Step Timeline (Right) */}
                     <div className="grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-8">
                       {/* Left Sub-grid: Borrow Metadata */}
-                      <div className="grid grid-cols-2 gap-y-6 gap-x-4 content-start">
+                      <div className="grid grid-cols-2 gap-y-5 gap-x-4 content-start">
                         <div>
-                          <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                          <div className="text-xs sm:text-sm font-medium text-ink-mute">
                             ผู้ยืม
                           </div>
-                          <div className="text-[16px] leading-[24px] font-medium text-[#0F172A]">
+                          <div className="text-sm sm:text-base font-semibold text-ink mt-0.5">
                             {selectedRequest.requesterName}
                           </div>
                         </div>
                         <div>
-                          <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                          <div className="text-xs sm:text-sm font-medium text-ink-mute">
                             จำนวนรวม
                           </div>
-                          <div className="text-[16px] leading-[24px] font-medium text-[#0F172A]">
+                          <div className="text-sm sm:text-base font-semibold text-ink mt-0.5">
                             {eqInfo.totalQty} ชิ้น
                           </div>
                         </div>
                         <div>
-                          <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                          <div className="text-xs sm:text-sm font-medium text-ink-mute">
                             วันที่เริ่มยืม
                           </div>
-                          <div className="text-[16px] leading-[24px] font-medium text-[#0F172A]">
+                          <div className="text-sm sm:text-base font-semibold text-ink mt-0.5">
                             {formatThaiDate(selectedRequest.pickupDate)}
                           </div>
                         </div>
                         <div>
-                          <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                          <div className="text-xs sm:text-sm font-medium text-ink-mute">
                             วันครบกำหนดคืน
                           </div>
                           <div
-                            className={`text-[16px] leading-[24px] font-medium ${
-                              isOverdue ? 'text-red-600' : 'text-[#0F172A]'
+                            className={`text-sm sm:text-base font-semibold mt-0.5 ${
+                              isOverdue ? 'text-rose-600 dark:text-rose-400' : 'text-ink'
                             }`}
                           >
                             {formatThaiDate(selectedRequest.returnDate)}
@@ -851,29 +851,29 @@ export default function MyBorrowsPage() {
                         </div>
                         {selectedRequest.receivedAt && (
                           <div>
-                            <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                            <div className="text-xs sm:text-sm font-medium text-ink-mute">
                               วันที่รับมอบจริง
                             </div>
-                            <div className="text-[16px] leading-[24px] font-medium text-[#0F172A]">
+                            <div className="text-sm sm:text-base font-semibold text-ink mt-0.5">
                               {formatThaiDate(selectedRequest.receivedAt)}
                             </div>
                           </div>
                         )}
                         {returnDateTimestamp && (
                           <div>
-                            <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                            <div className="text-xs sm:text-sm font-medium text-ink-mute">
                               วันที่ส่งคืน
                             </div>
-                            <div className="text-[16px] leading-[24px] font-medium text-[#0F172A]">
+                            <div className="text-sm sm:text-base font-semibold text-ink mt-0.5">
                               {formatThaiDate(returnDateTimestamp)}
                             </div>
                           </div>
                         )}
                         <div className="col-span-2">
-                          <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                          <div className="text-xs sm:text-sm font-medium text-ink-mute">
                             รายการอุปกรณ์
                           </div>
-                          <div className="text-[16px] leading-[24px] font-medium text-[#0F172A]">
+                          <div className="text-sm sm:text-base font-semibold text-ink mt-0.5">
                             {eqInfo.itemSummaries.length > 0
                               ? eqInfo.itemSummaries.join(', ')
                               : `${eqInfo.name} (${eqInfo.totalQty} ชิ้น)`}
@@ -881,14 +881,14 @@ export default function MyBorrowsPage() {
                         </div>
                       </div>
 
-                      {/* Right Sub-grid: Vertical 4-Step Stepper (from borrow-split.html) */}
-                      <div className="flex flex-col">
+                      {/* Right Sub-grid: Vertical 4-Step Stepper */}
+                      <div className="flex flex-col bg-surface-muted/40 p-4 rounded-xl border border-line">
                         {/* Step 1: อนุมัติคำขอ */}
                         <div className="flex gap-3">
                           <div className="flex flex-col items-center">
                             <span
                               className={`w-6 h-6 rounded-full flex items-center justify-center text-white shrink-0 ${
-                                isStepApproved ? 'bg-[#0F6B4C]' : 'bg-[#CBD5E1]'
+                                isStepApproved ? 'bg-brand shadow-xs' : 'bg-surface-muted text-ink-mute border border-line'
                               }`}
                             >
                               {isStepApproved && (
@@ -898,7 +898,7 @@ export default function MyBorrowsPage() {
                                   viewBox="0 0 256 256"
                                   fill="none"
                                   stroke="currentColor"
-                                  strokeWidth="16"
+                                  strokeWidth="20"
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
                                   aria-hidden="true"
@@ -907,13 +907,13 @@ export default function MyBorrowsPage() {
                                 </svg>
                               )}
                             </span>
-                            <span className="flex-1 w-[2px] bg-[#E2E8F0] min-h-[16px]" />
+                            <span className="flex-1 w-[2px] bg-line min-h-[18px]" />
                           </div>
                           <div className="pb-4">
-                            <div className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+                            <div className="text-sm font-semibold text-ink">
                               อนุมัติคำขอ
                             </div>
-                            <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                            <div className="text-xs text-ink-mute mt-0.5">
                               {isStepApproved ? formatThaiDate(approvalDate) : 'รออนุมัติ'}
                             </div>
                           </div>
@@ -924,7 +924,7 @@ export default function MyBorrowsPage() {
                           <div className="flex flex-col items-center">
                             <span
                               className={`w-6 h-6 rounded-full flex items-center justify-center text-white shrink-0 ${
-                                isStepReceived ? 'bg-[#0F6B4C]' : 'bg-[#CBD5E1]'
+                                isStepReceived ? 'bg-brand shadow-xs' : 'bg-surface-muted text-ink-mute border border-line'
                               }`}
                             >
                               {isStepReceived && (
@@ -934,7 +934,7 @@ export default function MyBorrowsPage() {
                                   viewBox="0 0 256 256"
                                   fill="none"
                                   stroke="currentColor"
-                                  strokeWidth="16"
+                                  strokeWidth="20"
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
                                   aria-hidden="true"
@@ -943,13 +943,13 @@ export default function MyBorrowsPage() {
                                 </svg>
                               )}
                             </span>
-                            <span className="flex-1 w-[2px] bg-[#E2E8F0] min-h-[16px]" />
+                            <span className="flex-1 w-[2px] bg-line min-h-[18px]" />
                           </div>
                           <div className="pb-4">
-                            <div className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+                            <div className="text-sm font-semibold text-ink">
                               รับมอบอุปกรณ์
                             </div>
-                            <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                            <div className="text-xs text-ink-mute mt-0.5">
                               {selectedRequest.receivedAt
                                 ? formatThaiDate(selectedRequest.receivedAt)
                                 : selectedRequest.status === 'approved'
@@ -964,7 +964,7 @@ export default function MyBorrowsPage() {
                           <div className="flex flex-col items-center">
                             <span
                               className={`w-6 h-6 rounded-full flex items-center justify-center text-white shrink-0 ${
-                                isStepReturned ? 'bg-[#0F6B4C]' : 'bg-[#CBD5E1]'
+                                isStepReturned ? 'bg-brand shadow-xs' : 'bg-surface-muted text-ink-mute border border-line'
                               }`}
                             >
                               {isStepReturned && (
@@ -974,7 +974,7 @@ export default function MyBorrowsPage() {
                                   viewBox="0 0 256 256"
                                   fill="none"
                                   stroke="currentColor"
-                                  strokeWidth="16"
+                                  strokeWidth="20"
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
                                   aria-hidden="true"
@@ -983,13 +983,13 @@ export default function MyBorrowsPage() {
                                 </svg>
                               )}
                             </span>
-                            <span className="flex-1 w-[2px] bg-[#E2E8F0] min-h-[16px]" />
+                            <span className="flex-1 w-[2px] bg-line min-h-[18px]" />
                           </div>
                           <div className="pb-4">
-                            <div className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+                            <div className="text-sm font-semibold text-ink">
                               ส่งคืนอุปกรณ์
                             </div>
-                            <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                            <div className="text-xs text-ink-mute mt-0.5">
                               {returnDateTimestamp
                                 ? formatThaiDate(returnDateTimestamp)
                                 : 'รอส่งคืน'}
@@ -1002,7 +1002,7 @@ export default function MyBorrowsPage() {
                           <div className="flex flex-col items-center">
                             <span
                               className={`w-6 h-6 rounded-full flex items-center justify-center text-white shrink-0 ${
-                                isStepInspected ? 'bg-[#0F6B4C]' : 'bg-[#CBD5E1]'
+                                isStepInspected ? 'bg-brand shadow-xs' : 'bg-surface-muted text-ink-mute border border-line'
                               }`}
                             >
                               {isStepInspected && (
@@ -1012,7 +1012,7 @@ export default function MyBorrowsPage() {
                                   viewBox="0 0 256 256"
                                   fill="none"
                                   stroke="currentColor"
-                                  strokeWidth="16"
+                                  strokeWidth="20"
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
                                   aria-hidden="true"
@@ -1021,13 +1021,12 @@ export default function MyBorrowsPage() {
                                 </svg>
                               )}
                             </span>
-                            <span className="flex-1 w-[2px] bg-[#E2E8F0] min-h-[16px]" />
                           </div>
-                          <div className="pb-4">
-                            <div className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+                          <div>
+                            <div className="text-sm font-semibold text-ink">
                               ตรวจสอบเสร็จสิ้น
                             </div>
-                            <div className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                            <div className="text-xs text-ink-mute mt-0.5">
                               {isStepInspected
                                 ? `${formatThaiDate(
                                     selectedRequest.inspectedAt || selectedRequest.updatedAt,
@@ -1048,14 +1047,14 @@ export default function MyBorrowsPage() {
                     {/* 3. Status-Specific Action Box */}
                     {/* 3.1 หมวด "ที่กำลังใช้งาน" — สถานะ: รอรับมอบ (approved) */}
                     {selectedRequest.status === 'approved' && (
-                      <div className="border border-[#E2E8F0] rounded-[12px] p-4 bg-[#F8FAFC] flex flex-col gap-3">
+                      <div className="border border-line rounded-xl p-4 bg-surface-muted/50 flex flex-col gap-3">
                         {eligibility.allowed ? (
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div className="flex flex-col gap-1">
-                              <div className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+                              <div className="text-sm font-semibold text-ink">
                                 สถานะ: รอรับมอบอุปกรณ์ (อนุมัติครบ 3 ระดับแล้ว)
                               </div>
-                              <div className="text-[14px] leading-[20px] text-[#475569]">
+                              <div className="text-xs sm:text-sm text-ink-mute leading-relaxed">
                                 กำหนดการยืม {formatThaiDate(selectedRequest.pickupDate)} –{' '}
                                 {formatThaiDate(selectedRequest.returnDate)} · กรุณากดยืนยันรับมอบล่วงหน้าอย่างน้อย 1 วันก่อนวันเริ่มยืม (ภายในวันที่{' '}
                                 {formatThaiDate(eligibility.lastAllowedReceiveDate)})
@@ -1069,7 +1068,7 @@ export default function MyBorrowsPage() {
                                 setFormNote('');
                                 setModalError('');
                               }}
-                              className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-[8px] bg-[#0F6B4C] text-white text-[14px] leading-[20px] font-semibold shrink-0 transition hover:opacity-90 active:scale-[0.98]"
+                              className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl bg-brand text-white text-sm font-semibold shrink-0 transition hover:bg-brand-ink shadow-xs active:scale-[0.98]"
                             >
                               <Icon name="check" className="w-4 h-4" />
                               <span>ยืนยันรับมอบ</span>
@@ -1078,10 +1077,10 @@ export default function MyBorrowsPage() {
                         ) : (
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div className="flex flex-col gap-1">
-                              <div className="text-[14px] leading-[20px] font-semibold text-red-700">
+                              <div className="text-sm font-semibold text-rose-600 dark:text-rose-400">
                                 ไม่สามารถกดยืนยันรับมอบได้ (ต้องรับมอบก่อนวันเริ่มยืมอย่างน้อย 1 วัน)
                               </div>
-                              <div className="text-[14px] leading-[20px] text-red-600">
+                              <div className="text-xs sm:text-sm text-rose-700/80 dark:text-rose-300/80">
                                 {eligibility.reason}
                               </div>
                             </div>
@@ -1094,14 +1093,14 @@ export default function MyBorrowsPage() {
                                   setNewReturnDate(selectedRequest.returnDate);
                                   setModalError('');
                                 }}
-                                className="inline-flex items-center justify-center px-3 py-2 rounded-[8px] border border-[#E2E8F0] bg-white hover:bg-[#F1F5F9] text-[#0F172A] text-[14px] leading-[20px] font-medium transition"
+                                className="inline-flex items-center justify-center h-10 px-3.5 rounded-xl border border-line bg-surface hover:bg-hover text-ink text-sm font-medium transition"
                               >
                                 เลื่อนวันรับครุภัณฑ์
                               </button>
                               <button
                                 type="button"
                                 disabled
-                                className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-[8px] bg-[#0F6B4C] text-white text-[14px] leading-[20px] font-semibold opacity-50 cursor-not-allowed"
+                                className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl bg-brand text-white text-sm font-semibold opacity-50 cursor-not-allowed"
                                 title={eligibility.reason}
                               >
                                 <Icon name="check" className="w-4 h-4" />
@@ -1115,20 +1114,20 @@ export default function MyBorrowsPage() {
 
                     {/* 3.2 หมวด "ที่กำลังใช้งาน" — สถานะ: กำลังใช้งาน (borrowing) */}
                     {selectedRequest.status === 'borrowing' && (
-                      <div className="border border-[#E2E8F0] rounded-[12px] p-4 bg-[#F8FAFC] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="border border-line rounded-xl p-4 bg-surface-muted/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex flex-col gap-1">
-                          <div className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+                          <div className="text-sm font-semibold text-ink">
                             สถานะ: กำลังใช้งานอุปกรณ์
                           </div>
-                          <div className="text-[14px] leading-[20px] text-[#475569]">
+                          <div className="text-xs sm:text-sm text-ink-mute">
                             วันที่รับมอบจริง:{' '}
-                            <b className="text-[#0F172A] font-medium">
+                            <b className="text-ink font-semibold">
                               {selectedRequest.receivedAt
                                 ? formatThaiDateTime(selectedRequest.receivedAt)
                                 : '-'}
                             </b>{' '}
                             · กำหนดส่งคืน:{' '}
-                            <b className="text-[#0F172A] font-medium">
+                            <b className="text-ink font-semibold">
                               {formatThaiDate(selectedRequest.returnDate)}
                             </b>
                           </div>
@@ -1140,7 +1139,7 @@ export default function MyBorrowsPage() {
                             setFormNote('');
                             setModalError('');
                           }}
-                          className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-[8px] bg-[#0F6B4C] text-white text-[14px] leading-[20px] font-semibold shrink-0 transition hover:opacity-90 active:scale-[0.98]"
+                          className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl bg-brand text-white text-sm font-semibold shrink-0 transition hover:bg-brand-ink shadow-xs active:scale-[0.98]"
                         >
                           <Icon name="package" className="w-4 h-4" />
                           <span>ยืนยันส่งคืนอุปกรณ์</span>
@@ -1150,16 +1149,16 @@ export default function MyBorrowsPage() {
 
                     {/* 3.3 หมวด "รอตรวจสอบ" — สถานะ: รอตรวจสอบ (return_inspect) */}
                     {selectedRequest.status === 'return_inspect' && (
-                      <div className="border border-[#E2E8F0] rounded-[12px] p-4 bg-[#F8FAFC] flex flex-col gap-3">
+                      <div className="border border-line rounded-xl p-4 bg-surface-muted/50 flex flex-col gap-3">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                           <div className="flex flex-col gap-1">
-                            <div className="text-[14px] leading-[20px] font-medium text-[#0F172A] flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse" />
+                            <div className="text-sm font-semibold text-ink flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
                               <span>รอเจ้าหน้าที่ตรวจสอบสภาพอุปกรณ์</span>
                             </div>
-                            <div className="text-[14px] leading-[20px] text-[#475569]">
+                            <div className="text-xs sm:text-sm text-ink-mute">
                               วันที่แจ้งส่งคืน:{' '}
-                              <b className="text-[#0F172A] font-medium">
+                              <b className="text-ink font-semibold">
                                 {returnDateTimestamp
                                   ? formatThaiDateTime(returnDateTimestamp)
                                   : '-'}
@@ -1180,7 +1179,7 @@ export default function MyBorrowsPage() {
                                 setFormNote('');
                                 setModalError('');
                               }}
-                              className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-[8px] bg-[#0F6B4C] text-white text-[14px] leading-[20px] font-semibold shrink-0 transition hover:opacity-90 active:scale-[0.98]"
+                              className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl bg-brand text-white text-sm font-semibold shrink-0 transition hover:bg-brand-ink shadow-xs active:scale-[0.98]"
                             >
                               <Icon name="check" className="w-4 h-4" />
                               <span>ตรวจสอบและยืนยันรับคืน</span>
@@ -1190,45 +1189,45 @@ export default function MyBorrowsPage() {
                       </div>
                     )}
 
-                    {/* 4. Inspection Result & Separated Photo Evidence Box (from borrow-split.html line 51) */}
-                    <div className="border border-[#E2E8F0] rounded-[12px] p-4 flex flex-col gap-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
+                    {/* 4. Inspection Result & Separated Photo Evidence Box */}
+                    <div className="border border-line rounded-xl p-4.5 bg-surface-muted/30 flex flex-col gap-3.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2.5">
                         <div className="flex items-center gap-2">
-                          <span className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+                          <span className="text-sm font-semibold text-ink">
                             ผลการตรวจสภาพ:
                           </span>
                           {selectedRequest.status === 'returned' ? (
                             selectedRequest.inspectResult === 'damaged' ? (
-                              <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-red-50 text-red-700 border border-red-200">
+                              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
                                 ⚠ ชำรุด
                               </span>
                             ) : selectedRequest.inspectResult === 'incomplete' ? (
-                              <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-amber-50 text-amber-800 border border-amber-200">
+                              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
                                 ✕ อุปกรณ์ไม่ครบ
                               </span>
                             ) : (
-                              <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-[#E6F4EC] text-[#0F6B4C] border border-[#BFE3CF]">
+                              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
                                 ✓ ปกติ
                               </span>
                             )
                           ) : selectedRequest.status === 'return_inspect' ? (
-                            <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
                               รอเจ้าหน้าที่ตรวจสอบ
                             </span>
                           ) : selectedRequest.status === 'borrowing' ? (
-                            <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30">
                               บันทึกสภาพก่อนใช้งานแล้ว
                             </span>
                           ) : (
-                            <span className="px-2 py-1 rounded-[6px] text-[12px] leading-[16px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-500/15 text-slate-700 dark:text-slate-300 border border-slate-500/30">
                               รอรับมอบอุปกรณ์
                             </span>
                           )}
                         </div>
 
                         {selectedRequest.inspectorName && (
-                          <span className="text-[14px] leading-[20px] text-[#475569]">
-                            ผู้ตรวจสอบ: <b className="text-[#0F172A] font-medium">{selectedRequest.inspectorName}</b>
+                          <span className="text-xs sm:text-sm text-ink-mute">
+                            ผู้ตรวจสอบ: <b className="text-ink font-semibold">{selectedRequest.inspectorName}</b>
                           </span>
                         )}
                       </div>
@@ -1237,23 +1236,23 @@ export default function MyBorrowsPage() {
                       {(selectedRequest.receiveNote ||
                         selectedRequest.returnNote ||
                         selectedRequest.inspectNote) && (
-                        <div className="flex flex-col gap-1 text-[14px] leading-[20px] text-[#475569] bg-[#F8FAFC] p-3 rounded-[8px] border border-[#E2E8F0]">
+                        <div className="flex flex-col gap-1.5 text-xs sm:text-sm text-ink bg-surface p-3.5 rounded-xl border border-line">
                           {selectedRequest.receiveNote && (
                             <div>
-                              <span className="font-medium text-[#0F172A]">หมายเหตุก่อนใช้งาน: </span>
-                              {selectedRequest.receiveNote}
+                              <span className="font-semibold text-ink">หมายเหตุก่อนใช้งาน: </span>
+                              <span className="text-ink-mute">{selectedRequest.receiveNote}</span>
                             </div>
                           )}
                           {selectedRequest.returnNote && (
                             <div>
-                              <span className="font-medium text-[#0F172A]">หมายเหตุเมื่อส่งคืน: </span>
-                              {selectedRequest.returnNote}
+                              <span className="font-semibold text-ink">หมายเหตุเมื่อส่งคืน: </span>
+                              <span className="text-ink-mute">{selectedRequest.returnNote}</span>
                             </div>
                           )}
                           {selectedRequest.inspectNote && (
                             <div>
-                              <span className="font-medium text-[#0F172A]">บันทึกผลตรวจสอบ: </span>
-                              {selectedRequest.inspectNote}
+                              <span className="font-semibold text-ink">บันทึกผลตรวจสอบ: </span>
+                              <span className="text-ink-mute">{selectedRequest.inspectNote}</span>
                             </div>
                           )}
                         </div>
@@ -1262,9 +1261,9 @@ export default function MyBorrowsPage() {
                       {/* Two Side-by-Side Photo Cards (Before Use vs After Return) */}
                       <div className="grid grid-cols-1 sm:grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
                         {/* Card 1: รูปภาพก่อนใช้งาน (อัปโหลดโดยผู้ยืม) */}
-                        <div className="border border-[#E2E8F0] rounded-[12px] p-4 flex flex-col gap-3 min-h-[104px]">
-                          <div className="text-[14px] leading-[20px] font-medium text-[#0F172A] flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-[#10B981] shrink-0" />
+                        <div className="border border-line rounded-xl p-4 bg-surface flex flex-col gap-2.5 min-h-[104px]">
+                          <div className="text-xs sm:text-sm font-semibold text-ink flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                             <span>รูปภาพก่อนใช้งาน ({receivePhotos.length} รูป)</span>
                           </div>
                           {receivePhotos.length > 0 ? (
@@ -1275,7 +1274,7 @@ export default function MyBorrowsPage() {
                                   type="button"
                                   onClick={() => setPreviewImage(src)}
                                   title="คลิกเพื่อดูรูปภาพก่อนใช้งานขนาดใหญ่"
-                                  className="w-16 h-16 rounded-[8px] bg-[#E2E8F0] overflow-hidden border border-[#E2E8F0] hover:border-[#0F6B4C] transition shrink-0"
+                                  className="w-16 h-16 rounded-lg bg-surface-muted overflow-hidden border border-line hover:border-brand transition shrink-0"
                                 >
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img
@@ -1287,16 +1286,16 @@ export default function MyBorrowsPage() {
                               ))}
                             </div>
                           ) : (
-                            <span className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                            <span className="text-xs sm:text-sm text-ink-mute">
                               ไม่มีรูปภาพ
                             </span>
                           )}
                         </div>
 
                         {/* Card 2: รูปภาพหลังส่งคืน (อัปโหลดโดยเจ้าหน้าที่) */}
-                        <div className="border border-[#E2E8F0] rounded-[12px] p-4 flex flex-col gap-3 min-h-[104px]">
-                          <div className="text-[14px] leading-[20px] font-medium text-[#0F172A] flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-[#3B82F6] shrink-0" />
+                        <div className="border border-line rounded-xl p-4 bg-surface flex flex-col gap-2.5 min-h-[104px]">
+                          <div className="text-xs sm:text-sm font-semibold text-ink flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
                             <span>รูปภาพหลังส่งคืน ({inspectPhotos.length} รูป)</span>
                           </div>
                           {inspectPhotos.length > 0 ? (
@@ -1307,7 +1306,7 @@ export default function MyBorrowsPage() {
                                   type="button"
                                   onClick={() => setPreviewImage(src)}
                                   title="คลิกเพื่อดูรูปภาพหลังส่งคืนขนาดใหญ่"
-                                  className="w-16 h-16 rounded-[8px] bg-[#E2E8F0] overflow-hidden border border-[#E2E8F0] hover:border-[#0F6B4C] transition shrink-0"
+                                  className="w-16 h-16 rounded-lg bg-surface-muted overflow-hidden border border-line hover:border-brand transition shrink-0"
                                 >
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img
@@ -1319,7 +1318,7 @@ export default function MyBorrowsPage() {
                               ))}
                             </div>
                           ) : (
-                            <span className="text-[14px] leading-[20px] font-normal text-[#475569]">
+                            <span className="text-xs sm:text-sm text-ink-mute">
                               ไม่มีรูปภาพ
                             </span>
                           )}
@@ -1328,13 +1327,13 @@ export default function MyBorrowsPage() {
                     </div>
 
                     {/* 5. Footer Link to Full Permit / Request Document */}
-                    <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-[#E2E8F0]">
-                      <span className="text-[12px] leading-[16px] text-[#475569]">
+                    <div className="flex items-center justify-between flex-wrap gap-2 pt-3 border-t border-line">
+                      <span className="text-xs text-ink-mute">
                         แจ้งเตือนผ่าน LINE อัตโนมัติเมื่อสถานะคำขอเปลี่ยนแปลง
                       </span>
                       <Link
                         href={`/requests/${selectedRequest.id}`}
-                        className="text-[14px] leading-[20px] font-medium text-[#0F6B4C] hover:underline inline-flex items-center gap-1"
+                        className="text-xs sm:text-sm font-semibold text-brand hover:text-brand-ink inline-flex items-center gap-1 transition"
                       >
                         <span>ดูเอกสารคำขอและไทม์ไลน์การลงนาม</span>
                         <Icon name="chevron-right" className="w-4 h-4" />
@@ -1364,17 +1363,17 @@ export default function MyBorrowsPage() {
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in"
         >
-          <div className="bg-white border border-[#E2E8F0] rounded-[16px] max-w-lg w-full p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
+          <div className="bg-surface border border-line rounded-2xl max-w-lg w-full p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-line">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-[8px] bg-[#E6F4EC] text-[#0F6B4C] flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-brand/10 text-brand flex items-center justify-center">
                   <Icon name="check" className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-[18px] leading-[26px] font-semibold text-[#0F172A]">
+                  <h3 className="text-lg font-bold text-ink">
                     ยืนยันรับมอบอุปกรณ์
                   </h3>
-                  <p className="text-[12px] leading-[16px] text-[#475569]">
+                  <p className="text-xs text-ink-mute">
                     คำขอ {receiveModalTarget.code} · วันเริ่มยืม{' '}
                     {formatThaiDate(receiveModalTarget.pickupDate)}
                   </p>
@@ -1383,34 +1382,34 @@ export default function MyBorrowsPage() {
               <button
                 type="button"
                 onClick={() => setReceiveModalTarget(null)}
-                className="w-8 h-8 rounded-[8px] hover:bg-[#F1F5F9] text-[#475569] flex items-center justify-center transition"
+                className="w-8 h-8 rounded-lg hover:bg-hover text-ink-mute hover:text-ink flex items-center justify-center transition"
               >
                 <Icon name="x" className="w-4 h-4" />
               </button>
             </div>
 
             {/* ข้อมูลอุปกรณ์และเงื่อนไขการรับมอบ */}
-            <div className="bg-[#F8FAFC] p-4 rounded-[12px] border border-[#E2E8F0] text-[14px] leading-[20px] flex flex-col gap-1.5">
+            <div className="bg-surface-muted p-4 rounded-xl border border-line text-sm flex flex-col gap-1.5">
               <div className="flex justify-between gap-2">
-                <span className="text-[#475569]">รายการอุปกรณ์:</span>
-                <b className="text-[#0F172A] font-medium text-right">
+                <span className="text-ink-mute">รายการอุปกรณ์:</span>
+                <b className="text-ink font-medium text-right">
                   {getEquipmentInfo(receiveModalTarget).name}
                 </b>
               </div>
               <div className="flex justify-between gap-2">
-                <span className="text-[#475569]">จำนวนรวม:</span>
-                <b className="text-[#0F172A] font-medium">
+                <span className="text-ink-mute">จำนวนรวม:</span>
+                <b className="text-ink font-medium">
                   {getEquipmentInfo(receiveModalTarget).totalQty} ชิ้น
                 </b>
               </div>
               <div className="flex justify-between gap-2">
-                <span className="text-[#475569]">ระยะเวลายืม:</span>
-                <b className="text-[#0F172A] font-medium">
+                <span className="text-ink-mute">ระยะเวลายืม:</span>
+                <b className="text-ink font-medium">
                   {formatThaiDate(receiveModalTarget.pickupDate)} –{' '}
                   {formatThaiDate(receiveModalTarget.returnDate)}
                 </b>
               </div>
-              <div className="pt-1.5 mt-1 border-t border-[#E2E8F0] text-[12px] leading-[16px] text-[#0F6B4C] font-medium">
+              <div className="pt-2 mt-1 border-t border-line text-xs text-brand font-medium">
                 เงื่อนไขการรับมอบ: ต้องยืนยันรับมอบล่วงหน้าอย่างน้อย 1 วันก่อนวันเริ่มยืม และแนบรูปถ่ายสภาพอุปกรณ์ก่อนใช้งาน
               </div>
             </div>
@@ -1418,14 +1417,14 @@ export default function MyBorrowsPage() {
             {/* อัปโหลดรูปภาพสภาพอุปกรณ์ก่อนใช้งาน */}
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <label className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+                <label className="text-sm font-semibold text-ink">
                   อัปโหลดรูปภาพอุปกรณ์ก่อนใช้งาน <span className="text-red-500">*</span>
                 </label>
-                <span className="text-[12px] leading-[16px] text-[#475569]">
+                <span className="text-xs text-ink-mute">
                   ({formPhotos.length}/6 รูป · JPG, PNG, WEBP)
                 </span>
               </div>
-              <p className="text-[12px] leading-[16px] text-[#475569]">
+              <p className="text-xs text-ink-mute">
                 ถ่ายภาพสภาพอุปกรณ์เพื่อใช้เป็นหลักฐานก่อนใช้งาน (คลิกที่รูปเพื่อดูภาพขยาย กดปุ่มเปลี่ยนรูปหรือลบรูปได้)
               </p>
 
@@ -1433,7 +1432,7 @@ export default function MyBorrowsPage() {
                 {formPhotos.map((src, i) => (
                   <div
                     key={i}
-                    className="relative w-24 h-24 rounded-[12px] overflow-hidden border border-[#E2E8F0] group"
+                    className="relative w-24 h-24 rounded-xl overflow-hidden border border-line group"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -1456,7 +1455,7 @@ export default function MyBorrowsPage() {
                         setReplaceIndex(i);
                         replaceInputRef.current?.click();
                       }}
-                      className="absolute bottom-0 inset-x-0 bg-black/70 text-white text-[10px] py-0.5 text-center hover:bg-[#0F6B4C] transition"
+                      className="absolute bottom-0 inset-x-0 bg-black/70 text-white text-[10px] py-0.5 text-center hover:bg-brand transition"
                     >
                       เปลี่ยนรูป
                     </button>
@@ -1467,7 +1466,7 @@ export default function MyBorrowsPage() {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-24 h-24 rounded-[12px] border-2 border-dashed border-[#E2E8F0] hover:border-[#0F6B4C] flex flex-col items-center justify-center gap-1 text-[12px] text-[#475569] hover:text-[#0F6B4C] transition bg-[#F8FAFC]"
+                    className="w-24 h-24 rounded-xl border-2 border-dashed border-line hover:border-brand flex flex-col items-center justify-center gap-1 text-xs text-ink-mute hover:text-brand transition bg-surface-muted"
                   >
                     <Icon name="upload" className="w-5 h-5" />
                     <span>เพิ่มรูปภาพ</span>
@@ -1486,7 +1485,7 @@ export default function MyBorrowsPage() {
 
             {/* หมายเหตุจากผู้ยืม */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+              <label className="text-sm font-semibold text-ink">
                 หมายเหตุสภาพอุปกรณ์ก่อนใช้งาน (ถ้ามี)
               </label>
               <textarea
@@ -1494,23 +1493,23 @@ export default function MyBorrowsPage() {
                 placeholder="เช่น ทดสอบเปิดติดปกติ อุปกรณ์เสริมครบถ้วน หรือระบุรอยตำหนิเดิมก่อนใช้งาน..."
                 value={formNote}
                 onChange={(e) => setFormNote(e.target.value)}
-                className="w-full border border-[#E2E8F0] focus:border-[#0F6B4C] outline-none text-[14px] leading-[20px] rounded-[12px] p-3 resize-none"
+                className="w-full border border-line focus:border-brand bg-surface text-ink outline-none text-sm rounded-xl p-3 resize-none"
               />
             </div>
 
             {modalError && (
-              <div className="p-3 rounded-[12px] bg-red-50 border border-red-200 text-red-700 text-[13px] flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-300 text-xs flex items-center gap-2">
                 <Icon name="alert-triangle" className="w-4 h-4 shrink-0" />
                 <span>{modalError}</span>
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#E2E8F0]">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-line">
               <button
                 type="button"
                 onClick={() => setReceiveModalTarget(null)}
                 disabled={submitting}
-                className="px-3 py-2 rounded-[8px] border border-[#E2E8F0] text-[#475569] hover:bg-[#F1F5F9] text-[14px] leading-[20px] font-medium transition"
+                className="px-4 py-2 rounded-xl border border-line text-ink-mute hover:text-ink hover:bg-hover text-sm font-medium transition"
               >
                 ยกเลิก
               </button>
@@ -1518,7 +1517,7 @@ export default function MyBorrowsPage() {
                 type="button"
                 onClick={handleConfirmReceive}
                 disabled={submitting || formPhotos.length === 0}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-[8px] bg-[#0F6B4C] text-white text-[14px] leading-[20px] font-semibold disabled:opacity-50 transition"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-ink disabled:opacity-50 transition"
               >
                 {submitting ? (
                   <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -1539,17 +1538,17 @@ export default function MyBorrowsPage() {
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in"
         >
-          <div className="bg-white border border-[#E2E8F0] rounded-[16px] max-w-lg w-full p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
+          <div className="bg-surface border border-line rounded-2xl max-w-lg w-full p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-line">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-[8px] bg-[#E6F4EC] text-[#0F6B4C] flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-brand/10 text-brand flex items-center justify-center">
                   <Icon name="package" className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-[18px] leading-[26px] font-semibold text-[#0F172A]">
+                  <h3 className="text-lg font-bold text-ink">
                     ยืนยันส่งคืนอุปกรณ์
                   </h3>
-                  <p className="text-[12px] leading-[16px] text-[#475569]">
+                  <p className="text-xs text-ink-mute">
                     คำขอ {returnModalTarget.code}
                   </p>
                 </div>
@@ -1557,29 +1556,29 @@ export default function MyBorrowsPage() {
               <button
                 type="button"
                 onClick={() => setReturnModalTarget(null)}
-                className="w-8 h-8 rounded-[8px] hover:bg-[#F1F5F9] text-[#475569] flex items-center justify-center transition"
+                className="w-8 h-8 rounded-lg hover:bg-hover text-ink-mute hover:text-ink flex items-center justify-center transition"
               >
                 <Icon name="x" className="w-4 h-4" />
               </button>
             </div>
 
             {/* ข้อมูลอุปกรณ์ที่ส่งคืน */}
-            <div className="bg-[#F8FAFC] p-4 rounded-[12px] border border-[#E2E8F0] flex flex-col gap-1.5 text-[14px] leading-[20px]">
+            <div className="bg-surface-muted p-4 rounded-xl border border-line flex flex-col gap-1.5 text-sm">
               <div className="flex justify-between gap-2">
-                <span className="text-[#475569]">อุปกรณ์ที่ส่งคืน:</span>
-                <b className="text-[#0F172A] font-medium text-right">
+                <span className="text-ink-mute">อุปกรณ์ที่ส่งคืน:</span>
+                <b className="text-ink font-medium text-right">
                   {getEquipmentInfo(returnModalTarget).name}
                 </b>
               </div>
               <div className="flex justify-between gap-2">
-                <span className="text-[#475569]">จำนวนรวม:</span>
-                <b className="text-[#0F172A] font-medium">
+                <span className="text-ink-mute">จำนวนรวม:</span>
+                <b className="text-ink font-medium">
                   {getEquipmentInfo(returnModalTarget).totalQty} ชิ้น
                 </b>
               </div>
               <div className="flex justify-between gap-2">
-                <span className="text-[#475569]">วันที่รับมอบจริง:</span>
-                <span className="text-[#0F172A] font-medium">
+                <span className="text-ink-mute">วันที่รับมอบจริง:</span>
+                <span className="text-ink font-medium">
                   {returnModalTarget.receivedAt
                     ? formatThaiDate(returnModalTarget.receivedAt)
                     : '-'}
@@ -1589,7 +1588,7 @@ export default function MyBorrowsPage() {
 
             {/* ช่องหมายเหตุการส่งคืน (ไม่มีช่องอัปโหลดรูปภาพตามข้อกำหนด 5.3 และ 6) */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+              <label className="text-sm font-semibold text-ink">
                 หมายเหตุเพิ่มเติม (ถ้ามี)
               </label>
               <textarea
@@ -1597,27 +1596,27 @@ export default function MyBorrowsPage() {
                 placeholder="ระบุหมายเหตุการส่งคืน เช่น ส่งคืนที่ห้องพัสดุครบถ้วน หรือแจ้งอาการผิดปกติให้เจ้าหน้าที่ทราบ..."
                 value={formNote}
                 onChange={(e) => setFormNote(e.target.value)}
-                className="w-full border border-[#E2E8F0] focus:border-[#0F6B4C] outline-none text-[14px] leading-[20px] rounded-[12px] p-3 resize-none"
+                className="w-full border border-line focus:border-brand bg-surface text-ink outline-none text-sm rounded-xl p-3 resize-none"
               />
             </div>
 
-            <p className="text-[12px] leading-[16px] text-[#475569] bg-[#F8FAFC] p-3 rounded-[8px] border border-[#E2E8F0]">
+            <p className="text-xs text-ink-mute bg-surface-muted p-3 rounded-xl border border-line">
               เมื่อกดยืนยันส่งคืนอุปกรณ์ ระบบจะบันทึกวันและเวลาที่แจ้งส่งคืน เปลี่ยนสถานะเป็น &quot;รอตรวจสอบ&quot; และแจ้งเตือนเจ้าหน้าที่เพื่อตรวจสภาพและถ่ายภาพหลังส่งคืน
             </p>
 
             {modalError && (
-              <div className="p-3 rounded-[12px] bg-red-50 border border-red-200 text-red-700 text-[13px] flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-300 text-xs flex items-center gap-2">
                 <Icon name="alert-triangle" className="w-4 h-4 shrink-0" />
                 <span>{modalError}</span>
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#E2E8F0]">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-line">
               <button
                 type="button"
                 onClick={() => setReturnModalTarget(null)}
                 disabled={submitting}
-                className="px-3 py-2 rounded-[8px] border border-[#E2E8F0] text-[#475569] hover:bg-[#F1F5F9] text-[14px] leading-[20px] font-medium transition"
+                className="px-4 py-2 rounded-xl border border-line text-ink-mute hover:text-ink hover:bg-hover text-sm font-medium transition"
               >
                 ยกเลิก
               </button>
@@ -1625,7 +1624,7 @@ export default function MyBorrowsPage() {
                 type="button"
                 onClick={handleConfirmReturn}
                 disabled={submitting}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-[8px] bg-[#0F6B4C] text-white text-[14px] leading-[20px] font-semibold disabled:opacity-50 transition"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-ink disabled:opacity-50 transition"
               >
                 {submitting ? (
                   <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -1646,17 +1645,17 @@ export default function MyBorrowsPage() {
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in"
         >
-          <div className="bg-white border border-[#E2E8F0] rounded-[16px] max-w-xl w-full p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
+          <div className="bg-surface border border-line rounded-2xl max-w-xl w-full p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-line">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-[8px] bg-[#E6F4EC] text-[#0F6B4C] flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-brand/10 text-brand flex items-center justify-center">
                   <Icon name="check" className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-[18px] leading-[26px] font-semibold text-[#0F172A]">
+                  <h3 className="text-lg font-bold text-ink">
                     ตรวจสอบอุปกรณ์หลังส่งคืน (เจ้าหน้าที่)
                   </h3>
-                  <p className="text-[12px] leading-[16px] text-[#475569]">
+                  <p className="text-xs text-ink-mute">
                     คำขอ {inspectModalTarget.code}
                   </p>
                 </div>
@@ -1664,34 +1663,34 @@ export default function MyBorrowsPage() {
               <button
                 type="button"
                 onClick={() => setInspectModalTarget(null)}
-                className="w-8 h-8 rounded-[8px] hover:bg-[#F1F5F9] text-[#475569] flex items-center justify-center transition"
+                className="w-8 h-8 rounded-lg hover:bg-hover text-ink-mute hover:text-ink flex items-center justify-center transition"
               >
                 <Icon name="x" className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="bg-[#F8FAFC] p-3.5 rounded-[12px] border border-[#E2E8F0] text-[14px] leading-[20px] grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+            <div className="bg-surface-muted p-3.5 rounded-xl border border-line text-sm grid grid-cols-1 sm:grid-cols-2 gap-1.5">
               <div>
-                <span className="text-[#475569]">ผู้ยืม: </span>
-                <b className="text-[#0F172A] font-medium">{inspectModalTarget.requesterName}</b>
+                <span className="text-ink-mute">ผู้ยืม: </span>
+                <b className="text-ink font-medium">{inspectModalTarget.requesterName}</b>
               </div>
               <div>
-                <span className="text-[#475569]">อุปกรณ์: </span>
-                <b className="text-[#0F172A] font-medium">
+                <span className="text-ink-mute">อุปกรณ์: </span>
+                <b className="text-ink font-medium">
                   {getEquipmentInfo(inspectModalTarget).name}
                 </b>
               </div>
               <div>
-                <span className="text-[#475569]">วันที่รับมอบจริง: </span>
-                <b className="text-[#0F172A] font-medium">
+                <span className="text-ink-mute">วันที่รับมอบจริง: </span>
+                <b className="text-ink font-medium">
                   {inspectModalTarget.receivedAt
                     ? formatThaiDate(inspectModalTarget.receivedAt)
                     : '-'}
                 </b>
               </div>
               <div>
-                <span className="text-[#475569]">วันที่แจ้งส่งคืน: </span>
-                <b className="text-[#0F172A] font-medium">
+                <span className="text-ink-mute">วันที่แจ้งส่งคืน: </span>
+                <b className="text-ink font-medium">
                   {inspectModalTarget.returnSubmittedAt
                     ? formatThaiDate(inspectModalTarget.returnSubmittedAt)
                     : '-'}
@@ -1699,17 +1698,17 @@ export default function MyBorrowsPage() {
               </div>
               {inspectModalTarget.returnNote && (
                 <div className="sm:col-span-2">
-                  <span className="text-[#475569]">หมายเหตุจากผู้ยืม: </span>
-                  <span className="text-[#0F172A]">{inspectModalTarget.returnNote}</span>
+                  <span className="text-ink-mute">หมายเหตุจากผู้ยืม: </span>
+                  <span className="text-ink">{inspectModalTarget.returnNote}</span>
                 </div>
               )}
             </div>
 
             {/* เปรียบเทียบรูปภาพก่อนใช้งาน vs รูปภาพหลังส่งคืน */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="p-3.5 rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] flex flex-col gap-2">
-                <b className="text-[13px] font-medium text-[#0F172A] flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#10B981]" />
+              <div className="p-3.5 rounded-xl border border-line bg-surface-muted flex flex-col gap-2">
+                <b className="text-xs font-semibold text-ink flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
                   รูปภาพก่อนใช้งาน (ผู้ยืม)
                 </b>
                 {(inspectModalTarget.receivePhotos || []).length > 0 ? (
@@ -1717,7 +1716,7 @@ export default function MyBorrowsPage() {
                     {(inspectModalTarget.receivePhotos || []).map((src, i) => (
                       <div
                         key={i}
-                        className="w-16 h-16 rounded-[8px] border border-[#E2E8F0] overflow-hidden cursor-pointer hover:opacity-85"
+                        className="w-16 h-16 rounded-lg border border-line overflow-hidden cursor-pointer hover:opacity-85"
                         onClick={() => setPreviewImage(src)}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1726,23 +1725,23 @@ export default function MyBorrowsPage() {
                     ))}
                   </div>
                 ) : (
-                  <span className="text-[12px] text-[#475569]">ไม่มีรูปภาพก่อนใช้งาน</span>
+                  <span className="text-xs text-ink-mute">ไม่มีรูปภาพก่อนใช้งาน</span>
                 )}
               </div>
 
-              <div className="p-3.5 rounded-[12px] border border-[#BFE3CF] bg-[#E6F4EC]/30 flex flex-col gap-2">
+              <div className="p-3.5 rounded-xl border border-brand/40 bg-brand/5 flex flex-col gap-2">
                 <div className="flex items-center justify-between">
-                  <b className="text-[13px] font-medium text-[#0F172A] flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#3B82F6]" />
+                  <b className="text-xs font-semibold text-ink flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
                     รูปภาพหลังส่งคืน <span className="text-red-500">*</span>
                   </b>
-                  <span className="text-[11px] text-[#475569]">({formPhotos.length}/6)</span>
+                  <span className="text-xs text-ink-mute">({formPhotos.length}/6)</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {formPhotos.map((src, i) => (
                     <div
                       key={i}
-                      className="relative w-16 h-16 rounded-[8px] overflow-hidden border border-[#E2E8F0] group"
+                      className="relative w-16 h-16 rounded-lg overflow-hidden border border-line group"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -1774,7 +1773,7 @@ export default function MyBorrowsPage() {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="w-16 h-16 rounded-[8px] border-2 border-dashed border-[#0F6B4C]/50 hover:border-[#0F6B4C] flex flex-col items-center justify-center text-[11px] text-[#0F6B4C] font-medium transition bg-white"
+                      className="w-16 h-16 rounded-lg border-2 border-dashed border-brand/40 hover:border-brand flex flex-col items-center justify-center text-xs text-brand font-medium transition bg-surface"
                     >
                       <Icon name="upload" className="w-4 h-4" />
                       <span>เพิ่มรูป</span>
@@ -1794,51 +1793,51 @@ export default function MyBorrowsPage() {
 
             {/* ผลการตรวจสอบสภาพ */}
             <div className="flex flex-col gap-2">
-              <label className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+              <label className="text-sm font-semibold text-ink">
                 ผลการตรวจสภาพ <span className="text-red-500">*</span>
               </label>
               <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => setInspectResult('normal')}
-                  className={`p-3 rounded-[12px] text-[13px] font-medium flex flex-col items-center justify-center gap-1 border transition ${
+                  className={`p-3 rounded-xl text-xs sm:text-sm font-semibold flex flex-col items-center justify-center gap-1 border transition ${
                     inspectResult === 'normal'
-                      ? 'bg-[#E6F4EC] text-[#0F6B4C] border-[#0F6B4C]'
-                      : 'bg-[#F8FAFC] text-[#475569] border-[#E2E8F0]'
+                      ? 'bg-brand/10 text-brand border-brand'
+                      : 'bg-surface-muted text-ink-mute border-line hover:border-brand/40'
                   }`}
                 >
-                  <Icon name="check" className="w-4 h-4 text-[#0F6B4C]" />
+                  <Icon name="check" className="w-4 h-4 text-brand" />
                   <span>ปกติ</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setInspectResult('damaged')}
-                  className={`p-3 rounded-[12px] text-[13px] font-medium flex flex-col items-center justify-center gap-1 border transition ${
+                  className={`p-3 rounded-xl text-xs sm:text-sm font-semibold flex flex-col items-center justify-center gap-1 border transition ${
                     inspectResult === 'damaged'
-                      ? 'bg-red-50 text-red-800 border-red-500'
-                      : 'bg-[#F8FAFC] text-[#475569] border-[#E2E8F0]'
+                      ? 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500'
+                      : 'bg-surface-muted text-ink-mute border-line hover:border-red-400/40'
                   }`}
                 >
-                  <Icon name="alert-triangle" className="w-4 h-4 text-red-600" />
+                  <Icon name="alert-triangle" className="w-4 h-4 text-red-500" />
                   <span>ชำรุด</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setInspectResult('incomplete')}
-                  className={`p-3 rounded-[12px] text-[13px] font-medium flex flex-col items-center justify-center gap-1 border transition ${
+                  className={`p-3 rounded-xl text-xs sm:text-sm font-semibold flex flex-col items-center justify-center gap-1 border transition ${
                     inspectResult === 'incomplete'
-                      ? 'bg-amber-50 text-amber-900 border-amber-500'
-                      : 'bg-[#F8FAFC] text-[#475569] border-[#E2E8F0]'
+                      ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500'
+                      : 'bg-surface-muted text-ink-mute border-line hover:border-amber-400/40'
                   }`}
                 >
-                  <Icon name="x" className="w-4 h-4 text-amber-600" />
+                  <Icon name="x" className="w-4 h-4 text-amber-500" />
                   <span>อุปกรณ์ไม่ครบ</span>
                 </button>
               </div>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-[14px] leading-[20px] font-medium text-[#0F172A]">
+              <label className="text-sm font-semibold text-ink">
                 หมายเหตุ / รายละเอียดความเสียหาย{' '}
                 {(inspectResult === 'damaged' || inspectResult === 'incomplete') && (
                   <span className="text-red-500">*</span>
@@ -1849,23 +1848,23 @@ export default function MyBorrowsPage() {
                 placeholder="ระบุผลการตรวจสภาพอุปกรณ์หลังส่งคืน หรือรายละเอียดความเสียหาย/รายการที่ไม่ครบ..."
                 value={formNote}
                 onChange={(e) => setFormNote(e.target.value)}
-                className="w-full border border-[#E2E8F0] focus:border-[#0F6B4C] outline-none text-[14px] leading-[20px] rounded-[12px] p-3 resize-none"
+                className="w-full border border-line focus:border-brand bg-surface text-ink outline-none text-sm rounded-xl p-3 resize-none"
               />
             </div>
 
             {modalError && (
-              <div className="p-3 rounded-[12px] bg-red-50 border border-red-200 text-red-700 text-[13px] flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-300 text-xs flex items-center gap-2">
                 <Icon name="alert-triangle" className="w-4 h-4 shrink-0" />
                 <span>{modalError}</span>
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#E2E8F0]">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-line">
               <button
                 type="button"
                 onClick={() => setInspectModalTarget(null)}
                 disabled={submitting}
-                className="px-3 py-2 rounded-[8px] border border-[#E2E8F0] text-[#475569] hover:bg-[#F1F5F9] text-[14px] leading-[20px] font-medium transition"
+                className="px-4 py-2 rounded-xl border border-line text-ink-mute hover:text-ink hover:bg-hover text-sm font-medium transition"
               >
                 ยกเลิก
               </button>
@@ -1873,7 +1872,7 @@ export default function MyBorrowsPage() {
                 type="button"
                 onClick={handleConfirmInspect}
                 disabled={submitting || formPhotos.length === 0}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-[8px] bg-[#0F6B4C] text-white text-[14px] leading-[20px] font-semibold disabled:opacity-50 transition"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-ink disabled:opacity-50 transition"
               >
                 {submitting ? (
                   <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -1894,32 +1893,32 @@ export default function MyBorrowsPage() {
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in"
         >
-          <div className="bg-white border border-[#E2E8F0] rounded-[16px] max-w-md w-full p-6 shadow-2xl flex flex-col gap-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
+          <div className="bg-surface border border-line rounded-2xl max-w-md w-full p-6 shadow-2xl flex flex-col gap-4">
+            <div className="flex items-center justify-between pb-3 border-b border-line">
               <div>
-                <h3 className="text-[18px] leading-[26px] font-semibold text-[#0F172A]">
+                <h3 className="text-lg font-bold text-ink">
                   แก้ไข/เลื่อนวันรับครุภัณฑ์
                 </h3>
-                <p className="text-[12px] leading-[16px] text-[#475569]">
+                <p className="text-xs text-ink-mute">
                   คำขอ {rescheduleModalTarget.code}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setRescheduleModalTarget(null)}
-                className="w-8 h-8 rounded-[8px] hover:bg-[#F1F5F9] text-[#475569] flex items-center justify-center"
+                className="w-8 h-8 rounded-lg hover:bg-hover text-ink-mute hover:text-ink flex items-center justify-center transition"
               >
                 <Icon name="x" className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-[13px] leading-[20px] text-[#475569]">
+            <p className="text-sm text-ink-mute">
               ผู้ยืมต้องยืนยันรับมอบอย่างน้อย 1 วันก่อนวันเริ่มยืม หากเลือกวันเริ่มยืมเป็นวันพรุ่งนี้เป็นต้นไป ระบบจะเปิดให้กดยืนยันรับมอบได้ทันที
             </p>
 
             <div className="flex flex-col gap-3">
               <div>
-                <label className="text-[14px] leading-[20px] font-medium text-[#0F172A] block mb-1">
+                <label className="text-sm font-semibold text-ink block mb-1">
                   วันที่เริ่มยืมใหม่ *
                 </label>
                 <input
@@ -1931,11 +1930,11 @@ export default function MyBorrowsPage() {
                       setNewReturnDate(e.target.value);
                     }
                   }}
-                  className="w-full border border-[#E2E8F0] focus:border-[#0F6B4C] outline-none rounded-[8px] px-3 py-2 text-[14px]"
+                  className="w-full border border-line focus:border-brand bg-surface text-ink outline-none rounded-xl px-3 py-2 text-sm"
                 />
               </div>
               <div>
-                <label className="text-[14px] leading-[20px] font-medium text-[#0F172A] block mb-1">
+                <label className="text-sm font-semibold text-ink block mb-1">
                   วันครบกำหนดคืนใหม่ *
                 </label>
                 <input
@@ -1943,22 +1942,22 @@ export default function MyBorrowsPage() {
                   value={newReturnDate}
                   min={newPickupDate}
                   onChange={(e) => setNewReturnDate(e.target.value)}
-                  className="w-full border border-[#E2E8F0] focus:border-[#0F6B4C] outline-none rounded-[8px] px-3 py-2 text-[14px]"
+                  className="w-full border border-line focus:border-brand bg-surface text-ink outline-none rounded-xl px-3 py-2 text-sm"
                 />
               </div>
             </div>
 
             {modalError && (
-              <div className="p-3 rounded-[12px] bg-red-50 border border-red-200 text-red-700 text-[13px]">
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-300 text-xs">
                 {modalError}
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E2E8F0]">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
               <button
                 type="button"
                 onClick={() => setRescheduleModalTarget(null)}
-                className="px-3 py-2 rounded-[8px] border border-[#E2E8F0] text-[#475569] hover:bg-[#F1F5F9] text-[14px] leading-[20px] font-medium"
+                className="px-4 py-2 rounded-xl border border-line text-ink-mute hover:text-ink hover:bg-hover text-sm font-medium transition"
               >
                 ยกเลิก
               </button>
@@ -1966,7 +1965,7 @@ export default function MyBorrowsPage() {
                 type="button"
                 onClick={handleConfirmReschedule}
                 disabled={submitting}
-                className="px-3 py-2 rounded-[8px] bg-[#0F6B4C] text-white text-[14px] leading-[20px] font-semibold"
+                className="px-4 py-2 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-ink transition"
               >
                 {submitting ? 'กำลังบันทึก...' : 'บันทึกวันรับครุภัณฑ์ใหม่'}
               </button>
@@ -1988,12 +1987,12 @@ export default function MyBorrowsPage() {
             <img
               src={previewImage}
               alt="ดูรูปภาพขนาดใหญ่"
-              className="max-w-full max-h-[80vh] object-contain rounded-[16px] shadow-2xl"
+              className="max-w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl"
             />
             <button
               type="button"
               onClick={() => setPreviewImage(null)}
-              className="absolute -top-10 right-0 text-white hover:text-white/80 flex items-center gap-1 text-[14px]"
+              className="absolute -top-10 right-0 text-white hover:text-white/80 flex items-center gap-1 text-sm font-medium"
             >
               <Icon name="x" className="w-5 h-5" />
               <span>ปิดหน้าต่าง</span>
