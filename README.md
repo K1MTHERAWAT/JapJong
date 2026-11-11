@@ -2,26 +2,28 @@
 
 ระบบบริหารจัดการคำขอใช้สถานที่ราชการ ขอยืม–คืนครุภัณฑ์ และแจ้งซ่อมบำรุง สำหรับองค์การบริหารส่วนตำบล (อบต.) พัฒนาด้วยสถาปัตยกรรม Monorepo ระดับ Production-ready โดยใช้ **Next.js 15 + NestJS 11 + Tailwind CSS + PostgreSQL (Supabase / Docker + Prisma ORM)**
 
-> 📖 **คู่มือการใช้งานสำหรับประชาชนและผู้ใช้งานทั่วไป:** อ่านได้ที่ไฟล์ **[`USER_MANUAL.md`](./USER_MANUAL.md)**
+> 📖 **คู่มือการใช้งานสำหรับประชาชนและผู้ใช้งานทั่วไป:** อ่านได้ที่ไฟล์ **[`USER_MANUAL.md`](./USER_MANUAL.md)**  
+> 🎨 **เอกสารมาตรฐานการออกแบบ UI/UX กลาง (Design System):** อ่านได้ที่ไฟล์ **[`DESIGN.md`](./DESIGN.md)**
 
 ---
 
 ## สถาปัตยกรรมระบบ (Architecture)
 
-* **Frontend**: Next.js 15 (App Router) + Tailwind CSS (Responsive Desktop / Tablet / Mobile + Print A4 ใบอนุญาตราชการ)
+* **Frontend**: Next.js 15 (App Router) + Tailwind CSS (Responsive Desktop / Tablet / Mobile + Print A4 ใบอนุญาตราชการ พร้อมระบบ Pinned Sticky Controls ตรึง Header และ Footer Action Bar ลอยตัว)
 * **Backend API**: NestJS 11 + Express + RESTful API + ValidationPipe (`class-validator`)
 * **Database**: รองรับทั้ง **Supabase PostgreSQL (Cloud)** และ **PostgreSQL 16 (Docker Compose)**
 * **ORM & Migrations**: Prisma ORM v6 + สคริปต์อัปเดตโครงสร้างฐานข้อมูลอัตโนมัติ (`migrate-supabase.ts`)
 * **Two-Factor Signing Verification**: ระบบยืนยันการลงนามเอกสาร 2 ชั้นด้วย **Email OTP (Resend SDK / Mock Mode)** + **รหัส PIN 6 หลักส่วนบุคคล** + **ลายมือชื่อดิจิทัลที่วาดจริง**
 * **LINE Official Account & Notification System (Phase 3)**: ระบบแจ้งเตือนประชาชนและเจ้าหน้าที่ผ่าน **LINE Messaging API (Push Text & Flex Messages)** พร้อม **Outbox Queue (Idempotency, Exponential Backoff Retry)**, **LINE Webhook (HMAC-SHA256, Friendship Status Tracking)** และ **Mock Provider** สำหรับโหมดทดสอบ
 * **LINE Login & Onboarding (Phase 2)**: เข้าสู่ระบบและเชื่อมต่อบัญชีด้วย LINE พร้อมระบบลงทะเบียนผู้ใช้ใหม่และบันทึกความยินยอม **PDPA Consent**
-* **Document Security**: ระบบตรวจสอบเอกสารดิจิทัล QR Code (`qrcode`, `html5-qrcode`), รหัสยืนยันสุ่ม 32-byte, SHA-256 Document Hashing และบันทึกประวัติการสแกน
+* **Document Security**: ระบบตรวจสอบเอกสารดิจิทัล QR Code ความเร็วสูง (`@nimiq/qr-scanner`, `qrcode`), รหัสยืนยันสุ่ม 32-byte, SHA-256 Document Hashing และบันทึกประวัติการสแกน
 * **Shared Package**: `@japjong/shared` (TypeScript Types, Labels, RBAC Logic, Date Helpers, Period Conflict Checks)
-* **Testing & CI/CD**: Vitest (Unit & Integration Tests 403 ข้อ ครอบคลุม 30 Test Files ใน Monorepo 100% Pass) + GitHub Actions CI Pipeline + Multi-stage Dockerfile
+* **Testing & CI/CD**: Vitest (Unit & Integration Tests 429 ข้อ ครอบคลุม 31 Test Files ใน Monorepo 100% Pass) + GitHub Actions CI Pipeline + Multi-stage Dockerfile
 * **LINE Webhook & LIFF Integration (Phase 4)**: รองรับการเข้าสู่ระบบอัตโนมัติผ่าน **LINE Front-end Framework (LIFF SDK)**, Direct Routing ถอดรหัส `liff.state`, ป้องกัน Open Redirect และระบบตรวจสอบ Webhook Signature (HMAC-SHA256) ป้องกัน Replay Attack
 * **LINE Rich Menu & Flex Message Engine (Phase 5)**: ระบบ Rich Menu อัจฉริยะแบบแยกบทบาท (Citizen, Staff, Admin, Guest) สลับเมนูอัตโนมัติตาม Role ของผู้ใช้งาน พร้อมระบบสร้างภาพกราฟิกด้วย Pure Node.js (2500x1686, RGB PNG, zlib deflate) และหน้าจอแอดมินบริหารจัดการครบวงจร (`/admin/line`)
 * **Dynamic Sidebar Navigation & Service Management (`/admin/services`)**: ระบบจัดการบริการและเมนู Sidebar จากฐานข้อมูล (Database-driven) จัดหมวดหมู่บริการ กำหนดสิทธิ์ตามบทบาท จัดเรียงลำดับเมนูด้วย Drag & Drop พร้อมหน้าจอ Interactive Preview และการตรวจสอบสิทธิ์ความปลอดภัยที่ Backend ทุก API
 * **Role-Based Access Control & User Role Management (`/admin/permissions`)**: ระบบบริหารจัดการบทบาทผู้ใช้งาน (RBAC) และกำหนดบทบาทผู้ใช้แบบรายบุคคลหรือแบบกลุ่ม (Bulk Role Assignment) สไตล์ Minimal Clean & Responsive เชื่อมโยงการแสดงผลเมนูกับ Sidebar โดยอัตโนมัติ
+* **Account Isolation & Privacy Control**: แยกสิทธิ์การดูข้อมูลรายการยืมเด็ดขาด "บัญชีใครบัญชีมัน" (`mine=1`) สำหรับประชาชนในหน้า `/borrow/my`
 
 ---
 
@@ -35,6 +37,8 @@ BookingV1/
 ├── docker-compose.yml          # Local PostgreSQL 16 Service (ตัวเลือกสำรองกรณีรันในเครื่อง)
 ├── Dockerfile                  # Multi-stage Dockerfile สำหรับ Production Deployment
 ├── .dockerignore               # กำหนดไฟล์ที่ไม่ต้องส่งเข้า Docker build context
+├── DESIGN.md                   # เอกสารมาตรฐานกลางระบบออกแบบ UI/UX (Single Source of Truth)
+├── USER_MANUAL.md              # คู่มือการใช้งานระบบสำหรับประชาชนและผู้ใช้งานทั่วไป
 ├── LICENSE                     # MIT License
 ├── vitest.config.mts           # กำหนดค่า Unit Testing สำหรับ Monorepo
 ├── packages/
@@ -70,8 +74,8 @@ BookingV1/
 │           │   ├── liff/         # LINE Front-end Framework (LIFF SSO Login & Dynamic Route Resolver)
 │           │   ├── account/      # จัดการบัญชีผู้ใช้งาน (โปรไฟล์, ที่อยู่, เปลี่ยนรหัสผ่าน, ลายเซ็น & PIN)
 │           │   ├── notifications/# ศูนย์การแจ้งเตือน (/notifications) และตั้งค่าช่องทางรับแจ้งเตือน (/settings)
-│           │   ├── booking/      # ขอใช้สถานที่ราชการ (5 ขั้นตอน + ล็อกรายการตามที่เลือกจริง)
-│           │   ├── borrow/       # ขอยืม–คืนอุปกรณ์ราชการ (3 ขั้นตอน + แบบคำขอราชการ) และ /borrow/my
+│           │   ├── booking/      # ขอใช้สถานที่ราชการ (5 ขั้นตอน รองรับรายวัน/รายชั่วโมง + ล็อกรายการ)
+│           │   ├── borrow/       # ขอยืม–คืนอุปกรณ์ราชการ (4 ขั้นตอน + เช็คสต็อกอัตโนมัติ) และ /borrow/my (แยกสิทธิ์บัญชี)
 │           │   ├── repair/       # แจ้งซ่อมบำรุงและติดตามสถานะ (Fast-ticket ไม่บังคับลงนาม)
 │           │   ├── requests/     # รายละเอียดคำขอ เอกสารราชการ A4 และขอเลื่อนวัน/ยกเลิก
 │           │   ├── history/      # ประวัติคำขอและการดำเนินการ (แยกตามบทบาทและฟิลเตอร์ครบชุด)
@@ -191,8 +195,9 @@ pnpm dev
    - ผู้ใช้ทุกบทบาทสามารถแก้ไขชื่อ-นามสกุล, ชื่อเล่น, หน่วยงาน/ชุมชน, เบอร์โทรศัพท์ และ **ที่อยู่ตามทะเบียน/ที่ติดต่อ** (`บ้านเลขที่`, `หมู่ที่`, `ตำบล/แขวง`, `อำเภอ/เขต`, `จังหวัด`)
    - เปลี่ยนรหัสผ่านด้วยตนเอง และตั้งค่าลายมือชื่อดิจิทัลพร้อมรหัส PIN 6 หลักสำหรับยืนยันการลงนาม
    - ข้อมูลชื่อ หน่วยงาน และที่อยู่จากโปรไฟล์จะถูกดึงไปกรอกใน **แบบขอใช้สถานที่ราชการ** และ **แบบคำขอใช้อุปกรณ์ราชการ** โดยอัตโนมัติ
-2. **การจองสถานที่ (5 ขั้นตอน) และการยืมอุปกรณ์ (3 ขั้นตอน) พร้อมล็อกรายการอัตโนมัติ:**
-   - ตรวจสอบคิวว่างและป้องกันการจองสถานที่ซ้อนทับช่วงเวลา รวมถึงตัดสต็อกอุปกรณ์ตามช่วงวันที่ใช้งานจริง
+2. **การจองสถานที่ (5 ขั้นตอน) และการยืมอุปกรณ์ (4 ขั้นตอน) พร้อมระบบคิวและสต็อกอัตโนมัติ:**
+   - **การจองสถานที่ (5 ขั้นตอน):** เลือกสถานที่ -> เลือกวัน-เวลา (สลับโหมดรายวัน Full Day หรือรายชั่วโมง Hourly) -> เลือกอุปกรณ์เสริม -> กรอกแบบขอใช้สถานที่ -> ลงนามดิจิทัลและส่งคำขอ
+   - **การยืม–คืนอุปกรณ์ (4 ขั้นตอน):** เลือกอุปกรณ์และระบุจำนวน -> กำหนดวันยืมและคืนอุปกรณ์ (คำนวณจำนวนวันและตรวจเช็คสต็อกคงเหลือตามช่วงวันจริง) -> กรอกแบบคำขอใช้อุปกรณ์ -> ลงนามดิจิทัลและส่งคำขอ
    - ในขั้นตอนกรอกคำขอ รายการภายใต้หัวข้อ **"มีความประสงค์ขอใช้สถานที่ราชการ ดังนี้"** และ **"มีความประสงค์ขอใช้อุปกรณ์ราชการ ดังนี้"** จะถูกล็อกตามสถานที่และอุปกรณ์ที่เลือกไว้ในขั้นตอนก่อนหน้า ป้องกันการพิมพ์แก้ไขรายการเองโดยไม่ผ่านการตรวจคิว/สต็อก
 3. **เอกสารราชการอิเล็กทรอนิกส์ 4 ฝ่าย (`OfficialGovFormDocument`):**
    - แสดงผลและสั่งพิมพ์ใบอนุญาตขนาด A4 ตามรูปแบบหนังสือราชการ:
@@ -200,14 +205,14 @@ pnpm dev
      2. **ความเห็นของเจ้าหน้าที่ผู้ตรวจสอบ** (แสดงตำแหน่งจริงของผู้ลงนาม)
      3. **ความเห็นของปลัดองค์การบริหารส่วนตำบล**
      4. **คำสั่งของนายกองค์การบริหารส่วนตำบล**
-4. **Sidebar แยกหมวดหมู่ & Sticky Action Bar:**
-   - แถบเมนูด้านซ้ายจัดหมวดหมู่ตามบทบาทชัดเจน (*บริการหลัก, รายการและประวัติ, งานเจ้าหน้าที่, งานผู้บริหาร, ระบบและผู้ดูแล, บัญชีผู้ใช้งาน*) ย่อ/ขยายได้ และรองรับ Mobile Drawer
-   - มีแถบหัวข้อหน้า (Top Page Header) พร้อมปุ่มย้อนกลับ และแถบปุ่มดำเนินการด้านล่างแบบลอยตัว (Sticky Footer Action Bar) ในหน้าฟอร์มหลายขั้นตอน
-5. **ระบบตรวจสอบเอกสารราชการด้วย QR Code (Document Verification & Anti-Tampering):**
+4. **ระบบแถบควบคุมตรึงติดหน้าจอ (Sticky Step Header & Pinned Action Bar Footer):**
+   - **Sticky Step Header:** แถบหัวข้อตรึงอยู่บนสุดของหน้าจอ (`top-0`) พร้อมเอฟเฟกต์ Glassmorphism / Backdrop Blur ระบุขั้นตอนปัจจุบันและสรุปจำนวนรายการที่เลือกไว้ ไม่เลื่อนหายไปตามการเลื่อนหน้าจอ
+   - **Pinned Action Bar Footer:** แถบดำเนินการลอยตรึงติดขอบล่าง (`bottom-0`) แสดงชิปสรุปรายการที่เลือกไว้ (สามารถคลิก `✕` เพื่อยกเลิกรายการได้ทันที) พร้อมปุ่ม "ล้างทั้งหมด" และปุ่ม "ถัดไป" ออกแบบให้ใช้งานสะดวกรวดเร็วทั้งบนคอมพิวเตอร์ (Floating Pill Card) และมือถือ (Docked Bottom Bar)
+5. **ระบบตรวจสอบเอกสารราชการด้วย QR Code ความเร็วสูง (Document Verification & High-Speed Scanner):**
    - เอกสารราชการที่ผ่านการอนุมัติแล้วจะได้รับการสร้างรหัสยืนยันดิจิทัล (Verification Token สุ่ม 32-byte) และคำนวณ **SHA-256 Hash** ประจำเอกสาร
    - ฝัง QR Code ลงในเอกสารราชการทางการ (`OfficialGovFormDocument`) ที่มุมล่างขวา เชื่อมโยงตรงไปยัง URL ตรวจสอบสาธารณะ
    - **ประชาชนทั่วไป (`/verify/[token]`):** ตรวจสอบสถานะเอกสารได้ทันทีจากสมาร์ตโฟน โดยไม่เปิดเผยข้อมูลส่วนบุคคล (PII Safe) แสดงเฉพาะสถานะความถูกต้อง วันที่ออกเอกสาร และหน่วยงานผู้ออก (อบต.)
-   - **เจ้าหน้าที่ (`/staff/verify`):** สแกนผ่านกล้องมือถือสด (ตรวจจับกล้องหลังอัตโนมัติ), อัปโหลดรูปภาพ QR Code หรือค้นหาด้วยเลขที่เอกสาร แสดงข้อมูลระดับลึก เช่น ชื่อผู้ยื่น ลายมือชื่อการอนุมัติ พร้อมบันทึกประวัติการสแกนลงฐานข้อมูลอัตโนมัติ
+   - **เจ้าหน้าที่ (`/staff/verify`):** สแกนผ่านกล้องมือถือสดความเร็วสูง (ขับเคลื่อนด้วยไลบรารีสแกนเนอร์ระดับ Production Nimiq `qr-scanner` รองรับการเปิด-ปิดไฟฉาย สลับกล้องหน้า-หลัง และโฟกัสเร็ว), อัปโหลดรูปภาพ QR Code หรือค้นหาด้วยเลขที่เอกสาร แสดงข้อมูลระดับลึก เช่น ชื่อผู้ยื่น ลายมือชื่อการอนุมัติ พร้อมบันทึกประวัติการสแกนลงฐานข้อมูลอัตโนมัติ
 6. **ระบบยืนยันการลงนาม 2 ชั้น (Two-Factor Document Signing: Email OTP + รหัส PIN 6 หลัก):**
    - ออกแบบกระบวนการลงนามเอกสารให้มีความน่าเชื่อถือและปลอดภัยตามหลักการลายมือชื่ออิเล็กทรอนิกส์:
      - **ชั้นที่ 1 (Verified Session):** ยืนยันตัวตนด้วยรหัส Email OTP 6 หลัก (ส่งผ่าน Resend SDK พร้อมระบบ Mock OTP สำหรับสภาพแวดล้อมการพัฒนา) เมื่อยืนยันสำเร็จจะได้สิทธิ์เซสชันลงนามต่อเนื่อง 30 นาที ช่วยให้ตรวจคำขอและลงนามได้หลายฉบับในคิวโดยไม่ต้องขอ OTP ซ้ำ
@@ -261,6 +266,20 @@ pnpm dev
       - สลับสถานะเปิดใช้งานหรือระงับบัญชี (Active/Suspended)
       - ป้องกันไม่ให้ผู้ดูแลระบบลดระดับบทบาทหรือระงับบัญชีของตนเอง
     - **Real-Time Sidebar Synchronization:** ระบบเชื่อมต่อแบบ Reactive เมื่อมีการเปลี่ยนบทบาท จะส่ง Event ปลุกให้ Sidebar Navigation โหลดเมนูสิทธิ์ใหม่จากฐานข้อมูลทันทีโดยไม่ต้องโหลดหน้าเว็บใหม่
+13. **ระบบติดตามและแจ้งคืนอุปกรณ์ "รายการยืมของฉัน" แยกสิทธิ์เด็ดขาด (Strict Account Isolation `/borrow/my`):**
+    - **บัญชีใครบัญชีมัน:** แสดงผลเฉพาะคำขอยืมอุปกรณ์ที่ผูกกับบัญชีผู้ใช้ปัจจุบัน (`requesterId === account.id`) อย่างเคร่งครัด คำขอของผู้อื่นหรือคำขอที่เจ้าหน้าที่กรอกแทนจะไม่แสดงปะปน
+    - **3 แท็บการติดตามสถานะ:**
+      - *ที่กำลังใช้งาน:* คำขอที่รอรับมอบหรือกำลังใช้งานอยู่ พร้อมวันรับ วันกำหนดคืน และปุ่ม **"แจ้งคืนอุปกรณ์"**
+      - *รอตรวจสอบ:* คำขอที่ส่งคืนแล้ว อยู่ระหว่างรอเจ้าหน้าที่ตรวจนับสภาพและเซ็นรับคืน
+      - *ประวัติ:* คำขอยืมอุปกรณ์ที่เสร็จสิ้นสมบูรณ์ในอดีต
+    - **Split-Pane Layout:** แบ่งหน้าจอออกเป็นฝั่งซ้าย (รายการค้นหาและบัตรคำขอ) และฝั่งขวา (รายละเอียดเต็ม ผลตรวจสภาพ และรูปถ่ายก่อน–หลังใช้งาน)
+14. **มาตรฐานเอกสารทางการแบบพิมพ์พร้อมใช้งาน (Print-Ready Official A4 Format):**
+    - ออกแบบคอมโพเนนต์ `OfficialGovFormDocument` ให้จัดหน้ากระดาษขนาด A4 แนวตั้งพอดีหน้าอย่างสมบูรณ์แบบ
+    - บังคับการแสดงผลชุดสีสว่าง (Light Theme Enforcement) ในโหมดพิมพ์ เพื่อให้เอกสารคมชัดและประหยัดหมึกพิมพ์ แม้หน้าจอจะเปิดใช้งานโหมดมืด (Dark Mode) อยู่ก็ตาม
+    - ซ่อน URL วันที่ และ Header ของเว็บเบราว์เซอร์อัตโนมัติขณะสั่งพิมพ์ผ่าน CSS `@media print`
+15. **เอกสารระบบการออกแบบกลางและคู่มือระบบ (Centralized Documentation):**
+    - **[`DESIGN.md`](./DESIGN.md):** เอกสารมาตรฐานกลางสำหรับกำหนดแนวทางการออกแบบ UI/UX ทั้งโปรเจกต์ (Design Principles, Design Tokens, Typography, Spacing Scale, Component Guidelines, Interaction Patterns, Responsive Guidelines) ทำหน้าที่เป็น Single Source of Truth
+    - **[`USER_MANUAL.md`](./USER_MANUAL.md):** คู่มือการใช้งานระบบฉบับสมบูรณ์สำหรับประชาชนและเจ้าหน้าที่ (Flowcharts, วิธีการสมัคร/เข้าสู่ระบบ, การยื่นคำขอทุกประเภท, การสแกน QR Code และการใช้งานผ่าน LINE OA / LIFF)
 
 
 ---
@@ -274,7 +293,7 @@ pnpm dev
    - ผู้ขอใช้บริการไม่สามารถลงนามอนุมัติคำขอของตนเองได้
    - ปลัด อบต. (`APPROVER_L2`) และ นายก อบต. (`APPROVER_L1`) ต้องเป็นคนละบัญชีในการลงนามคำขอเดียวกัน
    - เจ้าหน้าที่ไม่สามารถตรวจรับมอบ–รับคืนอุปกรณ์ให้คำขอของตนเองได้
-5. **การเข้ารหัสด้วย Argon2id:** รหัสผ่านบัญชี, รหัส PIN 6 หลัก และรหัส OTP ได้รับการแฮชด้วย `argon2id`
+5. **การเข้ารหัสด้วย Argon2id:** รหัสผ่านบัญชีและรหัส PIN 6 หลักได้รับการแฮชด้วย `argon2id` ส่วนรหัส Email OTP สำหรับยืนยันการลงนามจัดเก็บเป็นแฮช SHA-256 HMAC พร้อม Salt ลับเฉพาะ
 6. **การป้องกันการปลอมแปลงเอกสาร (Document Integrity & Anti-Tampering):**
    - ตรวจสอบสถานะเอกสารแบบเรียลไทม์ผ่าน Backend (`VALID`, `REVOKED`, `INVALID`, `NOT_FOUND`)
    - รองรับการเพิกถอนสิทธิ์เอกสาร (`POST /documents/:id/revoke`) และการออกเอกสารฉบับใหม่ (Versioning) โดยฉบับเดิมจะสิ้นผลทันที
@@ -551,16 +570,6 @@ erDiagram
         timestamptz created_at
     }
 
-    otp_codes {
-        string id PK
-        string phone
-        string code_hash "argon2id"
-        int attempts
-        timestamptz expires_at
-        timestamptz consumed_at
-        timestamptz created_at
-    }
-
     document_verifications {
         string id PK
         string document_id FK
@@ -731,7 +740,7 @@ erDiagram
 
 ## มาตรฐานการทดสอบและการรับประกันคุณภาพ (Quality Assurance)
 
-* **Vitest Suite**: รันแบบคู่ขนานผ่าน `pnpm test` ครอบคลุม **30 Test Files** รวม **403 ข้อทดสอบ (100% Pass)**
+* **Vitest Suite**: รันแบบคู่ขนานผ่าน `pnpm test` ครอบคลุม **31 Test Files** รวม **429 ข้อทดสอบ (100% Pass)**
 * **TypeScript Strictness**: ตรวจสอบ Types ทุกโปรเจกต์ (`@japjong/shared`, `@japjong/api`, `@japjong/web`) ไร้ข้อผิดพลาด
 * **Production Build Validation**: Next.js App Router คอมไพล์และสร้าง Static/Dynamic Pages สำเร็จครบทุกเส้นทาง
 * **Discipline**: มีการจัดเก็บบันทึกประวัติและโครงสร้างข้อมูลอย่างเป็นระบบ ปลอดภัยตามมาตรฐานสถาปัตยกรรมภาครัฐ
