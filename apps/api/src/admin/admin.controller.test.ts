@@ -3,6 +3,16 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { AdminController } from './admin.controller';
 import { Account, DEFAULT_PERMISSIONS } from '@japjong/shared';
 
+/**
+ * ชุดการทดสอบระดับหน่วย (Unit Tests) สำหรับ AdminController
+ * ครอบคลุม:
+ * 1. การดึงรายชื่อผู้ใช้ และการค้นหา/กรองบทบาท
+ * 2. การอัปเดตสิทธิ์ บทบาท ข้อมูลโปรไฟล์ และการรีเซ็ตรหัสผ่าน
+ * 3. กลไกความปลอดภัย Self-Protection ป้องกันแอดมินปลดสิทธิ์ตนเอง
+ * 4. การจัดการบทบาท (Role CRUD & Bulk Role Assignment)
+ * 5. แดชบอร์ดภาพรวมและตัวชี้วัด (Overview Metrics)
+ * 6. คำสั่งพิเศษสำหรับสภาพแวดล้อมทดสอบ (Dev / Demo Endpoints)
+ */
 describe('AdminController Unit Tests', () => {
   let controller: AdminController;
   let mockDb: any;
@@ -12,6 +22,7 @@ describe('AdminController Unit Tests', () => {
   beforeEach(() => {
     process.env.DEMO_MODE = 'true';
 
+    // บัญชีจำลอง: ผู้ดูแลระบบสูงสุด (Actor)
     actorAdmin = {
       id: 'u-admin-01',
       username: 'admin01',
@@ -30,6 +41,7 @@ describe('AdminController Unit Tests', () => {
       createdAt: new Date().toISOString(),
     };
 
+    // บัญชีจำลอง: ผู้ใช้งานเป้าหมายที่จะถูกแก้ไขสิทธิ์ (Target)
     targetUser = {
       id: 'u-target-01',
       username: 'somchai_user',
@@ -48,6 +60,7 @@ describe('AdminController Unit Tests', () => {
       createdAt: new Date().toISOString(),
     };
 
+    // Mock Database Service
     mockDb = {
       accounts: [actorAdmin, targetUser],
       venues: [{ id: 'v-01' }],
@@ -98,28 +111,38 @@ describe('AdminController Unit Tests', () => {
     controller = new AdminController(mockDb);
   });
 
+  // ==========================================
+  // 1. ทดสอบการค้นหาและดึงรายชื่อผู้ใช้
+  // ==========================================
   describe('GET users (listUsers)', () => {
     it('returns public account representations for all accounts', () => {
+      // ต้องแปลงข้อมูลเป็น Public format เพื่อซ่อนรหัสผ่าน
       const users = controller.listUsers();
       expect(users.length).toBe(2);
       expect(mockDb.toPublic).toHaveBeenCalledTimes(2);
     });
 
     it('filters users by search query (q)', () => {
+      // ค้นหาตามคำค้นชื่อ
       const users = controller.listUsers('สมชาย');
       expect(users.length).toBe(1);
       expect(users[0].name).toBe('สมชาย ผู้ใช้งาน');
     });
 
     it('filters users by role', () => {
+      // กรองเฉพาะบทบาท ADMIN
       const admins = controller.listUsers(undefined, 'ADMIN');
       expect(admins.length).toBe(1);
       expect(admins[0].role).toBe('ADMIN');
     });
   });
 
+  // ==========================================
+  // 2. ทดสอบการอัปเดตสิทธิ์และข้อมูลบัญชี
+  // ==========================================
   describe('PATCH users/:id/permissions (updatePermissions)', () => {
     it('updates user role and sets default permissions for the new role', async () => {
+      // เมื่อเปลี่ยนบทบาทเป็น STAFF สิทธิ์เริ่มต้นต้องเปลี่ยนตาม
       const updated = await controller.updatePermissions(actorAdmin, 'u-target-01', {
         role: 'STAFF',
       });
@@ -130,6 +153,7 @@ describe('AdminController Unit Tests', () => {
     });
 
     it('updates fine-grained permissions for user', async () => {
+      // เปิดสิทธิ์ย่อย manageResources ให้ผู้ใช้
       await controller.updatePermissions(actorAdmin, 'u-target-01', {
         permissions: { manageResources: true },
       });
@@ -137,6 +161,7 @@ describe('AdminController Unit Tests', () => {
     });
 
     it('updates user profile details and phone', async () => {
+      // แก้ไขชื่อ เบอร์โทร และตำแหน่ง
       await controller.updatePermissions(actorAdmin, 'u-target-01', {
         name: 'สมชาย แก้ไขใหม่',
         phone: '0898887766',
@@ -148,6 +173,7 @@ describe('AdminController Unit Tests', () => {
     });
 
     it('resets user password with valid length', async () => {
+      // รีเซ็ตรหัสผ่านใหม่ที่มีความยาวตั้งแต่ 4 ตัวอักษรขึ้นไป
       await controller.updatePermissions(actorAdmin, 'u-target-01', {
         newPassword: 'newAdminPassword123',
       });
@@ -156,6 +182,7 @@ describe('AdminController Unit Tests', () => {
     });
 
     it('throws BadRequestException if new password is too short', async () => {
+      // ปฏิเสธรหัสผ่านที่สั้นเกินไป
       await expect(
         controller.updatePermissions(actorAdmin, 'u-target-01', {
           newPassword: '12',
@@ -164,6 +191,7 @@ describe('AdminController Unit Tests', () => {
     });
 
     it('deactivates or activates a user account', async () => {
+      // สั่งระงับและเปิดการใช้งานบัญชี
       await controller.updatePermissions(actorAdmin, 'u-target-01', {
         active: false,
       });
@@ -175,7 +203,11 @@ describe('AdminController Unit Tests', () => {
       expect(targetUser.active).toBe(true);
     });
 
+    // ==========================================
+    // 3. ทดสอบกลไกป้องกันแอดมินล็อกตนเอง (Self-Protection)
+    // ==========================================
     it('throws ForbiddenException if admin attempts to demote their own admin role', async () => {
+      // แอดมินต้องไม่สามารถลดระดับบทบาทของตนเองเป็น USER ได้
       await expect(
         controller.updatePermissions(actorAdmin, actorAdmin.id, {
           role: 'USER',
@@ -184,6 +216,7 @@ describe('AdminController Unit Tests', () => {
     });
 
     it('throws ForbiddenException if admin attempts to revoke their own manageUsers permission', async () => {
+      // แอดมินต้องไม่สามารถเพิกถอนสิทธิ์ manageUsers ของตนเองได้
       await expect(
         controller.updatePermissions(actorAdmin, actorAdmin.id, {
           permissions: { manageUsers: false },
@@ -192,6 +225,7 @@ describe('AdminController Unit Tests', () => {
     });
 
     it('throws ForbiddenException if admin attempts to deactivate their own account', async () => {
+      // แอดมินต้องไม่สามารถสั่งปิดการใช้งานบัญชีตนเองได้
       await expect(
         controller.updatePermissions(actorAdmin, actorAdmin.id, {
           active: false,
@@ -200,12 +234,16 @@ describe('AdminController Unit Tests', () => {
     });
 
     it('throws NotFoundException when user does not exist', async () => {
+      // ส่งกลับ 404 เมื่อไม่พบ ID บัญชีผู้ใช้
       await expect(
         controller.updatePermissions(actorAdmin, 'non-existing', { name: 'New' }),
       ).rejects.toThrow(NotFoundException);
     });
   });
 
+  // ==========================================
+  // 4. ทดสอบแดชบอร์ดภาพรวมและการแจ้งเตือน
+  // ==========================================
   describe('Admin Overview & Notifications', () => {
     it('returns correct system overview metrics', () => {
       const ov = controller.overview();
@@ -228,6 +266,9 @@ describe('AdminController Unit Tests', () => {
     });
   });
 
+  // ==========================================
+  // 5. ทดสอบคำสั่งเครื่องมือสำหรับ Dev / Demo
+  // ==========================================
   describe('Dev Management Endpoints', () => {
     it('clears requests in demo mode', async () => {
       const res = await controller.clearRequests();
@@ -242,6 +283,9 @@ describe('AdminController Unit Tests', () => {
     });
   });
 
+  // ==========================================
+  // 6. ทดสอบการบริหารจัดการบทบาท (Role Management)
+  // ==========================================
   describe('Role Management Endpoints', () => {
     it('listRoles returns roles from db', () => {
       const roles = controller.listRoles();

@@ -199,6 +199,8 @@
     background-color: var(--color-brand-tint) !important;
   }
   .dark .text-\[\#14231f\],
+  .dark .text-\[\#1e302a\],
+  .dark .text-\[\#2b3833\],
   .dark .text-\[\#000000\],
   .dark .text-black {
     color: var(--color-ink) !important;

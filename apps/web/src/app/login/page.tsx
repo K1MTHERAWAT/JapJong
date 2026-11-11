@@ -242,7 +242,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#f6f5f0] text-[#14231f] flex flex-col lg:flex-row font-sans relative">
+    <div className="min-h-screen w-full bg-[#f6f5f0] dark:bg-bg text-[#14231f] dark:text-ink flex flex-col lg:flex-row font-sans relative">
       {/* Floating Theme Toggle (top-right, safe-area aware) */}
       <button
         type="button"
@@ -366,11 +366,11 @@ export default function LoginPage() {
         <div className="w-full max-w-[460px] flex flex-col gap-5">
           
           {/* Card Container: บนคอมจะเป็นการ์ดขาวขอบมนเงา บนมือถือจะเป็นการ์ดเรียบโปร่งสว่าง */}
-          <div className="bg-transparent lg:bg-white lg:border lg:border-[#e3e1d8] lg:rounded-[24px] p-2 sm:p-4 lg:p-9 lg:shadow-[0_1px_2px_rgba(20,35,31,0.04),0_16px_40px_rgba(20,35,31,0.07)] flex flex-col gap-5">
+          <div className="bg-transparent lg:bg-white lg:dark:bg-surface lg:border lg:border-[#e3e1d8] lg:dark:border-line lg:rounded-[24px] p-2 sm:p-4 lg:p-9 lg:shadow-[0_1px_2px_rgba(20,35,31,0.04),0_16px_40px_rgba(20,35,31,0.07)] flex flex-col gap-5">
 
             {/* MOBILE ONLY HEADER (สไตล์ B: โลโก้กล่อง 64x64 สีขาวตรงกลาง บนพื้นสว่าง) */}
             <div className="flex lg:hidden flex-col items-center text-center gap-2.5 pt-2 pb-1">
-              <div className="w-16 h-16 rounded-[20px] bg-white border border-[#e3e1d8] p-1.5 flex items-center justify-center shadow-[0_6px_18px_rgba(20,35,31,0.06)] shrink-0">
+              <div className="w-16 h-16 rounded-[20px] bg-white dark:bg-surface border border-[#e3e1d8] dark:border-line p-1.5 flex items-center justify-center shadow-[0_6px_18px_rgba(20,35,31,0.06)] shrink-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/logo.png"
@@ -378,8 +378,8 @@ export default function LoginPage() {
                   className="size-full object-contain"
                 />
               </div>
-              <h1 className="text-[28px] font-bold tracking-tight text-[#14231f] leading-tight">จับจอง</h1>
-              <p className="text-[13.5px] text-[#4a5853] leading-relaxed">
+              <h1 className="text-[28px] font-bold tracking-tight text-[#14231f] dark:text-ink leading-tight">จับจอง</h1>
+              <p className="text-[13.5px] text-[#4a5853] dark:text-ink-mute leading-relaxed">
                 ระบบขอใช้สถานที่ ขอใช้อุปกรณ์ และแจ้งซ่อม
                 <br />
                 องค์การบริหารส่วนตำบล (อบต.)
@@ -388,15 +388,15 @@ export default function LoginPage() {
 
             {/* DESKTOP ONLY HEADER (สไตล์ A: หัวเรื่องในการ์ดขวา) */}
             <div className="hidden lg:flex flex-col gap-1.5">
-              <h1 className="text-[28px] font-bold tracking-tight text-[#14231f]">เข้าสู่ระบบ</h1>
-              <p className="text-[14.5px] text-[#4a5853]">เข้าใช้งานด้วยบัญชีหน่วยงาน หรือชื่อผู้ใช้ของคุณ</p>
+              <h1 className="text-[28px] font-bold tracking-tight text-[#14231f] dark:text-ink">เข้าสู่ระบบ</h1>
+              <p className="text-[14.5px] text-[#4a5853] dark:text-ink-mute">เข้าใช้งานด้วยบัญชีหน่วยงาน หรือชื่อผู้ใช้ของคุณ</p>
             </div>
 
             {/* แจ้งเตือนกรณีพยายามล็อกอินด้วย LINE แต่ยังไม่ได้เชื่อมต่อบัญชี */}
             {unlinkedNotice.show && (
-              <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 text-[13px] text-amber-900 flex flex-col gap-2">
-                <div className="flex items-center gap-2 font-bold text-amber-950">
-                  <Icon name="alert-triangle" className="w-5 h-5 text-amber-600 shrink-0" />
+              <div className="rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 p-4 text-[13px] text-amber-900 dark:text-amber-200 flex flex-col gap-2">
+                <div className="flex items-center gap-2 font-bold text-amber-950 dark:text-amber-100">
+                  <Icon name="alert-triangle" className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
                   <span>ยังไม่พบบัญชีจับจองที่เชื่อมต่อกับ LINE</span>
                 </div>
                 <p className="leading-relaxed">
@@ -404,7 +404,7 @@ export default function LoginPage() {
                   <br />
                   กรุณาเข้าสู่ระบบด้วย <b>ชื่อผู้ใช้และรหัสผ่านเดิม</b> ของท่าน เพื่อเข้าใช้งานระบบ
                 </p>
-                <div className="text-[11.5px] text-amber-700 bg-amber-100/60 rounded-xl px-3 py-1.5 mt-1">
+                <div className="text-[11.5px] text-amber-700 dark:text-amber-300 bg-amber-100/60 dark:bg-amber-900/30 rounded-xl px-3 py-1.5 mt-1">
                   💡 เมื่อเข้าสู่ระบบสำเร็จ ท่านจะสามารถเชื่อมต่อบัญชี LINE ได้ที่หน้าตั้งค่าโปรไฟล์
                 </div>
               </div>
@@ -418,17 +418,17 @@ export default function LoginPage() {
               type="button"
               disabled={submitting}
               onClick={handleOpenGovSso}
-              className="h-[52px] w-full rounded-full lg:rounded-[14px] bg-white lg:bg-[#e1efe9] hover:bg-[#f1f5f3] lg:hover:bg-[#d3e8df] active:scale-[0.99] border-[1.5px] border-[#0b6b5c] lg:border-transparent text-[#074d41] font-semibold text-[15.5px] flex items-center justify-center gap-2.5 shadow-sm transition disabled:opacity-50 cursor-pointer"
+              className="h-[52px] w-full rounded-full lg:rounded-[14px] bg-white dark:bg-surface lg:bg-[#e1efe9] lg:dark:bg-brand/15 hover:bg-[#f1f5f3] dark:hover:bg-brand/20 lg:hover:bg-[#d3e8df] lg:dark:hover:bg-brand/25 active:scale-[0.99] border-[1.5px] border-[#0b6b5c] lg:border-transparent dark:border-brand/40 text-[#074d41] dark:text-brand font-semibold text-[15.5px] flex items-center justify-center gap-2.5 shadow-sm transition disabled:opacity-50 cursor-pointer"
             >
-              <GovIcon className="w-5 h-5 text-[#074d41]" />
+              <GovIcon className="w-5 h-5 text-[#074d41] dark:text-brand" />
               <span>เข้าสู่ระบบด้วย Gov Center (SSO)</span>
             </button>
 
             {/* ตัวแบ่งเส้นกลาง */}
-            <div className="flex items-center gap-3 text-[12.5px] text-[#56625d]">
-              <span className="flex-1 h-px bg-[#d7deda]" />
+            <div className="flex items-center gap-3 text-[12.5px] text-[#56625d] dark:text-ink-mute">
+              <span className="flex-1 h-px bg-[#d7deda] dark:bg-line" />
               <span>หรือเข้าด้วยชื่อผู้ใช้ / รหัสผ่าน</span>
-              <span className="flex-1 h-px bg-[#d7deda]" />
+              <span className="flex-1 h-px bg-[#d7deda] dark:bg-line" />
             </div>
 
             {/* ฟอร์มกรอกชื่อผู้ใช้และรหัสผ่าน */}
@@ -436,7 +436,7 @@ export default function LoginPage() {
               
               {/* ช่องกรอกชื่อผู้ใช้ */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[13.5px] font-semibold text-[#1e302a]">
+                <label className="text-[13.5px] font-semibold text-[#1e302a] dark:text-ink">
                   ชื่อผู้ใช้, อีเมล หรือ เบอร์โทรศัพท์
                 </label>
                 <input
@@ -445,27 +445,27 @@ export default function LoginPage() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="เช่น somchai หรืออีเมล"
-                  className="w-full h-[50px] px-5 lg:px-4 rounded-full lg:rounded-[12px] border-[1.5px] border-[#87928d] bg-white text-[#14231f] text-[15px] focus:outline-none focus:border-[#0b6b5c] focus:ring-2 focus:ring-[#0b6b5c]/20 transition"
+                  className="w-full h-[50px] px-5 lg:px-4 rounded-full lg:rounded-[12px] border-[1.5px] border-[#87928d] dark:border-line bg-white dark:bg-surface text-[#14231f] dark:text-ink text-[15px] focus:outline-none focus:border-[#0b6b5c] dark:focus:border-brand focus:ring-2 focus:ring-[#0b6b5c]/20 transition placeholder:text-ink-mute/50"
                   autoComplete="username"
                 />
               </div>
 
               {/* ช่องกรอกรหัสผ่าน พร้อมปุ่มเปิด/ปิดตา */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[13.5px] font-semibold text-[#1e302a]">รหัสผ่าน</label>
+                <label className="text-[13.5px] font-semibold text-[#1e302a] dark:text-ink">รหัสผ่าน</label>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="กรอกรหัสผ่าน"
-                    className="w-full h-[50px] pl-5 lg:pl-4 pr-12 rounded-full lg:rounded-[12px] border-[1.5px] border-[#87928d] bg-white text-[#14231f] text-[15px] focus:outline-none focus:border-[#0b6b5c] focus:ring-2 focus:ring-[#0b6b5c]/20 transition"
+                    className="w-full h-[50px] pl-5 lg:pl-4 pr-12 rounded-full lg:rounded-[12px] border-[1.5px] border-[#87928d] dark:border-line bg-white dark:bg-surface text-[#14231f] dark:text-ink text-[15px] focus:outline-none focus:border-[#0b6b5c] dark:focus:border-brand focus:ring-2 focus:ring-[#0b6b5c]/20 transition placeholder:text-ink-mute/50"
                     autoComplete="current-password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute top-1/2 -translate-y-1/2 right-2 w-10 h-10 flex items-center justify-center text-[#56625d] hover:text-[#0b6b5c] rounded-full transition cursor-pointer"
+                    className="absolute top-1/2 -translate-y-1/2 right-2 w-10 h-10 flex items-center justify-center text-[#56625d] dark:text-ink-mute hover:text-[#0b6b5c] dark:hover:text-brand rounded-full transition cursor-pointer"
                     aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
                   >
                     {showPassword ? (
@@ -490,18 +490,18 @@ export default function LoginPage() {
               */}
               <div
                 onClick={() => setPdpa((v) => !v)}
-                className="lg:bg-[#f1f5f3] lg:rounded-[12px] lg:p-3.5 flex items-start gap-3 cursor-pointer select-none py-1"
+                className="lg:bg-[#f1f5f3] lg:dark:bg-surface-muted lg:border lg:border-transparent lg:dark:border-line lg:rounded-[12px] lg:p-3.5 flex items-start gap-3 cursor-pointer select-none py-1"
               >
                 <div
                   className={`w-[22px] h-[22px] rounded-[6px] border-[1.5px] flex items-center justify-center shrink-0 mt-0.5 transition ${
-                    pdpa ? 'bg-[#0b6b5c] border-[#0b6b5c] text-white' : 'bg-white border-[#87928d]'
+                    pdpa ? 'bg-[#0b6b5c] border-[#0b6b5c] text-white' : 'bg-white dark:bg-surface border-[#87928d] dark:border-line'
                   }`}
                 >
                   {pdpa && <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} />}
                 </div>
-                <div className="text-[13px] text-[#2b3833] leading-relaxed">
+                <div className="text-[13px] text-[#2b3833] dark:text-ink leading-relaxed">
                   ยินยอมให้เก็บ ใช้ และเปิดเผยข้อมูลส่วนบุคคลตามนโยบาย PDPA{' '}
-                  <span className="text-[#0b6b5c] font-semibold underline underline-offset-2">
+                  <span className="text-[#0b6b5c] dark:text-brand font-semibold underline underline-offset-2">
                     อ่านประกาศความเป็นส่วนตัว
                   </span>
                 </div>
@@ -509,7 +509,7 @@ export default function LoginPage() {
 
               {/* แสดงข้อผิดพลาด */}
               {error && (
-                <div className="rounded-xl bg-[#FDE8E8] border border-[#f9b4b4] px-4 py-2.5 text-[13px] text-[#7a1010] flex items-center gap-2">
+                <div className="rounded-xl bg-[#FDE8E8] dark:bg-red-950/40 border border-[#f9b4b4] dark:border-red-900/50 px-4 py-2.5 text-[13px] text-[#7a1010] dark:text-red-300 flex items-center gap-2">
                   <Icon name="x" className="w-4 h-4 text-status-crit shrink-0" />
                   <span>{error}</span>
                 </div>
@@ -528,13 +528,13 @@ export default function LoginPage() {
               </button>
 
               {/* แถบลิงก์ล่าง */}
-              <div className="text-[13.5px] text-[#4a5853] text-center pt-1">
+              <div className="text-[13.5px] text-[#4a5853] dark:text-ink-mute text-center pt-1">
                 ยังไม่มีบัญชี?{' '}
-                <Link href="/register" className="font-bold text-[#0b6b5c] hover:underline">
+                <Link href="/register" className="font-bold text-[#0b6b5c] dark:text-brand hover:underline">
                   ลงทะเบียน
                 </Link>{' '}
                 · ลืมรหัสผ่าน?{' '}
-                <span className="text-[#0b6b5c] font-semibold cursor-pointer hover:underline">
+                <span className="text-[#0b6b5c] dark:text-brand font-semibold cursor-pointer hover:underline">
                   ติดต่อผู้ดูแลระบบ
                 </span>
               </div>
@@ -542,15 +542,15 @@ export default function LoginPage() {
 
             {/* บัญชีสาธิตสำหรับทดสอบระบบ (Demo Accounts) */}
             {isDemo && (
-              <div className="mt-2 pt-4 border-t border-dashed border-[#c8d4cf] flex flex-col gap-2.5">
+              <div className="mt-2 pt-4 border-t border-dashed border-[#c8d4cf] dark:border-line flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-[12px] font-bold text-[#0b6b5c] uppercase tracking-wide">
+                    <span className="text-[12px] font-bold text-[#0b6b5c] dark:text-brand uppercase tracking-wide">
                       ⚡ บัญชีทดสอบ (Demo)
                     </span>
                     <Chip tone="green">คลิกเดียวเข้าใช้งาน</Chip>
                   </div>
-                  <span className="text-[11px] text-[#697872]">ไม่ต้องกรอกรหัส</span>
+                  <span className="text-[11px] text-[#697872] dark:text-ink-mute">ไม่ต้องกรอกรหัส</span>
                 </div>
 
                 <div className="grid grid-cols-1 gap-2 max-h-[220px] overflow-y-auto pr-1">
@@ -565,23 +565,23 @@ export default function LoginPage() {
                         type="button"
                         disabled={submitting}
                         onClick={() => handleDemoLoginClick(acc.id)}
-                        className="w-full text-left border border-[#d7deda] hover:border-[#0b6b5c] hover:bg-[#f1f8f5] rounded-xl p-2.5 bg-white flex items-center justify-between gap-2.5 cursor-pointer transition group disabled:opacity-50"
+                        className="w-full text-left border border-[#d7deda] dark:border-line hover:border-[#0b6b5c] dark:hover:border-brand hover:bg-[#f1f8f5] dark:hover:bg-brand/10 rounded-xl p-2.5 bg-white dark:bg-surface flex items-center justify-between gap-2.5 cursor-pointer transition group disabled:opacity-50"
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-8 h-8 rounded-full bg-[#e1efe9] text-[#074d41] font-bold text-[12px] flex items-center justify-center shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-[#e1efe9] dark:bg-brand/20 text-[#074d41] dark:text-brand font-bold text-[12px] flex items-center justify-center shrink-0">
                             {acc.initial}
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <b className="text-[13px] text-[#14231f] truncate">{acc.name}</b>
+                              <b className="text-[13px] text-[#14231f] dark:text-ink truncate">{acc.name}</b>
                               <Chip tone={ROLE_TONE[acc.role]}>{ROLE_LABEL[acc.role]}</Chip>
                             </div>
-                            <div className="text-[11.5px] text-[#56625d] truncate">
+                            <div className="text-[11.5px] text-[#56625d] dark:text-ink-mute truncate">
                               {acc.position} · {acc.department}
                             </div>
                           </div>
                         </div>
-                        <span className="shrink-0 text-[12px] font-semibold text-[#0b6b5c] inline-flex items-center gap-0.5 group-hover:translate-x-0.5 transition">
+                        <span className="shrink-0 text-[12px] font-semibold text-[#0b6b5c] dark:text-brand inline-flex items-center gap-0.5 group-hover:translate-x-0.5 transition">
                           เข้าสู่ระบบ <Icon name="chevron-right" className="w-3.5 h-3.5" />
                         </span>
                       </button>
@@ -604,12 +604,12 @@ export default function LoginPage() {
           onClick={() => !govSubmitting && setShowGovModal(false)}
         >
           <div
-            className="w-full max-w-[440px] bg-white rounded-[24px] p-6 sm:p-7 shadow-xl border border-line flex flex-col gap-4"
+            className="w-full max-w-[440px] bg-white dark:bg-surface rounded-[24px] p-6 sm:p-7 shadow-xl border border-line flex flex-col gap-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-[#0b6b5c]/10 text-[#0b6b5c] flex items-center justify-center shrink-0">
+                <div className="w-11 h-11 rounded-2xl bg-[#0b6b5c]/10 dark:bg-brand/20 text-[#0b6b5c] dark:text-brand flex items-center justify-center shrink-0">
                   <GovIcon className="w-6 h-6" />
                 </div>
                 <div>
@@ -623,7 +623,7 @@ export default function LoginPage() {
                 type="button"
                 disabled={govSubmitting}
                 onClick={() => setShowGovModal(false)}
-                className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-ink-mute cursor-pointer"
+                className="w-8 h-8 rounded-full hover:bg-gray-100 dark:hover:bg-hover flex items-center justify-center text-ink-mute cursor-pointer"
                 aria-label="ปิดหน้าต่าง"
               >
                 <Icon name="x" className="w-4 h-4" />
@@ -672,7 +672,7 @@ export default function LoginPage() {
               </div>
 
               {govError && (
-                <div className="rounded-2xl bg-[#FDE8E8] border border-[#f9b4b4] px-3.5 py-2.5 text-[13px] text-[#7a1010] flex items-center gap-2">
+                <div className="rounded-2xl bg-[#FDE8E8] dark:bg-red-950/40 border border-[#f9b4b4] dark:border-red-900/50 px-3.5 py-2.5 text-[13px] text-[#7a1010] dark:text-red-300 flex items-center gap-2">
                   <Icon name="x" className="w-4 h-4 text-status-crit shrink-0" />
                   <span>{govError}</span>
                 </div>
@@ -683,7 +683,7 @@ export default function LoginPage() {
                   type="button"
                   disabled={govSubmitting}
                   onClick={() => setShowGovModal(false)}
-                  className="h-[46px] px-4 rounded-full border border-line text-[14px] font-medium text-ink hover:bg-gray-50 transition cursor-pointer"
+                  className="h-[46px] px-4 rounded-full border border-line text-[14px] font-medium text-ink hover:bg-gray-50 dark:hover:bg-hover transition cursor-pointer"
                 >
                   ยกเลิก
                 </button>
