@@ -1,9 +1,14 @@
-'use client';
+'use client'; // กำหนดให้คอมโพเนนต์นี้ทำงานในฝั่ง Client (React Client Component)
 
+// นำเข้า React Hooks พื้นฐานสำหรับจัดการ State, Effects และ Memoization
 import React, { useEffect, useMemo, useState } from 'react';
+// นำเข้า createPortal สำหรับเรนเดอร์ Modal นอก DOM Hierarchy ปกติ
 import { createPortal } from 'react-dom';
+// นำเข้า useRouter hook สำหรับสั่งนำทางเปลี่ยนเส้นทางผ่าน Next.js
 import { useRouter } from 'next/navigation';
+// นำเข้าไอคอนจาก lucide-react สำหรับหน้าขอใช้สถานที่
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Clock3, Eye, FileText, Upload, X } from 'lucide-react';
+// นำเข้า Type ข้อมูล, ค่าคงที่ และฟังก์ชันตรวจสอบความถูกต้องจากแพ็กเกจกลาง shared
 import {
   ConflictInfo,
   DayAvailability,
@@ -21,10 +26,15 @@ import {
   validateThaiAddressHierarchy,
   validateThaiPhone,
 } from '@japjong/shared';
+// นำเข้า Auth Context เพื่อตรวจสอบสิทธิ์ของผู้ใช้งานและเส้นทางหน้าแรกตามบทบาท
 import { roleHomePath, useAuth } from '@/components/auth-context';
+// นำเข้า AppShell คอมโพเนนต์เลย์เอาต์หลักของแอปพลิเคชัน
 import { AppShell } from '@/components/shell';
+// นำเข้า Icon แสดงรูปไอคอน SVG
 import { Icon } from '@/components/icons';
+// นำเข้าคอมโพเนนต์ฟอร์มกรอกเบอร์โทร 10 หลัก และเลือกที่อยู่ไทย 3 ระดับ
 import { Phone10DigitInput, ThaiAddressSelect } from '@/components/thai-address-select';
+// นำเข้า UI Components: ปฏิทินเลือกวัน, ป้าย Chip, ตัวเลือกวันเวลา, ฟอร์ม A4 ราชการ, กล่องลายเซ็น, Stepper
 import {
   CalendarC4,
   Chip,
@@ -37,11 +47,15 @@ import {
   equipmentIconName,
   venueIconName,
 } from '@/components/ui';
+// นำเข้า API client และฟังก์ชันแปลงวันที่/เวลาภาษาไทย
 import { api, formatMonthTitle, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
+// นำเข้า HourlyBookingSection คอมโพเนนต์จองสถานที่แบบรายชั่วโมงพร้อมเช็กตารางว่าง
 import { HourlyBookingSection } from '@/components/hourly-booking-section';
 
+// ขั้นตอนทั้ง 5 ของการขอใช้สถานที่ราชการ (Multi-step Wizard)
 const STEPS = ['เลือกสถานที่', 'วัน-เวลา', 'อุปกรณ์เสริม', 'กรอกคำขอ', 'ลงนามและส่ง'];
 
+// ป้ายกำกับภาษาไทยสำหรับสิ่งอำนวยความสะดวกในสถานที่
 const VENUE_FACILITY_LABEL: Record<string, string> = {
   projector: 'โปรเจกเตอร์',
   mic: 'เครื่องเสียง/ไมค์',
@@ -53,10 +67,16 @@ const VENUE_FACILITY_LABEL: Record<string, string> = {
   parking: 'ที่จอดรถ',
 };
 
+/**
+ * ฟังก์ชันแปลงรหัสสิ่งอำนวยความสะดวกเป็นข้อความภาษาไทย
+ */
 function formatFacilityLabel(facility: string): string {
   return VENUE_FACILITY_LABEL[facility] || facility;
 }
 
+/**
+ * ฟังก์ชันจัดรูปแบบข้อความวันเปิดทำการของสถานที่ (เช่น 'จันทร์ – ศุกร์' หรือ 'เปิดทุกวัน')
+ */
 function formatOpenDaysText(openDays?: number[]): string {
   if (!openDays || openDays.length === 0 || openDays.length === 7) return 'เปิดทุกวัน';
   const sorted = [...openDays].sort((a, b) => a - b);
@@ -70,6 +90,10 @@ function formatOpenDaysText(openDays?: number[]): string {
   return sorted.map((d) => dayNames[d] ?? '').filter(Boolean).join(', ');
 }
 
+/**
+ * ฟังก์ชันตรวจสอบความถูกต้องของช่วงวันเวลาการจอง (Business Logic Validation)
+ * ตรวจสอบ: เวลาเริ่มก่อนเวลาจบ, การจองล่วงหน้า (advanceDays), วันเปิดทำการ (openDays), เวลาเปิด-ปิด, และความจุผู้เข้าร่วม
+ */
 function validateBookingPeriods(periods: Period[], venues: Venue[], attendeesCount?: number): string[] {
   const errors: string[] = [];
   if (!periods || periods.length === 0) {
@@ -86,6 +110,7 @@ function validateBookingPeriods(periods: Period[], venues: Venue[], attendeesCou
     const s = new Date(p.start).getTime();
     const e = new Date(p.end).getTime();
 
+    // ตรวจสอบว่าเวลาเริ่มต้องมาก่อนเวลาสิ้นสุด
     if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) {
       errors.push(
         `ช่วงที่ ${i + 1}: เวลาเริ่มต้นต้องก่อนเวลาสิ้นสุด (เวลาเริ่มไม่สามารถเท่ากับหรือหลังเวลาสิ้นสุดได้)`,
@@ -146,6 +171,10 @@ function validateBookingPeriods(periods: Period[], venues: Venue[], attendeesCou
   return errors;
 }
 
+/**
+ * หน้าจอคำขอใช้สถานที่ราชการแบบ 5 ขั้นตอน (Booking Wizard Page)
+ * ขั้นที่ 1: เลือกสถานที่ -> ขั้นที่ 2: เลือกวัน-เวลา -> ขั้นที่ 3: เลือกอุปกรณ์เสริม -> ขั้นที่ 4: กรอกวัตถุประสงค์ -> ขั้นที่ 5: ลงนามและส่งคำขอ
+ */
 export default function BookingWizardPage() {
   const router = useRouter();
   const { account, accounts } = useAuth();

@@ -1,10 +1,22 @@
 import React from 'react';
 import { Button } from './Button';
 
+/**
+ * =====================================================================
+ * คอมโพเนนต์แสดงผลย้อนกลับและสถานะ (Feedback & State UI Components)
+ * =====================================================================
+ * 1. LoadingSkeleton: โครงร่างกะพริบระหว่างโหลดข้อมูล (Pulse Animation)
+ * 2. EmptyState: กล่องข้อความเมื่อไม่มีข้อมูล พร้อมปุ่ม Call-to-action
+ * 3. ErrorState: กล่องแจ้งเตือนข้อผิดพลาดสีแดง พร้อมปุ่ม "ลองอีกครั้ง" (Retry)
+ * 4. Feedback: แถบข้อความแจ้งเตือนผลการดำเนินงาน (Toast/Alert Banner) 4 โทนสี
+ */
+
+// โครงร่างโหลดกะพริบ
 export function LoadingSkeleton({ className = 'h-24 w-full' }: { className?: string }) {
   return <div className={`bg-surface-muted animate-pulse rounded-card ${className}`} />;
 }
 
+// กล่องแสดงผลเมื่อไม่มีข้อมูลในระบบ
 export function EmptyState({
   title,
   description,
@@ -39,6 +51,7 @@ export function EmptyState({
   );
 }
 
+// กล่องแสดงผลเมื่อเกิดข้อผิดพลาด
 export function ErrorState({
   message,
   onRetry,
@@ -62,6 +75,7 @@ export function ErrorState({
   );
 }
 
+// แถบข้อความตอบกลับผลลัพธ์ (Alert / Feedback Banner)
 export function Feedback({
   tone = 'neutral',
   className = '',

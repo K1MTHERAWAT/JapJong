@@ -1,22 +1,44 @@
 'use client';
 
+/**
+ * =====================================================================
+ * หน้าจอเข้าสู่ระบบ (Login Page) - ระบบจับจอง (@japjong/web)
+ * =====================================================================
+ * รองรับการยืนยันตัวตนหลากหลายรูปแบบ:
+ * 1. บัญชีผู้ใช้ทั่วไป (Username / Email / Phone + Password)
+ * 2. Gov Center SSO (IAM-GOV Single Sign-On สำหรับภาครัฐท้องถิ่น ทั้ง Direct LINE OAuth และรหัสผ่าน)
+ * 3. LINE Login Callback URL Handler (รับ token จาก LINE LIFF หรือ SSO redirect)
+ * 4. บัญชีทดสอบ (Demo Accounts) แบบ 1-Click สำหรับการสาธิตและทดสอบระบบตามบทบาท (RBAC)
+ * 5. Responsive Dual-Layout (Desktop แสดง Brand Sidebar สีเขียวลึก #0b4f43 พร้อมจุดเด่นบริการ / Mobile เรียบง่าย คลีน)
+ */
+
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+// ข้อมูลจำลองและคอนฟิกประเภทผู้ใช้/สีโทนประจำบทบาท (RBAC)
 import { DemoAccountSummary, ROLE_LABEL, ROLE_TONE } from '@japjong/shared';
+// Context จัดการสถานะการเข้าสู่ระบบและผู้ใช้ปัจจุบัน
 import { useAuth } from '@/components/auth-context';
+// Context จัดการสลับธีม สว่าง/มืด (Light / Dark mode)
 import { useTheme } from '@/components/theme-provider';
 import { Moon, Sun } from 'lucide-react';
+// ฟังก์ชันกำหนดเส้นทางหน้าแรกตามบทบาท (เช่น USER -> /booking, STAFF -> /staff, ADMIN -> /admin)
 import { roleHomePath } from '@/components/shell';
 import { Icon } from '@/components/icons';
 import { Chip } from '@/components/ui';
+// API SDK และฟังก์ชันบันทึก Token ลง LocalStorage / Cookie
 import { api, setStoredAuth } from '@/lib/api';
+// ฟังก์ชันช่วยสำหรับการเชื่อมต่อ Gov Center SSO
 import {
   buildGovCenterLineAuthorizeUrl,
   loginGovCenterWithPassword,
   logGovSsoDiagnostic,
 } from '@/lib/sso-config';
 
+/**
+ * รายชื่อบัญชีทดสอบเริ่มต้น (Fallback Demo Accounts)
+ * สำรองไว้กรณีที่ยังไม่ได้เริ่มหรือเชื่อมต่อ Backend API
+ */
 const DEFAULT_DEMO_ACCOUNTS: DemoAccountSummary[] = [
   { id: 'u-somchai', name: 'สมชาย ใจดี', role: 'USER', position: 'ประชาชน', department: 'กลุ่มแม่บ้านบ้านหนองบัว', initial: 'ส', nickname: 'สมชาย' },
   { id: 'u-manee', name: 'มานี มีนา', role: 'USER', position: 'ประชาชน', department: 'กองสวัสดิการสังคม', initial: 'ม', nickname: 'มานี' },
@@ -26,6 +48,9 @@ const DEFAULT_DEMO_ACCOUNTS: DemoAccountSummary[] = [
   { id: 'ad-admin', name: 'ผู้ดูแลระบบ', role: 'ADMIN', position: 'ผู้ดูแลระบบ', department: 'ฝ่ายเทคโนโลยีสารสนเทศ', initial: 'อ', nickname: 'แอดมิน' },
 ];
 
+/**
+ * ไอคอนสัญลักษณ์ LINE SVG Component
+ */
 function LineIcon({ className = 'w-5 h-5' }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -34,6 +59,9 @@ function LineIcon({ className = 'w-5 h-5' }: { className?: string }) {
   );
 }
 
+/**
+ * ไอคอนสัญลักษณ์หน่วยงานราชการ Gov SVG Component
+ */
 function GovIcon({ className = 'w-5 h-5' }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -46,32 +74,47 @@ function GovIcon({ className = 'w-5 h-5' }: { className?: string }) {
 }
 
 export default function LoginPage() {
+  // เครื่องมือสำหรับนำทางเปลี่ยนหน้าของ Next.js
   const router = useRouter();
+  // ดึงฟังก์ชันล็อกอินและรีเฟรชข้อมูลโปรไฟล์จาก Auth Context
   const { loginWithCredentials, loginWithDemo, refreshMe } = useAuth();
+  // จัดการโหมดกลางวัน/กลางคืน
   const { actualTheme, toggleTheme } = useTheme();
+
+  // สถานะฟอร์มเข้าสู่ระบบด้วยรหัสผ่าน
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [pdpa, setPdpa] = useState(true);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // ข้อมูลบัญชีสาธิต (Demo Accounts) สำหรับโหมดทดสอบ
   const [demoAccounts, setDemoAccounts] = useState<DemoAccountSummary[]>(DEFAULT_DEMO_ACCOUNTS);
   const [loadingDemo, setLoadingDemo] = useState(false);
+
+  // แจ้งเตือนกรณีล็อกอินด้วย LINE แล้วยังไม่พบบัญชีที่ผูกไว้
   const [unlinkedNotice, setUnlinkedNotice] = useState<{ show: boolean; displayName?: string }>({ show: false });
 
-  // สถานะสำหรับ Gov Center (SSO) Modal
+  // สถานะสำหรับ Modal เข้าสู่ระบบผ่าน Gov Center (IAM-GOV SSO)
   const [showGovModal, setShowGovModal] = useState(false);
   const [govEmail, setGovEmail] = useState('');
   const [govPassword, setGovPassword] = useState('');
   const [govError, setGovError] = useState('');
   const [govSubmitting, setGovSubmitting] = useState(false);
 
+  // ตรวจสอบการเปิดใช้งานโหมด Demo จาก Environment Variables
   const isDemo = process.env.NEXT_PUBLIC_DEMO === 'true';
 
+  /**
+   * Effect ดักจับพารามิเตอร์ URL Callback จาก LINE Login หรือ OAuth Redirect
+   */
   useEffect(() => {
+    // ป้องกันการทำงานฝั่ง Server-Side Rendering
     if (typeof window === 'undefined') return;
     logGovSsoDiagnostic('LoginPage โหลดสำเร็จ');
 
+    // อ่าน Query Parameters จาก URL
     const params = new URLSearchParams(window.location.search);
     const lineToken = params.get('line_token');
     const accountId = params.get('account_id');
@@ -79,20 +122,24 @@ export default function LoginPage() {
     const lineError = params.get('line_error');
     const displayName = params.get('displayName');
 
+    // กรณีเกิดข้อผิดพลาดในการเชื่อมต่อ LINE
     if (lineError) {
       setError(decodeURIComponent(lineError));
     } else if (lineStatus === 'unlinked') {
+      // กรณีบัญชี LINE ยังไม่ได้เชื่อมกับบัญชีใดในระบบ ให้แจ้งผู้ใช้ล็อกอินปกติเพื่อเชื่อมโยง
       setUnlinkedNotice({
         show: true,
         displayName: displayName ? decodeURIComponent(displayName) : undefined,
       });
     } else if (lineToken && accountId) {
+      // กรณีส่ง token และ accountId กลับมาสำเร็จ บันทึกเซสชันและเข้าสู่ระบบทันที
       setSubmitting(true);
       setStoredAuth(lineToken, accountId);
       api
         .me()
         .then((acc) => {
           refreshMe().then(() => {
+            // นำทางไปยังหน้าหลักตามบทบาทของผู้ใช้
             router.push(roleHomePath(acc.role));
           });
         })
@@ -103,6 +150,9 @@ export default function LoginPage() {
     }
   }, [refreshMe, router]);
 
+  /**
+   * Effect โหลดรายชื่อบัญชีสาธิต (Demo Accounts) จาก Backend API หากอยู่ในโหมด DEMO
+   */
   useEffect(() => {
     if (!isDemo) return;
     let active = true;
@@ -123,13 +173,18 @@ export default function LoginPage() {
     };
   }, [isDemo]);
 
+  /**
+   * ฟังก์ชันจัดการส่งฟอร์มเข้าสู่ระบบด้วยชื่อผู้ใช้ / รหัสผ่าน
+   */
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedUser = username.trim();
+    // ตรวจสอบความถูกต้องเบื้องต้น (Validation)
     if (!trimmedUser || !password.trim()) {
       setError('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน');
       return;
     }
+    // ต้องยินยอมนโยบาย PDPA
     if (!pdpa) {
       setError('กรุณายินยอมนโยบายคุ้มครองข้อมูลส่วนบุคคล (PDPA) ก่อนเข้าสู่ระบบ');
       return;
@@ -137,10 +192,11 @@ export default function LoginPage() {
     setError('');
     setSubmitting(true);
     try {
+      // ลองเข้าสู่ระบบผ่านระบบจัดการบัญชีภายใน (Local Auth)
       const acc = await loginWithCredentials(trimmedUser, password);
       router.push(roleHomePath(acc.role));
     } catch (localErr) {
-      // หากกรอกเป็นอีเมล ให้ลองตรวจสอบกับ Gov Center SSO โดยอัตโนมัติ
+      // หากกรอกเป็นรูปแบบอีเมล ให้ลองตรวจสอบกับ Gov Center SSO อัตโนมัติ (Fallback)
       if (trimmedUser.includes('@')) {
         try {
           const ssoResult = await loginGovCenterWithPassword(trimmedUser, password);
@@ -155,7 +211,7 @@ export default function LoginPage() {
           router.push(roleHomePath(role));
           return;
         } catch {
-          // ใช้ข้อความจาก localErr ด้านล่าง
+          // หาก SSO ไม่สำเร็จ ให้แสดงข้อผิดพลาดจาก Local Error
         }
       }
       setError((localErr as Error).message || 'เข้าสู่ระบบไม่สำเร็จ');
@@ -164,6 +220,9 @@ export default function LoginPage() {
     }
   };
 
+  /**
+   * ฟังก์ชันคลิกเข้าสู่ระบบทันทีด้วยบัญชีทดสอบ (1-Click Demo Login)
+   */
   const handleDemoLoginClick = async (accountId: string) => {
     setError('');
     setSubmitting(true);
@@ -177,6 +236,9 @@ export default function LoginPage() {
     }
   };
 
+  /**
+   * เปิดหน้าต่าง Modal ตัวเลือก Gov Center SSO
+   */
   const handleOpenGovSso = () => {
     if (!pdpa) {
       setError('กรุณายินยอมนโยบายคุ้มครองข้อมูลส่วนบุคคล (PDPA) ก่อนเข้าสู่ระบบ');
@@ -187,6 +249,9 @@ export default function LoginPage() {
     setShowGovModal(true);
   };
 
+  /**
+   * เปลี่ยนเส้นทางไปยังหน้า LINE OAuth ของ Gov Center โดยตรง (Direct SSO Flow)
+   */
   const handleGovCenterLineRedirect = () => {
     setGovError('');
     setGovSubmitting(true);
@@ -198,6 +263,7 @@ export default function LoginPage() {
       callbackWithState,
     });
     try {
+      // บันทึกหลักฐานประวัติการเข้าสู่ระบบลง LocalStorage สำหรับตรวจสอบย้อนหลัง
       localStorage.setItem(
         'japjong_sso_last_attempt',
         JSON.stringify({
@@ -210,11 +276,15 @@ export default function LoginPage() {
         }),
       );
     } catch {
-      // ignore storage quota
+      // ป้องกันกรณีหน่วยความจำเต็ม
     }
+    // สั่งย้ายหน้าไปยัง Authorize URL ของ SSO
     window.location.assign(authorizeUrl);
   };
 
+  /**
+   * ส่งข้อมูลล็อกอินด้วยอีเมลและรหัสผ่านของระบบ Gov Center
+   */
   const handleGovCenterPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!govEmail.trim() || !govPassword) {
@@ -243,7 +313,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen w-full bg-[#f6f5f0] dark:bg-bg text-[#14231f] dark:text-ink flex flex-col lg:flex-row font-sans relative">
-      {/* Floating Theme Toggle (top-right, safe-area aware) */}
+      {/* ปุ่มลอยสลับโหมดสว่าง/มืด (Floating Theme Toggle มุมขวาบน) */}
       <button
         type="button"
         onClick={toggleTheme}
@@ -259,11 +329,11 @@ export default function LoginPage() {
       </button>
       
       {/* ========================================================
-          DESKTOP (>= lg): Left Brand Sidebar (แบบ A)
-          โทนเขียวลึก #0b4f43 พร้อมลวดลายตาราง โลโก้ และ 3 บริการ
+          DESKTOP (>= lg): แถบแบรนด์ฝั่งซ้าย (Left Brand Sidebar)
+          โทนเขียวลึก #0b4f43 พร้อมลวดลายตาราง โลโก้ และจุดเด่น 3 บริการ
           ======================================================== */}
       <aside className="hidden lg:flex flex-[5_1_500px] min-w-[420px] relative overflow-hidden bg-[#0b4f43] text-white p-12 xl:p-16 flex-col justify-between gap-12">
-        {/* ลายตารางจางๆ แบบโมเดิร์น */}
+        {/* ลายตารางจางๆ สไตล์โมเดิร์น */}
         <div
           aria-hidden="true"
           className="absolute inset-0 pointer-events-none opacity-40"
@@ -274,7 +344,7 @@ export default function LoginPage() {
           }}
         />
 
-        {/* แบรนด์ & โลโก้ของเรา */}
+        {/* ตราสัญลักษณ์และชื่อระบบจับจอง */}
         <div className="relative flex items-center gap-4">
           <div className="w-[56px] h-[56px] rounded-[16px] bg-white p-1 flex items-center justify-center shadow-lg border border-white/30 shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -290,7 +360,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* หัวข้อระบบ & รายการ 3 บริการเด่น */}
+        {/* สรุปเนื้อหาสำคัญและ 3 บริการเด่นขององค์กรปกครองส่วนท้องถิ่น */}
         <div className="relative flex flex-col gap-9 max-w-[480px]">
           <div className="flex flex-col gap-3">
             <span className="text-[14px] font-semibold text-[#b9ddd1] tracking-wide uppercase">
@@ -304,8 +374,9 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* 3 การบริการ */}
+          {/* รายการแสดง 3 การบริการหลัก */}
           <div className="flex flex-col gap-4">
+            {/* 1. ขอใช้สถานที่ */}
             <div className="flex items-center gap-4">
               <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center shrink-0 text-white">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -321,6 +392,7 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {/* 2. ขอใช้อุปกรณ์ */}
             <div className="flex items-center gap-4">
               <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center shrink-0 text-white">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -334,6 +406,7 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {/* 3. แจ้งซ่อมแซม */}
             <div className="flex items-center gap-4">
               <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center shrink-0 text-white">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -348,7 +421,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* แถบความปลอดภัยล่าง */}
+        {/* แถบรับรองความปลอดภัยและมาตรฐาน PDPA */}
         <div className="relative flex items-center gap-2.5 text-[13px] text-[#a9cfc2] border-t border-white/15 pt-5">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -359,16 +432,16 @@ export default function LoginPage() {
 
       {/* ========================================================
           RIGHT AREA:
-          - Desktop (>= lg): การ์ดขาวลอยตัว สไตล์ A
-          - Mobile (< lg): สไตล์ B เรียบ สว่าง มนมน พร้อมโลโก้ตรงกลาง
+          - Desktop (>= lg): การ์ดสีขาวลอยตัว สไตล์โปร่งสบาย
+          - Mobile (< lg): สไตล์คลีน สว่าง กระชับ พร้อมโลโก้ตรงกลาง
           ======================================================== */}
       <main className="flex-[7_1_500px] min-w-0 flex items-center justify-center p-4 sm:p-8 lg:p-12">
         <div className="w-full max-w-[460px] flex flex-col gap-5">
           
-          {/* Card Container: บนคอมจะเป็นการ์ดขาวขอบมนเงา บนมือถือจะเป็นการ์ดเรียบโปร่งสว่าง */}
+          {/* กรอบการ์ดแสดงแบบฟอร์มเข้าสู่ระบบ */}
           <div className="bg-transparent lg:bg-white lg:dark:bg-surface lg:border lg:border-[#e3e1d8] lg:dark:border-line lg:rounded-[24px] p-2 sm:p-4 lg:p-9 lg:shadow-[0_1px_2px_rgba(20,35,31,0.04),0_16px_40px_rgba(20,35,31,0.07)] flex flex-col gap-5">
 
-            {/* MOBILE ONLY HEADER (สไตล์ B: โลโก้กล่อง 64x64 สีขาวตรงกลาง บนพื้นสว่าง) */}
+            {/* ส่วนหัวเฉพาะหน้าจอมือถือ (Mobile Header พร้อมโลโก้ตรงกลาง) */}
             <div className="flex lg:hidden flex-col items-center text-center gap-2.5 pt-2 pb-1">
               <div className="w-16 h-16 rounded-[20px] bg-white dark:bg-surface border border-[#e3e1d8] dark:border-line p-1.5 flex items-center justify-center shadow-[0_6px_18px_rgba(20,35,31,0.06)] shrink-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -386,13 +459,13 @@ export default function LoginPage() {
               </p>
             </div>
 
-            {/* DESKTOP ONLY HEADER (สไตล์ A: หัวเรื่องในการ์ดขวา) */}
+            {/* ส่วนหัวเฉพาะหน้าจอเดสก์ท็อป (Desktop Header) */}
             <div className="hidden lg:flex flex-col gap-1.5">
               <h1 className="text-[28px] font-bold tracking-tight text-[#14231f] dark:text-ink">เข้าสู่ระบบ</h1>
               <p className="text-[14.5px] text-[#4a5853] dark:text-ink-mute">เข้าใช้งานด้วยบัญชีหน่วยงาน หรือชื่อผู้ใช้ของคุณ</p>
             </div>
 
-            {/* แจ้งเตือนกรณีพยายามล็อกอินด้วย LINE แต่ยังไม่ได้เชื่อมต่อบัญชี */}
+            {/* แถบแจ้งเตือนกรณีผู้ใช้พยายามล็อกอินด้วย LINE แต่ยังไม่ได้ผูกกับบัญชีในระบบ */}
             {unlinkedNotice.show && (
               <div className="rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 p-4 text-[13px] text-amber-900 dark:text-amber-200 flex flex-col gap-2">
                 <div className="flex items-center gap-2 font-bold text-amber-950 dark:text-amber-100">
@@ -410,10 +483,7 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* ปุ่ม Single Sign-On (Gov Center SSO)
-                - บน Desktop: ปุ่มมน 12px สีเขียวอ่อน #e1efe9
-                - บน Mobile: ปุ่มมนแคปซูล rounded-full สีขาว ขอบเขียว 1.5px
-            */}
+            {/* ปุ่มทางเลือก Single Sign-On (Gov Center SSO) */}
             <button
               type="button"
               disabled={submitting}
@@ -424,17 +494,17 @@ export default function LoginPage() {
               <span>เข้าสู่ระบบด้วย Gov Center (SSO)</span>
             </button>
 
-            {/* ตัวแบ่งเส้นกลาง */}
+            {/* ตัวแบ่งเส้นกลาง (Divider) */}
             <div className="flex items-center gap-3 text-[12.5px] text-[#56625d] dark:text-ink-mute">
               <span className="flex-1 h-px bg-[#d7deda] dark:bg-line" />
               <span>หรือเข้าด้วยชื่อผู้ใช้ / รหัสผ่าน</span>
               <span className="flex-1 h-px bg-[#d7deda] dark:bg-line" />
             </div>
 
-            {/* ฟอร์มกรอกชื่อผู้ใช้และรหัสผ่าน */}
+            {/* ฟอร์มกรอกข้อมูลชื่อผู้ใช้และรหัสผ่าน */}
             <form onSubmit={handleLogin} className="flex flex-col gap-4">
               
-              {/* ช่องกรอกชื่อผู้ใช้ */}
+              {/* ช่องกรอกชื่อผู้ใช้ / อีเมล / เบอร์โทร */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[13.5px] font-semibold text-[#1e302a] dark:text-ink">
                   ชื่อผู้ใช้, อีเมล หรือ เบอร์โทรศัพท์
@@ -450,7 +520,7 @@ export default function LoginPage() {
                 />
               </div>
 
-              {/* ช่องกรอกรหัสผ่าน พร้อมปุ่มเปิด/ปิดตา */}
+              {/* ช่องกรอกรหัสผ่าน พร้อมปุ่มเปิด/ปิดตาแสดงรหัส */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[13.5px] font-semibold text-[#1e302a] dark:text-ink">รหัสผ่าน</label>
                 <div className="relative">
@@ -484,10 +554,7 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* ส่วนยินยอม PDPA
-                  - บน Desktop: กล่องพื้นหลังเขียวอ่อน #f1f5f3 มน 12px
-                  - บน Mobile: บรรทัดคลีนแนวนอน เรียบง่าย
-              */}
+              {/* เช็คบ็อกซ์ยินยอมเงื่อนไข PDPA */}
               <div
                 onClick={() => setPdpa((v) => !v)}
                 className="lg:bg-[#f1f5f3] lg:dark:bg-surface-muted lg:border lg:border-transparent lg:dark:border-line lg:rounded-[12px] lg:p-3.5 flex items-start gap-3 cursor-pointer select-none py-1"
@@ -507,7 +574,7 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* แสดงข้อผิดพลาด */}
+              {/* กล่องแสดงข้อความผิดพลาด (Error Message) */}
               {error && (
                 <div className="rounded-xl bg-[#FDE8E8] dark:bg-red-950/40 border border-[#f9b4b4] dark:border-red-900/50 px-4 py-2.5 text-[13px] text-[#7a1010] dark:text-red-300 flex items-center gap-2">
                   <Icon name="x" className="w-4 h-4 text-status-crit shrink-0" />
@@ -515,10 +582,7 @@ export default function LoginPage() {
                 </div>
               )}
 
-              {/* ปุ่มเข้าสู่ระบบ
-                  - Desktop: rounded-xl
-                  - Mobile: rounded-full
-              */}
+              {/* ปุ่มยืนยันเข้าสู่ระบบ */}
               <button
                 type="submit"
                 disabled={submitting}
@@ -527,7 +591,7 @@ export default function LoginPage() {
                 {submitting ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
               </button>
 
-              {/* แถบลิงก์ล่าง */}
+              {/* แถบลิงก์สำหรับผู้ใช้ใหม่และกรณีลืมรหัสผ่าน */}
               <div className="text-[13.5px] text-[#4a5853] dark:text-ink-mute text-center pt-1">
                 ยังไม่มีบัญชี?{' '}
                 <Link href="/register" className="font-bold text-[#0b6b5c] dark:text-brand hover:underline">
@@ -540,7 +604,7 @@ export default function LoginPage() {
               </div>
             </form>
 
-            {/* บัญชีสาธิตสำหรับทดสอบระบบ (Demo Accounts) */}
+            {/* ส่วนเลือกบัญชีสาธิตสำหรับทดสอบระบบ (Demo Accounts 1-Click Login) */}
             {isDemo && (
               <div className="mt-2 pt-4 border-t border-dashed border-[#c8d4cf] dark:border-line flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
@@ -553,6 +617,7 @@ export default function LoginPage() {
                   <span className="text-[11px] text-[#697872] dark:text-ink-mute">ไม่ต้องกรอกรหัส</span>
                 </div>
 
+                {/* รายการบัญชีแต่ละบทบาท (User, Staff, Approver L2, Approver L1, Admin) */}
                 <div className="grid grid-cols-1 gap-2 max-h-[220px] overflow-y-auto pr-1">
                   {loadingDemo ? (
                     <div className="py-4 text-center text-[12px] text-ink-mute">
@@ -568,6 +633,7 @@ export default function LoginPage() {
                         className="w-full text-left border border-[#d7deda] dark:border-line hover:border-[#0b6b5c] dark:hover:border-brand hover:bg-[#f1f8f5] dark:hover:bg-brand/10 rounded-xl p-2.5 bg-white dark:bg-surface flex items-center justify-between gap-2.5 cursor-pointer transition group disabled:opacity-50"
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
+                          {/* ตัวย่อชื่อ */}
                           <div className="w-8 h-8 rounded-full bg-[#e1efe9] dark:bg-brand/20 text-[#074d41] dark:text-brand font-bold text-[12px] flex items-center justify-center shrink-0">
                             {acc.initial}
                           </div>
@@ -596,7 +662,7 @@ export default function LoginPage() {
       </main>
 
       {/* ========================================================
-          หน้าต่างเข้าสู่ระบบด้วย Gov Center (SSO) แบบ Direct Flow
+          MODAL: หน้าต่างเข้าสู่ระบบด้วย Gov Center (SSO) แบบ Direct Flow
           ======================================================== */}
       {showGovModal && (
         <div
@@ -607,6 +673,7 @@ export default function LoginPage() {
             className="w-full max-w-[440px] bg-white dark:bg-surface rounded-[24px] p-6 sm:p-7 shadow-xl border border-line flex flex-col gap-4"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* หัวข้อ Modal และปุ่มปิด */}
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-2xl bg-[#0b6b5c]/10 dark:bg-brand/20 text-[#0b6b5c] dark:text-brand flex items-center justify-center shrink-0">
@@ -630,6 +697,7 @@ export default function LoginPage() {
               </button>
             </div>
 
+            {/* ปุ่มเข้าสู่ระบบ Gov Center ด้วย LINE Direct Flow */}
             <button
               type="button"
               disabled={govSubmitting}
@@ -640,12 +708,14 @@ export default function LoginPage() {
               <span>ดำเนินการต่อด้วย LINE (Gov Center)</span>
             </button>
 
+            {/* เส้นคั่นทางเลือก */}
             <div className="flex items-center gap-3 text-[12px] text-ink-mute">
               <span className="flex-1 h-px bg-line" />
               <span>หรือใช้อีเมลและรหัสผ่าน Gov Center</span>
               <span className="flex-1 h-px bg-line" />
             </div>
 
+            {/* ฟอร์มกรอกอีเมลและรหัสผ่านสำหรับ Gov Center */}
             <form onSubmit={handleGovCenterPasswordSubmit} className="flex flex-col gap-3.5">
               <div>
                 <label className="jw-lbl">อีเมลบัญชี Gov Center</label>
@@ -671,6 +741,7 @@ export default function LoginPage() {
                 />
               </div>
 
+              {/* ข้อความผิดพลาดสำหรับ SSO Modal */}
               {govError && (
                 <div className="rounded-2xl bg-[#FDE8E8] dark:bg-red-950/40 border border-[#f9b4b4] dark:border-red-900/50 px-3.5 py-2.5 text-[13px] text-[#7a1010] dark:text-red-300 flex items-center gap-2">
                   <Icon name="x" className="w-4 h-4 text-status-crit shrink-0" />
@@ -678,6 +749,7 @@ export default function LoginPage() {
                 </div>
               )}
 
+              {/* ปุ่มยกเลิกและปุ่มยืนยัน */}
               <div className="flex items-center gap-2.5 pt-1">
                 <button
                   type="button"

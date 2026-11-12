@@ -4,6 +4,15 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from '../auth/auth.guard';
 import { DbService } from '../db/db.service';
 
+/**
+ * =====================================================================
+ * ตัวตรวจสอบสถานะการทำงานของระบบ (Healthcheck Controller)
+ * =====================================================================
+ * Endpoint: `GET /api/health`
+ * ใช้สำหรับ Container Orchestration (เช่น Kubernetes Liveness/Readiness Probe, Cloud Run)
+ * รายงานสถานะความพร้อมของฐานข้อมูล, จำนวนผู้ใช้, ทรัพยากร, Uptime และวันเวลาปัจจุบัน
+ */
+
 @ApiTags('Admin')
 @SkipThrottle()
 @Controller('health')
@@ -26,4 +35,3 @@ export class HealthController {
     };
   }
 }
-

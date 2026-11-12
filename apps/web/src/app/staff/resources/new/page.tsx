@@ -1,5 +1,18 @@
 'use client';
 
+/**
+ * =====================================================================
+ * หน้าเพิ่มทรัพยากรใหม่ (Add Resource Page: Venue / Equipment)
+ * =====================================================================
+ * ฟังก์ชันการทำงาน:
+ * 1. สลับชนิดทรัพยากร: 'venue' (สถานที่) หรือ 'equipment' (อุปกรณ์/ครุภัณฑ์)
+ * 2. อัปโหลดภาพถ่ายจริงสูงสุด 3 รูป พร้อมการย่อบีบอัดอัตโนมัติ
+ * 3. กรอกข้อมูลทั่วไป เช่น ชื่อ, ประเภท, อาคาร, ชั้น, ความจุ, สิ่งอำนวยความสะดวก
+ * 4. กำหนดเงื่อนไขการจอง: เวลาเปิด-ปิด, วันที่เปิดให้บริการ, จำนวนวันต้องจองล่วงหน้า
+ * 5. จัดลำดับสายการอนุมัติ (Drag-and-Drop approval order)
+ * 6. เลือกหรือสร้างแบบฟอร์มเอกสารราชการใหม่ผ่าน OfficialDocumentEditor
+ */
+
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { EquipmentCategory, FACILITIES, VENUE_TYPE_LABEL, VenueType } from '@japjong/shared';
@@ -13,7 +26,6 @@ import {
   getFormTemplates,
   getFormTemplate,
   saveNewFormTemplate,
-  saveFormTemplateConfig,
   fetchFormTemplatesFromApi,
   saveTemplateToDatabase,
 } from '@/lib/forms-store';
@@ -23,27 +35,30 @@ const DAYS_TH = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
 export default function AddResourcePage() {
   const router = useRouter();
+  // Ref สำหรับคลิกเปิด File picker
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // ชนิดทรัพยากรที่ต้องการเพิ่ม (สถานที่ หรือ อุปกรณ์)
   const [kind, setKind] = useState<Kind>('venue');
+  // สเต็ปบนมุมมองมือถือ (1: ข้อมูลทั่วไป, 2: เงื่อนไขและอนุมัติ)
   const [mobileStep, setMobileStep] = useState(1);
 
-  // Available forms in system
+  // รายการแม่แบบฟอร์มที่มีในระบบ
   const [availableForms, setAvailableForms] = useState<FormTemplateItem[]>([]);
 
+  // โหลดรายการแม่แบบฟอร์มเมื่อเข้าหน้าจอ
   useEffect(() => {
-    // Initial from cache
     setAvailableForms(getFormTemplates());
-    // Live from backend database API
     fetchFormTemplatesFromApi().then((templates) => {
       setAvailableForms(templates);
     });
   }, []);
 
-  // รูปภาพจริง (สูงสุด 3 รูป)
+  // รูปภาพจริง (สูงสุด 3 รูป เก็บเป็น Base64 Data URL)
   const [images, setImages] = useState<string[]>([]);
+  // State ข้อมูลรูปภาพที่กำลังเปิดดูตัวอย่างขนาดใหญ่
   const [previewImg, setPreviewImg] = useState<string | null>(null);
 
-  // Venue / Equipment fields (เริ่มต้นเป็นค่าว่าง)
+  // ฟิลด์ข้อมูลสถานที่
   const [name, setName] = useState('');
   const [venueType, setVenueType] = useState<VenueType>('meeting');
   const [building, setBuilding] = useState('');
@@ -65,13 +80,15 @@ export default function AddResourcePage() {
   ]);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
 
-  // Equipment fields
+  // ฟิลด์ข้อมูลอุปกรณ์/ครุภัณฑ์
   const [eqCategory, setEqCategory] = useState<EquipmentCategory>('audio');
   const [stock, setStock] = useState(1);
 
+  // State การส่งบันทึกและข้อผิดพลาด
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  // ฟังก์ชันจัดเรียงลำดับขั้นตอนสายการอนุมัติ
   const moveApprovalStep = (from: number, to: number) => {
     if (to < 0 || to >= approvalOrder.length || from === to) return;
     setApprovalOrder((prev) => {
@@ -82,14 +99,17 @@ export default function AddResourcePage() {
     });
   };
 
+  // เปิด/ปิดสิ่งอำนวยความสะดวก
   const toggleFacility = (f: string) => {
     setFacilities((prev) => (prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]));
   };
 
+  // เปิด/ปิดวันเปิดให้บริการในสัปดาห์
   const toggleDay = (d: number) => {
     setOpenDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
   };
 
+  // เลือกและบีบอัดรูปภาพ
   const handleSelectFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const remaining = Math.max(0, 3 - images.length);
     if (remaining === 0) return;
@@ -105,10 +125,12 @@ export default function AddResourcePage() {
     }
   };
 
+  // ลบรูปภาพที่เลือก
   const removeImage = (idx: number) => {
     setImages((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  // ฟังก์ชันบันทึกข้อมูลทรัพยากรใหม่
   const handleSave = async () => {
     if (!name.trim()) {
       setError(kind === 'venue' ? 'กรุณากรอกชื่อสถานที่' : 'กรุณากรอกชื่ออุปกรณ์ / ครุภัณฑ์');
@@ -205,7 +227,7 @@ export default function AddResourcePage() {
         </div>
       }
     >
-      {/* Header + Tabs สถานที่ / อุปกรณ์ แบบเดิม */}
+      {/* ส่วนหัวและแท็บสลับชนิดทรัพยากร */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         <div>
           <h1 className="text-[22px] font-bold text-ink">เพิ่มรายการ</h1>
@@ -248,6 +270,7 @@ export default function AddResourcePage() {
             mobileStep === 2 ? 'hidden lg:flex' : 'flex'
           }`}
         >
+          {/* อัปโหลดรูปภาพ */}
           <div>
             <label className="jw-lbl">รูปภาพ (ไม่เกิน 3 รูป)</label>
             <p className="text-[12px] text-ink-mute mb-2">แนะนำขนาด 4:3 แนวนอน (สูงสุด 3 รูป)</p>
@@ -295,6 +318,7 @@ export default function AddResourcePage() {
             />
           </div>
 
+          {/* ชื่อสถานที่ หรือ ชื่ออุปกรณ์ */}
           <div>
             <label className="jw-lbl">
               {kind === 'venue' ? 'ชื่อสถานที่' : 'ชื่ออุปกรณ์ / ครุภัณฑ์'}{' '}
@@ -315,6 +339,7 @@ export default function AddResourcePage() {
 
           {kind === 'venue' ? (
             <>
+              {/* ประเภทสถานที่ */}
               <div>
                 <label className="jw-lbl">ประเภท</label>
                 <div className="flex flex-wrap gap-2">
@@ -335,6 +360,7 @@ export default function AddResourcePage() {
                 </div>
               </div>
 
+              {/* อาคารและชั้น */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="jw-lbl">อาคาร</label>
@@ -358,6 +384,7 @@ export default function AddResourcePage() {
                 </div>
               </div>
 
+              {/* ความจุ */}
               <div>
                 <label className="jw-lbl">ความจุ (คน)</label>
                 <div className="flex items-center gap-3">
@@ -387,6 +414,7 @@ export default function AddResourcePage() {
                 </div>
               </div>
 
+              {/* สิ่งอำนวยความสะดวก */}
               <div>
                 <label className="jw-lbl">สิ่งอำนวยความสะดวก</label>
                 <div className="flex flex-wrap gap-2">
@@ -412,6 +440,7 @@ export default function AddResourcePage() {
             </>
           ) : (
             <>
+              {/* หมวดหมู่อุปกรณ์ */}
               <div>
                 <label className="jw-lbl">หมวดหมู่อุปกรณ์</label>
                 <select
@@ -425,6 +454,7 @@ export default function AddResourcePage() {
                 </select>
               </div>
 
+              {/* จำนวนสต็อกคงเหลือ */}
               <div>
                 <label className="jw-lbl">จำนวนที่มีให้ยืม (ชิ้น/ชุด)</label>
                 <div className="flex items-center gap-3">
@@ -465,6 +495,7 @@ export default function AddResourcePage() {
         >
           {kind === 'venue' && (
             <>
+              {/* เวลาเปิด-ปิด และขอล่วงหน้า */}
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="jw-lbl">เปิด</label>
@@ -499,6 +530,7 @@ export default function AddResourcePage() {
                 </div>
               </div>
 
+              {/* วันที่เปิดให้จอง */}
               <div>
                 <label className="jw-lbl">วันที่เปิดให้จอง</label>
                 <div className="flex gap-1.5">
@@ -524,6 +556,7 @@ export default function AddResourcePage() {
             </>
           )}
 
+          {/* ลำดับการอนุมัติ (Drag-and-Drop) */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="jw-lbl mb-0">ลำดับการอนุมัติ (ลากเรียงลำดับได้)</label>
@@ -574,7 +607,7 @@ export default function AddResourcePage() {
             ))}
           </div>
 
-          {/* แบบฟอร์มที่ใช้: แบบเดิม + ปุ่มเพิ่มแบบฟอร์มใหม่เด้งไปตัวจัดการแบบฟอร์ม */}
+          {/* แบบฟอร์มราชการที่ผูกกับทรัพยากรนี้ */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="jw-lbl mb-0">แบบฟอร์มที่ใช้</label>
@@ -620,6 +653,7 @@ export default function AddResourcePage() {
             </p>
           </div>
 
+          {/* สวิตช์เปิดให้จอง */}
           <div className="border border-line rounded-2xl p-3.5 flex items-center justify-between bg-white">
             <div>
               <b className="block text-[14px]">เปิดให้จอง</b>

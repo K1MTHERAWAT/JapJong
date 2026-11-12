@@ -1,38 +1,50 @@
 'use client';
 
+/**
+ * =====================================================================
+ * หน้าตรวจสอบประวัติการส่ง LINE Notification & งานค้าง (Admin Notification Logs)
+ * =====================================================================
+ * ระบบแดชบอร์ดสำหรับตรวจสอบการจัดส่งข้อความผ่าน LINE Messaging API:
+ * 1. KPI สรุปผลการส่ง: ทั้งหมด, สำเร็จ (SENT), ล้มเหลว (FAILED), รอคิว (PENDING), ข้าม (SKIPPED)
+ * 2. ตัวกรองสถานะ และช่องค้นหาผู้รับ / รหัสคำขอ / ข้อผิดพลาด
+ * 3. ตารางประวัติ Log การส่ง พร้อมจำนวนรอบความพยายาม (Attempt Count)
+ * 4. ปุ่มสั่งส่งซ้ำ (Retry Button) สำหรับรายการที่ส่งไม่สำเร็จ
+ */
+
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  AlertCircle,
-  AlertTriangle,
   ArrowLeft,
-  BellRing,
   CheckCircle2,
   Clock,
-  Filter,
   RefreshCw,
   RotateCw,
   Search,
-  Send,
   XCircle,
 } from 'lucide-react';
 import {
   AdminNotificationDashboardSummary,
   LineDeliveryStatus,
-  LineNotificationLog,
 } from '@japjong/shared';
 import { AppShell } from '@/components/shell';
 import { Button, Card, Chip, Feedback } from '@/components/ui';
 import { api, formatThaiDateTime } from '@/lib/api';
 
 export default function AdminNotificationDashboardPage() {
+  // State สถานะกำลังโหลดข้อมูล
   const [loading, setLoading] = useState(true);
+  // State ข้อมูลสรุปสถิติและรายการล็อก
   const [data, setData] = useState<AdminNotificationDashboardSummary | null>(null);
+  // State ตัวกรองสถานะการส่ง
   const [statusFilter, setStatusFilter] = useState<LineDeliveryStatus | 'ALL'>('ALL');
+  // State ข้อความค้นหา
   const [search, setSearch] = useState('');
+  // State เก็บ ID ของรายการที่กำลังกดส่งซ้ำ
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  // State ข้อความแจ้งเตือนผลการดำเนินงาน
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  // ฟังก์ชันดึงข้อมูลบันทึกประวัติการส่งจาก API
   const fetchLogs = async () => {
     try {
       const res = await api.getAdminNotificationLogs(
@@ -50,10 +62,12 @@ export default function AdminNotificationDashboardPage() {
     }
   };
 
+  // โหลดข้อมูลใหม่เมื่อเปลี่ยนแท็บตัวกรองสถานะ
   useEffect(() => {
     fetchLogs();
   }, [statusFilter]);
 
+  // ฟังก์ชันสั่งส่งข้อความแจ้งเตือนซ้ำ (Retry Notification)
   const handleRetry = async (logId: string) => {
     setRetryingId(logId);
     setFeedback(null);
@@ -81,6 +95,7 @@ export default function AdminNotificationDashboardPage() {
     }
   };
 
+  // กรองรายการ Log ตามคำค้นหา (ชื่อผู้รับ, user ID, รหัสคำขอ, ประเภท, หรือ Error Code)
   const filteredLogs = (data?.logs || []).filter((l) => {
     if (!search.trim()) return true;
     const s = search.toLowerCase();
@@ -93,6 +108,7 @@ export default function AdminNotificationDashboardPage() {
     );
   });
 
+  // ฟังก์ชันแสดงชิปสถานะพร้อมไอคอน
   const getStatusChip = (status: LineDeliveryStatus) => {
     switch (status) {
       case 'SENT':
@@ -130,7 +146,7 @@ export default function AdminNotificationDashboardPage() {
   return (
     <AppShell maxWidth="max-w-[1200px]">
       <div className="flex flex-col gap-6">
-        {/* Header */}
+        {/* ส่วนหัวหน้าจอ */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
@@ -166,13 +182,14 @@ export default function AdminNotificationDashboardPage() {
           </Button>
         </div>
 
+        {/* แถบแจ้งเตือน Feedback แจ้งผลการทำงาน */}
         {feedback && (
           <Feedback tone={feedback.type === 'error' ? 'crit' : 'brand'}>
             {feedback.message}
           </Feedback>
         )}
 
-        {/* Metrics Grid */}
+        {/* การ์ดสถิติ Metric รวม 5 ด้าน */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
           <Card className="p-4 flex flex-col gap-1">
             <div className="text-[12px] text-muted font-medium">แจ้งเตือนทั้งหมด</div>
@@ -201,7 +218,7 @@ export default function AdminNotificationDashboardPage() {
           </Card>
         </div>
 
-        {/* Filters & Search */}
+        {/* แถบตัวกรองสถานะ และช่องค้นหาข้อความ */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-surface p-3 rounded-control border border-line">
           <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-none">
             {(['ALL', 'SENT', 'FAILED', 'PENDING', 'SKIPPED'] as const).map((st) => (
@@ -240,7 +257,7 @@ export default function AdminNotificationDashboardPage() {
           </div>
         </div>
 
-        {/* Logs Table */}
+        {/* ตารางแสดงรายการประวัติ Log */}
         <Card padding="none" className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-caption">

@@ -1,52 +1,80 @@
-'use client';
+'use client'; // กำหนดให้คอมโพเนนต์นี้ทำงานในฝั่ง Client (React Client Component)
 
+// นำเข้า React Hooks พื้นฐานสำหรับจัดการ State, Effects, Callbacks และ Refs
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Equipment, PublicAccount, REPAIR_CATEGORIES, RepairRequest, RequestWithTimeline, sanitizePhoneInput, validateThaiPhone, Venue } from '@japjong/shared';
+// นำเข้า Type และข้อมูลคงที่ของงานแจ้งซ่อมบำรุงจากแพ็กเกจกลาง shared
+import {
+  Equipment,
+  PublicAccount,
+  REPAIR_CATEGORIES,
+  RepairRequest,
+  RequestWithTimeline,
+  sanitizePhoneInput,
+  validateThaiPhone,
+  Venue,
+} from '@japjong/shared';
+// นำเข้า Auth Context เพื่อตรวจสอบสิทธิ์ของผู้ใช้และฟังก์ชันเส้นทางหน้าแรกตามบทบาท
 import { roleHomePath, useAuth } from '@/components/auth-context';
+// นำเข้า AppShell คอมโพเนนต์เลย์เอาต์หลักของแอปพลิเคชัน
 import { AppShell } from '@/components/shell';
+// นำเข้า Icon แสดงรูปไอคอน SVG
 import { Icon } from '@/components/icons';
+// นำเข้าคอมโพเนนต์ฟอร์มกรอกเบอร์โทรศัพท์ 10 หลัก
 import { Phone10DigitInput } from '@/components/thai-address-select';
+// นำเข้า UI Components: Chip, StatusChip, Tabs, Timeline
 import { Chip, StatusChip, Tabs, Timeline } from '@/components/ui';
+// นำเข้า API client, ฟังก์ชันจัดรูปแบบวันเวลาภาษาไทย, และฟังก์ชันบีบอัดรูปภาพ
 import { api, formatThaiDateTime, readAndCompressImages } from '@/lib/api';
 
+// กำหนดโหมดหน้าจอ: 'form' (ฟอร์มแจ้งซ่อมใหม่) หรือ 'track' (ติดตามสถานะแจ้งซ่อม)
 type Mode = 'form' | 'track';
+// กำหนดตัวกรองสถานะติดตาม: 'all' (ทั้งหมด), 'in_progress' (กำลังดำเนินการ), 'acceptance' (รอตรวจรับงาน)
 type TrackFilter = 'all' | 'in_progress' | 'acceptance';
+// กำหนดประเภทเป้าหมายที่ชำรุด: 'venue' (สถานที่), 'equipment' (อุปกรณ์/ครุภัณฑ์), 'other' (อื่น ๆ / ระบุเอง)
 type TargetType = 'venue' | 'equipment' | 'other';
 
+/**
+ * หน้าจอระบบแจ้งซ่อมบำรุงและติดตามสถานะ (Fast-ticket Repair Service)
+ * ออกแบบขั้นตอนการทำงานกระชับ (3 ขั้นตอน) ไม่บังคับลงลายมือชื่อดิจิทัลเพื่อความรวดเร็วในการแจ้งเหตุ
+ */
 export default function RepairPage() {
+  // ดึงข้อมูลบัญชีผู้ใช้ปัจจุบัน และรายชื่อบัญชีทั้งหมดในระบบ (สำหรับโหมดกรอกแทน)
   const { account, accounts } = useAuth();
+  // ตรวจสอบว่าผู้ใช้งานเป็นเจ้าหน้าที่หรือแอดมินหรือไม่
   const isStaff = account?.role === 'STAFF' || account?.role === 'ADMIN';
+  // State โหมดหน้าจอ (ฟอร์ม หรือ ติดตามสถานะ)
   const [mode, setMode] = useState<Mode>('form');
 
-  // โหมดกรอกแจ้งซ่อมแทนผู้มาติดต่อ (สำหรับเจ้าหน้าที่)
-  const [isWalkIn, setIsWalkIn] = useState(false);
-  const [walkInQuery, setWalkInQuery] = useState('');
-  const [foundUser, setFoundUser] = useState<PublicAccount | null>(null);
-  const [requesterName, setRequesterName] = useState(account?.name || '');
-  const [requesterPhone, setRequesterPhone] = useState(account?.phone || '');
-  const [organization, setOrganization] = useState(account?.department || '');
+  // --- Walk-in State: โหมดกรอกแจ้งซ่อมแทนผู้มาติดต่อ (สำหรับเจ้าหน้าที่) ---
+  const [isWalkIn, setIsWalkIn] = useState(false); // เปิดใช้งานโหมดกรอกแทนหรือไม่
+  const [walkInQuery, setWalkInQuery] = useState(''); // คำค้นหาชื่อหรือเบอร์โทรของผู้มาติดต่อ
+  const [foundUser, setFoundUser] = useState<PublicAccount | null>(null); // ข้อมูลผู้ใช้ในระบบที่ค้นพบ
+  const [requesterName, setRequesterName] = useState(account?.name || ''); // ชื่อผู้แจ้ง
+  const [requesterPhone, setRequesterPhone] = useState(account?.phone || ''); // เบอร์โทรผู้แจ้ง
+  const [organization, setOrganization] = useState(account?.department || ''); // หน่วยงาน/สังกัดผู้แจ้ง
 
-  // Resource list
+  // --- Resource State: ข้อมูลสถานที่และอุปกรณ์สำหรับเลือกแจ้งซ่อม ---
   const [venues, setVenues] = useState<Venue[]>([]);
   const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
 
-  // Form state
-  const [targetType, setTargetType] = useState<TargetType>('venue');
-  const [selectedResourceId, setSelectedResourceId] = useState<string>('');
-  const [customLocation, setCustomLocation] = useState('');
-  const [category, setCategory] = useState<string>(REPAIR_CATEGORIES[0] ?? 'ไฟฟ้า');
-  const [detail, setDetail] = useState('');
-  const [images, setImages] = useState<string[]>([]);
-  const [previewImg, setPreviewImg] = useState<string | null>(null);
-  const [draftSaved, setDraftSaved] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // --- Form State: ข้อมูลในฟอร์มแจ้งซ่อม ---
+  const [targetType, setTargetType] = useState<TargetType>('venue'); // ประเภทเป้าหมาย (สถานที่/อุปกรณ์/อื่น ๆ)
+  const [selectedResourceId, setSelectedResourceId] = useState<string>(''); // ID ของสถานที่หรืออุปกรณ์ที่เลือก
+  const [customLocation, setCustomLocation] = useState(''); // สถานที่หรือจุดเกิดเหตุที่พิมพ์ระบุเอง
+  const [category, setCategory] = useState<string>(REPAIR_CATEGORIES[0] ?? 'ไฟฟ้า'); // หมวดหมู่อาการชำรุด
+  const [detail, setDetail] = useState(''); // รายละเอียดอาการชำรุด
+  const [images, setImages] = useState<string[]>([]); // รายการรูปภาพประกอบ (Base64 Data URLs สูงสุด 3 รูป)
+  const [previewImg, setPreviewImg] = useState<string | null>(null); // รูปภาพที่กำลังเปิดดูขนาดใหญ่ (Lightbox)
+  const [draftSaved, setDraftSaved] = useState(false); // สถานะแจ้งเตือนบันทึกร่างสำเร็จ
+  const [submitting, setSubmitting] = useState(false); // สถานะกำลังส่งคำขอไปยังเซิร์ฟเวอร์
+  const fileInputRef = useRef<HTMLInputElement>(null); // Ref สำหรับสั่งเปิด File Picker ของกล้องหรือเครื่อง
 
-  // Track state
-  const [repairs, setRepairs] = useState<(RequestWithTimeline & RepairRequest)[]>([]);
-  const [trackFilter, setTrackFilter] = useState<TrackFilter>('all');
-  const [activeId, setActiveId] = useState<string>('');
+  // --- Track State: ข้อมูลสำหรับแท็บติดตามสถานะแจ้งซ่อม ---
+  const [repairs, setRepairs] = useState<(RequestWithTimeline & RepairRequest)[]>([]); // รายการแจ้งซ่อมของฉัน
+  const [trackFilter, setTrackFilter] = useState<TrackFilter>('all'); // ตัวกรองสถานะคำขอ
+  const [activeId, setActiveId] = useState<string>(''); // ID คำขอที่กำลังเปิดดูรายละเอียดอยู่ในขณะนี้
 
+  // ตรวจสอบ URL Query Parameters เมื่อเปิดหน้าเว็บ (เช่น ?id=... หรือ ?mode=track)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const sp = new URLSearchParams(window.location.search);
@@ -61,6 +89,7 @@ export default function RepairPage() {
     }
   }, []);
 
+  // กำหนดค่าเริ่มต้นของผู้แจ้งตามข้อมูลบัญชีที่ล็อกอินอยู่ (กรณีไม่ได้เปิดโหมดกรอกแทน)
   useEffect(() => {
     if (account && !isWalkIn) {
       setRequesterName(account.name);
@@ -69,6 +98,10 @@ export default function RepairPage() {
     }
   }, [account, isWalkIn]);
 
+  /**
+   * ฟังก์ชันสลับโหมดแจ้งในนามตนเอง หรือกรอกคำขอแทนผู้มาติดต่อ
+   * @param walkInMode - true เมื่อเลือกกรอกแทน
+   */
   const handleToggleWalkIn = (walkInMode: boolean) => {
     setIsWalkIn(walkInMode);
     setFoundUser(null);
@@ -84,6 +117,9 @@ export default function RepairPage() {
     }
   };
 
+  /**
+   * ฟังก์ชันค้นหาผู้ใช้งานในระบบสำหรับโหมดกรอกแทนด้วยชื่อหรือเบอร์โทรศัพท์
+   */
   const handleSearchWalkInUser = () => {
     const q = walkInQuery.trim().toLowerCase();
     if (!q) return;
@@ -109,12 +145,15 @@ export default function RepairPage() {
     }
   };
 
-  // โหลดรายการสถานที่และอุปกรณ์จริงจากระบบ
+  // โหลดรายการสถานที่และอุปกรณ์จริงจาก Backend เมื่อเริ่มต้นหน้าจอ
   useEffect(() => {
     api.venues().then(setVenues).catch(() => {});
     api.equipment().then(setEquipmentList).catch(() => {});
   }, []);
 
+  /**
+   * ฟังก์ชันดึงประวัติการแจ้งซ่อมของตนเองจาก Backend API
+   */
   const loadRepairs = useCallback(() => {
     api
       .listRequests({ mine: true, type: 'repair' })
@@ -131,10 +170,14 @@ export default function RepairPage() {
       .catch(() => {});
   }, [activeId, account?.id]);
 
+  // โหลดรายการคำขอเมื่อเปิดหน้าหรือเปลี่ยนบัญชี
   useEffect(() => {
     loadRepairs();
   }, [loadRepairs, account?.id]);
 
+  /**
+   * ฟังก์ชันเลือกไฟล์ภาพจากอุปกรณ์ พร้อมบีบอัดภาพให้อัตโนมัติ (จำกัดสูงสุด 3 รูป)
+   */
   const handleSelectFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const remaining = Math.max(0, 3 - images.length);
     if (remaining === 0) return;
@@ -145,14 +188,21 @@ export default function RepairPage() {
     e.target.value = '';
   };
 
+  /**
+   * ฟังก์ชันลบรูปภาพประกอบตามลำดับ index
+   * @param idx - ตำแหน่งของรูปภาพใน Array
+   */
   const removeImage = (idx: number) => {
     setImages((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  // ดึงข้อมูลสถานที่หรืออุปกรณ์ที่เลือก
+  // ค้นหาข้อมูลสถานที่หรืออุปกรณ์ที่ผู้ใช้เลือกจากรายการ
   const selectedVenue = venues.find((v) => v.id === selectedResourceId);
   const selectedEquipment = equipmentList.find((e) => e.id === selectedResourceId);
 
+  /**
+   * คำนวณชื่อสถานที่หรืออุปกรณ์ตามประเภทเป้าหมายที่เลือก
+   */
   const getResolvedLocation = () => {
     if (targetType === 'venue') {
       return selectedVenue ? selectedVenue.name : customLocation.trim();
@@ -163,11 +213,16 @@ export default function RepairPage() {
     return customLocation.trim();
   };
 
+  // ตรวจสอบความสมบูรณ์ของฟอร์ม (ต้องระบุสถานที่/อุปกรณ์ และรายละเอียดปัญหา)
   const isFormValid = Boolean(getResolvedLocation()) && Boolean(detail.trim());
 
+  /**
+   * ฟังก์ชันส่งคำขอแจ้งซ่อมไปยัง Backend API
+   */
   const handleSubmit = async () => {
     const resolvedLocation = getResolvedLocation();
     if (!resolvedLocation || !detail.trim()) return;
+    // ตรวจสอบเบอร์โทรศัพท์ 10 หลัก
     const phoneCheck = validateThaiPhone(requesterPhone || account?.phone || '');
     if (!phoneCheck.valid) {
       alert(phoneCheck.error || 'กรุณากรอกเบอร์โทรศัพท์เป็นตัวเลข 10 หลัก');
@@ -179,6 +234,7 @@ export default function RepairPage() {
       const building = targetType === 'venue' && selectedVenue?.building ? selectedVenue.building : 'อาคารสำนักงาน';
       const floor = targetType === 'venue' && selectedVenue?.floor ? selectedVenue.floor : '-';
 
+      // เรียก API สร้างคำขอแจ้งซ่อม
       const created = await api.createRepair({
         building,
         floor,
@@ -193,11 +249,13 @@ export default function RepairPage() {
         organization: organization.trim() || undefined,
       });
 
+      // ล้างข้อมูลในฟอร์มเมื่อส่งสำเร็จ
       setSelectedResourceId('');
       setCustomLocation('');
       setDetail('');
       setImages([]);
       await loadRepairs();
+      // นำทางไปยังแท็บติดตามสถานะพร้อมเปิดคำขอที่เพิ่งส่งทันที
       setActiveId(created.id);
       setTrackFilter('all');
       setMode('track');
@@ -208,6 +266,11 @@ export default function RepairPage() {
     }
   };
 
+  /**
+   * ฟังก์ชันตรวจรับงานซ่อม (ยืนยันว่าเรียบร้อย หรือขอดำเนินการซ่อมใหม่)
+   * @param id - รหัสคำขอแจ้งซ่อม
+   * @param action - 'confirm' (ยืนยันตรวจรับ) หรือ 'reopen' (ยังไม่เรียบร้อย)
+   */
   const handleAction = async (id: string, action: 'confirm' | 'reopen') => {
     setSubmitting(true);
     try {
@@ -218,11 +281,13 @@ export default function RepairPage() {
     }
   };
 
+  // ค้นหารายการแจ้งซ่อมที่กำลังเลือกดูอยู่ในแท็บติดตาม
   const activeRepair =
     repairs.find((r) => r.id === activeId) ??
     repairs.find((r) => r.status === 'repair_awaiting_acceptance') ??
     repairs[0];
 
+  // กรองรายการคำขอตามตัวกรองที่เลือก (ทั้งหมด, กำลังดำเนินการ, หรือรอตรวจรับ)
   const filteredRepairs = repairs.filter((r) => {
     if (trackFilter === 'in_progress') return r.status === 'repair_in_progress' || r.status === 'repair_submitted';
     if (trackFilter === 'acceptance') return r.status === 'repair_awaiting_acceptance' || r.status === 'repair_done';
@@ -230,12 +295,14 @@ export default function RepairPage() {
   });
 
   return (
+    // โครงเลย์เอาต์หลัก พร้อมกำหนดแถบปุ่ม Action Footer ด้านล่าง
     <AppShell
       title={mode === 'form' ? 'แจ้งปัญหา / ซ่อมบำรุง' : 'แจ้งซ่อมของฉัน'}
       backHref={account ? roleHomePath(account.role) : '/'}
       maxWidth="max-w-[1000px]"
       footer={
         mode === 'form' ? (
+          // ปุ่มควบคุมด้านล่างในโหมดฟอร์ม (บันทึกร่าง / ส่งเรื่อง)
           <div className="flex w-full sm:w-auto gap-2.5">
             <button
               type="button"
@@ -257,6 +324,7 @@ export default function RepairPage() {
             </button>
           </div>
         ) : activeRepair && activeRepair.status === 'repair_awaiting_acceptance' ? (
+          // ปุ่มควบคุมการตรวจรับงานซ่อม (ยังไม่เรียบร้อย / ยืนยันตรวจรับ)
           <div className="flex w-full sm:w-auto gap-2.5">
             <button
               type="button"
@@ -279,6 +347,7 @@ export default function RepairPage() {
       }
     >
       <div className="flex flex-col gap-4">
+        {/* แถบสลับแท็บระหว่าง ฟอร์มแจ้งปัญหา กับ ติดตามรายการของฉัน */}
         <Tabs<Mode>
           value={mode}
           onChange={setMode}
@@ -289,7 +358,9 @@ export default function RepairPage() {
         />
 
         {mode === 'form' ? (
+          // ==================== MODE 1: ฟอร์มแจ้งซ่อมใหม่ ====================
           <div className="jw-card p-5 sm:p-6 flex flex-col gap-4">
+            {/* กล่องเลือกโหมดกรอกแทน (เฉพาะเจ้าหน้าที่ / แอดมิน) */}
             {isStaff && (
               <div className="rounded-2xl border border-brand/30 bg-brand-mint/25 p-4 flex flex-col gap-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -325,6 +396,7 @@ export default function RepairPage() {
                   </div>
                 </div>
 
+                {/* ช่องค้นหาข้อมูลผู้มาติดต่อ (เมื่อเปิดโหมด Walk-in) */}
                 {isWalkIn && (
                   <div className="pt-2 border-t border-brand/15 flex flex-col gap-2.5">
                     <label className="jw-lbl mb-0">ค้นหาข้อมูลผู้มาติดต่อ (เบอร์โทรหรือชื่อ)</label>
@@ -364,6 +436,7 @@ export default function RepairPage() {
               </div>
             )}
 
+            {/* ข้อมูลชื่อและเบอร์โทรศัพท์ผู้แจ้ง */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
                 <label className="jw-lbl">ชื่อ-นามสกุลผู้แจ้ง</label>
@@ -383,7 +456,7 @@ export default function RepairPage() {
               />
             </div>
 
-            {/* เลือกหมวดหมู่ของสิ่งที่ชำรุด */}
+            {/* เลือกหมวดหมู่ของสิ่งที่ชำรุด (สถานที่ / ครุภัณฑ์ / อื่น ๆ) */}
             <div>
               <label className="jw-lbl">รายการที่ต้องการแจ้งปัญหา / ซ่อมแซม</label>
               <div className="flex flex-wrap gap-2 mb-3">
@@ -431,6 +504,7 @@ export default function RepairPage() {
                 </button>
               </div>
 
+              {/* กรณีเลือกสถานที่ */}
               {targetType === 'venue' && (
                 <div>
                   <select
@@ -448,6 +522,7 @@ export default function RepairPage() {
                 </div>
               )}
 
+              {/* กรณีเลือกอุปกรณ์/ครุภัณฑ์ */}
               {targetType === 'equipment' && (
                 <div>
                   <select
@@ -465,6 +540,7 @@ export default function RepairPage() {
                 </div>
               )}
 
+              {/* กรณีเลือกระบุเอง */}
               {targetType === 'other' && (
                 <div>
                   <input
@@ -478,6 +554,7 @@ export default function RepairPage() {
               )}
             </div>
 
+            {/* ตัวเลือกหมวดหมู่ประเภทปัญหา */}
             <div>
               <label className="jw-lbl">ประเภทปัญหา</label>
               <div className="flex flex-wrap gap-2">
@@ -498,6 +575,7 @@ export default function RepairPage() {
               </div>
             </div>
 
+            {/* ช่องกรอกรายละเอียดอาการชำรุด */}
             <div>
               <label className="jw-lbl">รายละเอียด</label>
               <textarea
@@ -509,6 +587,7 @@ export default function RepairPage() {
               />
             </div>
 
+            {/* ส่วนอัปโหลดรูปภาพประกอบ (ไม่เกิน 3 รูป) */}
             <div>
               <label className="jw-lbl">รูปภาพประกอบ (ไม่เกิน 3 รูป)</label>
               <input
@@ -556,10 +635,12 @@ export default function RepairPage() {
               </div>
             </div>
 
+            {/* คำอธิบายโฟลว์งานแจ้งซ่อม */}
             <p className="text-[13px] text-ink-mute">
               ขั้นตอนงานแจ้งซ่อม: (1) ผู้แจ้งส่งเรื่อง → (2) เจ้าหน้าที่รับเรื่อง & ซ่อมแซม → (3) ผู้แจ้งตรวจรับงาน (ไม่ต้องลงนาม)
             </p>
 
+            {/* ข้อความแจ้งเตือนบันทึกร่างสำเร็จ */}
             {draftSaved && (
               <div className="rounded-2xl bg-brand-mint text-brand px-3.5 py-2 text-[13px] font-semibold">
                 บันทึกร่างการแจ้งซ่อมเรียบร้อยแล้ว
@@ -567,7 +648,9 @@ export default function RepairPage() {
             )}
           </div>
         ) : (
+          // ==================== MODE 2: ติดตามสถานะแจ้งซ่อม ====================
           <div className="flex flex-col gap-3.5">
+            {/* ตัวกรองสถานะติดตามคำขอ */}
             <Tabs<TrackFilter>
               value={trackFilter}
               onChange={setTrackFilter}
@@ -578,6 +661,7 @@ export default function RepairPage() {
               ]}
             />
 
+            {/* การ์ดรายละเอียดคำขอที่เลือก */}
             {activeRepair && (
               <div className="jw-card p-5 flex flex-col gap-4">
                 <div className="flex items-start justify-between gap-3">
@@ -590,6 +674,7 @@ export default function RepairPage() {
                   <StatusChip status={activeRepair.status} />
                 </div>
 
+                {/* รูปภาพแนบของคำขอ */}
                 {activeRepair.attachments && activeRepair.attachments.length > 0 && (
                   <div className="flex flex-wrap gap-2.5">
                     {activeRepair.attachments.map((src, idx) => (
@@ -605,17 +690,21 @@ export default function RepairPage() {
                   </div>
                 )}
 
+                {/* แถบ Timeline ไทม์ไลน์สถานะ */}
                 <Timeline steps={activeRepair.timeline} orientation="horizontal" />
 
+                {/* กล่องสรุปความคืบหน้า 3 ขั้นตอน */}
                 <div className="pt-2 border-t border-line flex flex-col gap-2.5">
                   <b className="text-[14px] text-ink">ความคืบหน้าการดำเนินงาน (3 ขั้นตอน)</b>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    {/* ขั้นที่ 1: ผู้แจ้งส่งเรื่อง */}
                     <div className="p-3 rounded-2xl bg-canvas border border-line flex flex-col gap-1">
                       <span className="text-[12px] font-semibold text-ink-mute">1. ผู้แจ้งส่งเรื่อง</span>
                       <span className="text-[13.5px] font-bold text-ink">{activeRepair.requesterName}</span>
                       <span className="text-[12px] text-ink-mute">{formatThaiDateTime(activeRepair.createdAt)}</span>
                       <span className="inline-flex items-center gap-1 text-[12px] font-medium text-brand mt-1">✓ ส่งเรื่องแล้ว</span>
                     </div>
+                    {/* ขั้นที่ 2: เจ้าหน้าที่รับเรื่อง & ซ่อม */}
                     <div className="p-3 rounded-2xl bg-canvas border border-line flex flex-col gap-1">
                       <span className="text-[12px] font-semibold text-ink-mute">2. เจ้าหน้าที่รับเรื่อง & ซ่อม</span>
                       <span className="text-[13.5px] font-bold text-ink">{activeRepair.staffSignerName || 'ฝ่ายช่างซ่อมบำรุง'}</span>
@@ -632,6 +721,7 @@ export default function RepairPage() {
                         {activeRepair.finishedAt ? '✓ ซ่อมเสร็จแล้ว' : activeRepair.acceptedAt ? '⟳ กำลังดำเนินการ' : '○ รอช่างรับเรื่อง'}
                       </span>
                     </div>
+                    {/* ขั้นที่ 3: ผู้แจ้งตรวจรับงาน */}
                     <div className="p-3 rounded-2xl bg-canvas border border-line flex flex-col gap-1">
                       <span className="text-[12px] font-semibold text-ink-mute">3. ผู้แจ้งตรวจรับงาน</span>
                       <span className="text-[13.5px] font-bold text-ink">{activeRepair.requesterName}</span>
@@ -647,6 +737,7 @@ export default function RepairPage() {
                   </div>
                 </div>
 
+                {/* กล่องแสดงผลการซ่อมและรูปถ่ายหลังซ่อมเสร็จ */}
                 {(activeRepair.status === 'repair_awaiting_acceptance' || activeRepair.status === 'repair_done') && (
                   <div className={`pt-3 border-t border-line flex flex-col gap-2 p-3.5 rounded-2xl border ${
                     activeRepair.status === 'repair_done'
@@ -688,6 +779,7 @@ export default function RepairPage() {
               </div>
             )}
 
+            {/* รายการคำขอทั้งหมดสำหรับคลิกเลือกดู */}
             <div className="flex flex-col gap-2.5">
               {filteredRepairs.map((r) => (
                 <div
@@ -711,6 +803,7 @@ export default function RepairPage() {
         )}
       </div>
 
+      {/* หน้าต่างป็อปอัปแสดงรูปภาพขนาดใหญ่ (Lightbox) */}
       {previewImg && (
         <div
           className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"

@@ -1,8 +1,12 @@
-'use client';
+'use client'; // กำหนดให้คอมโพเนนต์นี้ทำงานในฝั่ง Client (React Client Component)
 
+// นำเข้า React Hooks พื้นฐานสำหรับจัดการ State, Effects และ Memoization
 import React, { useEffect, useMemo, useState } from 'react';
+// นำเข้า Link สำหรับการนำทางระหว่างหน้า
 import Link from 'next/link';
+// นำเข้า useRouter hook สำหรับสั่งเปลี่ยน URL
 import { useRouter } from 'next/navigation';
+// นำเข้า Type ข้อมูล, ค่าคงที่ และฟังก์ชันตรวจสอบความถูกต้องจากแพ็กเกจกลาง shared
 import {
   EQUIPMENT_CATEGORY_LABEL,
   Equipment,
@@ -13,10 +17,15 @@ import {
   validateThaiAddressHierarchy,
   validateThaiPhone,
 } from '@japjong/shared';
+// นำเข้า Auth Context เพื่อตรวจสอบสิทธิ์ของผู้ใช้งานและเส้นทางหน้าแรกตามบทบาท
 import { roleHomePath, useAuth } from '@/components/auth-context';
+// นำเข้า AppShell คอมโพเนนต์เลย์เอาต์หลักของแอปพลิเคชัน
 import { AppShell } from '@/components/shell';
+// นำเข้า Icon แสดงรูปไอคอน SVG
 import { Icon } from '@/components/icons';
+// นำเข้าคอมโพเนนต์ฟอร์มกรอกเบอร์โทร 10 หลัก และเลือกที่อยู่ไทย 3 ระดับ
 import { Phone10DigitInput, ThaiAddressSelect } from '@/components/thai-address-select';
+// นำเข้า UI Components: ปฏิทิน C4, ป้าย Chip, ฟอร์มราชการ A4, กล่องลายเซ็น, Stepper
 import {
   CalendarC4,
   Chip,
@@ -27,48 +36,59 @@ import {
   ThumbnailImage,
   equipmentIconName,
 } from '@/components/ui';
+// นำเข้า API client และฟังก์ชันจัดรูปแบบวันที่ภาษาไทย
 import { api, formatThaiDate } from '@/lib/api';
 
+// ขั้นตอนทั้ง 4 ของการขอยืม–คืนอุปกรณ์ราชการ (4-Step Borrow Wizard)
 const STEPS = ['เลือกอุปกรณ์', 'วันยืม-คืน', 'กรอกคำขอ', 'ลงนามและส่ง'];
 
+/**
+ * หน้าจอคำขอยืม–คืนอุปกรณ์ราชการ (Borrow Wizard Page)
+ * ขั้นที่ 1: เลือกอุปกรณ์และระบุจำนวน -> ขั้นที่ 2: ระบุวันยืมและวันคืน (เช็กสต็อกอัตโนมัติ) -> ขั้นที่ 3: กรอกข้อมูลและที่อยู่ -> ขั้นที่ 4: ลงนามลายเซ็นดิจิทัลและส่งคำขอ
+ */
 export default function BorrowWizardPage() {
   const router = useRouter();
   const { account, accounts } = useAuth();
   const isStaff = account?.role === 'STAFF' || account?.role === 'ADMIN';
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(1); // ขั้นตอนปัจจุบัน (1-4)
 
-  // Step 1: Equipment Catalog & Selection
-  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  // --- Step 1 State: รายการอุปกรณ์และการเลือกจำนวน ---
+  const [equipment, setEquipment] = useState<Equipment[]>([]); // แคตตาล็อกอุปกรณ์ทั้งหมด
   const [equipmentLoading, setEquipmentLoading] = useState(true);
   const [equipmentError, setEquipmentError] = useState('');
-  const [cat, setCat] = useState<'all' | EquipmentCategory>('all');
-  const [search, setSearch] = useState('');
-  const [onlyAvailable, setOnlyAvailable] = useState(false);
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [cardView, setCardView] = useState<'grid' | 'list'>('grid');
-  const [inspectedEquipment, setInspectedEquipment] = useState<Equipment | null>(null);
+  const [cat, setCat] = useState<'all' | EquipmentCategory>('all'); // ตัวกรองหมวดหมู่อุปกรณ์
+  const [search, setSearch] = useState(''); // คำค้นหาชื่ออุปกรณ์
+  const [onlyAvailable, setOnlyAvailable] = useState(false); // กรองเฉพาะอุปกรณ์ที่พร้อมใช้งาน
+  const [quantities, setQuantities] = useState<Record<string, number>>({}); // จำนวนที่ต้องการยืมของแต่ละอุปกรณ์ { [id]: qty }
+  const [cardView, setCardView] = useState<'grid' | 'list'>('grid'); // รูปแบบการแสดงผล Grid หรือ List
+  const [inspectedEquipment, setInspectedEquipment] = useState<Equipment | null>(null); // อุปกรณ์ที่กำลังเปิดดูรายละเอียด
 
+  /**
+   * ฟังก์ชันปรับจำนวนยืมของอุปกรณ์ (จำกัดให้อยู่ระหว่าง 0 ถึงจำนวนคงเหลือสูงสุด)
+   */
   const setQty = (id: string, max: number, next: number) => {
     const clamped = Math.max(0, Math.min(max, next));
     setQuantities((prev) => ({ ...prev, [id]: clamped }));
   };
 
+  // รวมรายการอุปกรณ์ที่ถูกเลือกยืม (จำนวนมากกว่า 0)
   const selectedItems = useMemo(() => {
     return equipment
       .map((eq) => ({ eq, qty: quantities[eq.id] ?? 0 }))
       .filter((x) => x.qty > 0);
   }, [equipment, quantities]);
 
+  // รวมจำนวนชิ้นทั้งหมดที่เลือกยืม
   const totalSelectedUnits = useMemo(() => {
     return selectedItems.reduce((sum, item) => sum + item.qty, 0);
   }, [selectedItems]);
 
-  // โหมดกรอกคำขอแทนผู้มาติดต่อ (สำหรับเจ้าหน้าที่)
+  // --- Walk-in State: โหมดกรอกคำขอแทนผู้มาติดต่อ (สำหรับเจ้าหน้าที่) ---
   const [isWalkIn, setIsWalkIn] = useState(false);
   const [walkInQuery, setWalkInQuery] = useState('');
   const [foundUser, setFoundUser] = useState<PublicAccount | null>(null);
 
-  // Step 2: Date Range State (รายวันเท่านั้น)
+  // --- Step 2 State: กำหนดช่วงวันที่ยืมและวันที่คืน (แบบรายวัน) ---
   const [month, setMonth] = useState(() => {
     const today = new Date();
     const y = today.getFullYear();
@@ -76,18 +96,21 @@ export default function BorrowWizardPage() {
     return `${y}-${m}`;
   });
 
+  // วันที่รับอุปกรณ์ (ค่าเริ่มต้น: วันพรุ่งนี้)
   const [pickupDate, setPickupDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
     return d.toISOString().slice(0, 10);
   });
 
+  // วันที่กำหนดส่งคืนอุปกรณ์ (ค่าเริ่มต้น: 3 วันถัดไป)
   const [returnDate, setReturnDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 3);
     return d.toISOString().slice(0, 10);
   });
 
+  // คำนวณจำนวนวันยืมรวม
   const borrowDays = useMemo(() => {
     if (!pickupDate || !returnDate) return 1;
     const s = new Date(pickupDate).getTime();
@@ -96,7 +119,7 @@ export default function BorrowWizardPage() {
     return Math.max(1, diff + 1);
   }, [pickupDate, returnDate]);
 
-  // ตรวจสอบความว่างและจำนวนติดจองของอุปกรณ์ตามช่วงวันที่เลือก
+  // โครงสร้างสรุปการตรวจสอบสต็อกคงเหลือของอุปกรณ์ตามช่วงวันที่เลือก
   interface EquipmentSummaryItem {
     equipmentId: string;
     name: string;

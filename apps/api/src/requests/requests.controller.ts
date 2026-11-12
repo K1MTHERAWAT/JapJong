@@ -60,9 +60,15 @@ import {
   SignDto,
 } from './dto';
 
+/**
+ * Mutex แบบ Asynchronous สำหรับป้องกัน Race Condition เมื่อมีการจองซ้อนทับในเสี้ยววินาทีเดียวกัน
+ */
 class AsyncMutex {
   private queue = Promise.resolve();
 
+  /**
+   * รันฟังก์ชันแบบ Exclusive ไม่ให้รันชนกันในจังหวะเดียวกัน
+   */
   runExclusive<T>(fn: () => Promise<T>): Promise<T> {
     const res = this.queue.then(fn, fn);
     this.queue = res.then(() => {}, () => {});
@@ -70,6 +76,10 @@ class AsyncMutex {
   }
 }
 
+/**
+ * RequestsController: ศูนย์กลางบริหารจัดการคำร้องทุกประเภทในระบบจับจอง
+ * ครอบคลุม: ขอใช้สถานที่ราชการ, ขอยืมอุปกรณ์, แจ้งซ่อมบำรุง, การลงนาม 3 ระดับ, และการส่งมอบ-รับคืน
+ */
 @ApiTags('Requests')
 @ApiBearerAuth('bearer')
 @Controller('requests')
@@ -82,6 +92,9 @@ export class RequestsController {
     @Optional() private readonly notificationEvents?: NotificationEventsService,
   ) {}
 
+  /**
+   * กรองและตรวจสอบความถูกต้องของรายการอุปกรณ์และจำนวนที่ขอเบิกยืม
+   */
   private sanitizeItems(items: unknown): ItemQty[] {
     if (!Array.isArray(items)) return [];
     const cleaned: ItemQty[] = [];
@@ -99,6 +112,9 @@ export class RequestsController {
     return cleaned;
   }
 
+  /**
+   * ตรวจสอบความถูกต้องของเบอร์โทรศัพท์มือถือตามมาตรฐานเบอร์โทรไทย
+   */
   private resolveAndValidatePhone(rawPhone: unknown, fallbackPhone?: string): string | undefined {
     if (typeof rawPhone === 'string' && rawPhone.trim() !== '') {
       const check = validateThaiPhone(rawPhone);
@@ -114,6 +130,9 @@ export class RequestsController {
     return undefined;
   }
 
+  /**
+   * ตรวจสอบและประสานข้อมูลที่อยู่ตามลำดับขั้นราชการ (จังหวัด -> อำเภอ -> ตำบล)
+   */
   private resolveAndValidateAddress(
     body: {
       addressSubdistrict?: string;
@@ -165,6 +184,9 @@ export class RequestsController {
     };
   }
 
+  /**
+   * ตรวจสอบความถูกต้อง ปลอดภัย และขนาดของไฟล์รูปภาพแนบ
+   */
   private validatePhotoList(
     photos: unknown,
     options: { required: boolean; maxCount: number; fieldLabel: string },

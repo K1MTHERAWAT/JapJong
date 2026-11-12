@@ -1,7 +1,25 @@
 'use client';
 
+/**
+ * =====================================================================
+ * หน้าตั้งค่าช่องทางการรับการแจ้งเตือน (Notification Settings Page)
+ * =====================================================================
+ * ควบคุมช่องทางและประเภทการรับข่าวสารของระบบจับจอง:
+ * 1. ตรวจสอบสถานะการเชื่อมต่อบัญชี LINE Official Account (LINE OA)
+ * 2. ตรวจสอบสถานะความสัมพันธ์ (Friendship Status: เป็นเพื่อน / บล็อก / ยังไม่ทราบ)
+ * 3. ปุ่มเพิ่มเพื่อน LINE OA และปุ่มทดสอบส่งการแจ้งเตือนแบบเรียลไทม์ (Test Flex Message)
+ * 4. เมทริกซ์กำหนดสิทธิ์รับการแจ้งเตือนแยกตามประเภท (In-App และ LINE):
+ *    - คำขอจองสถานที่ราชการ
+ *    - คำขอยืมอุปกรณ์
+ *    - เตือนกำหนดส่งคืนอุปกรณ์
+ *    - งานแจ้งซ่อมแซม
+ *    - เอกสารและการลงนามอนุมัติ
+ * 5. ปฏิบัติตามมาตรฐาน PDPA คุ้มครองความเป็นส่วนตัว
+ */
+
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+// ไอคอนสำหรับแสดงสถานะการเชื่อมต่อและปุ่มคำสั่ง
 import {
   AlertTriangle,
   ArrowLeft,
@@ -16,6 +34,7 @@ import {
   UserCheck,
   XCircle,
 } from 'lucide-react';
+// โมเดลประเภทการแจ้งเตือนและช่องทางรับข่าวสารจาก Shared
 import {
   LineNotificationStatusResponse,
   NotificationCategory,
@@ -27,6 +46,9 @@ import { AppShell } from '@/components/shell';
 import { Button, Card, Chip, Feedback } from '@/components/ui';
 import { api } from '@/lib/api';
 
+/**
+ * นิยามหมวดหมู่การแจ้งเตือน พร้อมชื่อและคำอธิบายภาษาไทย
+ */
 const CATEGORIES: {
   key: NotificationCategory;
   title: string;
@@ -61,13 +83,22 @@ const CATEGORIES: {
 
 export default function NotificationSettingsPage() {
   const { account } = useAuth();
+  // สถานะการโหลดข้อมูลเริ่มต้น
   const [loading, setLoading] = useState(true);
+  // สถานะการเชื่อมต่อ LINE และการเป็นเพื่อนกับ LINE OA
   const [lineStatus, setLineStatus] = useState<LineNotificationStatusResponse | null>(null);
+  // รายการการตั้งค่าเปิด/ปิดของแต่ละช่องทาง
   const [preferences, setPreferences] = useState<UserNotificationPreference[]>([]);
+  // สถานะระหว่างบันทึกข้อมูล
   const [saving, setSaving] = useState(false);
+  // สถานะระหว่างทดสอบส่งข้อความเข้า LINE
   const [testingLine, setTestingLine] = useState(false);
+  // ข้อความแจ้งเตือนผลการดำเนินงาน (Success / Error)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
 
+  /**
+   * ดึงสถานะ LINE และการตั้งค่าช่องทางแจ้งเตือนจากเซิร์ฟเวอร์พร้อมกัน
+   */
   useEffect(() => {
     let active = true;
     Promise.all([api.getLineNotificationStatus(), api.getNotificationPreferences()])
@@ -91,11 +122,17 @@ export default function NotificationSettingsPage() {
     };
   }, []);
 
+  /**
+   * ตรวจสอบว่าช่องทางและประเภทที่ระบุเปิดใช้งานอยู่หรือไม่
+   */
   const isEnabled = (channel: NotificationChannel, type: NotificationCategory): boolean => {
     const item = preferences.find((p) => p.channel === channel && p.notificationType === type);
     return item ? item.isEnabled : channel === 'IN_APP';
   };
 
+  /**
+   * สลับเปิด/ปิดการแจ้งเตือนสำหรับช่องทางและประเภทที่เลือก
+   */
   const handleToggle = (channel: NotificationChannel, type: NotificationCategory) => {
     setPreferences((prev) => {
       const idx = prev.findIndex((p) => p.channel === channel && p.notificationType === type);
@@ -104,6 +141,7 @@ export default function NotificationSettingsPage() {
         next[idx] = { ...next[idx], isEnabled: !next[idx].isEnabled };
         return next;
       }
+      // หากยังไม่มีการตั้งค่าเดิม ให้เพิ่มรายการใหม่ลงใน State
       return [
         ...prev,
         {
@@ -111,7 +149,7 @@ export default function NotificationSettingsPage() {
           userId: account?.id || '',
           channel,
           notificationType: type,
-          isEnabled: channel === 'LINE', // toggle from default
+          isEnabled: channel === 'LINE',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },
@@ -119,6 +157,9 @@ export default function NotificationSettingsPage() {
     });
   };
 
+  /**
+   * บันทึกการตั้งค่าทั้งหมดไปยังเซิร์ฟเวอร์
+   */
   const handleSavePreferences = async () => {
     setSaving(true);
     setFeedback(null);
@@ -134,6 +175,7 @@ export default function NotificationSettingsPage() {
         type: 'success',
         message: 'บันทึกการตั้งค่าช่องทางแจ้งเตือนเรียบร้อยแล้ว',
       });
+      // ซ่อนข้อความแจ้งเตือนอัตโนมัติหลัง 4 วินาที
       setTimeout(() => setFeedback(null), 4000);
     } catch (err) {
       setFeedback({
@@ -145,6 +187,9 @@ export default function NotificationSettingsPage() {
     }
   };
 
+  /**
+   * ทดสอบส่งข้อความแจ้งเตือนตัวอย่างไปยัง LINE OA ของผู้ใช้
+   */
   const handleTestLine = async () => {
     setTestingLine(true);
     setFeedback(null);
@@ -175,7 +220,7 @@ export default function NotificationSettingsPage() {
   return (
     <AppShell maxWidth="max-w-[960px]">
       <div className="flex flex-col gap-6">
-        {/* Top Back Link */}
+        {/* ลิงก์ย้อนกลับไปยังศูนย์แจ้งเตือน */}
         <div className="flex items-center gap-3">
           <Link
             href="/notifications"
@@ -191,13 +236,14 @@ export default function NotificationSettingsPage() {
           </div>
         </div>
 
+        {/* แถบแสดงข้อความผลการดำเนินการ */}
         {feedback && (
           <Feedback tone={feedback.type === 'error' ? 'crit' : feedback.type === 'success' ? 'brand' : 'neutral'}>
             {feedback.message}
           </Feedback>
         )}
 
-        {/* Card 1: LINE OA Connection & Friendship Status */}
+        {/* การ์ดที่ 1: สถานะการเชื่อมต่อ LINE OA และสถานะการเป็นเพื่อน */}
         <Card className="p-5 sm:p-6 flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3 border-b border-line-soft pb-4">
             <div className="flex items-center gap-3">
@@ -212,6 +258,7 @@ export default function NotificationSettingsPage() {
               </div>
             </div>
 
+            {/* ป้ายแสดงสถานะการเชื่อมโยงบัญชี */}
             {lineStatus?.isLinked ? (
               <Chip tone="green" className="gap-1.5">
                 <CheckCircle2 className="size-3.5" />
@@ -226,7 +273,7 @@ export default function NotificationSettingsPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-            {/* Left: Account details */}
+            {/* ฝั่งซ้าย: ข้อมูลโปรไฟล์ LINE และสถานะเพื่อน */}
             <div className="rounded-control bg-surface-muted border border-line-soft p-4 flex flex-col justify-between gap-3">
               <div className="flex items-center gap-3">
                 {lineStatus?.lineAccount?.pictureUrl ? (
@@ -266,7 +313,7 @@ export default function NotificationSettingsPage() {
               </div>
             </div>
 
-            {/* Right: Actions */}
+            {/* ฝั่งขวา: ปุ่มเพิ่มเพื่อนและปุ่มทดสอบส่งข้อความ */}
             <div className="rounded-control bg-surface-muted border border-line-soft p-4 flex flex-col justify-between gap-3">
               <div>
                 <b className="text-caption font-semibold text-ink">การเพิ่มเพื่อนและการทดสอบ</b>
@@ -276,6 +323,7 @@ export default function NotificationSettingsPage() {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                {/* ปุ่มเพิ่มเพื่อน LINE OA */}
                 {lineStatus?.addFriendUrl ? (
                   <a
                     href={lineStatus.addFriendUrl}
@@ -294,6 +342,7 @@ export default function NotificationSettingsPage() {
                   </div>
                 )}
 
+                {/* ปุ่มทดสอบส่งข้อความแจ้งเตือนเข้า LINE */}
                 <Button
                   variant="primary"
                   onClick={handleTestLine}
@@ -308,7 +357,7 @@ export default function NotificationSettingsPage() {
           </div>
         </Card>
 
-        {/* Card 2: Notification Preferences Matrix */}
+        {/* การ์ดที่ 2: เมทริกซ์เปิด/ปิดการแจ้งเตือนแต่ละประเภท (Preferences Matrix) */}
         <Card className="p-5 sm:p-6 flex flex-col gap-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-line-soft pb-4">
             <div>
@@ -326,7 +375,7 @@ export default function NotificationSettingsPage() {
             </div>
           </div>
 
-          {/* Preferences Table */}
+          {/* รายการสวิตช์เปิด/ปิดแยกตามหมวดหมู่ */}
           <div className="divide-y divide-line-soft">
             {CATEGORIES.map((cat) => {
               const inAppActive = isEnabled('IN_APP', cat.key);
@@ -340,7 +389,7 @@ export default function NotificationSettingsPage() {
                   </div>
 
                   <div className="flex items-center gap-6 shrink-0 self-end sm:self-center">
-                    {/* In-App Toggle */}
+                    {/* สวิตช์ In-App (เว็บไซต์) */}
                     <label className="flex items-center gap-2.5 cursor-pointer select-none">
                       <span className="text-[13px] font-medium text-ink-soft">เว็บไซต์</span>
                       <button
@@ -360,7 +409,7 @@ export default function NotificationSettingsPage() {
                       </button>
                     </label>
 
-                    {/* LINE Toggle */}
+                    {/* สวิตช์ LINE OA */}
                     <label className="flex items-center gap-2.5 cursor-pointer select-none">
                       <span className="text-[13px] font-medium text-ink-soft">LINE</span>
                       <button
@@ -385,7 +434,7 @@ export default function NotificationSettingsPage() {
             })}
           </div>
 
-          {/* Privacy & Policy Note */}
+          {/* กล่องข้อความนโยบายความเป็นส่วนตัว PDPA */}
           <div className="rounded-control bg-sky-50/70 border border-sky-200 p-3.5 flex items-start gap-2.5 text-[12px] text-sky-900 leading-relaxed">
             <Info className="size-4 text-sky-600 shrink-0 mt-0.5" />
             <div>
@@ -397,7 +446,7 @@ export default function NotificationSettingsPage() {
             </div>
           </div>
 
-          {/* Save Button */}
+          {/* ปุ่มบันทึกการตั้งค่า */}
           <div className="flex justify-end pt-2">
             <Button
               variant="primary"

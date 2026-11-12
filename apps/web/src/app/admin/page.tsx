@@ -1,5 +1,20 @@
 'use client';
 
+/**
+ * =====================================================================
+ * หน้าแดชบอร์ดผู้ดูแลระบบสูงสุด (Super Admin Dashboard Page)
+ * =====================================================================
+ * ภาพรวมการบริหารจัดการระบบส่วนกลางทั้งหมด:
+ * 1. KPI สถิติภาพรวม: คำขอวันนี้, รอดำเนินการ, ใกล้ครบกำหนดคืน, จำนวนผู้ใช้, ทรัพยากร, คำขอเดือนนี้
+ * 2. เมนูลัดจัดการระบบ 5 ด้าน:
+ *    - บริการ & Sidebar (/admin/services): กำหนดการเปิดปิดเมนูและสิทธิ์
+ *    - แม่แบบเอกสาร (/admin/document-templates): ออกแบบฟอร์มราชการและตราครุฑ
+ *    - จัดการสิทธิ์ (/admin/permissions): บัญชีผู้ใช้, บทบาท และการมอบหมายสิทธิ์
+ *    - ประวัติแจ้งเตือน (/admin/notifications): ตรวจสอบการส่งข้อความ LINE OA และ Outbox
+ *    - เอกสาร API (OpenAPI Docs / Swagger UI)
+ * 3. รายการบันทึกกิจกรรมล่าสุด (Audit Log / Activity Log Feed)
+ */
+
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ActivityLog } from '@japjong/shared';
@@ -8,6 +23,7 @@ import { Icon, IconName } from '@/components/icons';
 import { api, formatThaiDateTime } from '@/lib/api';
 
 export default function AdminHomePage() {
+  // State ข้อมูลสรุปภาพรวมแดชบอร์ดแอดมิน
   const [overview, setOverview] = useState<{
     usersCount: number;
     resourcesCount: number;
@@ -26,10 +42,12 @@ export default function AdminHomePage() {
     activities: [],
   });
 
+  // เรียก API โหลดข้อมูลสถิติภาพรวมระบบ
   useEffect(() => {
     api.adminOverview().then(setOverview).catch(() => {});
   }, []);
 
+  // ฟังก์ชันเลือกไอคอนตามประเภทกิจกรรม
   const iconForKind = (kind: ActivityLog['kind']): IconName => {
     switch (kind) {
       case 'user':
@@ -46,7 +64,7 @@ export default function AdminHomePage() {
   return (
     <AppShell title="หน้าแรกผู้ดูแลระบบ" maxWidth="max-w-[1100px]">
       <div className="flex flex-col gap-5">
-        {/* KPI ภาพรวมระบบและคำขอวันนี้ (6.3.1) */}
+        {/* การ์ดสถิติ KPI 6 ด้าน แสดงภาพรวมระบบและคำขอวันนี้ */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <div className="jw-card p-4 flex flex-col gap-1">
             <span className="text-[12px] text-ink-mute">คำขอวันนี้</span>
@@ -80,10 +98,11 @@ export default function AdminHomePage() {
           </div>
         </div>
 
-        {/* จัดการระบบ */}
+        {/* การ์ดเมนูทางลัดจัดการระบบ */}
         <div>
           <h2 className="text-[16px] sm:text-[18px] font-bold text-ink mb-3">จัดการระบบ</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            {/* เมนูจัดการบริการ & เมนูแถบข้าง */}
             <Link
               href="/admin/services"
               className="jw-card p-4 flex items-center gap-3 hover:ring-1 hover:ring-brand transition"
@@ -97,6 +116,7 @@ export default function AdminHomePage() {
               </div>
             </Link>
 
+            {/* เมนูจัดการแม่แบบเอกสารราชการ */}
             <Link
               href="/admin/document-templates"
               className="jw-card p-4 flex items-center gap-3 hover:ring-1 hover:ring-brand transition"
@@ -110,6 +130,7 @@ export default function AdminHomePage() {
               </div>
             </Link>
 
+            {/* เมนูจัดการสิทธิ์ผู้ใช้งานและบทบาท */}
             <Link
               href="/admin/permissions"
               className="jw-card p-4 flex items-center gap-3 hover:ring-1 hover:ring-brand transition"
@@ -123,6 +144,7 @@ export default function AdminHomePage() {
               </div>
             </Link>
 
+            {/* เมนูประวัติและคิวการแจ้งเตือน */}
             <Link
               href="/admin/notifications"
               className="jw-card p-4 flex items-center gap-3 hover:ring-1 hover:ring-brand transition"
@@ -136,6 +158,7 @@ export default function AdminHomePage() {
               </div>
             </Link>
 
+            {/* เอกสารทดสอบ API (Interactive Swagger Docs) */}
             <a
               href="/api/docs"
               target="_blank"
@@ -153,7 +176,7 @@ export default function AdminHomePage() {
           </div>
         </div>
 
-        {/* กิจกรรมล่าสุด */}
+        {/* รายการกิจกรรมล่าสุดของระบบ */}
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <b className="text-[16px] sm:text-[18px]">กิจกรรมล่าสุด</b>

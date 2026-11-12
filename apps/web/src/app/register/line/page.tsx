@@ -1,36 +1,51 @@
-'use client';
+'use client'; // กำหนดให้คอมโพเนนต์นี้ทำงานในฝั่ง Client (React Client Component)
 
+// นำเข้า React Hooks พื้นฐาน และ Suspense สำหรับ Next.js Client Component ที่ใช้ useSearchParams
 import React, { useEffect, useState, Suspense } from 'react';
+// นำเข้า Link สำหรับการนำทางระหว่างหน้า
 import Link from 'next/link';
+// นำเข้า useRouter และ useSearchParams สำหรับดึงค่า Ticket จาก URL
 import { useRouter, useSearchParams } from 'next/navigation';
+// นำเข้า Auth Context เพื่ออัปเดต Session
 import { useAuth } from '@/components/auth-context';
+// นำเข้าฟังก์ชันหาเส้นทางหน้าแรกตามบทบาท
 import { roleHomePath } from '@/components/shell';
+// นำเข้า Icon แสดงรูปไอคอน SVG
 import { Icon } from '@/components/icons';
+// นำเข้า API client และฟังก์ชันจัดเก็บ Auth Token ลงใน LocalStorage
 import { api, setStoredAuth } from '@/lib/api';
 
+/**
+ * คอมโพเนนต์ฟอร์มลงทะเบียนผู้ใช้ครั้งแรกผ่าน LINE (Onboarding Form)
+ */
 function LineRegisterContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // ดึง Registration Ticket จาก Query Parameter ที่ส่งกลับมาจาก LINE Login Callback
   const ticket = searchParams.get('ticket') || '';
   const { refreshMe } = useAuth();
 
+  // State ตรวจสอบสถานะ Ticket
   const [loading, setLoading] = useState(true);
   const [ticketError, setTicketError] = useState('');
+  // State ข้อมูลโปรไฟล์ LINE (ชื่อแสดงผล, รูปประจำตัว)
   const [lineProfile, setLineProfile] = useState<{ displayName: string; pictureUrl?: string | null } | null>(null);
 
-  // Form fields
+  // State ฟิลด์ข้อมูลที่ต้องกรอกเพิ่ม
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
 
-  // PDPA Consents (Unchecked by default)
-  const [consentTerms, setConsentTerms] = useState(false);
-  const [consentPrivacy, setConsentPrivacy] = useState(false);
-  const [consentMarketing, setConsentMarketing] = useState(false);
+  // State ความยินยอม PDPA (ไม่เลือกโดยเริ่มต้น เพื่อให้เป็นไปตามกฎหมาย PDPA)
+  const [consentTerms, setConsentTerms] = useState(false); // [จำเป็น] ยอมรับข้อกำหนดและเงื่อนไข
+  const [consentPrivacy, setConsentPrivacy] = useState(false); // [จำเป็น] ยินยอมตามนโยบายความเป็นส่วนตัว
+  const [consentMarketing, setConsentMarketing] = useState(false); // [ไม่บังคับ] ยินยอมรับข่าวสารประชาสัมพันธ์
 
+  // State ควบคุมการแสดงรายละเอียดนโยบาย PDPA
   const [showPrivacyDetail, setShowPrivacyDetail] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  // ตรวจสอบความถูกต้องของ Registration Ticket จากเซิร์ฟเวอร์
   useEffect(() => {
     if (!ticket) {
       setTicketError('ไม่พบ Registration Ticket กรุณาเข้าสู่ระบบด้วย LINE ใหม่อีกครั้ง');
@@ -58,6 +73,9 @@ function LineRegisterContent() {
       });
   }, [ticket]);
 
+  /**
+   * ฟังก์ชันบันทึกข้อมูลการลงทะเบียนและข้อตกลง PDPA
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
@@ -78,6 +96,7 @@ function LineRegisterContent() {
     setSubmitting(true);
 
     try {
+      // เรียก API บันทึกการลงทะเบียนพร้อมแนบ Consent Logs ตามมาตรฐาน PDPA
       const res = await api.registerWithLine({
         ticket,
         name: name.trim(),
@@ -101,8 +120,10 @@ function LineRegisterContent() {
         ],
       });
 
+      // จัดเก็บ JWT Token และ Account ID
       setStoredAuth(res.token, res.account.id);
       await refreshMe();
+      // นำทางไปยัง URL ปลายทางที่ต้องการ หรือหน้าแรกตามสิทธิ์ของผู้ใช้
       const target = searchParams.get('target');
       router.push(target || roleHomePath(res.account.role));
     } catch (err) {
@@ -111,6 +132,7 @@ function LineRegisterContent() {
     }
   };
 
+  // กำลังตรวจสอบ Ticket
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
@@ -122,6 +144,7 @@ function LineRegisterContent() {
     );
   }
 
+  // กรณี Ticket ไม่ถูกต้องหรือหมดอายุ
   if (ticketError) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
@@ -142,7 +165,7 @@ function LineRegisterContent() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 sm:p-8">
       <div className="w-full max-w-[620px] flex flex-col gap-5">
-        {/* หัวข้อและข้อมูลโปรไฟล์ LINE */}
+        {/* หัวข้อและข้อมูลโปรไฟล์ LINE ที่ได้รับมาจาก OAuth */}
         <div className="jw-card p-6 sm:p-7 flex flex-col gap-4">
           <div className="flex items-center gap-3.5 pb-4 border-b border-line">
             {lineProfile?.pictureUrl ? (
@@ -174,6 +197,7 @@ function LineRegisterContent() {
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            {/* ช่องกรอกชื่อ-นามสกุลจริง */}
             <div>
               <label className="jw-lbl">
                 ชื่อ - นามสกุลจริง <span className="text-status-crit">*</span>
@@ -188,6 +212,7 @@ function LineRegisterContent() {
               />
             </div>
 
+            {/* ช่องกรอกเบอร์โทรศัพท์มือถือ 10 หลัก */}
             <div>
               <label className="jw-lbl">
                 เบอร์โทรศัพท์มือถือ <span className="text-status-crit">*</span>
@@ -206,7 +231,7 @@ function LineRegisterContent() {
               </span>
             </div>
 
-            {/* ส่วน PDPA Consent */}
+            {/* ส่วนกล่องบันทึกความยินยอม PDPA Consent */}
             <div className="rounded-2xl border border-line p-4 bg-paper/50 flex flex-col gap-3 mt-1">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -224,6 +249,7 @@ function LineRegisterContent() {
                 </button>
               </div>
 
+              {/* ข้อความชี้แจงรายละเอียดวัตถุประสงค์ PDPA (Accordion) */}
               {showPrivacyDetail && (
                 <div className="text-[12.5px] text-ink-mute leading-relaxed bg-white p-3.5 rounded-xl border border-line flex flex-col gap-2 max-h-[160px] overflow-y-auto">
                   <b className="text-ink">วัตถุประสงค์การเก็บรวบรวมและใช้ข้อมูลส่วนบุคคล:</b>
@@ -239,7 +265,7 @@ function LineRegisterContent() {
                 </div>
               )}
 
-              {/* ข้อกำหนดจำเป็น 1 */}
+              {/* ข้อกำหนดจำเป็น 1: Terms of Service */}
               <label className="flex items-start gap-2.5 cursor-pointer select-none text-[13px] text-ink pt-1">
                 <input
                   type="checkbox"
@@ -253,7 +279,7 @@ function LineRegisterContent() {
                 </span>
               </label>
 
-              {/* ข้อกำหนดจำเป็น 2 */}
+              {/* ข้อกำหนดจำเป็น 2: Privacy Policy */}
               <label className="flex items-start gap-2.5 cursor-pointer select-none text-[13px] text-ink">
                 <input
                   type="checkbox"
@@ -267,7 +293,7 @@ function LineRegisterContent() {
                 </span>
               </label>
 
-              {/* ข้อกำหนดเพิ่มเติม (ไม่บังคับ) */}
+              {/* ข้อกำหนดเพิ่มเติม (ไม่บังคับ): Marketing & Notifications */}
               <label className="flex items-start gap-2.5 cursor-pointer select-none text-[13px] text-ink-mute">
                 <input
                   type="checkbox"
@@ -281,6 +307,7 @@ function LineRegisterContent() {
               </label>
             </div>
 
+            {/* ข้อความเตือนข้อผิดพลาด */}
             {error && (
               <div className="rounded-2xl bg-[#FDE8E8] border border-[#f9b4b4] px-3.5 py-2.5 text-[13px] text-[#7a1010] flex items-center gap-2">
                 <Icon name="x" className="w-4 h-4 text-status-crit shrink-0" />
@@ -288,6 +315,7 @@ function LineRegisterContent() {
               </div>
             )}
 
+            {/* ปุ่มยืนยันการลงทะเบียน */}
             <button
               type="submit"
               disabled={submitting || !consentTerms || !consentPrivacy || !name.trim() || !phone.trim()}
@@ -309,6 +337,9 @@ function LineRegisterContent() {
   );
 }
 
+/**
+ * หน้าลงทะเบียนด้วย LINE พร้อม Suspense Wrapper สำหรับ Next.js Client-side params
+ */
 export default function LineRegisterPage() {
   return (
     <Suspense
@@ -322,4 +353,3 @@ export default function LineRegisterPage() {
     </Suspense>
   );
 }
-

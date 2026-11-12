@@ -1,21 +1,42 @@
-'use client';
+'use client'; // กำหนดให้คอมโพเนนต์นี้ทำงานในฝั่ง Client (React Client Component)
 
+// นำเข้า React Hooks พื้นฐานสำหรับจัดการ State, Effects และ Callbacks
 import React, { useCallback, useEffect, useState } from 'react';
+// นำเข้า Link สำหรับการนำทางระหว่างหน้าใน Next.js
 import Link from 'next/link';
+// นำเข้า useParams hook สำหรับดึง Dynamic Route Parameter (id ของคำขอ)
 import { useParams } from 'next/navigation';
+// นำเข้า Type และค่าคงที่ระดับการลงนามจากแพ็กเกจกลาง shared
 import { Equipment, RequestWithTimeline, SIGN_LEVEL_TITLE } from '@japjong/shared';
+// นำเข้า Auth Context สำหรับตรวจสอบสิทธิ์และบทบาทของผู้ใช้
 import { useAuth } from '@/components/auth-context';
+// นำเข้า AppShell และฟังก์ชันหาเส้นทางหน้าแรกตามบทบาท
 import { AppShell, roleHomePath } from '@/components/shell';
+// นำเข้า UI Components: เอกสารราชการ A4, ป้ายประเภทคำขอ, การ์ดแสดงลายเซ็น, ป้ายสถานะ, แถบไทม์ไลน์
 import { OfficialGovFormDocument, RequestTypeChip, SignaturePreviewCard, StatusChip, Timeline } from '@/components/ui';
+// นำเข้า API client และฟังก์ชันจัดรูปแบบวันที่เวลาภาษาไทย
 import { api, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
 
+/**
+ * หน้ารายละเอียดคำขอ (/requests/[id])
+ * แสดงข้อมูลสรุปคำขอ, เอกสารราชการ A4 พร้อมพิมพ์, ไทม์ไลน์ 4 ระดับ,
+ * และการ์ดแสดงลายมือชื่อดิจิทัล 4 ฝ่าย (ผู้ขอ, จนท., ปลัด, นายก)
+ */
 export default function RequestDetailPage() {
+  // ดึงรหัส ID ของคำขอจาก URL Parameters (/requests/:id)
   const params = useParams<{ id: string }>();
+  // ดึงข้อมูลบัญชีผู้ใช้ปัจจุบันที่ล็อกอินอยู่
   const { account } = useAuth();
+  // State เก็บข้อมูลคำขอพร้อมไทม์ไลน์สถานะ
   const [req, setReq] = useState<RequestWithTimeline | null>(null);
+  // State ข้อมูลอุปกรณ์สำหรับอ้างอิงชื่ออุปกรณ์ในคำขอ
   const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
+  // State ควบคุมการแสดง/ซ่อนแบบฟอร์มเอกสารราชการ A4 แบบเต็มใบ
   const [showOfficialForm, setShowOfficialForm] = useState(true);
 
+  /**
+   * ฟังก์ชันดึงข้อมูลรายละเอียดคำขอจาก Backend API ตาม ID
+   */
   const load = useCallback(() => {
     if (!params.id) return;
     api
@@ -24,13 +45,16 @@ export default function RequestDetailPage() {
       .catch(() => {});
   }, [params.id]);
 
+  // โหลดข้อมูลคำขอและรายการอุปกรณ์เมื่อเปิดหน้าจอ
   useEffect(() => {
     load();
     api.equipment().then(setEquipmentList).catch(() => {});
   }, [load]);
 
+  // เส้นทางย้อนกลับตามบทบาทของผู้ใช้งาน
   const backHref = roleHomePath(account?.role);
 
+  // แสดงหน้าจอระหว่างกำลังโหลดข้อมูลคำขอ
   if (!req) {
     return (
       <AppShell title="รายละเอียดคำขอ" backHref={backHref}>
@@ -39,26 +63,34 @@ export default function RequestDetailPage() {
     );
   }
 
+  // คำนวณเงื่อนไขสถานะการอนุมัติสมบูรณ์
   const isFullyApproved = req.status === 'approved' || req.status === 'borrowing' || req.status === 'returned';
+
+  // ตรวจสอบสิทธิ์ว่าเจ้าหน้าที่สามารถกดไปหน้าตรวจรับคำขอนี้ได้หรือไม่
   const canStaffReview =
     account?.role === 'STAFF' &&
     (req.status === 'pending_staff' ||
       (req.type === 'repair' && (req.status === 'repair_submitted' || req.status === 'repair_in_progress')));
+
+  // ตรวจสอบสิทธิ์ว่าผู้บริหาร (ปลัด หรือ นายก) สามารถกดไปหน้าลงนามได้หรือไม่
   const canApproverSign =
     (account?.role === 'APPROVER_L2' && req.status === 'pending_l2') ||
     (account?.role === 'APPROVER_L1' && req.status === 'pending_l1');
 
+  // ดึงข้อมูลลายมือชื่อของแต่ละระดับ (สำหรับคำขอสถานที่และอุปกรณ์)
   const sigStaff = req.type !== 'repair' ? req.signatures.find((s) => s.level === 'staff') : undefined;
   const sigL2 = req.type !== 'repair' ? req.signatures.find((s) => s.level === 'l2') : undefined;
   const sigL1 = req.type !== 'repair' ? req.signatures.find((s) => s.level === 'l1') : undefined;
 
   return (
+    // โครงเลย์เอาต์หลัก พร้อมกำหนดแถบปุ่ม Action Footer ตามสถานะและสิทธิ์ของผู้ใช้
     <AppShell
       title={`คำขอ ${req.code}`}
       backHref={backHref}
       maxWidth="max-w-[1080px]"
       footer={
         canStaffReview ? (
+          // ปุ่มสำหรับเจ้าหน้าที่ตรวจรับคำขอ
           <Link
             href={req.type === 'repair' ? `/staff/repairs?id=${req.id}` : `/staff/review?id=${req.id}`}
             className="jw-btn w-full sm:w-64"
@@ -66,10 +98,12 @@ export default function RequestDetailPage() {
             {req.type === 'repair' ? 'ไปหน้าจัดการงานซ่อมนี้ →' : 'ไปหน้าตรวจและลงนามคำขอนี้ →'}
           </Link>
         ) : canApproverSign ? (
+          // ปุ่มสำหรับผู้บริหารลงนาม 2 ระดับ
           <Link href={`/approver/sign/${req.id}`} className="jw-btn w-full sm:w-64">
             ไปหน้าลงนามเอกสาร 3 ระดับ →
           </Link>
         ) : req.status !== 'cancelled' && req.status !== 'rejected' ? (
+          // ปุ่มสำหรับผู้ยื่นคำขอ: ขอยกเลิกคำขอ หรือ ขอเลื่อนวันเวลา
           <div className="flex w-full sm:w-auto gap-2.5">
             {/* ยกเลิกคำขอ: สามารถยกเลิกได้ตลอดทุกสถานะก่อนการใช้งานเสร็จสิ้น */}
             {(req.type === 'booking' || req.type === 'borrow') &&
@@ -83,7 +117,7 @@ export default function RequestDetailPage() {
               )}
 
             {/* ขอเลื่อนวัน / แก้ไข: แสดงเฉพาะก่อนปลัดหรือนายกลงนาม (pending_staff หรือ pending_l2 เท่านั้น)
-                ถ้าปลัด (L2) หรือ นายก (L1) ลงนามแล้ว (pending_l1 หรือ approved) ปุ่มนี้จะหายไป */}
+                ถ้าปลัด (L2) หรือ นายก (L1) ลงนามแล้ว ปุ่มนี้จะหายไปเพื่อป้องกันการแก้ไขเอกสารที่ลงนามแล้ว */}
             {(req.type === 'booking' || req.type === 'borrow') &&
               ['pending_staff', 'pending_l2'].includes(req.status) && (
                 <Link
@@ -93,6 +127,7 @@ export default function RequestDetailPage() {
                   ขอเลื่อนวัน / แก้ไข
                 </Link>
               )}
+            {/* ทางลัดไปหน้ารับมอบ/ส่งคืนอุปกรณ์สำหรับงานขอยืม */}
             {req.type === 'borrow' &&
               (req.status === 'approved' || req.status === 'borrowing' || req.status === 'return_inspect') && (
                 <Link href="/borrow/my" className="jw-btn flex-1 sm:w-56">
@@ -103,6 +138,7 @@ export default function RequestDetailPage() {
                     : 'ไปหน้าตรวจสอบการคืน'}
                 </Link>
               )}
+            {/* ปุ่มเปิดดูใบอนุญาตราชการ PDF เมื่อลงนามอนุมัติครบสมบูรณ์ */}
             {isFullyApproved && (
               <Link href={`/approver/permit/${req.id}`} className="jw-btn-sec flex-1 sm:w-48">
                 ดูใบอนุญาต (PDF)
@@ -113,24 +149,31 @@ export default function RequestDetailPage() {
       }
     >
       <div className="flex flex-col gap-4">
+        {/* แถบหัวข้อสถานะคำขอ */}
         <div className="flex items-center justify-between">
           <b className="text-[17px] text-ink">สถานะคำขอ</b>
           <StatusChip status={req.status} />
         </div>
 
+        {/* การ์ดสรุปข้อมูลสำคัญของคำขอ */}
         <div className="jw-card p-5 flex flex-col gap-2 text-[14px]">
+          {/* เลขคำขอ */}
           <div className="flex gap-2">
             <b className="w-24 shrink-0 text-ink-mute">เลขคำขอ</b>
             <span className="font-semibold">{req.code}</span>
           </div>
+          {/* ประเภทคำขอ */}
           <div className="flex gap-2">
             <b className="w-24 shrink-0 text-ink-mute">ประเภท</b>
             <RequestTypeChip type={req.type} />
           </div>
+          {/* ชื่อสถานที่ หรือรายการที่ขอ */}
           <div className="flex gap-2">
             <b className="w-24 shrink-0 text-ink-mute">รายการ</b>
             <span className="font-semibold">{req.title}</span>
           </div>
+
+          {/* ช่วงวันเวลา (สำหรับจองสถานที่) */}
           {req.type === 'booking' && (
             <div className="flex gap-2">
               <b className="w-24 shrink-0 text-ink-mute">วันเวลา</b>
@@ -141,6 +184,8 @@ export default function RequestDetailPage() {
               </div>
             </div>
           )}
+
+          {/* อุปกรณ์เสริมที่ขอใช้ร่วมด้วย */}
           {req.type === 'booking' && req.extraItems && req.extraItems.length > 0 && (
             <div className="flex gap-2 items-start">
               <b className="w-24 shrink-0 text-ink-mute">อุปกรณ์เสริม</b>
@@ -159,6 +204,8 @@ export default function RequestDetailPage() {
               </div>
             </div>
           )}
+
+          {/* ช่วงวันที่ขอใช้ (สำหรับขอยืมอุปกรณ์) */}
           {req.type === 'borrow' && (
             <>
               <div className="flex gap-2">
@@ -177,6 +224,8 @@ export default function RequestDetailPage() {
               )}
             </>
           )}
+
+          {/* ข้อมูลผู้ยื่นคำขอ */}
           <div className="flex gap-2">
             <b className="w-24 shrink-0 text-ink-mute">ผู้ขอ</b>
             <span>
@@ -184,12 +233,16 @@ export default function RequestDetailPage() {
               {req.requesterPhone ? ` · โทร. ${req.requesterPhone}` : ''}
             </span>
           </div>
+
+          {/* ข้อความวัตถุประสงค์ถึงเจ้าหน้าที่ */}
           {req.type !== 'repair' && req.purpose ? (
             <div className="flex gap-2 items-start bg-amber-50/80 border border-amber-200/80 rounded-xl p-2.5 text-[13px] text-amber-950">
               <b className="w-24 shrink-0 text-amber-900 font-semibold">ข้อความถึง จนท.</b>
               <span className="whitespace-pre-wrap">{req.purpose}</span>
             </div>
           ) : null}
+
+          {/* ลิงก์ดาวน์โหลดเอกสารใบอนุญาต */}
           <div className="flex gap-2">
             <b className="w-24 shrink-0 text-ink-mute">เอกสาร</b>
             <span>
@@ -203,6 +256,8 @@ export default function RequestDetailPage() {
               )}
             </span>
           </div>
+
+          {/* กรณีคำขอถูกปฏิเสธ แสดงเหตุผลการปฏิเสธ */}
           {req.rejectReason && (
             <div className="mt-2 rounded-2xl bg-[#FDE8E8] border border-[#f9b4b4] px-3.5 py-2 text-[13px] text-[#7a1010]">
               <b>หมายเหตุ:</b> {req.rejectReason}
@@ -210,7 +265,7 @@ export default function RequestDetailPage() {
           )}
         </div>
 
-        {/* เอกสารราชการจริง: แบบขอใช้สถานที่ราชการ / แบบคำขอยืมครุภัณฑ์ราชการ */}
+        {/* แบบฟอร์มเอกสารราชการจริงขนาด A4: แบบขอใช้สถานที่ หรือแบบขอยืมครุภัณฑ์ */}
         {req.type !== 'repair' && (
           <div className="flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
@@ -227,11 +282,12 @@ export default function RequestDetailPage() {
                 {showOfficialForm ? 'ซ่อนแบบฟอร์มราชการ' : 'แสดงแบบฟอร์มราชการเต็มใบ'}
               </button>
             </div>
+            {/* คอมโพเนนต์แสดงแบบฟอร์ม A4 ตามระเบียบงานสารบรรณ พร้อมพิมพ์ */}
             {showOfficialForm && <OfficialGovFormDocument req={req} />}
           </div>
         )}
 
-        {/* ส่วนแสดงลายมือชื่อของทุกฝ่าย */}
+        {/* ส่วนแสดงลายมือชื่อดิจิทัลของผู้เกี่ยวข้องทุกฝ่าย */}
         <div className="jw-card p-5 flex flex-col gap-3">
           <div>
             <b className="text-[16px] text-ink block">
@@ -245,6 +301,7 @@ export default function RequestDetailPage() {
           </div>
 
           {req.type === 'repair' ? (
+            // ไทม์ไลน์ 3 ขั้นตอนสำหรับงานแจ้งซ่อม
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <div className="p-3.5 rounded-2xl bg-canvas border border-line flex flex-col gap-1">
                 <span className="text-[12px] font-semibold text-ink-mute">1. ผู้แจ้งส่งเรื่อง</span>
@@ -282,6 +339,7 @@ export default function RequestDetailPage() {
               </div>
             </div>
           ) : (
+            // การ์ดแสดงลายเซ็น 4 ระดับ (ผู้ขอ -> เจ้าหน้าที่ -> ปลัด อบต. -> นายก อบต.)
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
               <SignaturePreviewCard
                 roleLabel="1. ผู้ยื่นคำขอ"
@@ -314,6 +372,7 @@ export default function RequestDetailPage() {
             </div>
           )}
 
+          {/* ลายเซ็นเพิ่มเติมกรณีเจ้าหน้าที่กรอกแทนที่เคาน์เตอร์ */}
           {(req.createdByStaffId || req.createdByStaffSignature) && (
             <div className="pt-2 border-t border-line">
               <span className="text-[12px] font-semibold text-ink-mute block mb-1.5">
@@ -332,6 +391,7 @@ export default function RequestDetailPage() {
           )}
         </div>
 
+        {/* แถบแสดงประวัติไทม์ไลน์การเปลี่ยนแปลงสถานะ */}
         <div className="jw-card p-5 flex flex-col gap-3">
           <b className="text-[16px]">ความคืบหน้า</b>
           <Timeline steps={req.timeline} />

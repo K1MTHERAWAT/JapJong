@@ -1,7 +1,10 @@
-'use client';
+'use client'; // กำหนดให้คอมโพเนนต์นี้ทำงานในฝั่ง Client (React Client Component)
 
+// นำเข้า React Hooks พื้นฐานสำหรับจัดการ State และ Side Effects
 import React, { useEffect, useState } from 'react';
+// นำเข้า Link สำหรับการเปลี่ยนหน้าภายในระบบ Next.js
 import Link from 'next/link';
+// นำเข้าไอคอนจากไลบรารี lucide-react สำหรับหน้าจัดการ LINE
 import {
   AlertCircle,
   ArrowLeft,
@@ -21,37 +24,50 @@ import {
   Upload,
   UserCheck,
 } from 'lucide-react';
+// นำเข้า AppShell คอมโพเนนต์เลย์เอาต์หลักของแอปพลิเคชัน
 import { AppShell } from '@/components/shell';
+// นำเข้าคอมโพเนนต์ UI พื้นฐาน: Button, Card, Chip, Feedback
 import { Button, Card, Chip, Feedback } from '@/components/ui';
+// นำเข้า API client SDK และฟังก์ชันจัดรูปแบบวันเวลาภาษาไทย
 import { api, formatThaiDateTime } from '@/lib/api';
 
+/**
+ * โครงสร้างข้อมูล Action ในแต่ละช่องของ Rich Menu (เช่น ลิงก์ URL, ส่งข้อความ, หรือ Postback)
+ */
 interface RichMenuAction {
-  id: string;
-  sortOrder: number;
-  label: string;
-  actionType: 'URI' | 'MESSAGE' | 'POSTBACK';
-  actionData: string;
-  area: { x: number; y: number; width: number; height: number };
+  id: string; // รหัสอ้างอิง Action
+  sortOrder: number; // ลำดับช่อง
+  label: string; // ข้อความป้ายกำกับของปุ่ม
+  actionType: 'URI' | 'MESSAGE' | 'POSTBACK'; // ประเภทการทำงานเมื่อกด
+  actionData: string; // ข้อมูลคำสั่ง เช่น URL ปลายทาง หรือข้อความที่ส่ง
+  area: { x: number; y: number; width: number; height: number }; // พิกัดสี่เหลี่ยมบนภาพ Rich Menu
 }
 
+/**
+ * โครงสร้างข้อมูลแบบจำลอง Rich Menu
+ */
 interface RichMenu {
-  id: string;
-  name: string;
-  menuType: 'CITIZEN' | 'STAFF' | 'ADMIN' | 'DEFAULT' | 'CUSTOM';
-  lineRichMenuId: string | null;
-  chatBarText: string;
-  width: number;
-  height: number;
-  imageData?: string | null;
-  imageMimeType?: string | null;
-  status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
-  isDefault: boolean;
-  publishedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-  actions: RichMenuAction[];
+  id: string; // รหัสประจำตัวในฐานข้อมูลของระบบ
+  name: string; // ชื่อเมนู (แสดงในระบบ)
+  menuType: 'CITIZEN' | 'STAFF' | 'ADMIN' | 'DEFAULT' | 'CUSTOM'; // กลุ่มผู้ใช้งานเป้าหมาย
+  lineRichMenuId: string | null; // รหัส ID ที่ได้รับจาก LINE Messaging API หลังเผยแพร่
+  chatBarText: string; // ข้อความบนแถบเปิด/ปิดเมนูด้านล่างห้องแชท
+  width: number; // ความกว้างของภาพ (มาตรฐาน 2500px)
+  height: number; // ความสูงของภาพ (มาตรฐาน 1686px)
+  imageData?: string | null; // ข้อมูลภาพแบบ Base64
+  imageMimeType?: string | null; // ประเภทไฟล์ภาพ เช่น image/png
+  status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'; // สถานะเมนู
+  isDefault: boolean; // เป็นเมนูเริ่มต้นของ LINE OA หรือไม่
+  publishedAt: string | null; // วันเวลาที่เผยแพร่ขึ้น LINE
+  createdAt: string; // วันที่สร้าง
+  updatedAt: string; // วันที่แก้ไขล่าสุด
+  actions: RichMenuAction[]; // รายการปุ่ม Action ทั้งหมดบนผังเมนู
 }
 
+/**
+ * รายการประเภทเหตุการณ์การแจ้งเตือน (Notification Events) แบ่งตามหมวดหมู่
+ * สำหรับนำไปใช้เลือกปรับแต่งและทดสอบพรีวิว Flex Message
+ */
 const EVENT_CATEGORIES = [
   {
     category: 'Booking (ขอใช้สถานที่)',
@@ -104,33 +120,48 @@ const EVENT_CATEGORIES = [
   },
 ];
 
+/**
+ * หน้าจอจัดการ LINE Official Account, Rich Menu และ Flex Message สำหรับผู้ดูแลระบบ
+ * รองรับการจัดการ Rich Menu แบบแยกร่างตามบทบาทผู้ใช้, ปรับแต่ง Flex Message พร้อมพรีวิวสด, และทดสอบระบบสลับเมนู
+ */
 export default function AdminLinePage() {
+  // State แท็บหลัก: 'menus' (จัดการ Rich Menu), 'flex' (ปรับแต่ง Flex Message), 'switching' (ทดสอบสลับเมนู)
   const [activeTab, setActiveTab] = useState<'menus' | 'flex' | 'switching'>('menus');
+  // State รายการ Rich Menu ทั้งหมดในระบบ
   const [menus, setMenus] = useState<RichMenu[]>([]);
+  // State Rich Menu ที่กำลังถูกเลือกดูรายละเอียดและพรีวิว
   const [selectedMenu, setSelectedMenu] = useState<RichMenu | null>(null);
+  // State กำลังโหลดข้อมูลเริ่มต้น
   const [loading, setLoading] = useState(true);
+  // State กำลังประมวลผลคำสั่ง (เช่น เผยแพร่, อัปโหลดภาพ)
   const [actionLoading, setActionLoading] = useState(false);
+  // State แสดงข้อความแจ้งเตือนผลลัพธ์ (สำเร็จ/ล้มเหลว)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Flex Message State
-  const [selectedEvent, setSelectedEvent] = useState<string>('BOOKING_APPROVED');
-  const [previewData, setPreviewData] = useState<any>(null);
-  const [flexHeadline, setFlexHeadline] = useState('');
-  const [flexFooter, setFlexFooter] = useState('');
-  const [flexHeaderColor, setFlexHeaderColor] = useState('#0F4C81');
-  const [flexButtonLabel, setFlexButtonLabel] = useState('ดูรายละเอียดในระบบ');
+  // --- Flex Message State: การปรับแต่งและการพรีวิว Flex Message Card ---
+  const [selectedEvent, setSelectedEvent] = useState<string>('BOOKING_APPROVED'); // เหตุการณ์ที่เลือกปรับแต่ง
+  const [previewData, setPreviewData] = useState<any>(null); // ข้อมูลจำลองสำหรับแสดงตัวอย่าง
+  const [flexHeadline, setFlexHeadline] = useState(''); // ข้อความหัวเรื่องหลักที่กำหนดเอง
+  const [flexFooter, setFlexFooter] = useState(''); // ข้อความหมายเหตุท้ายการ์ด
+  const [flexHeaderColor, setFlexHeaderColor] = useState('#0F4C81'); // รหัสสี Hex ของแถบหัวการ์ด
+  const [flexButtonLabel, setFlexButtonLabel] = useState('ดูรายละเอียดในระบบ'); // ข้อความบนปุ่มกด
 
-  // Switching & User Linking State
-  const [testLineUserId, setTestLineUserId] = useState('');
-  const [testRole, setTestRole] = useState<'USER' | 'STAFF' | 'ADMIN' | 'GUEST'>('USER');
+  // --- Switching State: ทดสอบการสลับเมนูตาม LINE User ID และ Role ---
+  const [testLineUserId, setTestLineUserId] = useState(''); // LINE User ID ที่ต้องการทดสอบ
+  const [testRole, setTestRole] = useState<'USER' | 'STAFF' | 'ADMIN' | 'GUEST'>('USER'); // บทบาทที่ต้องการจำลอง
 
+  /**
+   * ฟังก์ชันดึงรายการ Rich Menus ทั้งหมดจาก Backend API
+   */
   const fetchMenus = async () => {
     try {
       const data = await api.getRichMenus();
       setMenus(data);
+      // หากยังไม่ได้เลือกเมนู ให้เลือกเมนูแรกโดยอัตโนมัติ
       if (data.length > 0 && !selectedMenu) {
         setSelectedMenu(data[0]);
       } else if (selectedMenu) {
+        // หากมีเมนูที่เลือกอยู่แล้ว ให้อัปเดตข้อมูลล่าสุดของเมนูนั้น
         const refreshed = data.find((m: any) => m.id === selectedMenu.id);
         if (refreshed) setSelectedMenu(refreshed);
       }
@@ -141,6 +172,10 @@ export default function AdminLinePage() {
     }
   };
 
+  /**
+   * ฟังก์ชันดึงข้อมูลจำลองสำหรับพรีวิว Flex Card ตามประเภท Event
+   * @param eventKey - รหัสประเภทเหตุการณ์แจ้งเตือน
+   */
   const loadFlexPreview = async (eventKey: string) => {
     try {
       const res = await api.previewFlexTemplate(eventKey);
@@ -150,16 +185,21 @@ export default function AdminLinePage() {
     }
   };
 
+  // โหลดรายการเมนูและตัวอย่าง Flex Card เมื่อเปิดหน้าจอครั้งแรก
   useEffect(() => {
     fetchMenus();
     loadFlexPreview(selectedEvent);
   }, []);
 
+  // โหลดพรีวิวใหม่เมื่อเปลี่ยนประเภท Event
   useEffect(() => {
     loadFlexPreview(selectedEvent);
   }, [selectedEvent]);
 
-  // Actions
+  /**
+   * ฟังก์ชันเผยแพร่ Rich Menu ขึ้นไปยัง LINE Official Account ผ่าน Messaging API
+   * @param id - รหัส Rich Menu ในระบบ
+   */
   const handlePublish = async (id: string) => {
     setActionLoading(true);
     setFeedback(null);
@@ -174,6 +214,10 @@ export default function AdminLinePage() {
     }
   };
 
+  /**
+   * ฟังก์ชันกำหนดให้ Rich Menu นี้เป็นเมนูหลักเริ่มต้น (Default) ของ LINE OA
+   * @param id - รหัส Rich Menu
+   */
   const handleSetDefault = async (id: string) => {
     setActionLoading(true);
     setFeedback(null);
@@ -188,6 +232,9 @@ export default function AdminLinePage() {
     }
   };
 
+  /**
+   * ฟังก์ชันสร้างชุด Rich Menu เริ่มต้นอัตโนมัติครบ 4 ประเภท (Citizen, Staff, Admin, Guest)
+   */
   const handleInitDefaults = async () => {
     if (!confirm('ยืนยันสร้างชุดเมนูเริ่มต้น (Citizen, Staff, Admin, Guest)?')) return;
     setActionLoading(true);
@@ -203,6 +250,10 @@ export default function AdminLinePage() {
     }
   };
 
+  /**
+   * ฟังก์ชันลบ Rich Menu ออกจากระบบและจากเซิร์ฟเวอร์ LINE
+   * @param id - รหัส Rich Menu
+   */
   const handleDelete = async (id: string) => {
     if (!confirm('ยืนยันลบ Rich Menu นี้? ระบบจะลบออกจาก LINE Messaging API ด้วย')) return;
     setActionLoading(true);
@@ -219,9 +270,13 @@ export default function AdminLinePage() {
     }
   };
 
+  /**
+   * ฟังก์ชันอัปโหลดไฟล์ภาพกราฟิก Rich Menu ขนาด 2500x1686 px (ไม่เกิน 1MB)
+   */
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!selectedMenu || !e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
+    // ตรวจสอบขนาดไฟล์ไม่ให้เกิน 1 MB ตามข้อกำหนดของ LINE
     if (file.size > 1048576) {
       setFeedback({ type: 'error', message: 'ไฟล์ภาพต้องมีขนาดไม่เกิน 1 MB ตามเกณฑ์ของ LINE' });
       return;
@@ -247,6 +302,9 @@ export default function AdminLinePage() {
     reader.readAsDataURL(file);
   };
 
+  /**
+   * ฟังก์ชันบันทึกการปรับแต่งแม่แบบ Flex Message ของ Event ที่เลือก
+   */
   const handleSaveFlexOverride = async () => {
     setActionLoading(true);
     setFeedback(null);
@@ -272,6 +330,9 @@ export default function AdminLinePage() {
     }
   };
 
+  /**
+   * ฟังก์ชันทดสอบการสลับ Rich Menu ของผู้ใช้รายบุคคลผ่าน LINE User ID
+   */
   const handleTestSwitch = async () => {
     if (!testLineUserId.trim()) {
       setFeedback({ type: 'error', message: 'กรุณากรอก LINE User ID (เช่น U1111222233334444)' });
@@ -294,9 +355,10 @@ export default function AdminLinePage() {
   };
 
   return (
+    // โครงเลย์เอาต์หลักของแอปพลิเคชัน
     <AppShell>
       <div className="w-full space-y-6">
-        {/* Header Breadcrumb */}
+        {/* แถบส่วนหัว Breadcrumb และปุ่มดำเนินการส่วนกลาง */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -314,6 +376,7 @@ export default function AdminLinePage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {/* ปุ่มรีเฟรชข้อมูล */}
             <Button
               variant="secondary"
               onClick={fetchMenus}
@@ -323,6 +386,7 @@ export default function AdminLinePage() {
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               รีเฟรช
             </Button>
+            {/* ปุ่มสร้างชุดเมนูเริ่มต้น 4 ประเภท */}
             <Button
               variant="primary"
               onClick={handleInitDefaults}
@@ -335,6 +399,7 @@ export default function AdminLinePage() {
           </div>
         </div>
 
+        {/* แถบแจ้งเตือน Feedback การทำงาน */}
         {feedback && (
           <div className="mb-6">
             <Feedback tone={feedback.type === 'success' ? 'brand' : 'crit'}>
@@ -352,7 +417,7 @@ export default function AdminLinePage() {
           </div>
         )}
 
-        {/* Tab Navigation */}
+        {/* แถบนำทางแท็บเมนูหลัก 3 แท็บ */}
         <div className="mb-6 border-b border-slate-200">
           <nav className="-mb-px flex space-x-6">
             <button
@@ -392,11 +457,11 @@ export default function AdminLinePage() {
         </div>
 
         {/* ========================================================= */}
-        {/* TAB 1: RICH MENUS MANAGEMENT */}
+        {/* TAB 1: RICH MENUS MANAGEMENT (จัดการ Rich Menu) */}
         {/* ========================================================= */}
         {activeTab === 'menus' && (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-            {/* List Sidebar */}
+            {/* คอลัมน์ซ้าย: รายการ Rich Menu ทั้งหมด */}
             <div className="lg:col-span-4 space-y-3">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
                 รายการ Rich Menu ในระบบ
@@ -456,11 +521,11 @@ export default function AdminLinePage() {
               )}
             </div>
 
-            {/* Menu Details & Live Grid Preview */}
+            {/* คอลัมน์ขวา: รายละเอียดเมนูที่เลือก และ Live Smartphone Mockup */}
             <div className="lg:col-span-8">
               {selectedMenu ? (
                 <div className="space-y-6">
-                  {/* Action Bar */}
+                  {/* แถบ Action Bar จัดการเมนู */}
                   <Card className="p-5">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                       <div>
@@ -489,6 +554,7 @@ export default function AdminLinePage() {
                         </p>
                       </div>
 
+                      {/* ปุ่มคำสั่ง: เผยแพร่, ตั้ง Default, อัปโหลดภาพ, ลบ */}
                       <div className="flex flex-wrap items-center gap-2">
                         <Button
                           variant="primary"
@@ -536,7 +602,7 @@ export default function AdminLinePage() {
                     </div>
                   </Card>
 
-                  {/* 6-Tiles Visual Interactive Grid Preview */}
+                  {/* ผังจำลองเมนู 6 ช่องบนหน้าจอสมาร์ตโฟน (Interactive Smartphone Mockup) */}
                   <Card className="p-6">
                     <div className="mb-4 flex items-center justify-between">
                       <div>
@@ -553,9 +619,9 @@ export default function AdminLinePage() {
                       </span>
                     </div>
 
-                    {/* Smartphone Mockup Container */}
+                    {/* กล่องกรอบสมาร์ตโฟนจำลอง */}
                     <div className="mx-auto max-w-lg overflow-hidden rounded-2xl border-4 border-slate-800 bg-slate-900 shadow-2xl">
-                      {/* Chat Header Simulation */}
+                      {/* ส่วนหัวห้องแชทจำลอง */}
                       <div className="flex items-center justify-between border-b border-slate-800 bg-slate-800 px-4 py-2.5 text-xs text-slate-300">
                         <span className="font-semibold text-white flex items-center gap-1.5">
                           <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block"></span>
@@ -566,14 +632,14 @@ export default function AdminLinePage() {
                         </span>
                       </div>
 
-                      {/* Mock Chat Body */}
+                      {/* ข้อความในห้องแชทจำลอง */}
                       <div className="bg-slate-100 p-4 text-center text-xs text-slate-400 min-h-[140px] flex flex-col justify-end">
                         <div className="mx-auto mb-2 max-w-xs rounded-lg bg-white p-2.5 text-left text-xs text-slate-700 shadow-sm border border-slate-200">
                           👋 สวัสดีครับ ยินดีต้อนรับสู่ระบบจับจอง กรุณาเลือกรายการบริการจากเมนูด้านล่างนี้
                         </div>
                       </div>
 
-                      {/* Rich Menu Visual Grid */}
+                      {/* พื้นที่แสดงภาพ Rich Menu และผังช่องกด Hotspots */}
                       <div className="relative aspect-[2500/1686] w-full border-t border-slate-700 bg-slate-800">
                         {selectedMenu.imageData ? (
                           <img
@@ -583,7 +649,7 @@ export default function AdminLinePage() {
                           />
                         ) : null}
 
-                        {/* Interactive Clickable Hotspots Overlay */}
+                        {/* เลเยอร์ Overlay ช่องกด 6 ช่อง */}
                         <div className="absolute inset-0 grid grid-cols-3 grid-rows-2 gap-1 p-1">
                           {selectedMenu.actions.map((act, idx) => (
                             <div
@@ -603,7 +669,7 @@ export default function AdminLinePage() {
                         </div>
                       </div>
 
-                      {/* Chat Bar Simulation */}
+                      {/* แถบแชทบาร์จำลองด้านล่าง */}
                       <div className="flex items-center justify-between border-t border-slate-800 bg-white px-4 py-2.5 text-xs text-slate-600">
                         <span className="font-medium text-slate-800">
                           ▼ {selectedMenu.chatBarText}
@@ -613,7 +679,7 @@ export default function AdminLinePage() {
                     </div>
                   </Card>
 
-                  {/* Actions Data Table */}
+                  {/* ตารางแสดงข้อมูลรายละเอียด Action ทั้งหมด */}
                   <Card className="overflow-hidden">
                     <div className="border-b border-slate-200 bg-slate-50 px-6 py-3">
                       <h4 className="font-semibold text-slate-800 text-sm">
@@ -662,7 +728,7 @@ export default function AdminLinePage() {
         {/* ========================================================= */}
         {activeTab === 'flex' && (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-            {/* Event List Sidebar */}
+            {/* รายการเหตุการณ์แจ้งเตือนสำหรับเลือกปรับแต่ง */}
             <div className="lg:col-span-4 space-y-4">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
                 เลือกประเภทการแจ้งเตือน (Notification Events)
@@ -699,9 +765,9 @@ export default function AdminLinePage() {
               </div>
             </div>
 
-            {/* Flex Message Live Mockup & Customizer */}
+            {/* ส่วนปรับแต่งเนื้อหา และจำลองการแสดงผล Flex Card */}
             <div className="lg:col-span-8 space-y-6">
-              {/* Customizer Card */}
+              {/* การ์ดฟอร์มปรับแต่งข้อความ */}
               <Card className="p-6">
                 <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
                   <MessageSquare className="h-5 w-5 text-brand" />
@@ -777,7 +843,7 @@ export default function AdminLinePage() {
                 </div>
               </Card>
 
-              {/* Live LINE Flex Card Mockup */}
+              {/* การ์ดจำลองข้อความ LINE Flex Message บนแชทมือถือ */}
               <Card className="p-6">
                 <div className="mb-4 flex items-center justify-between">
                   <h4 className="font-semibold text-slate-900 flex items-center gap-2 text-sm">
@@ -787,17 +853,17 @@ export default function AdminLinePage() {
                   <span className="text-xs text-slate-400">JapJong Clean & Minimal Design</span>
                 </div>
 
-                {/* Smartphone Chat Bubble */}
+                {/* กรอบแชทมือถือจำลอง */}
                 <div className="mx-auto max-w-sm rounded-2xl border-4 border-slate-800 bg-slate-900 p-3 shadow-2xl">
-                  {/* Chat Top Banner */}
+                  {/* แถบหัวแชท */}
                   <div className="mb-3 flex items-center justify-between text-[11px] text-slate-300 border-b border-slate-800 pb-2">
                     <span className="font-bold text-white">ระบบจับจอง (JapJong)</span>
                     <span>10:30 น.</span>
                   </div>
 
-                  {/* LINE Flex Card Container */}
+                  {/* กล่องการ์ด LINE Flex Message */}
                   <div className="overflow-hidden rounded-xl bg-white shadow-lg text-slate-800">
-                    {/* Header Banner */}
+                    {/* แถบหัวการ์ด */}
                     <div
                       className="px-4 py-3 text-white flex items-center justify-between"
                       style={{ backgroundColor: flexHeaderColor || '#0F4C81' }}
@@ -810,7 +876,7 @@ export default function AdminLinePage() {
                       </span>
                     </div>
 
-                    {/* Headline Body */}
+                    {/* ข้อความหัวเรื่องและคำอธิบาย */}
                     <div className="p-4 border-b border-slate-100">
                       <h5 className="font-bold text-base text-slate-900 leading-snug">
                         {flexHeadline || previewData?.inAppTitle || 'คำขอได้รับการอนุมัติเรียบร้อยแล้ว'}
@@ -820,7 +886,7 @@ export default function AdminLinePage() {
                       </p>
                     </div>
 
-                    {/* Details Box */}
+                    {/* รายละเอียดคำขอจำลอง */}
                     <div className="bg-slate-50/70 p-4 text-xs space-y-2 border-b border-slate-100">
                       <div className="flex justify-between">
                         <span className="text-slate-500">เลขที่คำขอ</span>
@@ -844,7 +910,7 @@ export default function AdminLinePage() {
                       </div>
                     </div>
 
-                    {/* Footer & CTA Button */}
+                    {/* ท้ายการ์ดและปุ่ม Call-to-Action */}
                     <div className="p-4 bg-white">
                       <p className="text-[11px] text-slate-400 text-center mb-3">
                         {flexFooter || 'ท่านสามารถเปิดดูเอกสารหรือติดตามสถานะผ่านลิงก์ด้านล่าง'}
@@ -868,6 +934,7 @@ export default function AdminLinePage() {
         {/* ========================================================= */}
         {activeTab === 'switching' && (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+            {/* คำอธิบายสถาปัตยกรรม Rich Menu Switching */}
             <div className="lg:col-span-6 space-y-6">
               <Card className="p-6">
                 <h3 className="text-base font-bold text-slate-900 mb-2 flex items-center gap-2">
@@ -931,7 +998,7 @@ export default function AdminLinePage() {
               </Card>
             </div>
 
-            {/* Test Simulation Card */}
+            {/* กล่องทดสอบจำลองคำสั่งสลับเมนูรายบุคคล */}
             <div className="lg:col-span-6 space-y-6">
               <Card className="p-6">
                 <h3 className="text-base font-bold text-slate-900 mb-2 flex items-center gap-2">

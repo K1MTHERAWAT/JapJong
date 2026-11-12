@@ -1,8 +1,22 @@
 'use client';
 
+/**
+ * =====================================================================
+ * โมดูลจัดการ LINE Front-end Framework (LIFF SDK Client Module)
+ * =====================================================================
+ * หน้าที่หลัก:
+ * 1. getLiffInstance: โหลดโมดูล @line/liff แบบไดนามิก (Lazy load ป้องกัน SSR crash)
+ * 2. initLiff: เริ่มต้นการทำงานของ LIFF ด้วย NEXT_PUBLIC_LIFF_ID
+ * 3. getLiffIdToken: ดึง ID Token (JWT) เพื่อนำไปล็อกอิน Single Sign-On กับ API
+ * 4. loginWithLiff & closeLiffWindow: ควบคุมวงจรหน้าต่างของ LINE App
+ * 5. isValidLocalTarget & resolveLiffTarget: ถอดรหัสและตรวจสอบเส้นทางเป้าหมาย (Deep Link)
+ *    จาก `liff.state` หรือ `target` อย่างปลอดภัย ป้องกันการโจมตี Open Redirect
+ */
+
 let liffInstance: typeof import('@line/liff').default | null = null;
 let initPromise: Promise<typeof import('@line/liff').default | null> | null = null;
 
+// ดึง Instance ของ LIFF SDK แบบ Singleton
 export async function getLiffInstance(): Promise<typeof import('@line/liff').default | null> {
   if (typeof window === 'undefined') return null;
   if (liffInstance) return liffInstance;
@@ -23,6 +37,7 @@ export async function getLiffInstance(): Promise<typeof import('@line/liff').def
   return initPromise;
 }
 
+// เริ่มต้นการทำงานของ LIFF SDK
 export async function initLiff(customLiffId?: string): Promise<{
   ok: boolean;
   liff: typeof import('@line/liff').default | null;
@@ -73,6 +88,7 @@ export async function initLiff(customLiffId?: string): Promise<{
   }
 }
 
+// ดึง ID Token จาก LIFF
 export async function getLiffIdToken(): Promise<string | null> {
   const liff = await getLiffInstance();
   if (!liff) return null;
@@ -85,6 +101,7 @@ export async function getLiffIdToken(): Promise<string | null> {
   }
 }
 
+// ส่งผู้ใช้ไปหน้าเข้าสู่ระบบของ LINE
 export async function loginWithLiff(redirectUri?: string): Promise<void> {
   const liff = await getLiffInstance();
   if (!liff) return;
@@ -93,6 +110,7 @@ export async function loginWithLiff(redirectUri?: string): Promise<void> {
   }
 }
 
+// สั่งปิดหน้าต่าง LIFF ในแอปพลิเคชัน LINE
 export async function closeLiffWindow(): Promise<void> {
   const liff = await getLiffInstance();
   if (!liff) return;
@@ -102,8 +120,8 @@ export async function closeLiffWindow(): Promise<void> {
 }
 
 /**
- * ตรวจสอบความถูกต้องของ Local Target Path ป้องกัน Open Redirect
- * ต้องเริ่มต้นด้วย '/' และไม่ตามด้วย '/' อีกตัว (เช่น '//malicious.com')
+ * ตรวจสอบความถูกต้องของ Local Target Path ป้องกันช่องโหว่ Open Redirect
+ * ต้องเริ่มต้นด้วย '/' และห้ามตามด้วย '/' อีกตัว (เช่น '//malicious.com')
  */
 export function isValidLocalTarget(path?: string | null): boolean {
   if (!path || typeof path !== 'string') return false;
@@ -209,5 +227,3 @@ export function resolveLiffTarget(
 
   return fallback;
 }
-
-

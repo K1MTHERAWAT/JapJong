@@ -1,6 +1,16 @@
 import React from 'react';
 import Link from 'next/link';
 
+/**
+ * =====================================================================
+ * แถวรายการข้อมูลแบบมาตรฐาน (ListRow Component)
+ * =====================================================================
+ * โครงสร้างแถวแสดงผลรายการคำขอหรือประวัติ:
+ * - ซ้าย: รหัสคำขอ (code), หัวเรื่อง (title), ข้อความย่อย (subtitle)
+ * - ขวา: ชิปสถานะ (chip), เนื้อหาเพิ่มเติม (rightExtra)
+ * - รองรับ prop `href` เพื่อเชื่อมต่อไปยังหน้ารายละเอียดพร้อมเอฟเฟกต์ hover
+ */
+
 export interface ListRowProps {
   href?: string;
   code?: React.ReactNode;
@@ -20,6 +30,7 @@ export function ListRow({
   rightExtra,
   className = '',
 }: ListRowProps) {
+  // เนื้อหาภายในแถวรายการ
   const innerContent = (
     <div
       className={[
@@ -40,6 +51,7 @@ export function ListRow({
     </div>
   );
 
+  // กรณีมี href ให้ครอบด้วย Link
   if (href) {
     return (
       <Link href={href} className="group block focus-visible:outline-2 focus-visible:outline-brand rounded-control">

@@ -1,5 +1,16 @@
 'use client';
 
+/**
+ * =====================================================================
+ * หน้าตรวจสอบคำขอใช้สถานที่และอุปกรณ์สำหรับเจ้าหน้าที่ (Staff Review Page)
+ * =====================================================================
+ * เจ้าหน้าที่ธุรการ/ผู้รับผิดชอบทำการตรวจสอบคำขอ (ฝ่ายที่ 2 จาก 4 ฝ่าย):
+ * 1. ตรวจสอบความถูกต้องของข้อมูล ผู้ขอ วัตถุประสงค์ และวัน-เวลา
+ * 2. ดูแบบฟอร์มเอกสารราชการฉบับเต็ม (OfficialGovFormDocument)
+ * 3. ลงนามเห็นชอบเพื่อส่งต่อให้ปลัด อบต. (ฝ่ายที่ 3) หรือลงนามไม่ผ่านพร้อมระบุเหตุผล
+ * 4. ยืนยันความปลอดภัยด้วย Email OTP และรหัส PIN 6 หลัก
+ */
+
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { BookingRequest, BorrowRequest, RequestWithTimeline, canSignRequest } from '@japjong/shared';
@@ -17,27 +28,47 @@ import {
 } from '@/components/ui';
 import { api, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
 
+// ชนิดคำขอที่เจ้าหน้าที่ต้องตรวจ (คำขอจองสถานที่ หรือ ขอยืมอุปกรณ์)
 type ReviewRequest = (BookingRequest | BorrowRequest) & RequestWithTimeline;
 
 export default function StaffReviewPage() {
+  // ดึงข้อมูลบัญชีเจ้าหน้าที่ปัจจุบัน
   const { account } = useAuth();
+
+  // State รายการคำขอในคิวตรวจของเจ้าหน้าที่
   const [queue, setQueue] = useState<ReviewRequest[]>([]);
+  // State id ของคำขอที่กำลังเปิดดู/ตรวจ
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // State กำลังโหลดข้อมูล
   const [loading, setLoading] = useState(true);
+  // State ควบคุมการแสดงผลฟอร์มราชการเต็มใบ
   const [showOfficialForm, setShowOfficialForm] = useState(true);
+  // State บันทึกความเห็น/เหตุผล (กรณีไม่ผ่านหรือเสนอแนะ)
   const [note, setNote] = useState('');
+  // State ข้อมูลลายเซ็นเจ้าหน้าที่ (Base64)
   const [staffSignature, setStaffSignature] = useState('');
+  // State ติ๊กถูกรับรองการตรวจสอบ
   const [confirmed, setConfirmed] = useState(true);
+  // State แสดงหน้าต่างยืนยัน OTP
   const [otpStep, setOtpStep] = useState(false);
+  // State สถานะความปลอดภัยของเซสชัน
   const [isSessionVerified, setIsSessionVerified] = useState(false);
+  // State ผลการตัดสินใจ: 'approve' (เห็นชอบส่งต่อ) หรือ 'reject' (ไม่เห็นชอบ)
   const [pendingDecision, setPendingDecision] = useState<'approve' | 'reject'>('approve');
+  // State ควบคุมการเปิด Modal แป้นพิมพ์ PIN 6 หลัก
   const [showPinModal, setShowPinModal] = useState(false);
+  // State ค่ารหัส PIN
   const [pin, setPin] = useState('');
+  // State ข้อผิดพลาดรหัส PIN
   const [pinError, setPinError] = useState('');
+  // State ข้อความแจ้งเตือนข้อผิดพลาดทั่วไป
   const [errorMsg, setErrorMsg] = useState('');
+  // State คำขอล่าสุดที่ดำเนินการเสร็จแล้ว (สำหรับแสดงแบนเนอร์แจ้งเตือน)
   const [lastCompleted, setLastCompleted] = useState<RequestWithTimeline | null>(null);
+  // State กำลังบันทึกข้อมูลการลงนาม
   const [submitting, setSubmitting] = useState(false);
 
+  // ฟังก์ชันโหลดรายการคิวงานตรวจสอบของเจ้าหน้าที่
   const load = useCallback((preferId?: string | null) => {
     setLoading(true);
     api
@@ -45,6 +76,7 @@ export default function StaffReviewPage() {
       .then(async (list) => {
         // กรองเฉพาะคำขอขอใช้สถานที่และอุปกรณ์ (แยกงานซ่อมออกไปที่ /staff/repairs)
         let combined = list.filter((r): r is ReviewRequest => r.type === 'booking' || r.type === 'borrow');
+        // หากส่ง preferId มาแต่ไม่อยู่ในคิว ให้โหลดคำขอนั้นแยกมาเติม
         if (preferId && !combined.some((r) => r.id === preferId || r.code === preferId)) {
           try {
             const single = await api.getRequest(preferId);
@@ -52,10 +84,11 @@ export default function StaffReviewPage() {
               combined = [single as ReviewRequest, ...combined];
             }
           } catch {
-            // ignore if not found
+            // ละเว้นกรณีไม่พบข้อมูล
           }
         }
         setQueue(combined);
+        // หากระบุ id มาใน URL ให้เลือกรายการนั้นทันที
         if (preferId) {
           const found = combined.find((r) => r.id === preferId || r.code === preferId);
           setSelectedId(found ? found.id : null);
@@ -65,6 +98,7 @@ export default function StaffReviewPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // ดึงพารามิเตอร์ ?id= จาก URL เมื่อเปิดหน้า
   useEffect(() => {
     const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
     load(sp?.get('id'));
@@ -78,14 +112,17 @@ export default function StaffReviewPage() {
       .catch(() => {});
   }, []);
 
+  // คำขอปัจจุบันที่กำลังเลือกดู
   const current = selectedId ? queue.find((r) => r.id === selectedId || r.code === selectedId) ?? null : null;
 
+  // โหลดลายเซ็นของเจ้าหน้าที่ที่บันทึกไว้ในระบบ
   useEffect(() => {
     setStaffSignature(account?.signature || '');
     setOtpStep(false);
     setErrorMsg('');
   }, [account?.id, account?.signature, current?.id]);
 
+  // ฟังก์ชันกดย้อนกลับไปหน้ารายการคิวงาน
   const handleBackToList = () => {
     setOtpStep(false);
     setErrorMsg('');
@@ -95,12 +132,14 @@ export default function StaffReviewPage() {
     }
   };
 
+  // ฟังก์ชันเลือกคำขอเพื่อเริ่มการตรวจสอบ
   const handleSelectRequest = (reqId: string) => {
     setLastCompleted(null);
     setErrorMsg('');
     setSelectedId(reqId);
   };
 
+  // ฟังก์ชันส่งคำวินิจฉัยตรวจสอบพร้อมรหัส PIN 6 หลัก
   const handleDecision = async (decision: 'approve' | 'reject', enteredPin?: string) => {
     if (!current || !staffSignature.trim()) return;
     setErrorMsg('');
@@ -142,6 +181,7 @@ export default function StaffReviewPage() {
     }
   };
 
+  // เริ่มต้นขั้นตอนการลงนามเห็นชอบ/ไม่เห็นชอบ
   const handleStartDecision = (decision: 'approve' | 'reject') => {
     setPendingDecision(decision);
     setErrorMsg('');
@@ -165,6 +205,7 @@ export default function StaffReviewPage() {
         current && !otpStep ? (
           <div className="flex w-full sm:w-auto gap-2.5">
             {(() => {
+              // ตรวจสอบสิทธิ์การลงนามในคำขอนี้
               const signCheck = canSignRequest(account, current);
               if (!signCheck.allowed) {
                 return (
@@ -188,6 +229,7 @@ export default function StaffReviewPage() {
               }
               return (
                 <>
+                  {/* ปุ่มลงนามไม่ผ่าน */}
                   <button
                     type="button"
                     disabled={submitting || !staffSignature.trim()}
@@ -196,6 +238,7 @@ export default function StaffReviewPage() {
                   >
                     ลงนามไม่ผ่าน
                   </button>
+                  {/* ปุ่มลงนามเห็นชอบและส่งต่อปลัด */}
                   <button
                     type="button"
                     disabled={submitting || !confirmed || !staffSignature.trim()}
@@ -279,6 +322,7 @@ export default function StaffReviewPage() {
             </span>
           </div>
 
+          {/* คอมโพเนนต์ยืนยัน OTP */}
           <SignOtpVerifier
             initialEmail={account?.email}
             onVerified={() => {
@@ -297,7 +341,7 @@ export default function StaffReviewPage() {
           )}
         </div>
       ) : !current ? (
-        /* ===================== หน้ารายการ (List View) ===================== */
+        /* ===================== หน้ารายการคำขอรอตรวจ (List View) ===================== */
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -382,6 +426,7 @@ export default function StaffReviewPage() {
             <StatusChip status={current.status} />
           </div>
 
+          {/* รายละเอียดข้อมูลคำขอ */}
           <div className="jw-card p-4 sm:p-5 flex flex-col gap-3 text-[14px]">
             <div className="flex items-start gap-2">
               <b className="w-24 shrink-0 text-ink">ผู้ยืม/ผู้ขอ</b>
@@ -441,6 +486,7 @@ export default function StaffReviewPage() {
 
           <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1.15fr)_minmax(420px,0.85fr)] gap-4 sm:gap-5 items-start">
             <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
+              {/* แบบฟอร์มราชการฉบับเต็ม */}
               {showOfficialForm && <OfficialGovFormDocument req={current} />}
 
               {/* สถานะลายมือชื่อทั้ง 4 ฝ่าย */}
@@ -540,6 +586,7 @@ export default function StaffReviewPage() {
         </div>
       )}
 
+      {/* Modal ยืนยันรหัส PIN 6 หลักเพื่อลงนาม */}
       {showPinModal && current && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
           <div className="w-full max-w-[420px] bg-white rounded-hard p-6 flex flex-col items-center gap-4 shadow-md">

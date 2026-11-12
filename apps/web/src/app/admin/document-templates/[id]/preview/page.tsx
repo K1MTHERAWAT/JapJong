@@ -1,5 +1,17 @@
 'use client';
 
+/**
+ * =====================================================================
+ * หน้าดูตัวอย่างและพิมพ์แม่แบบเอกสารราชการ (Document Template Preview Page)
+ * =====================================================================
+ * จำลองหน้ากระดาษราชการขนาดมาตรฐาน A4 (210mm x 297mm) ตามระเบียบสำนักนายกรัฐมนตรี:
+ * 1. แสดงตราสัญลักษณ์ครุฑหรือโลโก้องค์กร จัดวาง กึ่งกลาง/ซ้าย/ขวา
+ * 2. ข้อความหัวเรื่อง "แบบขอใช้สถานที่ราชการ", สถานที่เขียน, วันที่จุดประ
+ * 3. เรื่อง, เรียน, ข้อมูลผู้ขอ, วัตถุประสงค์
+ * 4. ช่องลงนามลายมือชื่อ 3-4 ระดับ
+ * 5. ฟังก์ชันสั่งพิมพ์ (Print stylesheet) ซ่อนเครื่องมือและตัดพื้นหลังออกอัตโนมัติ
+ */
+
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -10,10 +22,14 @@ import { api } from '@/lib/api';
 export default function DocumentTemplatePreviewPage() {
   const params = useParams();
   const templateId = String(params.id || '');
+  // State ข้อมูลแม่แบบเอกสาร
   const [template, setTemplate] = useState<DocumentTemplateItem | null>(null);
+  // State สถานะกำลังโหลด
   const [loading, setLoading] = useState(true);
+  // State ข้อผิดพลาด
   const [error, setError] = useState('');
 
+  // โหลดข้อมูลแม่แบบเอกสารตาม templateId
   useEffect(() => {
     async function loadData() {
       if (!templateId) return;
@@ -30,6 +46,7 @@ export default function DocumentTemplatePreviewPage() {
     loadData();
   }, [templateId]);
 
+  // ฟังก์ชันสั่งพิมพ์ผ่านหน้าต่าง Print ของเบราว์เซอร์
   const handlePrint = () => {
     window.print();
   };
@@ -53,11 +70,12 @@ export default function DocumentTemplatePreviewPage() {
     );
   }
 
+  // โครงสร้างเอกสารราชการ
   const doc = template.structure;
 
   return (
     <div className="min-h-screen bg-slate-200 py-6 px-4 flex flex-col items-center">
-      {/* Print Control Toolbar (Hidden during print) */}
+      {/* แถบเครื่องมือควบคุมการพิมพ์ (ซ่อนอัตโนมัติเวลาสั่งพิมพ์) */}
       <div className="w-[210mm] max-w-full flex items-center justify-between mb-4 print:hidden">
         <Link
           href={`/admin/document-templates/${template.id}/editor`}
@@ -81,14 +99,14 @@ export default function DocumentTemplatePreviewPage() {
         </div>
       </div>
 
-      {/* A4 Paper Container */}
+      {/* หน้ากระดาษมาตรฐาน A4 จำลอง (210mm x 297mm, ระยะขอบ 25mm) */}
       <div
         id="official-doc-print-area"
         className="bg-white shadow-xl w-[210mm] min-h-[297mm] p-[25mm] rounded-xs text-[#111] flex flex-col justify-between print:shadow-none print:p-0 print:w-full print:min-h-0"
         style={{ fontFamily: "'TH Sarabun New', 'Sarabun', sans-serif" }}
       >
         <div className="space-y-4">
-          {/* Genuine Logo */}
+          {/* ตราสัญลักษณ์ / ตราครุฑ */}
           {doc.logoUrl && (
             <div
               className={`flex mb-4 ${
@@ -114,12 +132,12 @@ export default function DocumentTemplatePreviewPage() {
             </div>
           )}
 
-          {/* Title */}
+          {/* ชื่อแบบฟอร์มเอกสารราชการ */}
           <h1 className="text-center text-[22px] font-bold text-ink mb-2">
             {doc.title}
           </h1>
 
-          {/* Written At & Date */}
+          {/* สถานที่เขียน และวันที่ */}
           <div className="flex justify-end pt-2">
             <div className="text-right space-y-1 text-[15px]">
               <div>
@@ -137,7 +155,7 @@ export default function DocumentTemplatePreviewPage() {
             </div>
           </div>
 
-          {/* Subject & Recipient */}
+          {/* เรื่อง และ เรียน */}
           <div className="space-y-1.5 pt-2 text-[15px]">
             <div>
               <span className="font-bold">เรื่อง: </span>
@@ -149,7 +167,7 @@ export default function DocumentTemplatePreviewPage() {
             </div>
           </div>
 
-          {/* Requester Details & Clean Dotted Slots */}
+          {/* ข้อมูลผู้ยื่นคำขอและช่องจุดประ */}
           <div className="pt-3 text-[15px] leading-relaxed">
             <div className="flex flex-wrap items-center gap-y-2 gap-x-1.5">
               <span className="font-medium indent-8">ด้วยข้าพเจ้า</span>
@@ -165,7 +183,7 @@ export default function DocumentTemplatePreviewPage() {
             </div>
           </div>
 
-          {/* Purpose & Items */}
+          {/* วัตถุประสงค์และรายการ */}
           <div className="pt-2 space-y-2 text-[15px]">
             <p className="font-medium">{doc.purposeText}</p>
             <div className="space-y-1.5 pl-6">
@@ -184,13 +202,13 @@ export default function DocumentTemplatePreviewPage() {
             </div>
           </div>
 
-          {/* Closing */}
+          {/* คำลงท้ายเอกสาร */}
           <div className="pt-3 text-[15px]">
             <p className="indent-8">{doc.closingText}</p>
           </div>
         </div>
 
-        {/* 3-Level Signature Section */}
+        {/* ส่วนลงนามลายมือชื่อ 3-4 ระดับ */}
         <div className="pt-8 border-t border-line/60 mt-8">
           <div className="grid grid-cols-2 gap-6 text-center text-[13px]">
             {doc.signatures.map((sig) => (

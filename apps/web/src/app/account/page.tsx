@@ -1,7 +1,10 @@
-'use client';
+'use client'; // กำหนดให้คอมโพเนนต์นี้ทำงานในฝั่ง Client (React Client Component)
 
+// นำเข้า React Hooks พื้นฐานสำหรับจัดการ State และ Side Effects
 import React, { useEffect, useState } from 'react';
+// นำเข้า Link สำหรับการเปลี่ยนหน้าแบบ Client-side Navigation
 import Link from 'next/link';
+// นำเข้าไอคอนจากไลบรารี lucide-react
 import {
   Building2,
   CheckCircle2,
@@ -12,6 +15,7 @@ import {
   UserCircle,
   AlertCircle,
 } from 'lucide-react';
+// นำเข้า Type, ค่าคงที่ และฟังก์ชันตรวจสอบความถูกต้องจากแพ็กเกจกลาง shared
 import {
   LineAuthStatusResponse,
   ROLE_LABEL,
@@ -20,12 +24,16 @@ import {
   validateThaiAddressHierarchy,
   validateThaiPhone,
 } from '@japjong/shared';
+// นำเข้า Custom Hook สำหรับดึงข้อมูลผู้ใช้งานที่ล็อกอินอยู่และฟังก์ชัน Refresh Session
 import { useAuth } from '@/components/auth-context';
+// นำเข้า AppShell คอมโพเนนต์เลย์เอาต์หลักของแอปพลิเคชัน
 import { AppShell } from '@/components/shell';
+// นำเข้าคอมโพเนนต์ฟอร์มเฉพาะทางสำหรับเบอร์โทรศัพท์ 10 หลัก และการเลือกที่อยู่ภาษาไทย
 import {
   Phone10DigitInput,
   ThaiAddressSelect,
 } from '@/components/thai-address-select';
+// นำเข้า UI Components พื้นฐานของระบบ
 import {
   Button,
   Card,
@@ -35,10 +43,15 @@ import {
   SignatureBox,
   Tabs,
 } from '@/components/ui';
+// นำเข้า API client และฟังก์ชันแปลงวันที่เป็น พ.ศ.
 import { api, formatThaiDate } from '@/lib/api';
 
+// กำหนดประเภทชื่อแท็บในหน้าจัดการบัญชี
 type AccountTab = 'profile' | 'password' | 'signature';
 
+/**
+ * คอมโพเนนต์ไอคอน LINE แบบ SVG กำหนดขนาดเริ่มต้นได้
+ */
 function LineIcon({ className = 'w-5 h-5' }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -47,11 +60,17 @@ function LineIcon({ className = 'w-5 h-5' }: { className?: string }) {
   );
 }
 
+/**
+ * หน้าจัดการบัญชีผู้ใช้งาน (Account Page)
+ * ประกอบด้วย: แก้ไขข้อมูลส่วนตัว/ที่อยู่, การเชื่อมต่อ LINE, เปลี่ยนรหัสผ่าน, และจัดการลายมือชื่อดิจิทัล & PIN 6 หลัก
+ */
 export default function AccountPage() {
+  // ดึงข้อมูลบัญชีผู้ใช้ปัจจุบัน และฟังก์ชันรีเฟรชข้อมูลโปรไฟล์จาก Auth Context
   const { account, refreshMe } = useAuth();
+  // State สำหรับแท็บที่กำลังเปิดอยู่ (ค่าเริ่มต้น: แท็บข้อมูลโปรไฟล์)
   const [activeTab, setActiveTab] = useState<AccountTab>('profile');
 
-  // Profile state
+  // --- Profile state: เก็บข้อมูลฟอร์มโปรไฟล์และที่อยู่ ---
   const [name, setName] = useState('');
   const [nickname, setNickname] = useState('');
   const [department, setDepartment] = useState('');
@@ -69,7 +88,7 @@ export default function AccountPage() {
   const [profileMsg, setProfileMsg] = useState('');
   const [profileErr, setProfileErr] = useState('');
 
-  // Password state
+  // --- Password state: เก็บข้อมูลฟอร์มเปลี่ยนรหัสผ่าน ---
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -77,32 +96,39 @@ export default function AccountPage() {
   const [pwdMsg, setPwdMsg] = useState('');
   const [pwdErr, setPwdErr] = useState('');
 
-  // Signature & PIN state
+  // --- Signature & PIN state: เก็บข้อมูลลายเซ็นและรหัส PIN ---
   const [signature, setSignature] = useState('');
   const [pin, setPin] = useState('');
   const [savingSig, setSavingSig] = useState(false);
   const [sigMsg, setSigMsg] = useState('');
   const [sigErr, setSigErr] = useState('');
 
-  // LINE link state
+  // --- LINE link state: สถานะการผูกบัญชีกับ LINE ---
   const [lineStatus, setLineStatus] = useState<LineAuthStatusResponse | null>(null);
   const [linkingLine, setLinkingLine] = useState(false);
 
+  // ดึงสถานะการผูกบัญชี LINE และตรวจสอบ URL Query Parameters เมื่อ redirect กลับมา
   useEffect(() => {
+    // ดึงสถานะการเชื่อมต่อ LINE จาก Backend
     api.getLineStatus().then(setLineStatus).catch(() => {});
     if (typeof window !== 'undefined') {
       const sp = new URLSearchParams(window.location.search);
+      // กรณีเชื่อมต่อ LINE สำเร็จ
       if (sp.get('line_linked') === '1') {
         setProfileMsg('เชื่อมต่อบัญชี LINE เรียบร้อยแล้ว');
         refreshMe();
         window.history.replaceState({}, '', '/account');
       } else if (sp.get('line_error')) {
+        // กรณีเกิดข้อผิดพลาดในการเชื่อมต่อ LINE
         setProfileErr(decodeURIComponent(sp.get('line_error') || 'เชื่อมต่อ LINE ไม่สำเร็จ'));
         window.history.replaceState({}, '', '/account');
       }
     }
   }, [refreshMe]);
 
+  /**
+   * ฟังก์ชันขอ URL เพื่อเปลี่ยนเส้นทางไปหน้าขออนุญาตสิทธิ์ของ LINE Login (OAuth)
+   */
   const handleLinkLine = async () => {
     setLinkingLine(true);
     setProfileErr('');
@@ -113,6 +139,7 @@ export default function AccountPage() {
         return;
       }
     } catch {
+      // Fallback ไปยัง direct link endpoint หาก API ล้มเหลว
       if (account?.id) {
         window.location.href = `/api/auth/line?linkUserId=${encodeURIComponent(account.id)}`;
         return;
@@ -121,6 +148,9 @@ export default function AccountPage() {
     setLinkingLine(false);
   };
 
+  /**
+   * ฟังก์ชันยกเลิกการผูกบัญชี LINE กับบัญชีผู้ใช้นี้
+   */
   const handleUnlinkLine = async () => {
     setLinkingLine(true);
     setProfileErr('');
@@ -138,6 +168,7 @@ export default function AccountPage() {
     }
   };
 
+  // นำข้อมูลบัญชีที่มีอยู่มาใส่ลงใน Form state เมื่อโหลดข้อมูลผู้ใช้สำเร็จ
   useEffect(() => {
     if (account) {
       setName(account.name || '');
@@ -157,23 +188,30 @@ export default function AccountPage() {
     }
   }, [account]);
 
+  /**
+   * ฟังก์ชันบันทึกการแก้ไขข้อมูลโปรไฟล์และที่อยู่
+   */
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setProfileMsg('');
     setProfileErr('');
+    // ตรวจสอบชื่อ-นามสกุล
     if (!name.trim()) {
       setProfileErr('กรุณากรอกชื่อ-นามสกุล');
       return;
     }
+    // ตรวจสอบหน่วยงาน/สังกัด
     if (!department.trim()) {
       setProfileErr('กรุณาระบุหน่วยงาน / ชุมชน / สังกัด');
       return;
     }
+    // ตรวจสอบเบอร์โทรศัพท์ 10 หลัก
     const phoneCheck = validateThaiPhone(phone);
     if (!phoneCheck.valid) {
       setProfileErr(phoneCheck.error || 'กรุณากรอกเบอร์โทรศัพท์เป็นตัวเลข 10 หลัก');
       return;
     }
+    // ตรวจสอบลำดับขั้นที่อยู่ไทย (จังหวัด -> อำเภอ -> ตำบล)
     if (
       addressProvinceId ||
       addressDistrictId ||
@@ -198,6 +236,7 @@ export default function AccountPage() {
 
     setSavingProfile(true);
     try {
+      // ส่งข้อมูลอัปเดตโปรไฟล์ไปยังเซิร์ฟเวอร์
       await api.updateProfile({
         name: name.trim(),
         nickname: nickname.trim(),
@@ -213,7 +252,7 @@ export default function AccountPage() {
         addressDistrict: addressDistrict.trim(),
         addressProvince: addressProvince.trim(),
       });
-      await refreshMe();
+      await refreshMe(); // รีเฟรชข้อมูลใน Auth Context
       setProfileMsg('บันทึกข้อมูลบัญชีและโปรไฟล์เรียบร้อยแล้ว');
       setTimeout(() => setProfileMsg(''), 3500);
     } catch (err) {
@@ -223,6 +262,9 @@ export default function AccountPage() {
     }
   };
 
+  /**
+   * ฟังก์ชันรีเซ็ตฟอร์มข้อมูลส่วนตัวกลับเป็นค่าเดิมจากฐานข้อมูล
+   */
   const handleResetProfileForm = () => {
     if (!account) return;
     setName(account.name || '');
@@ -241,6 +283,9 @@ export default function AccountPage() {
     setProfileMsg('');
   };
 
+  /**
+   * ฟังก์ชันเปลี่ยนรหัสผ่านผู้ใช้งาน
+   */
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPwdMsg('');
@@ -268,6 +313,7 @@ export default function AccountPage() {
         currentPassword,
         newPassword,
       });
+      // ล้างข้อมูลรหัสผ่านในฟอร์มเมื่อเปลี่ยนสำเร็จ
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -280,6 +326,9 @@ export default function AccountPage() {
     }
   };
 
+  /**
+   * ฟังก์ชันบันทึกลายมือชื่อดิจิทัล (Base64 Canvas Image)
+   */
   const handleSaveSignature = async () => {
     setSigMsg('');
     setSigErr('');
@@ -300,6 +349,10 @@ export default function AccountPage() {
     }
   };
 
+  /**
+   * ฟังก์ชันบันทึกรหัส PIN 6 หลักสำหรับการยืนยันการลงนาม
+   * @param fullPin - รหัส PIN ตัวเลข 6 หลัก
+   */
   const handleSavePin = async (fullPin: string) => {
     setSigMsg('');
     setSigErr('');
@@ -316,12 +369,14 @@ export default function AccountPage() {
   };
 
   return (
+    // โครงเลย์เอาต์หลักของหน้าบัญชีผู้ใช้
     <AppShell title="จัดการบัญชีผู้ใช้งาน" maxWidth="max-w-none">
       {account && (
         <div className="flex w-full flex-col gap-4 sm:gap-5">
-          {/* Header Card Summary */}
+          {/* การ์ดสรุปข้อมูลโปรไฟล์ส่วนหัว (Header Card Summary) */}
           <Card className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:p-6">
             <div className="flex items-center gap-4 min-w-0">
+              {/* อวาตาร์แสดงอักษรย่อ */}
               <div className="size-14 rounded-full bg-brand-tint text-brand-ink font-bold text-title flex items-center justify-center shrink-0 border border-brand/20 sm:size-16">
                 {account.initial || account.name.charAt(0) || 'ผ'}
               </div>
@@ -330,10 +385,12 @@ export default function AccountPage() {
                   <h1 className="text-heading sm:text-title font-bold text-ink truncate">
                     {account.name}
                   </h1>
+                  {/* ป้ายแสดงบทบาทของผู้ใช้ */}
                   <Chip tone={ROLE_TONE[account.role]}>
                     {ROLE_LABEL[account.role]}
                   </Chip>
                 </div>
+                {/* ข้อมูลชื่อผู้ใช้ ตำแหน่ง สังกัด และเบอร์โทร */}
                 <div className="text-body text-muted mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="inline-flex items-center gap-1">
                     <UserCircle className="size-4 shrink-0" />
@@ -351,6 +408,7 @@ export default function AccountPage() {
               </div>
             </div>
 
+            {/* สถานะความพร้อมในการลงนาม (มีลายเซ็น/ตั้ง PIN) และลิงก์ตั้งค่าแจ้งเตือน */}
             <div className="flex flex-col gap-1 text-caption text-muted sm:shrink-0 sm:items-end">
               <span>วันที่สร้างบัญชี: {formatThaiDate(account.createdAt)}</span>
               <div className="flex items-center gap-1.5">
@@ -371,7 +429,7 @@ export default function AccountPage() {
             </div>
           </Card>
 
-          {/* Navigation Tabs */}
+          {/* แถบสลับแท็บเมนูจัดการบัญชี (Navigation Tabs) */}
           <Tabs<AccountTab>
             className="flex-wrap sm:flex-nowrap"
             value={activeTab}
@@ -383,7 +441,7 @@ export default function AccountPage() {
             ]}
           />
 
-          {/* TAB 1: Profile & Department */}
+          {/* แท็บที่ 1: ข้อมูลโปรไฟล์ ที่อยู่ และการผูกบัญชี LINE */}
           {activeTab === 'profile' && (
             <Card className="p-4 sm:p-6">
               <form onSubmit={handleSaveProfile} className="flex flex-col gap-4 sm:gap-5">
@@ -399,6 +457,7 @@ export default function AccountPage() {
                   </div>
                 </div>
 
+                {/* ชื่อและชื่อเล่น */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
                   <Input
                     label="ชื่อ-นามสกุล *"
@@ -415,6 +474,7 @@ export default function AccountPage() {
                   />
                 </div>
 
+                {/* หน่วยงาน, เบอร์โทรศัพท์ และอีเมล */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
                   <Input
                     label="หน่วยงาน / ชุมชน / สังกัด *"
@@ -438,7 +498,7 @@ export default function AccountPage() {
                   />
                 </div>
 
-                {/* ที่อยู่สำหรับดึงไปกรอกคำขออัตโนมัติ */}
+                {/* ส่วนที่อยู่สำหรับดึงไปกรอกแบบคำขอราชการอัตโนมัติ */}
                 <div className="pt-2 border-t border-line-soft flex flex-col gap-3">
                   <div>
                     <b className="text-body font-bold text-ink block">ที่อยู่ (สำหรับแบบคำขอราชการ)</b>
@@ -460,6 +520,7 @@ export default function AccountPage() {
                       placeholder="หมู่ที่"
                     />
                   </div>
+                  {/* กล่องเลือกที่อยู่ไทยแบบเชื่อมโยง จังหวัด/อำเภอ/ตำบล */}
                   <ThaiAddressSelect
                     province={addressProvince}
                     district={addressDistrict}
@@ -478,6 +539,7 @@ export default function AccountPage() {
                   />
                 </div>
 
+                {/* ส่วนการเชื่อมต่อบัญชี LINE (LINE Link) */}
                 <div className="pt-2 border-t border-line-soft flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-surface-muted p-4 border border-line">
                   <div className="flex items-center gap-3">
                     <div className="size-11 rounded-2xl bg-[#06C755]/15 text-[#06C755] flex items-center justify-center shrink-0">
@@ -525,6 +587,7 @@ export default function AccountPage() {
                   </div>
                 </div>
 
+                {/* ข้อความแจ้งเตือนข้อผิดพลาดโปรไฟล์ */}
                 {profileErr && (
                   <div className="rounded-control bg-danger-bg border border-danger-fg/30 px-4 py-3 text-body text-danger-fg flex items-center gap-2">
                     <AlertCircle className="size-5 shrink-0" />
@@ -532,6 +595,7 @@ export default function AccountPage() {
                   </div>
                 )}
 
+                {/* ข้อความแจ้งเตือนสำเร็จโปรไฟล์ */}
                 {profileMsg && (
                   <div className="rounded-control bg-brand-tint border border-brand px-4 py-3 text-body text-brand-ink font-semibold flex items-center gap-2">
                     <CheckCircle2 className="size-5 shrink-0" />
@@ -539,6 +603,7 @@ export default function AccountPage() {
                   </div>
                 )}
 
+                {/* ปุ่มควบคุมด้านล่าง (คืนค่าเดิม / บันทึก) */}
                 <div className="flex flex-col-reverse gap-2.5 border-t border-line-soft pt-3 sm:flex-row sm:justify-end">
                   <Button
                     type="button"
@@ -556,7 +621,7 @@ export default function AccountPage() {
             </Card>
           )}
 
-          {/* TAB 2: Change Password */}
+          {/* แท็บที่ 2: เปลี่ยนรหัสผ่าน (Change Password) */}
           {activeTab === 'password' && (
             <Card className="w-full p-4 sm:p-6 lg:p-7">
               <form onSubmit={handleChangePassword} className="flex flex-col gap-4 sm:gap-5">
@@ -570,6 +635,7 @@ export default function AccountPage() {
                   </div>
                 </div>
 
+                {/* ช่องกรอกรหัสผ่านปัจจุบัน */}
                 <Input
                   type="password"
                   label="รหัสผ่านปัจจุบัน *"
@@ -579,6 +645,7 @@ export default function AccountPage() {
                   required
                 />
 
+                {/* ช่องกรอกรหัสผ่านใหม่ */}
                 <Input
                   type="password"
                   label="รหัสผ่านใหม่ *"
@@ -589,6 +656,7 @@ export default function AccountPage() {
                   required
                 />
 
+                {/* ช่องยืนยันรหัสผ่านใหม่ */}
                 <Input
                   type="password"
                   label="ยืนยันรหัสผ่านใหม่ *"
@@ -598,6 +666,7 @@ export default function AccountPage() {
                   required
                 />
 
+                {/* ข้อความแจ้งเตือนข้อผิดพลาดรหัสผ่าน */}
                 {pwdErr && (
                   <div className="rounded-control bg-danger-bg border border-danger-fg/30 px-4 py-3 text-body text-danger-fg flex items-center gap-2">
                     <AlertCircle className="size-5 shrink-0" />
@@ -605,6 +674,7 @@ export default function AccountPage() {
                   </div>
                 )}
 
+                {/* ข้อความแจ้งเตือนสำเร็จรหัสผ่าน */}
                 {pwdMsg && (
                   <div className="rounded-control bg-brand-tint border border-brand px-4 py-3 text-body text-brand-ink font-semibold flex items-center gap-2">
                     <CheckCircle2 className="size-5 shrink-0" />
@@ -612,6 +682,7 @@ export default function AccountPage() {
                   </div>
                 )}
 
+                {/* ปุ่มล้างข้อมูลและปุ่มบันทึกรหัสผ่าน */}
                 <div className="flex flex-col-reverse gap-2.5 border-t border-line-soft pt-3 sm:flex-row sm:justify-end">
                   <Button
                     type="button"
@@ -635,10 +706,10 @@ export default function AccountPage() {
             </Card>
           )}
 
-          {/* TAB 3: Signature & PIN */}
+          {/* แท็บที่ 3: จัดการลายมือชื่อดิจิทัล & รหัส PIN 6 หลัก */}
           {activeTab === 'signature' && (
             <div className="flex flex-col gap-4 sm:gap-5">
-              {/* Notice Banner */}
+              {/* ป้ายคำแนะนำการใช้งานระบบลงนาม */}
               <div className="rounded-control border border-line bg-surface p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[13px]">
                 <div className="flex items-start gap-2.5">
                   <KeyRound className="size-5 text-brand shrink-0 mt-0.5" />
@@ -654,6 +725,7 @@ export default function AccountPage() {
                 )}
               </div>
 
+              {/* ข้อความแจ้งเตือนสำเร็จ/ล้มเหลว */}
               {sigMsg && (
                 <div className="rounded-2xl bg-brand-mint border border-brand/30 px-4 py-2.5 text-[13px] font-semibold text-brand text-center">
                   {sigMsg}
@@ -666,7 +738,7 @@ export default function AccountPage() {
               )}
 
               <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-5">
-                {/* Signature Card */}
+                {/* การ์ดที่ 1: วาดและบันทึกลายเซ็นดิจิทัล (Signature Canvas) */}
                 <Card className="flex min-w-0 flex-col gap-4 p-4 sm:p-6">
                   <div className="flex items-center gap-2.5 border-b border-line-soft pb-3">
                     <PenTool className="size-5 text-brand" />
@@ -680,6 +752,7 @@ export default function AccountPage() {
                     </div>
                   </div>
 
+                  {/* กล่องวาดลายเซ็น HTML5 Canvas */}
                   <SignatureBox
                     value={signature}
                     onChange={setSignature}
@@ -688,6 +761,7 @@ export default function AccountPage() {
                     skipPinPrompt
                   />
 
+                  {/* ปุ่มบันทึกลายเซ็น */}
                   <Button
                     type="button"
                     variant="primary"
@@ -699,7 +773,7 @@ export default function AccountPage() {
                   </Button>
                 </Card>
 
-                {/* PIN 6 หลัก Card */}
+                {/* การ์ดที่ 2: แป้นกดตั้งรหัส PIN 6 หลัก (PinKeypad) */}
                 <Card className="flex min-w-0 flex-col gap-4 p-4 sm:p-6">
                   <div className="flex items-center justify-between border-b border-line-soft pb-3">
                     <div className="flex items-center gap-2.5">
@@ -716,6 +790,7 @@ export default function AccountPage() {
                     <Chip tone="green">กดเพื่อเปลี่ยน PIN</Chip>
                   </div>
 
+                  {/* แป้นพิมพ์ PIN 6 หลักแบบ Interactive */}
                   <div className="flex flex-col items-center gap-3">
                     <PinKeypad
                       pin={pin}
@@ -733,4 +808,3 @@ export default function AccountPage() {
     </AppShell>
   );
 }
-

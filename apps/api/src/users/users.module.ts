@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
 import { UsersController } from './users.controller';
 
-// DbService มาจาก DbModule (Global) — ห้ามประกาศซ้ำใน providers
+/**
+ * UsersModule: โมดูลจัดการข้อมูลบัญชีผู้ใช้งานและสิทธิ์ความยินยอม PDPA
+ * - DbService ถูกเรียกใช้งานจาก DbModule ซึ่งเป็น Global Module
+ */
 @Module({
   controllers: [UsersController],
   providers: [],

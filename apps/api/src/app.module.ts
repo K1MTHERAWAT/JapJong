@@ -17,6 +17,17 @@ import { ResourcesController } from './resources/resources.controller';
 import { StorageModule } from './storage/storage.module';
 import { HealthController } from './health/health.controller';
 
+/**
+ * =====================================================================
+ * โมดูลหลักระดับรากของระบบ (Root Application Module)
+ * =====================================================================
+ * รวมโมดูลทางธุรกิจ, คอนโทรลเลอร์ และการป้องกันความปลอดภัยระดับโกลบอล:
+ * 1. ThrottlerModule: ป้องกันการยิงสแปม (Rate Limiting) 100 req/min ทั่วไป และ 10 req/min สำหรับ Auth
+ * 2. AuthGuard: การตรวจสิทธิ์การเข้าถึง (Bearer Token, RBAC Roles & Permissions) ระดับโกลบอล
+ * 3. DbModule: การเชื่อมต่อและการจัดเก็บฐานข้อมูล
+ * 4. Sub-modules: Notifications, Documents, LineAuth, GovSso, Users, Storage
+ */
+
 @Module({
   imports: [
     DbModule,
@@ -26,6 +37,7 @@ import { HealthController } from './health/health.controller';
     GovSsoModule,
     UsersModule,
     StorageModule,
+    // การจำกัดอัตราการส่งคำขอเพื่อป้องกัน Brute-force และ DoS Attacks
     ThrottlerModule.forRoot([
       {
         name: 'default',
@@ -49,10 +61,12 @@ import { HealthController } from './health/health.controller';
   ],
   providers: [
     EmailService,
+    // เปิดใช้งาน ThrottlerGuard ระดับโกลบอล
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
+    // เปิดใช้งาน AuthGuard ระดับโกลบอล (ตรวจสอบ Decorator @Public() และ Roles)
     {
       provide: APP_GUARD,
       useClass: AuthGuard,

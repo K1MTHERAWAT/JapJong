@@ -1,14 +1,26 @@
 import React from 'react';
 import { REQUEST_TYPE_LABEL, RequestStatus, RequestType, STATUS_META, Tone } from '@japjong/shared';
 
+/**
+ * =====================================================================
+ * ชิปป้ายสถานะและประเภท (Chip & Status Badge Component)
+ * =====================================================================
+ * คอมโพเนนต์แสดงแท็กสถานะคำขอและประเภทบริการ:
+ * 1. Chip: ป้ายแท็กพื้นฐานรองรับชุดสี TONE_CLASSES หลากหลาย
+ * 2. statusToTone: ฟังก์ชันแปลงสถานะคำขอราชการให้เป็นโทนสี (warn / ok / info / danger)
+ * 3. StatusChip: ชิปแสดงสถานะของคำขอ (เช่น "รอเจ้าหน้าที่ตรวจสอบ", "อนุมัติแล้ว")
+ * 4. RequestTypeChip: ชิปแสดงประเภทคำขอ (ขอใช้สถานที่, ยืมอุปกรณ์, แจ้งซ่อม)
+ */
+
 export type ChipTone = 'warn' | 'ok' | 'info' | 'danger' | 'typeBorrow' | 'typeBooking' | 'typeRepair' | Tone;
 
+// ตารางสีพื้นหลังและสีตัวอักษรสำหรับแต่ละ Tone
 const TONE_CLASSES: Record<ChipTone, string> = {
   warn: 'bg-warn-bg text-warn-fg',
   ok: 'bg-ok-bg text-ok-fg',
   info: 'bg-info-bg text-info-fg',
   danger: 'bg-danger-bg text-danger-fg',
-  // Legacy mappings for backwards compatibility
+  // สีเดิมสำหรับความเข้ากันได้ย้อนหลัง (Legacy color mappings)
   amber: 'bg-[#FFF4CC] text-[#765500]',
   green: 'bg-[#ECF5D8] text-[#405D0A]',
   blue: 'bg-[#E8F1FF] text-[#2454A6]',
@@ -25,6 +37,7 @@ const TONE_CLASSES: Record<ChipTone, string> = {
   typeRepair: 'bg-[#F4EBDD] text-[#79552A]',
 };
 
+// คอมโพเนนต์ Chip พื้นฐาน
 export function Chip({
   tone = 'info',
   className = '',
@@ -47,6 +60,7 @@ export function Chip({
   );
 }
 
+// ฟังก์ชันจับคู่สถานะคำขอเป็น Tone สี
 export function statusToTone(status: RequestStatus | string): 'warn' | 'ok' | 'info' | 'danger' {
   switch (status) {
     case 'pending_staff':
@@ -71,6 +85,7 @@ export function statusToTone(status: RequestStatus | string): 'warn' | 'ok' | 'i
   }
 }
 
+// คอมโพเนนต์แสดงชิปสถานะคำขออัตโนมัติ
 export function StatusChip({ status }: { status: RequestStatus }) {
   const meta = STATUS_META[status];
   const label = meta ? meta.label : status;
@@ -79,12 +94,14 @@ export function StatusChip({ status }: { status: RequestStatus }) {
   return <Chip tone={tone}>{label}</Chip>;
 }
 
+// โทนสีประจำแต่ละประเภทบริการ
 const REQUEST_TYPE_TONE: Record<RequestType, ChipTone> = {
   borrow: 'typeBorrow',
   booking: 'typeBooking',
   repair: 'typeRepair',
 };
 
+// คอมโพเนนต์แสดงชิปประเภทคำขอ (สถานที่/อุปกรณ์/แจ้งซ่อม)
 export function RequestTypeChip({ type }: { type: RequestType }) {
   return <Chip tone={REQUEST_TYPE_TONE[type]}>{REQUEST_TYPE_LABEL[type]}</Chip>;
 }

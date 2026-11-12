@@ -1,6 +1,8 @@
-'use client';
+'use client'; // กำหนดให้คอมโพเนนต์นี้ทำงานในฝั่ง Client (React Client Component)
 
+// นำเข้า React Hooks พื้นฐานสำหรับจัดการ State, Effects, Memoization และ Callbacks
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+// นำเข้า Type นิยามประเภทข้อมูลบทบาทและสิทธิ์จากแพ็กเกจกลาง shared
 import {
   CreateRoleDto,
   PublicAccount,
@@ -9,14 +11,21 @@ import {
   Tone,
   UpdateRoleDto,
 } from '@japjong/shared';
+// นำเข้า Auth Context เพื่อตรวจสอบบัญชีของผู้ดูแลระบบปัจจุบัน และรีเฟรชสิทธิ์
 import { useAuth } from '@/components/auth-context';
+// นำเข้า AppShell โครงสร้างเลย์เอาต์หลักของแอปพลิเคชัน
 import { AppShell } from '@/components/shell';
+// นำเข้า Icon แสดงรูปไอคอน SVG
 import { Icon } from '@/components/icons';
+// นำเข้าคอมโพเนนต์ UI พื้นฐาน: Chip (ป้ายกำกับ), Tabs (สลับแท็บ), Toggle (สวิตช์เปิด/ปิด)
 import { Chip, Tabs, Toggle } from '@/components/ui';
+// นำเข้า API client SDK กลางสำหรับเรียก Backend REST API
 import { api } from '@/lib/api';
 
+// กำหนดประเภทชื่อแท็บหลัก: 'roles' (จัดการบทบาท) หรือ 'assignment' (กำหนดบทบาทให้ผู้ใช้งาน)
 type MainTab = 'roles' | 'assignment';
 
+// รายการโทนสีป้ายบทบาท (Badge Tone) พร้อมชื่อภาษาไทยและ Class สำหรับแสดงตัวอย่างสี
 const AVAILABLE_TONES: { tone: Tone; label: string; colorClass: string }[] = [
   { tone: 'green', label: 'เขียว', colorClass: 'bg-emerald-500' },
   { tone: 'blue', label: 'น้ำเงิน', colorClass: 'bg-blue-500' },
@@ -28,50 +37,64 @@ const AVAILABLE_TONES: { tone: Tone; label: string; colorClass: string }[] = [
   { tone: 'orange', label: 'ส้ม', colorClass: 'bg-orange-500' },
 ];
 
+/**
+ * หน้าจอจัดการบทบาทและสิทธิ์ผู้ใช้งาน (RBAC Management Page)
+ * สำหรับผู้ดูแลระบบ เพื่อสร้าง แก้ไข ปิด/เปิด บทบาทในระบบ และกำหนดบทบาทให้ผู้ใช้งานแบบรายคนหรือแบบกลุ่ม
+ */
 export default function AdminPermissionsPage() {
+  // ดึงข้อมูลบัญชีผู้ใช้ปัจจุบันที่ล็อกอินอยู่ และฟังก์ชันรีเฟรชข้อมูลโปรไฟล์
   const { account: currentAccount, refreshMe } = useAuth();
+  // State แท็บหลักที่กำลังเลือกแสดงผลอยู่ (ค่าเริ่มต้น: จัดการบทบาท)
   const [mainTab, setMainTab] = useState<MainTab>('roles');
 
-  // Roles state
-  const [roles, setRoles] = useState<RoleItem[]>([]);
-  const [rolesLoading, setRolesLoading] = useState(true);
-  const [editingRole, setEditingRole] = useState<RoleItem | null>(null);
-  const [isAddRoleModalOpen, setIsAddRoleModalOpen] = useState(false);
-  const [roleFormKey, setRoleFormKey] = useState('');
-  const [roleFormName, setRoleFormName] = useState('');
-  const [roleFormDesc, setRoleFormDesc] = useState('');
-  const [roleFormTone, setRoleFormTone] = useState<Tone>('blue');
-  const [roleFormEnabled, setRoleFormEnabled] = useState(true);
-  const [roleModalError, setRoleModalError] = useState('');
-  const [roleModalSaving, setRoleModalSaving] = useState(false);
-  const [deletingRole, setDeletingRole] = useState<RoleItem | null>(null);
+  // --- Roles State: ข้อมูลบทบาทและการจัดการ Modal บทบาท ---
+  const [roles, setRoles] = useState<RoleItem[]>([]); // รายการบทบาททั้งหมดในระบบ
+  const [rolesLoading, setRolesLoading] = useState(true); // สถานะกำลังโหลดบทบาท
+  const [editingRole, setEditingRole] = useState<RoleItem | null>(null); // บทบาทที่กำลังแก้ไข (ถ้าเป็น null คือสร้างใหม่)
+  const [isAddRoleModalOpen, setIsAddRoleModalOpen] = useState(false); // ควบคุมการเปิด/ปิด Modal บทบาท
+  const [roleFormKey, setRoleFormKey] = useState(''); // รหัสบทบาท (Role Code ตัวพิมพ์ใหญ่)
+  const [roleFormName, setRoleFormName] = useState(''); // ชื่อบทบาทภาษาไทย
+  const [roleFormDesc, setRoleFormDesc] = useState(''); // คำอธิบายขอบเขตหน้าที่ของบทบาท
+  const [roleFormTone, setRoleFormTone] = useState<Tone>('blue'); // โทนสีป้ายบทบาท
+  const [roleFormEnabled, setRoleFormEnabled] = useState(true); // สถานะเปิด/ปิดใช้งานบทบาท
+  const [roleModalError, setRoleModalError] = useState(''); // ข้อความเตือนข้อผิดพลาดใน Modal
+  const [roleModalSaving, setRoleModalSaving] = useState(false); // สถานะกำลังบันทึกข้อมูลบทบาท
+  const [deletingRole, setDeletingRole] = useState<RoleItem | null>(null); // บทบาทที่ถูกเลือกเพื่อขอยืนยันการลบ
 
-  // Users state
-  const [users, setUsers] = useState<PublicAccount[]>([]);
-  const [usersLoading, setUsersLoading] = useState(true);
-  const [userSearch, setUserSearch] = useState('');
-  const [userRoleFilter, setUserRoleFilter] = useState<string>('all');
-  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
-  const [bulkTargetRole, setBulkTargetRole] = useState<string>('');
-  const [isBulkAssigning, setIsBulkAssigning] = useState(false);
+  // --- Users State: ข้อมูลผู้ใช้งานและการกำหนดบทบาท ---
+  const [users, setUsers] = useState<PublicAccount[]>([]); // รายชื่อผู้ใช้งานทั้งหมด
+  const [usersLoading, setUsersLoading] = useState(true); // สถานะกำลังโหลดรายชื่อผู้ใช้
+  const [userSearch, setUserSearch] = useState(''); // ข้อความค้นหาผู้ใช้งาน (ชื่อ, เบอร์, สังกัด)
+  const [userRoleFilter, setUserRoleFilter] = useState<string>('all'); // ตัวกรองบทบาทผู้ใช้
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]); // รายการ ID ผู้ใช้ที่ถูกเลือกสำหรับ Bulk Assign
+  const [bulkTargetRole, setBulkTargetRole] = useState<string>(''); // บทบาทเป้าหมายสำหรับการเปลี่ยนพร้อมกันเป็นกลุ่ม
+  const [isBulkAssigning, setIsBulkAssigning] = useState(false); // สถานะกำลังส่งคำขอกำหนดบทบาทแบบกลุ่ม
 
-  // Notifications / Feedback
-  const [successMsg, setSuccessMsg] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
+  // --- Feedback Notification State: แสดงข้อความแจ้งเตือนผลการทำงาน ---
+  const [successMsg, setSuccessMsg] = useState(''); // ข้อความแจ้งเตือนสำเร็จ
+  const [errorMsg, setErrorMsg] = useState(''); // ข้อความแจ้งเตือนข้อผิดพลาด
 
+  /**
+   * ฟังก์ชันแสดงข้อความสำเร็จแบบตั้งเวลาซ่อนอัตโนมัติ (4 วินาที)
+   */
   const showSuccess = (msg: string) => {
     setSuccessMsg(msg);
     setErrorMsg('');
     setTimeout(() => setSuccessMsg(''), 4000);
   };
 
+  /**
+   * ฟังก์ชันแสดงข้อความแจ้งเตือนข้อผิดพลาด (5 วินาที)
+   */
   const showError = (msg: string) => {
     setErrorMsg(msg);
     setSuccessMsg('');
     setTimeout(() => setErrorMsg(''), 5000);
   };
 
-  // Load roles
+  /**
+   * ฟังก์ชันดึงรายการบทบาททั้งหมดจาก Backend API
+   */
   const loadRoles = useCallback(async () => {
     try {
       setRolesLoading(true);
@@ -84,7 +107,9 @@ export default function AdminPermissionsPage() {
     }
   }, []);
 
-  // Load users
+  /**
+   * ฟังก์ชันดึงรายชื่อผู้ใช้งานทั้งหมดจาก Backend API
+   */
   const loadUsers = useCallback(async () => {
     try {
       setUsersLoading(true);
@@ -97,13 +122,15 @@ export default function AdminPermissionsPage() {
     }
   }, []);
 
-  // Initial load
+  // ดึงข้อมูลบทบาทและรายชื่อผู้ใช้งานเมื่อเปิดหน้าจอครั้งแรก
   useEffect(() => {
     loadRoles();
     loadUsers();
   }, [loadRoles, loadUsers]);
 
-  // Sync navigation after changes
+  /**
+   * ฟังก์ชันส่ง Custom Event แจ้งเตือนเมนู Sidebar ให้รีเฟรชสิทธิ์ตามบทบาทที่เปลี่ยนแปลง
+   */
   const notifyNavigationChange = () => {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('japjong-navigation-refresh'));
@@ -111,7 +138,9 @@ export default function AdminPermissionsPage() {
     refreshMe();
   };
 
-  // Open Add Modal
+  /**
+   * ฟังก์ชันเปิด Modal สำหรับสร้างบทบาทใหม่ (เคลียร์ค่าฟอร์มเป็นค่าเริ่มต้น)
+   */
   const openAddModal = () => {
     setEditingRole(null);
     setRoleFormKey('');
@@ -123,7 +152,10 @@ export default function AdminPermissionsPage() {
     setIsAddRoleModalOpen(true);
   };
 
-  // Open Edit Modal
+  /**
+   * ฟังก์ชันเปิด Modal เพื่อแก้ไขข้อมูลบทบาทเดิมที่มีอยู่
+   * @param role - บทบาทที่ต้องการแก้ไข
+   */
   const openEditModal = (role: RoleItem) => {
     setEditingRole(role);
     setRoleFormKey(role.key);
@@ -135,9 +167,12 @@ export default function AdminPermissionsPage() {
     setIsAddRoleModalOpen(true);
   };
 
-  // Save Role (Add or Edit)
+  /**
+   * ฟังก์ชันบันทึกข้อมูลบทบาท (รองรับทั้งการสร้างใหม่และการอัปเดตบทบาทเดิม)
+   */
   const handleSaveRole = async (e: React.FormEvent) => {
     e.preventDefault();
+    // ตรวจสอบความถูกต้องของชื่อบทบาท
     if (!roleFormName.trim()) {
       setRoleModalError('กรุณากรอกชื่อบทบาท');
       return;
@@ -148,6 +183,7 @@ export default function AdminPermissionsPage() {
       setRoleModalError('');
 
       if (editingRole) {
+        // อัปเดตข้อมูลบทบาทเดิม
         const dto: UpdateRoleDto = {
           name: roleFormName.trim(),
           description: roleFormDesc.trim(),
@@ -157,6 +193,7 @@ export default function AdminPermissionsPage() {
         await api.updateRole(editingRole.id, dto);
         showSuccess(`แก้ไขข้อมูลบทบาท "${roleFormName.trim()}" สำเร็จ`);
       } else {
+        // สร้างบทบาทใหม่
         const dto: CreateRoleDto = {
           key: roleFormKey.trim() ? roleFormKey.trim().toUpperCase() : undefined,
           name: roleFormName.trim(),
@@ -168,9 +205,9 @@ export default function AdminPermissionsPage() {
         showSuccess(`เพิ่มบทบาทใหม่ "${roleFormName.trim()}" สำเร็จ`);
       }
 
-      setIsAddRoleModalOpen(false);
-      await loadRoles();
-      notifyNavigationChange();
+      setIsAddRoleModalOpen(false); // ปิด Modal
+      await loadRoles(); // โหลดข้อมูลบทบาทใหม่
+      notifyNavigationChange(); // รีเฟรชเมนู Sidebar
     } catch (err: any) {
       setRoleModalError(err.message || 'บันทึกบทบาทไม่สำเร็จ');
     } finally {
@@ -178,8 +215,12 @@ export default function AdminPermissionsPage() {
     }
   };
 
-  // Toggle Role Status
+  /**
+   * ฟังก์ชันสลับสถานะเปิด/ปิดการใช้งานบทบาท
+   * @param role - บทบาทที่ต้องการเปลี่ยนสถานะ
+   */
   const handleToggleRole = async (role: RoleItem) => {
+    // ป้องกันการปิดการใช้งานบทบาทผู้ดูแลระบบ (ADMIN)
     if (role.key === 'ADMIN') {
       showError('ไม่สามารถปิดการใช้งานบทบาทผู้ดูแลระบบ (ADMIN) ได้');
       return;
@@ -194,7 +235,9 @@ export default function AdminPermissionsPage() {
     }
   };
 
-  // Delete Role
+  /**
+   * ฟังก์ชันลบบทบาทออกจากระบบถาวร (เฉพาะบทบาทที่สร้างขึ้นเองและไม่มีผู้ใช้ผูกอยู่)
+   */
   const handleDeleteRole = async () => {
     if (!deletingRole) return;
     try {
@@ -208,9 +251,14 @@ export default function AdminPermissionsPage() {
     }
   };
 
-  // Single User Role Assignment
+  /**
+   * ฟังก์ชันเปลี่ยนบทบาทให้ผู้ใช้งานแบบรายบุคคล
+   * @param user - ข้อมูลผู้ใช้งานเป้าหมาย
+   * @param newRole - บทบาทใหม่ที่ต้องการมอบหมาย
+   */
   const handleAssignSingleUserRole = async (user: PublicAccount, newRole: Role) => {
-    if (user.role === newRole) return;
+    if (user.role === newRole) return; // หากเป็นบทบาทเดิมอยู่แล้ว ไม่ต้องทำอะไร
+    // ป้องกัน Admin ลดระดับบทบาทของตนเองเพื่อไม่ให้ล็อคระบบ
     if (user.id === currentAccount?.id && currentAccount?.role === 'ADMIN' && newRole !== 'ADMIN') {
       showError('ไม่สามารถลดระดับบทบาทของตนเองได้');
       return;
@@ -227,8 +275,12 @@ export default function AdminPermissionsPage() {
     }
   };
 
-  // Single User Active Toggle
+  /**
+   * ฟังก์ชันเปิด/ระงับการใช้งานบัญชีผู้ใช้
+   * @param user - ข้อมูลผู้ใช้งาน
+   */
   const handleToggleUserActive = async (user: PublicAccount) => {
+    // ป้องกันการระงับบัญชีของตนเอง
     if (user.id === currentAccount?.id) {
       showError('ไม่สามารถระงับการใช้งานบัญชีของตนเองได้');
       return;
@@ -243,12 +295,16 @@ export default function AdminPermissionsPage() {
     }
   };
 
-  // Bulk Role Assignment
+  /**
+   * ฟังก์ชันเปลี่ยนบทบาทผู้ใช้แบบกลุ่ม (Bulk Role Assignment)
+   */
   const handleBulkAssign = async () => {
+    // ตรวจสอบว่าเลือกผู้ใช้อย่างน้อย 1 คนหรือไม่
     if (selectedUserIds.length === 0) {
       showError('กรุณาเลือกผู้ใช้งานที่ต้องการเปลี่ยนบทบาทอย่างน้อย 1 คน');
       return;
     }
+    // ตรวจสอบว่าเลือกบทบาทเป้าหมายหรือไม่
     if (!bulkTargetRole) {
       showError('กรุณาเลือกบทบาทเป้าหมายที่ต้องการกำหนด');
       return;
@@ -262,8 +318,8 @@ export default function AdminPermissionsPage() {
       } else {
         showSuccess(`เปลี่ยนบทบาทให้ผู้ใช้งาน ${res.updatedCount} คนเป็น "${bulkTargetRole}" เรียบร้อยแล้ว`);
       }
-      setSelectedUserIds([]);
-      setBulkTargetRole('');
+      setSelectedUserIds([]); // ล้างรายการเลือก
+      setBulkTargetRole(''); // ล้างค่าบทบาทเป้าหมาย
       await loadUsers();
       await loadRoles();
       notifyNavigationChange();
@@ -274,16 +330,24 @@ export default function AdminPermissionsPage() {
     }
   };
 
-  // Multi-select helpers
+  /**
+   * ฟังก์ชันเปิด/ปิดการเลือก Checkbox ของผู้ใช้แต่ละคน
+   * @param id - รหัส ID ของผู้ใช้งาน
+   */
   const handleToggleSelectUser = (id: string) => {
     setSelectedUserIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
   };
 
+  /**
+   * คำนวณรายชื่อผู้ใช้ที่ผ่านการกรองตาม Search Query และ Role Filter
+   */
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
+      // กรองตามบทบาท
       if (userRoleFilter !== 'all' && u.role !== userRoleFilter) return false;
+      // กรองตามคำค้นหา
       if (userSearch.trim()) {
         const q = userSearch.toLowerCase();
         return (
@@ -298,6 +362,9 @@ export default function AdminPermissionsPage() {
     });
   }, [users, userRoleFilter, userSearch]);
 
+  /**
+   * ฟังก์ชันเลือกหรือยกเลิกการเลือกผู้ใช้ทั้งหมดในรายการที่กรองอยู่
+   */
   const handleSelectAllFiltered = () => {
     const allFilteredIds = filteredUsers.map((u) => u.id);
     const allSelected = allFilteredIds.every((id) => selectedUserIds.includes(id));
@@ -308,11 +375,13 @@ export default function AdminPermissionsPage() {
     }
   };
 
+  // ตรวจสอบว่าผู้ใช้ทั้งหมดในรายการที่กรองอยู่ถูกเลือกครบหรือไม่
   const isAllFilteredSelected =
     filteredUsers.length > 0 &&
     filteredUsers.every((u) => selectedUserIds.includes(u.id));
 
   return (
+    // โครงเลย์เอาต์หลักของหน้าแอดมิน
     <AppShell
       title="จัดการบทบาทผู้ใช้งาน (Role Management)"
       backHref="/admin"
@@ -320,7 +389,7 @@ export default function AdminPermissionsPage() {
       maxWidth="max-w-[1120px]"
     >
       <div className="flex flex-col gap-5">
-        {/* Header Intro Banner */}
+        {/* แบนเนอร์แนะนำระบบ RBAC ด้านบน */}
         <div className="jw-card p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-l-4 border-l-brand">
           <div>
             <div className="flex items-center gap-2">
@@ -334,6 +403,7 @@ export default function AdminPermissionsPage() {
               พร้อมการตรวจสอบสิทธิ์ความปลอดภัยที่ Backend ทุก API
             </p>
           </div>
+          {/* ปุ่มเพิ่มบทบาทใหม่ (แสดงเฉพาะในแท็บบทบาท) */}
           {mainTab === 'roles' && (
             <button
               type="button"
@@ -346,7 +416,7 @@ export default function AdminPermissionsPage() {
           )}
         </div>
 
-        {/* Feedback Messages */}
+        {/* แถบแจ้งเตือนผลลัพธ์การทำงาน (Success / Error) */}
         {successMsg && (
           <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[14px] flex items-center gap-2.5 animate-fadeIn">
             <Icon name="check" className="w-5 h-5 text-emerald-600 shrink-0" />
@@ -360,7 +430,7 @@ export default function AdminPermissionsPage() {
           </div>
         )}
 
-        {/* Main Tabs */}
+        {/* แถบแท็บหลักสลับระหว่าง จัดการบทบาท กับ กำหนดบทบาทผู้ใช้ */}
         <Tabs<MainTab>
           value={mainTab}
           onChange={setMainTab}
@@ -388,8 +458,10 @@ export default function AdminPermissionsPage() {
             {rolesLoading ? (
               <div className="p-12 text-center text-ink-mute text-[14px]">กำลังโหลดรายการบทบาท...</div>
             ) : (
+              // แสดงการ์ดรายการบทบาททั้งหมด
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {roles.map((role) => {
+                  // ตรวจสอบเงื่อนไขว่าสามารถลบบทบาทนี้ได้หรือไม่ (ต้องไม่ใช่ System Role และไม่มีผู้ใช้งานผูกอยู่)
                   const canDelete = !role.isSystem && role.userCount === 0;
                   return (
                     <div
@@ -399,7 +471,7 @@ export default function AdminPermissionsPage() {
                       }`}
                     >
                       <div>
-                        {/* Card Header */}
+                        {/* ส่วนหัวการ์ดบทบาท: ป้ายชื่อรหัสบทบาท และสวิตช์เปิด/ปิด */}
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="flex flex-wrap items-center gap-2">
                             <Chip tone={role.tone || 'blue'}>{role.key}</Chip>
@@ -415,7 +487,7 @@ export default function AdminPermissionsPage() {
                             )}
                           </div>
 
-                          {/* Toggle Active Switch */}
+                          {/* สวิตช์สลับสถานะเปิด/ปิดการใช้งานบทบาท */}
                           <div className="flex items-center gap-2">
                             <span className="text-[12px] text-ink-mute">
                               {role.enabled ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
@@ -428,14 +500,14 @@ export default function AdminPermissionsPage() {
                           </div>
                         </div>
 
-                        {/* Role Name & Description */}
+                        {/* ชื่อบทบาทภาษาไทยและคำอธิบาย */}
                         <h3 className="text-[16px] font-bold text-ink">{role.name}</h3>
                         <p className="text-[13px] text-ink-mute mt-1 min-h-[38px] line-clamp-2">
                           {role.description || 'ไม่มีคำอธิบายบทบาท'}
                         </p>
                       </div>
 
-                      {/* Card Footer: User Count & Actions */}
+                      {/* ส่วนท้ายการ์ด: แสดงจำนวนผู้ใช้ในบทบาท และปุ่มแก้ไข/ลบ */}
                       <div className="pt-3 border-t border-line flex items-center justify-between gap-3">
                         <div className="flex items-center gap-1.5 text-[13px] text-ink-mute">
                           <Icon name="users" className="w-4 h-4 text-brand" />
@@ -444,6 +516,7 @@ export default function AdminPermissionsPage() {
                         </div>
 
                         <div className="flex items-center gap-1.5">
+                          {/* ปุ่มเปิด Modal แก้ไขบทบาท */}
                           <button
                             type="button"
                             onClick={() => openEditModal(role)}
@@ -453,6 +526,7 @@ export default function AdminPermissionsPage() {
                             <span>แก้ไข</span>
                           </button>
 
+                          {/* ปุ่มเปิด Modal ลบบทบาท */}
                           <button
                             type="button"
                             onClick={() => setDeletingRole(role)}
@@ -486,7 +560,7 @@ export default function AdminPermissionsPage() {
         {/* ==================== TAB 2: USER ROLE ASSIGNMENT ==================== */}
         {mainTab === 'assignment' && (
           <div className="flex flex-col gap-4">
-            {/* Search and Filters */}
+            {/* แถบค้นหาและตัวกรองบทบาท */}
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-ph">
@@ -501,7 +575,7 @@ export default function AdminPermissionsPage() {
                 />
               </div>
 
-              {/* Quick Role Filter Dropdown */}
+              {/* เมนู Dropdown กรองตามบทบาท */}
               <div className="flex items-center gap-2">
                 <select
                   value={userRoleFilter}
@@ -518,7 +592,7 @@ export default function AdminPermissionsPage() {
               </div>
             </div>
 
-            {/* Bulk Actions Toolbar (Visible when users selected) */}
+            {/* แถบเครื่องมือจัดการแบบกลุ่ม (Bulk Actions Toolbar - แสดงเมื่อมีการเลือก Checkbox อย่างน้อย 1 คน) */}
             {selectedUserIds.length > 0 && (
               <div className="p-3.5 rounded-2xl bg-brand-mint border border-brand/40 flex flex-wrap items-center justify-between gap-3 animate-fadeIn">
                 <div className="flex items-center gap-2">
@@ -531,6 +605,7 @@ export default function AdminPermissionsPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {/* ตัวเลือกบทบาทใหม่สำหรับเปลี่ยนพร้อมกัน */}
                   <select
                     value={bulkTargetRole}
                     onChange={(e) => setBulkTargetRole(e.target.value)}
@@ -566,7 +641,7 @@ export default function AdminPermissionsPage() {
               </div>
             )}
 
-            {/* Select All Checkbox Header */}
+            {/* แถว Checkbox เลือกทั้งหมด (Select All) */}
             <div className="flex items-center justify-between px-2 text-[13px] text-ink-mute">
               <label className="flex items-center gap-2.5 cursor-pointer">
                 <input
@@ -582,7 +657,7 @@ export default function AdminPermissionsPage() {
               <span>เปลี่ยนบทบาทได้ทันทีจากเมนูในแต่ละแถว</span>
             </div>
 
-            {/* Users List */}
+            {/* รายชื่อผู้ใช้งาน (Users List) */}
             {usersLoading ? (
               <div className="p-12 text-center text-ink-mute text-[14px]">กำลังโหลดรายชื่อผู้ใช้งาน...</div>
             ) : filteredUsers.length === 0 ? (
@@ -594,7 +669,6 @@ export default function AdminPermissionsPage() {
                 {filteredUsers.map((user) => {
                   const isSelected = selectedUserIds.includes(user.id);
                   const isSelf = user.id === currentAccount?.id;
-                  const roleObj = roles.find((r) => r.key === user.role);
 
                   return (
                     <div
@@ -607,7 +681,7 @@ export default function AdminPermissionsPage() {
                           : 'border-line hover:border-brand/40 bg-white'
                       }`}
                     >
-                      {/* Left: Checkbox & User Info */}
+                      {/* ส่วนซ้าย: Checkbox และข้อมูลผู้ใช้ */}
                       <div className="flex items-start sm:items-center gap-3">
                         <input
                           type="checkbox"
@@ -616,12 +690,12 @@ export default function AdminPermissionsPage() {
                           className="w-4 h-4 rounded text-brand border-line focus:ring-brand mt-1 sm:mt-0"
                         />
 
-                        {/* Avatar Initial */}
+                        {/* อวาตาร์อักษรย่อ */}
                         <div className="w-10 h-10 rounded-full bg-soft text-brand font-bold text-[15px] flex items-center justify-center shrink-0 border border-line">
                           {user.initial || user.name.charAt(0) || 'ผ'}
                         </div>
 
-                        {/* Info details */}
+                        {/* รายละเอียดชื่อ ตำแหน่ง สังกัด และเบอร์โทร */}
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
                             <b className="text-[15px] text-ink">{user.name}</b>
@@ -648,9 +722,9 @@ export default function AdminPermissionsPage() {
                         </div>
                       </div>
 
-                      {/* Right: Inline Role Selector & Status Toggle */}
+                      {/* ส่วนขวา: ตัวเลือกเปลี่ยนบทบาททันที และสวิตช์สถานะเปิด/ระงับบัญชี */}
                       <div className="flex items-center justify-end gap-3 self-end sm:self-center pl-7 sm:pl-0">
-                        {/* Quick Role Change Dropdown */}
+                        {/* Dropdown เปลี่ยนบทบาทผู้ใช้แบบรายคน */}
                         <div className="flex items-center gap-1.5">
                           <label className="text-[12px] text-ink-mute whitespace-nowrap">บทบาท:</label>
                           <select
@@ -667,7 +741,7 @@ export default function AdminPermissionsPage() {
                           </select>
                         </div>
 
-                        {/* Active status toggle */}
+                        {/* สวิตช์เปิด/ระงับการใช้งานบัญชี */}
                         <div className="flex items-center gap-1.5 pl-2 border-l border-line">
                           <Toggle
                             checked={user.active !== false}
@@ -689,6 +763,7 @@ export default function AdminPermissionsPage() {
         {isAddRoleModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn">
             <div className="jw-card w-full max-w-lg p-5 sm:p-6 bg-white shadow-xl flex flex-col gap-4">
+              {/* ส่วนหัว Modal */}
               <div className="flex items-center justify-between pb-3 border-b border-line">
                 <h3 className="text-[17px] font-bold text-ink">
                   {editingRole ? 'แก้ไขข้อมูลบทบาท' : 'เพิ่มบทบาทใหม่'}
@@ -702,6 +777,7 @@ export default function AdminPermissionsPage() {
                 </button>
               </div>
 
+              {/* ข้อความแจ้งเตือนข้อผิดพลาดใน Modal */}
               {roleModalError && (
                 <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-[13px]">
                   {roleModalError}
@@ -709,7 +785,7 @@ export default function AdminPermissionsPage() {
               )}
 
               <form onSubmit={handleSaveRole} className="flex flex-col gap-4">
-                {/* Role Code / Key */}
+                {/* ช่องกรอกรหัสบทบาท (Role Code) */}
                 <div>
                   <label className="jw-lbl">
                     รหัสบทบาท (Role Code){' '}
@@ -727,7 +803,7 @@ export default function AdminPermissionsPage() {
                   />
                 </div>
 
-                {/* Role Name */}
+                {/* ช่องกรอกชื่อบทบาทภาษาไทย */}
                 <div>
                   <label className="jw-lbl">ชื่อบทบาทภาษาไทย *</label>
                   <input
@@ -740,7 +816,7 @@ export default function AdminPermissionsPage() {
                   />
                 </div>
 
-                {/* Description */}
+                {/* ช่องกรอกคำอธิบายหน้าที่ */}
                 <div>
                   <label className="jw-lbl">คำอธิบายหน้าที่ / ขอบเขตงาน</label>
                   <textarea
@@ -752,7 +828,7 @@ export default function AdminPermissionsPage() {
                   />
                 </div>
 
-                {/* Tone Color Picker */}
+                {/* ตัวเลือกโทนสีของ Badge บทบาท */}
                 <div>
                   <label className="jw-lbl">โทนสีป้ายบทบาท (Badge Tone)</label>
                   <div className="flex flex-wrap gap-2 mt-1">
@@ -774,7 +850,7 @@ export default function AdminPermissionsPage() {
                   </div>
                 </div>
 
-                {/* Enabled Toggle */}
+                {/* สวิตช์เปิด/ปิดการใช้งานบทบาท */}
                 <div className="flex items-center justify-between p-3.5 rounded-2xl bg-soft border border-line">
                   <div>
                     <b className="text-[14px] text-ink block">สถานะเปิดใช้งานบทบาท</b>
@@ -789,7 +865,7 @@ export default function AdminPermissionsPage() {
                   />
                 </div>
 
-                {/* Modal Buttons */}
+                {/* ปุ่มยกเลิกและปุ่มบันทึกใน Modal */}
                 <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-line mt-2">
                   <button
                     type="button"

@@ -2,15 +2,15 @@ import { Global, Module } from '@nestjs/common';
 import { DbService } from './db.service';
 
 /**
- * DbService ต้องเป็น Singleton เดียวทั้งแอป
- * เพราะเก็บ cache ของ accounts / sessions ไว้ในหน่วยความจำ
- * หากแต่ละ Module ประกาศ DbService ใน providers เอง จะได้คนละ instance
- * ทำให้บัญชีที่สร้างใน Module หนึ่งไม่ปรากฏใน AuthGuard
+ * DbModule: โมดูลฐานข้อมูลหลักของระบบ
+ * - กำหนดเป็น @Global() เพื่อให้ DbService เป็น Singleton ตัวเดียวตลอดทั้งแอปพลิเคชัน
+ * - ป้องกันปัญหาการแยก Instance ของ in-memory cache/state ระหว่างโมดูลต่างๆ
  */
 @Global()
 @Module({
+  // ลงทะเบียน DbService ในฐานะ Provider
   providers: [DbService],
+  // ส่งออก DbService เพื่อให้ทุกโมดูลในระบบเรียกใช้งานได้โดยตรง
   exports: [DbService],
 })
 export class DbModule {}
-

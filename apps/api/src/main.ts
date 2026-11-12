@@ -8,7 +8,19 @@ import helmet from 'helmet';
 import * as express from 'express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
-// โหลดค่าจากไฟล์ .env ในโฟลเดอร์ apps/api และโปรเจกต์
+/**
+ * =====================================================================
+ * ไฟล์หลักเริ่มต้นระบบเซิร์ฟเวอร์ Backend API (Server Bootstrap Entrypoint)
+ * =====================================================================
+ * ระบบจับจอง (JapJong) Backend API บน NestJS Framework:
+ * 1. โหลดค่า Environment Variables (.env) อัตโนมัติจากหลายตำแหน่ง
+ * 2. ตั้งค่า Global Prefix เป็น '/api' พร้อม URL Rewriting รองรับ LINE Webhook & SSO
+ * 3. ระบบรักษาความปลอดภัย: Helmet headers, CORS Whitelist, Body Limit 8MB, rawBody สำหรับ LINE Webhook
+ * 4. การตรวจสอบความถูกต้องของข้อมูล (ValidationPipe)
+ * 5. Swagger OpenAPI 3.0 Interactive Documentation ที่ `/api/docs`
+ */
+
+// โหลดค่าจากไฟล์ .env ในโฟลเดอร์ apps/api และโปรเจกต์หลัก
 (() => {
   const candidates = [
     path.resolve(process.cwd(), 'apps/api/.env'),
@@ -38,10 +50,12 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
+  // สร้างอินสแตนซ์ของ NestJS Express Application ปิด bodyParser อัตโนมัติเพื่อปรับแต่งเอง
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
+  // กำหนดคำนำหน้าเส้นทาง API ทั้งหมดเป็น /api
   app.setGlobalPrefix('api');
 
-  // รองรับทั้ง /auth/line, /line/webhook, /auth/sso-* (ตาม GOV SSO Spec) และ /api/*
+  // URL Rewriting Middleware: ปรับเส้นทาง /auth/line, /line/webhook, /auth/sso-* ให้ชี้ไปที่ /api/* อัตโนมัติ
   app.use((req: express.Request, _res: express.Response, next: express.NextFunction) => {
     if (
       req.url.startsWith('/auth/line') ||
@@ -65,10 +79,10 @@ async function bootstrap() {
     }),
   );
 
-  // รองรับ Reverse Proxy / PaaS (เช่น Cloud Run, Nginx, Railway) ให้ throttler จับ IP จริงผ่าน X-Forwarded-For
+  // รองรับ Reverse Proxy / PaaS (เช่น Cloud Run, Nginx, Railway) ให้จับ IP จริงผ่าน X-Forwarded-For
   app.set('trust proxy', 1);
 
-  // Security headers ด้วย helmet (ปิด CSP เฉพาะในระดับ global เพื่อให้ Swagger UI render CSS/JS ได้สมบูรณ์)
+  // Security headers ด้วย helmet (ปิด CSP เฉพาะในระดับ global เพื่อให้ Swagger UI แสดงผลได้)
   app.use(
     helmet({
       contentSecurityPolicy: false,
@@ -76,7 +90,7 @@ async function bootstrap() {
     }),
   );
 
-  // ตั้ง body limit ให้รองรับภาพลายเซ็นและรูปภาพประกอบ (สูงสุด 3 รูป) และเก็บ rawBody สำหรับตรวจสอบ X-Line-Signature
+  // ตั้ง body limit เป็น 8MB รองรับภาพลายเซ็นและรูปภาพประกอบ พร้อมเก็บ rawBody สำหรับตรวจ X-Line-Signature
   app.use(
     express.json({
       limit: '8mb',
@@ -87,6 +101,7 @@ async function bootstrap() {
   );
   app.use(express.urlencoded({ limit: '8mb', extended: true }));
 
+  // จัดการ Cross-Origin Resource Sharing (CORS) ตามรายการโดเมนที่ได้รับอนุญาต
   const allowedOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:3000,http://127.0.0.1:3000')
     .split(',')
     .map((o) => o.trim())
@@ -105,6 +120,7 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
+  // ส่วนหัวความปลอดภัย HTTP ป้องกัน Clickjacking และ MIME-type Sniffing
   app.use((_req: unknown, res: { setHeader: (k: string, v: string) => void }, next: () => void) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
@@ -113,7 +129,7 @@ async function bootstrap() {
     next();
   });
 
-  // ตั้งค่า OpenAPI Interactive (Swagger UI)
+  // ตั้งค่า OpenAPI Interactive (Swagger UI) สำหรับทดสอบ API
   const swaggerConfig = new DocumentBuilder()
     .setTitle('JapJong API Documentation')
     .setDescription(
@@ -153,6 +169,7 @@ async function bootstrap() {
     },
   });
 
+  // เริ่มต้นเปิดรับการเชื่อมต่อที่พอร์ตที่กำหนด
   const port = Number(process.env.PORT ?? 4000);
   await app.listen(port, '0.0.0.0');
   // eslint-disable-next-line no-console

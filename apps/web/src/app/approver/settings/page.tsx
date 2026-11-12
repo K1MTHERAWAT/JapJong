@@ -1,5 +1,15 @@
 'use client';
 
+/**
+ * =====================================================================
+ * หน้าตั้งค่าลายมือชื่อและรหัส PIN ผู้อนุมัติ (Approver Signature & PIN Settings Page)
+ * =====================================================================
+ * ระบบเตรียมความพร้อมการลงนามดิจิทัล 3 ขั้นตอน (3-Step Setup Wizard):
+ * 1. วาดบันทึกลายมือชื่อดิจิทัลประจำตัว (SignatureBox)
+ * 2. กำหนดรหัสผ่านลับ PIN 6 หลักสำหรับกดยืนยันการอนุมัติ (PinKeypad)
+ * 3. ยืนยันเปิดใช้งานเซสชันด้วยรหัสผ่านใช้ครั้งเดียวทางอีเมล (Email OTP Verifier)
+ */
+
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { roleHomePath, useAuth } from '@/components/auth-context';
@@ -7,32 +17,45 @@ import { AppShell } from '@/components/shell';
 import { PinKeypad, SignatureBox, SignOtpVerifier } from '@/components/ui';
 import { api } from '@/lib/api';
 
+// ชนิดสเต็ปในกระบวนการตั้งค่า
 type StepMode = 'signature' | 'pin' | 'otp';
 
 export default function ApproverSignaturePinSettingsPage() {
   const router = useRouter();
+  // ดึงข้อมูลบัญชีผู้ใช้ปัจจุบัน และฟังก์ชันรีเฟรชข้อมูลโปรไฟล์
   const { account, refreshMe } = useAuth();
+
+  // State สเต็ปปัจจุบันของวิซาร์ด
   const [step, setStep] = useState<StepMode>('signature');
+  // State ข้อมูลภาพลายเซ็น (Base64 data URL)
   const [signature, setSignature] = useState(account?.signature || '');
+  // State รหัส PIN 6 หลักที่กำลังกรอก
   const [pin, setPin] = useState('');
+  // State ข้อความแจ้งเตือนข้อผิดพลาดของ PIN
   const [pinError, setPinError] = useState('');
+  // State กำลังบันทึก PIN
   const [savingPin, setSavingPin] = useState(false);
+  // State ข้อความแจ้งเตือนผลสำเร็จ
   const [message, setMessage] = useState('');
 
+  // ซิงค์ลายเซ็นเดิมที่มีอยู่ในระบบมาแสดงเมื่อเข้าหน้า
   useEffect(() => {
     if (account) {
       setSignature(account.signature || '');
     }
   }, [account]);
 
+  // คำนวณเส้นทางกลับหน้าหลักตามบทบาท
   const homeHref = roleHomePath(account?.role);
 
+  // ฟังก์ชันบันทึกลายเซ็นและไปสเต็ปถัดไป (ตั้ง PIN)
   const handleSaveSignature = async () => {
     await api.saveSignature(signature);
     await refreshMe();
     setStep('pin');
   };
 
+  // ฟังก์ชันบันทึกรหัส PIN 6 หลัก
   const handleSavePin = async (fullPin: string) => {
     setPinError('');
     setSavingPin(true);
@@ -85,7 +108,7 @@ export default function ApproverSignaturePinSettingsPage() {
         ) : undefined
       }
     >
-      {/* Stepper Header */}
+      {/* แถบลำดับขั้นตอน (Stepper Header 1-2-3) */}
       <div className="flex items-center justify-between mb-4 px-1">
         <div className="flex items-center gap-2">
           <span
@@ -127,6 +150,7 @@ export default function ApproverSignaturePinSettingsPage() {
         </div>
       </div>
 
+      {/* สเต็ปที่ 1: วาดลายเซ็นดิจิทัล */}
       {step === 'signature' ? (
         <div className="jw-card p-5 flex flex-col gap-4">
           <div>
@@ -144,6 +168,7 @@ export default function ApproverSignaturePinSettingsPage() {
           />
         </div>
       ) : step === 'pin' ? (
+        /* สเต็ปที่ 2: ตั้งค่ารหัส PIN 6 หลัก */
         <div className="jw-card p-6 flex flex-col items-center gap-4">
           <PinKeypad
             pin={pin}
@@ -181,6 +206,7 @@ export default function ApproverSignaturePinSettingsPage() {
           </div>
         </div>
       ) : (
+        /* สเต็ปที่ 3: ตรวจสอบยืนยันเซสชันผ่าน OTP */
         <div className="flex flex-col gap-4">
           <SignOtpVerifier
             initialEmail={account?.email}

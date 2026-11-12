@@ -19,6 +19,10 @@ import { NotificationPreferencesService } from './notification-preferences.servi
 import { NotificationQueueService } from './notification-queue.service';
 import { NotificationsService } from './notifications.service';
 
+/**
+ * Controller ศูนย์กลางระบบแจ้งเตือน (Notifications Center)
+ * ให้บริการ: รายการแจ้งเตือนภายในเว็บ (In-App), การตั้งค่า Preferences, สถานะการแจ้งเตือน LINE, และแดชบอร์ดแอดมิน
+ */
 @ApiTags('Notifications')
 @ApiBearerAuth('bearer')
 @Controller()
@@ -29,41 +33,69 @@ export class NotificationsController {
     private readonly queueService: NotificationQueueService,
   ) {}
 
-  // ===================== In-App Notifications =====================
+  // ===================== In-App Notifications (แจ้งเตือนภายในเว็บ) =====================
 
+  /**
+   * ดึงรายการการแจ้งเตือนทั้งหมดของผู้ใช้ปัจจุบัน
+   * GET /notifications
+   */
   @Get('notifications')
   getNotifications(@CurrentUser() user: Account) {
     return this.notificationsService.getUserNotifications(user.id);
   }
 
+  /**
+   * นับจำนวนการแจ้งเตือนที่ยังไม่ได้อ่าน
+   * GET /notifications/unread-count
+   */
   @Get('notifications/unread-count')
   getUnreadCount(@CurrentUser() user: Account) {
     return this.notificationsService.getUnreadCount(user.id);
   }
 
+  /**
+   * ทำเครื่องหมายว่าอ่านการแจ้งเตือนทั้งหมดแล้ว (PATCH)
+   * PATCH /notifications/read-all
+   */
   @Patch('notifications/read-all')
   patchReadAll(@CurrentUser() user: Account) {
     return this.notificationsService.markAllAsRead(user.id);
   }
 
+  /**
+   * ทำเครื่องหมายว่าอ่านการแจ้งเตือนทั้งหมดแล้ว (POST)
+   * POST /notifications/read-all
+   */
   @Post('notifications/read-all')
   postReadAll(@CurrentUser() user: Account) {
     return this.notificationsService.markAllAsRead(user.id);
   }
 
+  /**
+   * ทำเครื่องหมายว่าอ่านการแจ้งเตือนรายการที่ระบุแล้ว
+   * PATCH /notifications/:id/read
+   */
   @Patch('notifications/:id/read')
   async markRead(@CurrentUser() user: Account, @Param('id') id: string) {
     return this.notificationsService.markAsRead(user.id, id);
   }
 
-  // ===================== Notification Preferences =====================
+  // ===================== Notification Preferences (ตั้งค่าการรับแจ้งเตือน) =====================
 
+  /**
+   * ดึงการตั้งค่าช่องทางและประเภทการรับแจ้งเตือนของผู้ใช้ปัจจุบัน
+   * GET /notifications/preferences
+   */
   @Get('notifications/preferences')
   async getPreferences(@CurrentUser() user: Account) {
     const preferences = await this.preferencesService.getPreferences(user.id);
     return { preferences };
   }
 
+  /**
+   * บันทึกการตั้งค่าช่องทางและประเภทการรับแจ้งเตือน
+   * PATCH /notifications/preferences
+   */
   @Patch('notifications/preferences')
   async updatePreferences(
     @CurrentUser() user: Account,
@@ -76,13 +108,21 @@ export class NotificationsController {
     return { ok: true, preferences };
   }
 
-  // ===================== LINE Notification Status & Test =====================
+  // ===================== LINE Notification Status & Test (สถานะและทดสอบ LINE) =====================
 
+  /**
+   * ตรวจสอบสถานะความพร้อมของการแจ้งเตือนผ่าน LINE ของผู้ใช้
+   * GET /line/notification/status
+   */
   @Get('line/notification/status')
   async getLineNotificationStatus(@CurrentUser() user: Account) {
     return this.notificationsService.getLineNotificationStatus(user.id);
   }
 
+  /**
+   * ทดสอบส่งการแจ้งเตือนผ่าน LINE
+   * POST /line/notification/test
+   */
   @Post('line/notification/test')
   async sendTestNotification(
     @CurrentUser() user: Account,
@@ -98,8 +138,12 @@ export class NotificationsController {
     return this.notificationsService.sendTestNotification(targetUserId, dto?.useFlex ?? false);
   }
 
-  // ===================== Admin Notification Dashboard =====================
+  // ===================== Admin Notification Dashboard (แดชบอร์ดประวัติการส่ง) =====================
 
+  /**
+   * ดึงประวัติ Log การส่งข้อความแจ้งเตือนทั้งหมดสำหรับแอดมิน
+   * GET /admin/notifications/logs
+   */
   @Permissions('manageUsers')
   @Get('admin/notifications/logs')
   async getAdminLogs(
@@ -110,6 +154,10 @@ export class NotificationsController {
     return this.notificationsService.getAdminLogs(status, parsedLimit);
   }
 
+  /**
+   * ดึงประวัติข้อความแจ้งเตือนที่ส่งไม่สำเร็จ (Failed Deliveries) สำหรับตรวจสอบและแก้ไข
+   * GET /admin/notifications/failed
+   */
   @Permissions('manageUsers')
   @Get('admin/notifications/failed')
   async getAdminFailedLogs(@Query('limit') limit?: string) {
@@ -121,6 +169,10 @@ export class NotificationsController {
     };
   }
 
+  /**
+   * สั่งให้ระบบลองส่งข้อความที่ล้มเหลวใหม่อีกครั้ง (Retry Failed Notification)
+   * POST /admin/notifications/:id/retry
+   */
   @Permissions('manageUsers')
   @Post('admin/notifications/:id/retry')
   async retryFailedNotification(@Param('id') id: string) {
@@ -131,4 +183,3 @@ export class NotificationsController {
     };
   }
 }
-

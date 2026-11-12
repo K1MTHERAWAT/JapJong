@@ -1,8 +1,21 @@
 'use client';
 
+/**
+ * =====================================================================
+ * โครงสร้างหลักของหน้าจอ (AppShell - Core Layout Container)
+ * =====================================================================
+ * หน้าที่หลัก:
+ * 1. รวมโครงสร้าง Layout ร่วม (Sidebar, Unified Mobile Header, Main Container, Sticky Footer)
+ * 2. ตรวจสอบสิทธิ์การเข้าถึงหน้า (RBAC & Permissions Guard) ป้องกันผู้ใช้เข้าถึงหน้าที่ไม่ได้รับอนุญาต
+ * 3. รองรับแถบนำทางไดนามิก (Dynamic Service Navigation) ดึงจากฐานข้อมูลและรีเฟรชผ่าน Custom Event
+ * 4. จัดการปุ่มย้อนกลับ (onBack / backHref) และแถบความคืบหน้าของฟอร์มแบบหลายขั้นตอน (Progress Bar)
+ * 5. รองรับธีม มืด/สว่าง และ Safe-Area Insets สำหรับสมาร์ทโฟนทุกรุ่น
+ */
+
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+// ไอคอนสัญลักษณ์สำหรับส่วนหัว เมนู การแจ้งเตือน และกล่องแจ้งเตือนสิทธิ์
 import {
   Bell,
   ChevronLeft,
@@ -12,6 +25,7 @@ import {
   ShieldAlert,
   Sun,
 } from 'lucide-react';
+// โมเดลสิทธิ์ บทบาท และฟังก์ชันตรวจสอบการเข้าถึงหน้าของระบบ
 import {
   PERMISSION_LABEL,
   ROLE_LABEL,
@@ -21,37 +35,55 @@ import {
   canAccessRoute,
   canAccessServiceRoute,
 } from '@japjong/shared';
+// Context ระบบยืนยันตัวตน และ Context จัดการธีม
 import { useAuth } from './auth-context';
 import { useTheme } from './theme-provider';
+// แถบเมนูด้านข้าง
 import { Sidebar } from './Sidebar';
 import { getVisibleNav } from './nav';
 import { Button, Card } from './ui';
 import { api } from '@/lib/api';
 
+/**
+ * ฟังก์ชันหาเส้นทางหน้าหลัก (Default Home Route) ตามบทบาทของผู้ใช้งาน
+ */
 export function roleHomePath(role?: Role): string {
   switch (role) {
     case 'STAFF':
-      return '/staff';
+      return '/staff'; // เจ้าหน้าที่ อบต.
     case 'APPROVER_L2':
     case 'APPROVER_L1':
-      return '/approver';
+      return '/approver'; // ปลัด อบต. หรือ นายก อบต.
     case 'ADMIN':
-      return '/admin';
+      return '/admin'; // ผู้ดูแลระบบ
     default:
-      return '/';
+      return '/'; // ประชาชนทั่วไป
   }
 }
 
+/**
+ * Interface กำหนดคุณสมบัติของ AppShell Props
+ */
 export interface AppShellProps {
+  /** หัวข้อหน้าเว็บ (Title) แสดงบนส่วนหัว */
   title?: string;
+  /** ป้ายข้อความเสริมฝั่งขวา */
   rightLabel?: string;
+  /** ความกว้างสูงสุดของพื้นที่เนื้อหา (เช่น max-w-5xl, max-w-none) */
   maxWidth?: string;
+  /** คอมโพเนนต์แถบด้านล่าง (Footer) ตรึงไว้ที่ขอบล่างของจอ */
   footer?: React.ReactNode;
+  /** ฟังก์ชันย้อนกลับเมื่อกดปุ่มลูกศรย้อนกลับ */
   onBack?: () => void;
+  /** URL ปลายทางเมื่อกดปุ่มย้อนกลับ */
   backHref?: string;
+  /** ส่วนเนื้อหาภายในหน้า */
   children: React.ReactNode;
+  /** หมายเลขขั้นตอนปัจจุบัน (สำหรับฟอร์มหลายขั้นตอน) */
   step?: number;
+  /** จำนวนขั้นตอนทั้งหมด */
   totalSteps?: number;
+  /** คำอธิบายขั้นตอนย่อย (Subtitle) */
   stepSubtitle?: string;
 }
 
@@ -67,19 +99,30 @@ export function AppShell({
   totalSteps,
   stepSubtitle,
 }: AppShellProps) {
+  // เส้นทาง URL ปัจจุบัน
   const pathname = usePathname();
+  // ตัวจัดการการนำทางหน้า
   const router = useRouter();
+
+  // ดึงข้อมูลบัญชีผู้ใช้ สถานะการโหลด และจำนวนแจ้งเตือนจาก AuthContext
   const {
     account,
     loading,
     logout,
     unreadCount,
   } = useAuth();
+
+  // จัดการโหมดสีสว่าง/มืด
   const { actualTheme, toggleTheme } = useTheme();
 
+  // สถานะการเปิด/ปิด Drawer บนมือถือ
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  // รายการบริการแบบไดนามิกที่ดึงมาจากฐานข้อมูล
   const [dbServices, setDbServices] = useState<SidebarServiceItem[]>([]);
 
+  /**
+   * ดึงรายการเมนูบริการแบบไดนามิกจาก Backend API
+   */
   const fetchNav = useCallback(() => {
     api
       .getNavigation()
@@ -91,6 +134,9 @@ export function AppShell({
       .catch(() => {});
   }, []);
 
+  /**
+   * Effect ดักฟังการอัปเดตเมนูนำทางผ่าน Custom DOM Event
+   */
   useEffect(() => {
     fetchNav();
     window.addEventListener('japjong-navigation-refresh', fetchNav);
@@ -99,19 +145,29 @@ export function AppShell({
     };
   }, [account?.id, account?.role, fetchNav]);
 
+  /**
+   * คำนวณเมนูที่ผู้ใช้มีสิทธิ์มองเห็นตาม Role และ Service Config
+   */
   const visibleNav = useMemo(() => {
     return getVisibleNav(account, dbServices.length > 0 ? dbServices : undefined);
   }, [account, dbServices]);
 
+  /**
+   * ตรวจสอบสิทธิ์การเข้าใช้งานหน้านี้ (Route Authorization Guard)
+   */
   const access = useMemo(() => {
     return canAccessServiceRoute(account, pathname, dbServices.length > 0 ? dbServices : undefined);
   }, [account, pathname, dbServices]);
 
+  /**
+   * ฟังก์ชันออกจากระบบแล้วนำทางกลับไปยังหน้าล็อกอิน
+   */
   const handleLogoutAndLogin = () => {
     logout();
     router.push('/login');
   };
 
+  // ตรวจสอบว่าหน้านี้มีการกำหนดปุ่มย้อนกลับหรือไม่
   const hasBackAction = Boolean(onBack || backHref);
 
   return (
@@ -268,12 +324,14 @@ export function AppShell({
         <main
           className={`flex-1 w-full max-w-none p-3.5 sm:p-5 lg:px-6 lg:py-6 ${footer ? 'pb-24 sm:pb-28 lg:pb-28' : ''} min-w-0 print:p-0 print:max-w-none flex flex-col pl-[max(0.875rem,env(safe-area-inset-left,0px))] pr-[max(0.875rem,env(safe-area-inset-right,0px))]`}
         >
+          {/* สถานะที่ 1: กำลังตรวจสอบสถานะการล็อกอิน */}
           {loading ? (
             <Card className="p-8 max-w-[480px] mx-auto my-8 text-center text-body text-muted flex flex-col items-center justify-center gap-3">
               <div className="size-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
               <span>กำลังตรวจสอบสถานะการเข้าสู่ระบบ...</span>
             </Card>
           ) : !account ? (
+            /* สถานะที่ 2: ยังไม่ได้เข้าสู่ระบบ */
             <Card className="p-6 sm:p-8 max-w-[500px] w-full mx-auto my-6 sm:my-8 flex flex-col items-center text-center gap-4">
               <div className="size-12 rounded-full bg-brand-tint text-brand-ink flex items-center justify-center">
                 <Lock className="size-6" />
@@ -291,6 +349,7 @@ export function AppShell({
               </Link>
             </Card>
           ) : !access.allowed ? (
+            /* สถานะที่ 3: ไม่มีสิทธิ์เข้าถึงหน้านี้ (Permission & Role Guard) */
             <Card className="p-6 max-w-[620px] mx-auto my-6 border-danger-fg/30 flex flex-col gap-4">
               <div className="flex items-start gap-4">
                 <div className="size-11 rounded-[12px] bg-danger-bg text-danger-fg flex items-center justify-center shrink-0">
@@ -306,6 +365,7 @@ export function AppShell({
                 </div>
               </div>
 
+              {/* รายละเอียดสิทธิ์ที่ต้องการเพื่อเข้าใช้งาน */}
               <div className="rounded-control bg-surface-muted border border-line p-4 flex flex-col gap-2 text-caption">
                 <div className="flex justify-between gap-2">
                   <span className="text-muted">บัญชีของคุณขณะนี้:</span>
@@ -334,6 +394,7 @@ export function AppShell({
                 )}
               </div>
 
+              {/* ปุ่มทางเลือกสำหรับผู้ใช้ที่ไม่มีสิทธิ์ */}
               <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
                 <Button
                   variant="primary"
@@ -350,6 +411,7 @@ export function AppShell({
               </div>
             </Card>
           ) : (
+            /* สถานะที่ 4: ผ่านการตรวจสอบสิทธิ์แล้ว แสดงเนื้อหาของหน้า */
             <div className={`flex-1 flex flex-col justify-between gap-5 w-full ${maxWidth && maxWidth !== 'max-w-none' ? `${maxWidth} mx-auto` : ''}`}>
               <div className="w-full">{children}</div>
             </div>

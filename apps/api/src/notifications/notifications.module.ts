@@ -11,9 +11,17 @@ import { NotificationQueueService } from './notification-queue.service';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
 
+/**
+ * NotificationsModule: โมดูลศูนย์กลางการแจ้งเตือนและการสื่อสารของระบบ
+ * กำหนดเป็น @Global() เพื่อให้ทุกโมดูลในระบบสามารถเรียกส่งการแจ้งเตือน (In-App และ LINE Messaging) ได้สะดวก
+ */
 @Global()
 @Module({
-  controllers: [NotificationsController, LineWebhookController, LineAdminController],
+  controllers: [
+    NotificationsController,
+    LineWebhookController,
+    LineAdminController,
+  ],
   providers: [
     LineMessagingService,
     LineMessageTemplateService,
@@ -36,4 +44,3 @@ import { NotificationsService } from './notifications.service';
   ],
 })
 export class NotificationsModule {}
-

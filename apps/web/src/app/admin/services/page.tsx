@@ -1,7 +1,10 @@
-'use client';
+'use client'; // กำหนดให้คอมโพเนนต์นี้ทำงานในฝั่ง Client (React Client Component)
 
+// นำเข้า React Hooks พื้นฐานสำหรับจัดการ State, Side Effects, Callbacks และ Memoization
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+// นำเข้าคอมโพเนนต์ Link สำหรับการนำทางระหว่างหน้าใน Next.js
 import Link from 'next/link';
+// นำเข้าไอคอนจาก lucide-react สำหรับแสดงผลในตาราง, ปุ่ม และตัวเลือกไอคอน
 import {
   AlertTriangle,
   ArrowDown,
@@ -25,6 +28,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
+// นำเข้า Type นิยามประเภทข้อมูลบริการ, บทบาท, และสิทธิ์จากแพ็กเกจกลาง shared
 import {
   PublicAccount,
   Role,
@@ -35,11 +39,16 @@ import {
   SidebarServiceItem,
   Tone,
 } from '@japjong/shared';
+// นำเข้า AppShell คอมโพเนนต์เลย์เอาต์หลักของหน้าจอ
 import { AppShell } from '@/components/shell';
+// นำเข้าคอมโพเนนต์ UI พื้นฐาน: Button, Card, Chip, Feedback, Input, Toggle
 import { Button, Card, Chip, Feedback, Input, Toggle } from '@/components/ui';
+// นำเข้า API client สำหรับติดต่อ Backend REST API
 import { api } from '@/lib/api';
+// นำเข้าฟังก์ชัน resolveNavIcon สำหรับแปลงชื่อไอคอนเป็น React Component ไอคอนที่ถูกต้อง
 import { resolveNavIcon } from '@/components/nav';
 
+// รายการไอคอนยอดนิยมที่แนะนำให้เลือกใช้สำหรับเมนูบริการ พร้อมชื่อป้ายกำกับภาษาไทย
 const POPULAR_ICONS = [
   { name: 'Home', label: 'หน้าหลัก' },
   { name: 'Building2', label: 'สถานที่ / อาคาร' },
@@ -63,6 +72,7 @@ const POPULAR_ICONS = [
   { name: 'Zap', label: 'สาธารณูปโภค' },
 ];
 
+// รายการบทบาททั้งหมดในระบบ พร้อมป้ายกำกับและโทนสีสำหรับการเลือกสิทธิ์
 const ROLES_LIST: { role: Role; label: string; tone: Tone }[] = [
   { role: 'ADMIN', label: 'ผู้ดูแลระบบ (ADMIN)', tone: 'green' },
   { role: 'STAFF', label: 'เจ้าหน้าที่ (STAFF)', tone: 'blue' },
@@ -71,6 +81,7 @@ const ROLES_LIST: { role: Role; label: string; tone: Tone }[] = [
   { role: 'USER', label: 'ผู้ใช้งานทั่วไป / ประชาชน (USER)', tone: 'gray' },
 ];
 
+// รายการสิทธิ์ระดับการกระทำ (Granular Action Permissions)
 const ACTION_PERMS: { key: keyof ServicePermissions; label: string; desc: string }[] = [
   { key: 'view', label: 'ดูข้อมูล (View)', desc: 'เข้าชมหน้าบริการและดูรายละเอียด' },
   { key: 'create', label: 'เพิ่มข้อมูล (Create)', desc: 'ยื่นคำขอใหม่ หรือสร้างข้อมูล' },
@@ -80,35 +91,44 @@ const ACTION_PERMS: { key: keyof ServicePermissions; label: string; desc: string
   { key: 'manage', label: 'จัดการ (Manage)', desc: 'ตั้งค่าระบบและจัดการสิทธิ์' },
 ];
 
+/**
+ * หน้าจอจัดการบริการและเมนู Sidebar แบบ Dynamic สำหรับผู้ดูแลระบบ
+ * รองรับการสร้าง/แก้ไขบริการ, จัดหมวดหมู่, จัดเรียงลำดับด้วย Drag & Drop, และจำลองมุมมอง Sidebar ตาม Role
+ */
 export default function AdminServicesPage() {
+  // State รายการบริการทั้งหมดที่โหลดมาจาก Backend
   const [services, setServices] = useState<SidebarServiceItem[]>([]);
+  // State สถานะกำลังโหลดข้อมูล
   const [loading, setLoading] = useState(true);
+  // State คำค้นหาสำหรับฟิลเตอร์บริการ
   const [search, setSearch] = useState('');
+  // State หมวดหมู่ที่กำลังเลือกกรอง ('ALL' หรือชื่อหมวดหมู่)
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  // State รายชื่อผู้ใช้งานทั้งหมด (สำหรับยกเว้นสิทธิ์รายคน)
   const [allUsers, setAllUsers] = useState<PublicAccount[]>([]);
 
-  // Dialogs
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editingService, setEditingService] = useState<SidebarServiceItem | null>(null);
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [deletingService, setDeletingService] = useState<SidebarServiceItem | null>(null);
-  const [deleteCheck, setDeleteCheck] = useState<ServiceRelationCheckResult | null>(null);
-  const [checkingDelete, setCheckingDelete] = useState(false);
-  const [previewRole, setPreviewRole] = useState<Role | null>(null);
+  // --- Dialogs & Modals State: สถานะหน้าต่างป็อปอัป ---
+  const [editModalOpen, setEditModalOpen] = useState(false); // เปิด/ปิด Modal เพิ่ม/แก้ไขบริการ
+  const [editingService, setEditingService] = useState<SidebarServiceItem | null>(null); // บริการที่กำลังแก้ไข
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false); // เปิด/ปิด Modal ยืนยันการลบ
+  const [deletingService, setDeletingService] = useState<SidebarServiceItem | null>(null); // บริการที่กำลังจะลบ
+  const [deleteCheck, setDeleteCheck] = useState<ServiceRelationCheckResult | null>(null); // ผลการตรวจสอบความสัมพันธ์ก่อนลบ
+  const [checkingDelete, setCheckingDelete] = useState(false); // สถานะกำลังตรวจสอบความสัมพันธ์ก่อนลบ
+  const [previewRole, setPreviewRole] = useState<Role | null>(null); // บทบาทที่กำลังพรีวิว Sidebar (null = ไม่ได้เปิดพรีวิว)
 
-  // Notifications
+  // --- Feedback Notification State: แสดงกล่องข้อความผลการทำงาน ---
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Form State for Add / Edit
-  const [formLabel, setFormLabel] = useState('');
-  const [formDesc, setFormDesc] = useState('');
-  const [formHref, setFormHref] = useState('');
-  const [formCategory, setFormCategory] = useState('บริการหลัก');
-  const [formCustomCategory, setFormCustomCategory] = useState('');
-  const [formIcon, setFormIcon] = useState('Layers');
-  const [formEnabled, setFormEnabled] = useState(true);
-  const [formExact, setFormExact] = useState(false);
-  const [formRoles, setFormRoles] = useState<Role[]>(['USER']);
+  // --- Form State: ข้อมูลในฟอร์มเพิ่ม/แก้ไขบริการ ---
+  const [formLabel, setFormLabel] = useState(''); // ชื่อบริการภาษาไทย
+  const [formDesc, setFormDesc] = useState(''); // คำอธิบายบริการ
+  const [formHref, setFormHref] = useState(''); // เส้นทาง URL / Path
+  const [formCategory, setFormCategory] = useState('บริการหลัก'); // หมวดหมู่บริการ
+  const [formCustomCategory, setFormCustomCategory] = useState(''); // กรณีเลือกสร้างหมวดหมู่ใหม่
+  const [formIcon, setFormIcon] = useState('Layers'); // ชื่อไอคอนที่เลือก
+  const [formEnabled, setFormEnabled] = useState(true); // สถานะเปิดใช้งาน
+  const [formExact, setFormExact] = useState(false); // จับคู่ URL แบบ Exact match หรือไม่
+  const [formRoles, setFormRoles] = useState<Role[]>(['USER']); // รายการบทบาทที่มองเห็นเมนูนี้
   const [formPerms, setFormPerms] = useState<ServicePermissions>({
     view: true,
     create: false,
@@ -116,14 +136,17 @@ export default function AdminServicesPage() {
     delete: false,
     approve: false,
     manage: false,
-  });
-  const [formAllowedUsers, setFormAllowedUsers] = useState<string[]>([]);
-  const [formDeniedUsers, setFormDeniedUsers] = useState<string[]>([]);
-  const [modalTab, setModalTab] = useState<'info' | 'roles'>('info');
+  }); // สิทธิ์ย่อยในการกระทำ
+  const [formAllowedUsers, setFormAllowedUsers] = useState<string[]>([]); // บัญชีที่อนุญาตเป็นพิเศษ
+  const [formDeniedUsers, setFormDeniedUsers] = useState<string[]>([]); // บัญชีที่ถูกปฏิเสธเป็นพิเศษ
+  const [modalTab, setModalTab] = useState<'info' | 'roles'>('info'); // แท็บใน Modal: ข้อมูลทั่วไป หรือ สิทธิ์บทบาท
 
-  // Drag and Drop state
+  // --- Drag and Drop State: จัดเก็บ ID ของแถวที่กำลังถูกลาก ---
   const [draggedId, setDraggedId] = useState<string | null>(null);
 
+  /**
+   * ฟังก์ชันดึงข้อมูลบริการทั้งหมดและรายชื่อผู้ใช้จาก Backend
+   */
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -140,11 +163,14 @@ export default function AdminServicesPage() {
     }
   }, []);
 
+  // ดึงข้อมูลเมื่อโหลดหน้าจอครั้งแรก
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // Categories list
+  /**
+   * รวมรายชื่อหมวดหมู่บริการทั้งหมดที่มีอยู่โดยไม่ซ้ำกัน
+   */
   const categories = useMemo(() => {
     const set = new Set<string>();
     for (const s of services) {
@@ -153,7 +179,9 @@ export default function AdminServicesPage() {
     return Array.from(set);
   }, [services]);
 
-  // Filtered services
+  /**
+   * คำนวณรายการบริการที่ผ่านการกรองตามหมวดหมู่และคำค้นหา พร้อมเรียงลำดับตาม sortOrder
+   */
   const filteredServices = useMemo(() => {
     return services
       .filter((s) => {
@@ -171,7 +199,9 @@ export default function AdminServicesPage() {
       .sort((a, b) => a.sortOrder - b.sortOrder);
   }, [services, selectedCategory, search]);
 
-  // Open Create Modal
+  /**
+   * ฟังก์ชันเปิด Modal สำหรับสร้างบริการใหม่ (ล้างค่าในฟอร์มเป็นค่าเริ่มต้น)
+   */
   const handleOpenCreate = () => {
     setEditingService(null);
     setFormLabel('');
@@ -197,7 +227,10 @@ export default function AdminServicesPage() {
     setEditModalOpen(true);
   };
 
-  // Open Edit Modal
+  /**
+   * ฟังก์ชันเปิด Modal สำหรับแก้ไขข้อมูลบริการเดิม
+   * @param s - ข้อมูลบริการที่ต้องการแก้ไข
+   */
   const handleOpenEdit = (s: SidebarServiceItem) => {
     setEditingService(s);
     setFormLabel(s.label);
@@ -228,7 +261,9 @@ export default function AdminServicesPage() {
     setEditModalOpen(true);
   };
 
-  // Save Add / Edit
+  /**
+   * ฟังก์ชันบันทึกข้อมูลบริการ (สร้างใหม่หรืออัปเดต)
+   */
   const handleSaveService = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formLabel.trim()) {
@@ -244,7 +279,7 @@ export default function AdminServicesPage() {
       return;
     }
 
-    // Safety rule: if editing an admin management menu (/admin or /admin/*), ADMIN must remain in roles
+    // กฎความปลอดภัย: เมนูของ Admin (/admin หรือ /admin/*) ต้องมีสิทธิ์ ADMIN เสมอ เพื่อป้องกันการล็อกระบบ
     const isAdminMenu =
       formHref === '/admin' ||
       formHref.startsWith('/admin/');
@@ -261,6 +296,7 @@ export default function AdminServicesPage() {
 
     try {
       if (editingService) {
+        // อัปเดตบริการเดิม
         await api.updateService(editingService.id, {
           label: formLabel.trim(),
           description: formDesc.trim(),
@@ -276,6 +312,7 @@ export default function AdminServicesPage() {
         });
         setFeedback({ type: 'success', message: `บันทึกการแก้ไขบริการ "${formLabel}" เรียบร้อยแล้ว` });
       } else {
+        // สร้างบริการใหม่
         await api.createService({
           label: formLabel.trim(),
           description: formDesc.trim(),
@@ -298,10 +335,13 @@ export default function AdminServicesPage() {
     }
   };
 
-  // Toggle active/inactive
+  /**
+   * ฟังก์ชันสลับสถานะเปิด/ปิดใช้งานบริการ
+   * @param s - บริการที่ต้องการสลับสถานะ
+   */
   const handleToggle = async (s: SidebarServiceItem) => {
     try {
-      // Optimistic update
+      // Optimistic update: อัปเดต UI ทันทีเพื่อความลื่นไหล
       setServices((prev) =>
         prev.map((item) => (item.id === s.id ? { ...item, enabled: !item.enabled } : item)),
       );
@@ -311,7 +351,7 @@ export default function AdminServicesPage() {
         message: `${updated.enabled ? 'เปิด' : 'ปิด'}การใช้งานบริการ "${updated.label}" เรียบร้อยแล้ว`,
       });
     } catch (err: any) {
-      // Rollback
+      // ย้อนคืนค่าเดิมหากเกิดข้อผิดพลาด
       setServices((prev) =>
         prev.map((item) => (item.id === s.id ? { ...item, enabled: s.enabled } : item)),
       );
@@ -319,12 +359,16 @@ export default function AdminServicesPage() {
     }
   };
 
-  // Open Delete Modal
+  /**
+   * ฟังก์ชันเปิด Modal ขอยืนยันการลบบริการ พร้อมตรวจสอบความสัมพันธ์กับคำขอและทรัพยากร
+   * @param s - บริการที่ต้องการลบ
+   */
   const handleOpenDelete = async (s: SidebarServiceItem) => {
     setDeletingService(s);
     setCheckingDelete(true);
     setDeleteModalOpen(true);
     try {
+      // เรียก API ตรวจสอบว่ามีคำขอหรือทรัพยากรผูกอยู่กับบริการนี้หรือไม่
       const check = await api.checkDeleteService(s.id);
       setDeleteCheck(check);
     } catch (err: any) {
@@ -340,7 +384,9 @@ export default function AdminServicesPage() {
     }
   };
 
-  // Confirm Delete
+  /**
+   * ฟังก์ชันยืนยันคำสั่งลบบริการออกจากฐานข้อมูลถาวร
+   */
   const handleConfirmDelete = async () => {
     if (!deletingService) return;
     try {
@@ -354,7 +400,9 @@ export default function AdminServicesPage() {
     }
   };
 
-  // Move Up / Move Down
+  /**
+   * ฟังก์ชันสลับลำดับขึ้น/ลงทีละ 1 ขั้น (Move Up / Move Down)
+   */
   const handleMoveOrder = async (index: number, direction: 'up' | 'down') => {
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= filteredServices.length) return;
@@ -387,15 +435,23 @@ export default function AdminServicesPage() {
     }
   };
 
-  // Drag & Drop handlers
+  /**
+   * Drag & Drop: เมื่อเริ่มลากแถว
+   */
   const handleDragStart = (id: string) => {
     setDraggedId(id);
   };
 
+  /**
+   * Drag & Drop: อนุญาตให้ปล่อยลงในพื้นที่นี้
+   */
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
   };
 
+  /**
+   * Drag & Drop: เมื่อปล่อยแถวลงในตำแหน่งเป้าหมาย
+   */
   const handleDrop = async (targetId: string) => {
     if (!draggedId || draggedId === targetId) {
       setDraggedId(null);
@@ -413,14 +469,14 @@ export default function AdminServicesPage() {
     const [moved] = items.splice(fromIdx, 1);
     items.splice(toIdx, 0, moved);
 
-    // Reassign sequential sortOrders
+    // กำหนดค่า sortOrder ใหม่เรียงตามลำดับ 1, 2, 3...
     const reorderedPayload = items.map((item, idx) => ({
       id: item.id,
       sortOrder: idx + 1,
     }));
 
     try {
-      // Optimistic
+      // Optimistic update
       setServices((prev) => {
         const orderMap = new Map(reorderedPayload.map((p) => [p.id, p.sortOrder]));
         return prev.map((s) => (orderMap.has(s.id) ? { ...s, sortOrder: orderMap.get(s.id)! } : s));
@@ -435,7 +491,9 @@ export default function AdminServicesPage() {
     }
   };
 
-  // Role preview list
+  /**
+   * คำนวณรายการเมนูที่จะปรากฏใน Sidebar ตามบทบาทที่เลือกพรีวิว (Live Role Preview)
+   */
   const previewItems = useMemo(() => {
     if (!previewRole) return [];
     return services
@@ -467,9 +525,10 @@ export default function AdminServicesPage() {
   }, [services, previewRole]);
 
   return (
+    // โครงเลย์เอาต์หลักของหน้าจอจัดการบริการ
     <AppShell title="จัดการบริการและเมนูระบบ" maxWidth="max-w-[1240px]">
       <div className="flex flex-col gap-6">
-        {/* Breadcrumb & Header */}
+        {/* แถบเส้นทาง (Breadcrumb) และส่วนหัวหน้าจอ */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2 text-[12px] text-ink-mute">
@@ -488,6 +547,7 @@ export default function AdminServicesPage() {
             </p>
           </div>
 
+          {/* ปุ่มควบคุมส่วนหัว: พรีวิว Sidebar และเพิ่มบริการใหม่ */}
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => setPreviewRole(previewRole ? null : 'USER')}
@@ -508,7 +568,7 @@ export default function AdminServicesPage() {
           </div>
         </div>
 
-        {/* Feedback Alert */}
+        {/* แถบแสดงข้อความแจ้งเตือนผลการทำงาน (Feedback Banner) */}
         {feedback && (
           <Feedback tone={feedback.type === 'error' ? 'crit' : 'brand'}>
             <div className="flex items-center justify-between gap-3 w-full">
@@ -524,7 +584,7 @@ export default function AdminServicesPage() {
           </Feedback>
         )}
 
-        {/* KPI / Overview Summary */}
+        {/* การ์ดสรุปสถิติภาพรวม (KPI Overview Summary) */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="jw-card p-4 flex flex-col gap-1">
             <span className="text-[12px] text-ink-mute">บริการทั้งหมด</span>
@@ -548,7 +608,7 @@ export default function AdminServicesPage() {
           </div>
         </div>
 
-        {/* Live Role Preview Panel (Collapsible) */}
+        {/* แผงพรีวิว Sidebar จำลองตามบทบาท (Live Role Preview Panel) */}
         {previewRole && (
           <div className="jw-card p-5 border-2 border-brand/40 bg-brand-mint/10 rounded-2xl flex flex-col gap-4 transition-all">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-brand/20 pb-3">
@@ -569,7 +629,7 @@ export default function AdminServicesPage() {
               </button>
             </div>
 
-            {/* Role Switcher Tabs */}
+            {/* ปุ่มเลือกบทบาทที่จะพรีวิว */}
             <div className="flex flex-wrap gap-2">
               {ROLES_LIST.map((r) => (
                 <button
@@ -586,7 +646,7 @@ export default function AdminServicesPage() {
               ))}
             </div>
 
-            {/* Simulated Sidebar */}
+            {/* กล่องแสดงผลเมนูจำลองของ Sidebar */}
             <div className="bg-surface rounded-xl p-4 border border-line shadow-xs">
               <div className="text-[12px] font-semibold text-ink-mute mb-2">
                 เมนู Sidebar ที่ปรากฏสำหรับ: <span className="text-brand font-bold">{ROLE_LABEL[previewRole]}</span> ({previewItems.length} เมนู)
@@ -617,7 +677,7 @@ export default function AdminServicesPage() {
           </div>
         )}
 
-        {/* Filter & Search Bar */}
+        {/* แถบตัวกรองหมวดหมู่และช่องค้นหา (Filter & Search Bar) */}
         <div className="jw-card p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-1.5">
             <button
@@ -668,7 +728,7 @@ export default function AdminServicesPage() {
           </div>
         </div>
 
-        {/* Services Table List */}
+        {/* ตารางแสดงรายการบริการทั้งหมด (Services Table List) */}
         <div className="jw-card overflow-hidden">
           <div className="p-4 border-b border-line flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -721,7 +781,7 @@ export default function AdminServicesPage() {
                           isDragging ? 'opacity-40 bg-brand-tint/20' : ''
                         } ${!item.enabled ? 'bg-ground/40 text-ink-mute' : ''}`}
                       >
-                        {/* Drag Handle & Order */}
+                        {/* คอลัมน์ที่ 1: ด้ามจับลาก (Drag Handle) และปุ่มเลื่อนขึ้น/ลง */}
                         <td className="py-3 px-2 text-center align-middle">
                           <div className="flex items-center justify-center gap-0.5">
                             <span
@@ -751,7 +811,7 @@ export default function AdminServicesPage() {
                           </div>
                         </td>
 
-                        {/* Name & Icon */}
+                        {/* คอลัมน์ที่ 2: ไอคอนและชื่อบริการ */}
                         <td className="py-3 px-3">
                           <div className="flex items-center gap-3">
                             <div className="size-9 rounded-control bg-brand-tint text-brand flex items-center justify-center shrink-0 border border-brand/20">
@@ -778,21 +838,21 @@ export default function AdminServicesPage() {
                           </div>
                         </td>
 
-                        {/* Route / Href */}
+                        {/* คอลัมน์ที่ 3: เส้นทาง URL Route */}
                         <td className="py-3 px-3 font-mono text-[12px] text-ink-soft">
                           <span className="bg-surface px-2 py-0.5 rounded border border-line-soft">
                             {item.href}
                           </span>
                         </td>
 
-                        {/* Category */}
+                        {/* คอลัมน์ที่ 4: ชื่อหมวดหมู่ */}
                         <td className="py-3 px-3">
                           <span className="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-surface border border-line text-ink">
                             {item.category}
                           </span>
                         </td>
 
-                        {/* Roles */}
+                        {/* คอลัมน์ที่ 5: ป้ายบทบาทที่ได้รับสิทธิ์ */}
                         <td className="py-3 px-3">
                           <div className="flex flex-wrap gap-1">
                             {item.roles.map((r) => {
@@ -806,7 +866,7 @@ export default function AdminServicesPage() {
                           </div>
                         </td>
 
-                        {/* Status Toggle */}
+                        {/* คอลัมน์ที่ 6: สวิตช์สลับสถานะเปิด/ปิด */}
                         <td className="py-3 px-3 text-center">
                           <div className="inline-flex items-center gap-1.5">
                             <Toggle
@@ -823,7 +883,7 @@ export default function AdminServicesPage() {
                           </div>
                         </td>
 
-                        {/* Actions */}
+                        {/* คอลัมน์ที่ 7: ปุ่มแก้ไขและปุ่มลบ */}
                         <td className="py-3 px-3 text-right">
                           <div className="inline-flex items-center gap-1">
                             <button
@@ -855,7 +915,7 @@ export default function AdminServicesPage() {
       {editModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/40 backdrop-blur-xs">
           <div className="jw-card w-full max-w-2xl max-h-[90vh] flex flex-col shadow-pop animate-in fade-in zoom-in-95 duration-150">
-            {/* Modal Header */}
+            {/* ส่วนหัว Modal */}
             <div className="flex items-center justify-between p-4 border-b border-line">
               <b className="text-[16px] text-ink flex items-center gap-2">
                 <Sliders className="size-5 text-brand" />
@@ -869,7 +929,7 @@ export default function AdminServicesPage() {
               </button>
             </div>
 
-            {/* Modal Tabs */}
+            {/* แถบสลับแท็บข้อมูลบริการ กับ สิทธิ์บทบาท */}
             <div className="flex border-b border-line px-4 pt-2 gap-4">
               <button
                 type="button"
@@ -895,10 +955,11 @@ export default function AdminServicesPage() {
               </button>
             </div>
 
-            {/* Modal Body */}
+            {/* ฟอร์มกรอกข้อมูล */}
             <form onSubmit={handleSaveService} className="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
               {modalTab === 'info' && (
                 <>
+                  {/* ชื่อบริการ และ เส้นทาง URL */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[13px] font-medium text-ink">
@@ -929,6 +990,7 @@ export default function AdminServicesPage() {
                     </div>
                   </div>
 
+                  {/* คำอธิบายบริการ */}
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[13px] font-medium text-ink">คำอธิบายบริการ</label>
                     <textarea
@@ -940,7 +1002,7 @@ export default function AdminServicesPage() {
                     />
                   </div>
 
-                  {/* Category Selection */}
+                  {/* ตัวเลือกหมวดหมู่บริการ */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[13px] font-medium text-ink">หมวดหมู่ / กลุ่มบริการ</label>
@@ -974,7 +1036,7 @@ export default function AdminServicesPage() {
                     )}
                   </div>
 
-                  {/* Icon Picker */}
+                  {/* ตัวเลือกไอคอนเมนู */}
                   <div className="flex flex-col gap-2">
                     <label className="text-[13px] font-medium text-ink flex items-center justify-between">
                       <span>เลือกไอคอนเมนู</span>
@@ -1003,7 +1065,7 @@ export default function AdminServicesPage() {
                     </div>
                   </div>
 
-                  {/* Status & Options */}
+                  {/* สถานะการเปิดให้บริการ */}
                   <div className="flex items-center justify-between p-3 rounded-control bg-ground border border-line-soft">
                     <div>
                       <div className="text-[13px] font-semibold text-ink">สถานะการเปิดให้บริการ</div>
@@ -1021,6 +1083,7 @@ export default function AdminServicesPage() {
 
               {modalTab === 'roles' && (
                 <>
+                  {/* กำหนดบทบาทที่มองเห็นบริการนี้ */}
                   <div className="flex flex-col gap-3">
                     <div>
                       <b className="text-[14px] text-ink">บทบาทที่ได้รับสิทธิ์มองเห็นบริการนี้</b>
@@ -1074,7 +1137,7 @@ export default function AdminServicesPage() {
                 </>
               )}
 
-              {/* Modal Footer */}
+              {/* ปุ่มควบคุมท้าย Modal (ยกเลิก / บันทึก) */}
               <div className="flex items-center justify-end gap-2 border-t border-line pt-4 mt-2">
                 <Button
                   type="button"
@@ -1110,6 +1173,7 @@ export default function AdminServicesPage() {
               </div>
             </div>
 
+            {/* ส่วนตรวจสอบผลกระทบก่อนลบ */}
             {checkingDelete ? (
               <div className="p-6 text-center text-ink-mute flex flex-col items-center gap-2">
                 <div className="size-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
@@ -1137,13 +1201,14 @@ export default function AdminServicesPage() {
                       ))}
                     </ul>
                     <div className="mt-1 text-[11px] font-medium text-ink bg-white/70 p-2 rounded border border-amber-200">
-                      💡 คำแนะนำ: แนะนำให้ใช้การ "ปิดการใช้งานบริการ" แทน เพื่อซ่อนเมนูจากผู้ใช้โดยยังคงรักษาความถูกต้องของข้อมูลประวัติคำขอ
+                      💡 คำแนะนำ: แนะนำให้ใช้การ &quot;ปิดการใช้งานบริการ&quot; แทน เพื่อซ่อนเมนูจากผู้ใช้โดยยังคงรักษาความถูกต้องของข้อมูลประวัติคำขอ
                     </div>
                   </div>
                 )}
               </div>
             ) : null}
 
+            {/* ปุ่มดำเนินการใน Delete Modal */}
             <div className="flex items-center justify-end gap-2 border-t border-line pt-3">
               <Button
                 type="button"

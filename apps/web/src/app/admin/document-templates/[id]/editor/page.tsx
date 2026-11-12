@@ -1,5 +1,18 @@
 'use client';
 
+/**
+ * =====================================================================
+ * พื้นที่ทำงานออกแบบและแก้ไขแม่แบบเอกสารราชการ (Document Editor Workspace)
+ * =====================================================================
+ * โปรแกรมแก้ไขแม่แบบฟอร์มราชการขนาด A4 แบบ Interactive WYSIWYG:
+ * 1. เครื่องมือออกแบบ (Design Mode) & ดูตัวอย่างเหมือนจริง (Preview Mode)
+ * 2. ระบบผูกข้อมูลอัตโนมัติ (Data Binding): ดึงชื่อ ตำแหน่ง วันที่ จากคำขอจริง
+ * 3. ปรับขนาดช่องข้อมูลได้อย่างอิสระ (Horizontal Drag to Resize & Presets)
+ * 4. ลากสลับตำแหน่งช่องข้อมูล (Drag-and-Drop Reorder)
+ * 5. ประวัติการแก้ไข Undo/Redo ในหน่วยความจำ
+ * 6. บันทึกร่างอัตโนมัติ (Debounced Auto-save 2s) และการเผยแพร่เวอร์ชันใหม่ (Publish)
+ */
+
 import React, { useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -11,6 +24,7 @@ import {
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
 
+// รายการตัวเลือกสำหรับผูกข้อมูลอัตโนมัติ (Data Binding Options)
 const DATA_BINDING_OPTIONS = [
   { group: 'ข้อมูลผู้ยื่นคำขอ', items: [
     { key: 'requester.name', label: 'ชื่อ-นามสกุลผู้ขอ' },

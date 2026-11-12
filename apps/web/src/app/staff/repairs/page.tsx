@@ -1,5 +1,20 @@
 'use client';
 
+/**
+ * =====================================================================
+ * หน้าจัดการงานแจ้งซ่อมบำรุงและปัญหาอาคารสำหรับเจ้าหน้าที่ (Staff Repairs Page)
+ * =====================================================================
+ * วงจรการทำงานของระบบแจ้งซ่อมบำรุง (3-Step Repair Lifecycle):
+ * 1. ผู้แจ้งส่งเรื่อง (repair_submitted)
+ *    - เจ้าหน้าที่ตรวจสอบปัญหา รูปภาพ และสถานที่
+ *    - กด "รับเรื่องซ่อม" (repair_in_progress) หรือ "ส่งกลับ/ไม่รับเรื่อง" (rejected)
+ * 2. เจ้าหน้าที่เข้าซ่อมและบันทึกผลงาน (repair_in_progress -> repair_awaiting_acceptance)
+ *    - ช่างพิมพ์บันทึกผลการซ่อม (Resolution note)
+ *    - บังคับแนบภาพถ่ายหลังซ่อมเสร็จจริง (After photos) บีบอัดอัตโนมัติ 1-3 รูป
+ *    - ยืนยันด้วยรหัส PIN 6 หลัก
+ * 3. ผู้แจ้งตรวจรับงาน (repair_awaiting_acceptance -> repair_done)
+ */
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { RepairRequest, RequestWithTimeline } from '@japjong/shared';
@@ -14,22 +29,39 @@ import {
 import { api, formatThaiDateTime, readAndCompressImages } from '@/lib/api';
 
 export default function StaffRepairsPage() {
+  // ดึงข้อมูลบัญชีเจ้าหน้าที่ผู้ใช้งาน
   const { account } = useAuth();
+
+  // State เก็บรายการคำขอแจ้งซ่อมทั้งหมดในคิว
   const [queue, setQueue] = useState<(RequestWithTimeline & RepairRequest)[]>([]);
+  // State id คำขอแจ้งซ่อมที่เลือกเปิดดู
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // State กำลังโหลดข้อมูล
   const [loading, setLoading] = useState(true);
+  // State บันทึกผลการซ่อมบำรุง
   const [resolution, setResolution] = useState('');
+  // State ภาพถ่ายหลังซ่อมเสร็จ (Base64 data URLs)
   const [afterPhotos, setAfterPhotos] = useState<string[]>([]);
+  // State ติ๊กถูกรับรองการตรวจสอบ
   const [confirmed, setConfirmed] = useState(true);
+  // State เปิด/ปิด Modal รหัส PIN 6 หลัก
   const [showPinModal, setShowPinModal] = useState(false);
+  // State การกระทำที่รอยืนยัน: 'accept' (รับเรื่อง) | 'finish' (ซ่อมเสร็จ) | 'reject' (ไม่รับเรื่อง)
   const [pendingAction, setPendingAction] = useState<'accept' | 'finish' | 'reject'>('accept');
+  // State ค่ารหัส PIN
   const [pin, setPin] = useState('');
+  // State ข้อผิดพลาด PIN
   const [pinError, setPinError] = useState('');
+  // State ข้อความแจ้งเตือนข้อผิดพลาดทั่วไป
   const [errorMsg, setErrorMsg] = useState('');
+  // State งานซ่อมล่าสุดที่ดำเนินการเสร็จแล้ว
   const [lastCompleted, setLastCompleted] = useState<RequestWithTimeline | null>(null);
+  // State กำลังบันทึกข้อมูล
   const [submitting, setSubmitting] = useState(false);
+  // Ref สำหรับช่องเลือกไฟล์รูปภาพ
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ฟังก์ชันโหลดรายการคิวงานแจ้งซ่อม
   const load = useCallback((preferId?: string | null) => {
     setLoading(true);
     api
@@ -43,7 +75,7 @@ export default function StaffRepairsPage() {
               combined = [single as (RequestWithTimeline & RepairRequest), ...combined];
             }
           } catch {
-            // ignore
+            // ละเว้นกรณีไม่พบ
           }
         }
         setQueue(combined);
@@ -56,19 +88,23 @@ export default function StaffRepairsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // ดึง param id จาก URL query string
   useEffect(() => {
     const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
     load(sp?.get('id'));
   }, [load]);
 
+  // คำขอปัจจุบันที่กำลังเลือกดู
   const current = selectedId ? queue.find((r) => r.id === selectedId || r.code === selectedId) ?? null : null;
 
+  // รีเซ็ตฟิลด์บันทึกผลการซ่อมและภาพเมื่อเปลี่ยนรายการ
   useEffect(() => {
     setErrorMsg('');
     setResolution(current?.resolution || '');
     setAfterPhotos(current?.afterPhotos || []);
   }, [current?.id, current?.resolution, current?.afterPhotos]);
 
+  // ฟังก์ชันย้อนกลับไปหน้ารายการงานซ่อม
   const handleBackToList = () => {
     setErrorMsg('');
     setSelectedId(null);
@@ -77,12 +113,14 @@ export default function StaffRepairsPage() {
     }
   };
 
+  // เลือกรายการงานซ่อม
   const handleSelectRepair = (reqId: string) => {
     setLastCompleted(null);
     setErrorMsg('');
     setSelectedId(reqId);
   };
 
+  // อัปโหลดและบีบอัดรูปภาพหลังซ่อม
   const handleSelectPhotos = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const remaining = Math.max(0, 3 - afterPhotos.length);
     if (remaining === 0) return;
@@ -94,15 +132,18 @@ export default function StaffRepairsPage() {
     e.target.value = '';
   };
 
+  // ลบรูปภาพหลังซ่อมที่เลือกไว้
   const removePhoto = (idx: number) => {
     setAfterPhotos((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  // ฟังก์ชันยิง API อัปเดตสถานะงานแจ้งซ่อม
   const handleExecuteAction = async (action: 'accept' | 'finish' | 'reject', enteredPin?: string) => {
     if (!current) return;
     setErrorMsg('');
     setPinError('');
 
+    // กรณีซ่อมเสร็จ บังคับกรอกรายละเอียดและแนบรูปหลังซ่อม
     if (action === 'finish') {
       if (!resolution.trim()) {
         setErrorMsg('กรุณาระบุข้อมูลใน "บันทึกผลการซ่อม"');
@@ -157,6 +198,7 @@ export default function StaffRepairsPage() {
     }
   };
 
+  // เริ่มต้นขั้นตอนดำเนินการ (ตรวจเงื่อนไขก่อนเปิด Modal PIN)
   const handleStartAction = (action: 'accept' | 'finish' | 'reject') => {
     if (action === 'finish') {
       if (!resolution.trim()) {
@@ -191,6 +233,7 @@ export default function StaffRepairsPage() {
           <div className="flex w-full sm:w-auto gap-2.5">
             {current.status === 'repair_submitted' ? (
               <>
+                {/* ปุ่มส่งกลับ / ไม่รับเรื่อง */}
                 <button
                   type="button"
                   disabled={submitting}
@@ -199,6 +242,7 @@ export default function StaffRepairsPage() {
                 >
                   ส่งกลับ / ไม่รับเรื่อง
                 </button>
+                {/* ปุ่มรับเรื่องซ่อม */}
                 <button
                   type="button"
                   disabled={submitting || !confirmed}
@@ -209,6 +253,7 @@ export default function StaffRepairsPage() {
                 </button>
               </>
             ) : current.status === 'repair_in_progress' ? (
+              /* ปุ่มบันทึกซ่อมเสร็จ */
               <button
                 type="button"
                 disabled={submitting || !confirmed || !resolution.trim() || afterPhotos.length === 0}

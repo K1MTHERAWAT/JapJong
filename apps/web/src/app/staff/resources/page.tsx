@@ -1,5 +1,18 @@
 'use client';
 
+/**
+ * =====================================================================
+ * หน้าจัดการทรัพยากรและแบบฟอร์มราชการ (Staff Resources & Forms Management)
+ * =====================================================================
+ * รวมศูนย์บริหารจัดการ 4 แท็บหลัก:
+ * 1. สถานที่ (Venues): รายชื่อ, ความจุ, เปิด/ปิดรับจองทันทีด้วย Toggle Switch
+ * 2. ครุภัณฑ์/อุปกรณ์ (Equipment): สต็อกคงเหลือ, เปิด/ปิดให้ยืม
+ * 3. ยานพาหนะ (Vehicles): ระบบบริหารการขอใช้รถส่วนกลาง
+ * 4. แบบฟอร์มราชการ (Forms):
+ *    - แสดงตัวอย่างเอกสารราชการจริง (OfficialGovFormDocument)
+ *    - ปรับแต่งหัวกระดาษ ข้อความ และช่องลงนามแบบ WYSIWYG (OfficialDocumentEditor)
+ */
+
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -25,18 +38,23 @@ import {
   fetchFormTemplatesFromApi,
 } from '@/lib/forms-store';
 
+// ชนิดแท็บหมวดหมู่ทรัพยากร
 type ResourceTab = 'venues' | 'equipment' | 'vehicles' | 'forms';
 
 function ManageResourcesContent() {
   const { account } = useAuth();
+  // รับค่า query parameter เช่น ?tab=forms
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get('tab') as ResourceTab) || 'venues';
 
+  // State แท็บที่เลือก
   const [tab, setTab] = useState<ResourceTab>(initialTab);
+  // State รายการสถานที่
   const [venues, setVenues] = useState<Venue[]>([]);
+  // State รายการอุปกรณ์
   const [equipment, setEquipment] = useState<Equipment[]>([]);
 
-  // Forms management
+  // State การจัดการแบบฟอร์มราชการ
   const [formsList, setFormsList] = useState<FormTemplateItem[]>([]);
   const [selectedFormKey, setSelectedFormKey] = useState<string>('venue');
   const [formPreviewMode, setFormPreviewMode] = useState<'sample' | 'blank'>('sample');
@@ -44,6 +62,7 @@ function ManageResourcesContent() {
   const [isCreatingNewForm, setIsCreatingNewForm] = useState(false);
   const [previewImg, setPreviewImg] = useState<string | null>(null);
 
+  // โหลดรายการแม่แบบฟอร์มทั้งจากแคชและ API
   const loadForms = useCallback(() => {
     setFormsList(getFormTemplates());
     fetchFormTemplatesFromApi().then((list) => {
@@ -51,6 +70,7 @@ function ManageResourcesContent() {
     });
   }, []);
 
+  // โหลดข้อมูลสถานที่ อุปกรณ์ และแบบฟอร์ม
   const load = useCallback(() => {
     api.venues().then(setVenues).catch(() => {});
     api.equipment().then(setEquipment).catch(() => {});
@@ -61,16 +81,19 @@ function ManageResourcesContent() {
     load();
   }, [load]);
 
+  // ฟังก์ชันสลับสถานะเปิด/ปิดการจองสถานที่
   const toggleVenue = async (v: Venue, enabled: boolean) => {
     await api.updateVenue(v.id, { enabled });
     load();
   };
 
+  // ฟังก์ชันสลับสถานะเปิด/ปิดการยืมอุปกรณ์
   const toggleEquipment = async (e: Equipment, enabled: boolean) => {
     await api.updateEquipment(e.id, { enabled });
     load();
   };
 
+  // ฟังก์ชันลบแบบฟอร์มที่สร้างขึ้นเอง
   const handleDeleteForm = (id: string, title: string) => {
     if (window.confirm(`คุณต้องการลบแบบฟอร์ม "${title}" ออกจากระบบใช่หรือไม่?`)) {
       deleteCustomFormTemplate(id);
@@ -81,6 +104,7 @@ function ManageResourcesContent() {
     }
   };
 
+  // ค้นหาแบบฟอร์มที่กำลังเลือกดูตัวอย่าง
   const currentSelectedForm = formsList.find((f) => f.id === selectedFormKey) || formsList[0];
 
   return (
@@ -109,6 +133,7 @@ function ManageResourcesContent() {
       }
     >
       <div className="flex flex-col gap-3.5">
+        {/* แถบแท็บสลับหมวดหมู่ทรัพยากร */}
         <Tabs<ResourceTab>
           value={tab}
           onChange={setTab}
@@ -120,6 +145,7 @@ function ManageResourcesContent() {
           ]}
         />
 
+        {/* แท็บที่ 1: สถานที่ */}
         {tab === 'venues' && (
           <div className="flex flex-col gap-2.5">
             {venues.length === 0 ? (
@@ -170,6 +196,7 @@ function ManageResourcesContent() {
           </div>
         )}
 
+        {/* แท็บที่ 2: อุปกรณ์ */}
         {tab === 'equipment' && (
           <div className="flex flex-col gap-2.5">
             {equipment.length === 0 ? (
@@ -216,6 +243,7 @@ function ManageResourcesContent() {
           </div>
         )}
 
+        {/* แท็บที่ 3: ยานพาหนะ */}
         {tab === 'vehicles' && (
           <div className="jw-card p-8 text-center flex flex-col items-center gap-3">
             <span className="text-3xl">🚐</span>
@@ -236,10 +264,9 @@ function ManageResourcesContent() {
           </div>
         )}
 
-        {/* ================= TAB === 'forms' ================= */}
+        {/* แท็บที่ 4: แบบฟอร์มราชการ */}
         {tab === 'forms' && (
           <div className="flex flex-col gap-4">
-            {/* Header + Add Form Button */}
             <div className="flex items-center justify-between pb-1">
               <div>
                 <b className="text-[16px] text-ink block">รายการแบบฟอร์มในระบบ ({formsList.length})</b>
@@ -260,7 +287,7 @@ function ManageResourcesContent() {
               </button>
             </div>
 
-            {/* List of Forms */}
+            {/* รายชื่อแบบฟอร์มทั้งหมด */}
             <div className="flex flex-col gap-2.5">
               {formsList.map((f) => {
                 const active = selectedFormKey === f.id;
@@ -309,7 +336,7 @@ function ManageResourcesContent() {
               })}
             </div>
 
-            {/* Document Preview & Editor Trigger */}
+            {/* แสดงตัวอย่างหน้ากระดาษราชการและการเปิดโปรแกรมแก้ไข WYSIWYG */}
             {selectedFormKey !== 'repair' && (
               <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -383,6 +410,7 @@ function ManageResourcesContent() {
         </p>
       </div>
 
+      {/* Modal ดูภาพขยาย */}
       {previewImg && (
         <div
           className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"

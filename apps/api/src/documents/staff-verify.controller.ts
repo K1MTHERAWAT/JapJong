@@ -11,13 +11,18 @@ import { Account } from '@japjong/shared';
 import { CurrentUser, Roles } from '../auth/auth.guard';
 import { DocumentsService } from './documents.service';
 
+/**
+ * Controller สำหรับเจ้าหน้าที่ (STAFF, ADMIN) ในการตรวจสอบเอกสารดิจิทัล
+ * และเรียกดูประวัติบันทึกการตรวจสอบสแกนเอกสารราชการทั้งหมด
+ */
 @Controller('staff/documents')
 @Roles('STAFF', 'ADMIN')
 export class StaffVerifyController {
   constructor(private readonly documentsService: DocumentsService) {}
 
   /**
-   * เรียกดูประวัติการตรวจสอบของเจ้าหน้าที่
+   * ดึงประวัติการตรวจสอบเอกสารราชการของเจ้าหน้าที่
+   * GET /staff/documents/verify-history
    */
   @Get('verify-history')
   getVerifyHistory(@Query('limit') limit?: string) {
@@ -26,7 +31,8 @@ export class StaffVerifyController {
   }
 
   /**
-   * ตรวจสอบเอกสารด้วย QR Code หรือรหัสเอกสารสำหรับเจ้าหน้าที่
+   * ตรวจสอบเอกสารราชการด้วย QR Code หรือรหัสเอกสารโดยเจ้าหน้าที่ (บันทึก Audit Trail ของผู้ตรวจ)
+   * POST /staff/documents/verify
    */
   @Post('verify')
   async verifyDocument(
@@ -39,4 +45,3 @@ export class StaffVerifyController {
     return this.documentsService.verifyStaff(query, user, ip, userAgent);
   }
 }
-

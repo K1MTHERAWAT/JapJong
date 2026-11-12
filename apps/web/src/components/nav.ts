@@ -1,3 +1,13 @@
+/**
+ * =====================================================================
+ * ระบบเมนูนำทางและคำนวณสิทธิ์การเข้าถึง (Navigation & RBAC Route Resolver)
+ * =====================================================================
+ * 1. resolveNavIcon: แปลงชื่อสตริงไอคอน Lucide ให้เป็นคอมโพเนนต์ไอคอนจริง
+ * 2. NAV: รายการเมนูพื้นฐาน (Fallback Static Nav Items)
+ * 3. serviceToNavItem: แปลงโมเดลข้อมูล Dynamic Services จากฐานข้อมูลเป็น NavItem
+ * 4. getVisibleNav: ฟิลเตอร์คัดกรองเมนูที่จะแสดงผลใน Sidebar ตามบทบาทและสิทธิ์รายบุคคล
+ */
+
 import type { LucideIcon } from 'lucide-react';
 import {
   Home,
@@ -10,7 +20,6 @@ import {
   BellRing,
   ClipboardList,
   CheckSquare,
-  PenTool,
   QrCode,
   Shield,
   Users,
@@ -23,6 +32,7 @@ import {
 import * as LucideIcons from 'lucide-react';
 import { canAccessRoute, PublicAccount, Role, SidebarServiceItem } from '@japjong/shared';
 
+// ฟังก์ชันแปลงชื่อสตริงเป็นไอคอน Lucide (หากไม่พบจะคืนค่าเป็น FolderTree)
 export function resolveNavIcon(iconName?: string): LucideIcon {
   if (!iconName) return FolderTree;
   const found = (LucideIcons as Record<string, any>)[iconName];
@@ -32,6 +42,7 @@ export function resolveNavIcon(iconName?: string): LucideIcon {
   return FolderTree;
 }
 
+// ชนิดข้อมูลรายการเมนูนำทาง
 export type NavItem = {
   id?: string;
   href: string;
@@ -46,6 +57,7 @@ export type NavItem = {
   description?: string;
 };
 
+// รายการเมนูมาตรฐานเริ่มต้น (Static Fallback Nav)
 export const NAV: NavItem[] = [
   // บริการประชาชน
   { href: '/', label: 'หน้าแรกบริการ', icon: Home, section: 'บริการหลัก', exact: true },
@@ -102,6 +114,7 @@ export const NAV: NavItem[] = [
   },
 ];
 
+// แปลงข้อมูลบริการจากตารางฐานข้อมูลมาเป็นเมนู NavItem
 export function serviceToNavItem(service: SidebarServiceItem): NavItem {
   return {
     id: service.id,
@@ -118,6 +131,7 @@ export function serviceToNavItem(service: SidebarServiceItem): NavItem {
   };
 }
 
+// ฟังก์ชันคัดกรองเมนูที่จะมองเห็นได้ใน Sidebar ตามบัญชีผู้ใช้งานปัจจุบัน
 export function getVisibleNav(account: PublicAccount | null, services?: SidebarServiceItem[]): NavItem[] {
   // หากได้รับข้อมูลบริการจากฐานข้อมูล ให้ใช้ข้อมูลบริการจากฐานข้อมูล
   if (services && services.length > 0) {
@@ -125,13 +139,13 @@ export function getVisibleNav(account: PublicAccount | null, services?: SidebarS
       .filter((s) => {
         if (!s.enabled) return false;
 
-        // สิทธิ์เฉพาะรายบุคคล
+        // สิทธิ์เฉพาะรายบุคคล (Individual overrides)
         if (account?.id && s.deniedUserIds?.includes(account.id)) return false;
         if (account?.id && s.allowedUserIds?.includes(account.id)) return true;
 
         if (account) {
           if (account.role === 'ADMIN') {
-            // สำหรับ Admin: แสดงเฉพาะเมนูระบบและผู้ดูแล
+            // สำหรับ Admin: แสดงเฉพาะเมนูระบบและผู้ดูแล ซ่อนเมนูประชาชน
             const isCitizenOrStaffService = [
               '/',
               '/booking',
@@ -162,7 +176,7 @@ export function getVisibleNav(account: PublicAccount | null, services?: SidebarS
       .map(serviceToNavItem);
   }
 
-  // Fallback เดิม
+  // กรณีใช้ Fallback Static Menu
   return NAV.filter((item) => {
     // สำหรับ Admin: ซ่อนบริการประชาชนและงานเจ้าหน้าที่ใน Sidebar
     if (account?.role === 'ADMIN') {
@@ -201,4 +215,3 @@ export function getVisibleNav(account: PublicAccount | null, services?: SidebarS
     return true;
   });
 }
-

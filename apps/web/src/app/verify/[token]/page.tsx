@@ -1,5 +1,7 @@
 /**
+ * =====================================================================
  * หน้าตรวจสอบความถูกต้องของเอกสารทางราชการแบบสาธารณะ (Public Verification Page)
+ * =====================================================================
  * สำหรับประชาชนหรือบุคคลภายนอกที่สแกน QR Code บนเอกสารใบอนุญาต/หนังสือรับรองของ อบต.
  * 
  * คุณสมบัติหลัก:
@@ -12,7 +14,9 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+// อ่านพารามิเตอร์ token จาก URL
 import { useParams } from 'next/navigation';
+// โมเดลผลลัพธ์การตรวจสอบและป้ายกำกับสถานะจาก Shared
 import {
   PublicVerificationResult,
   VERIFICATION_DOC_TYPE_LABEL,
@@ -22,16 +26,20 @@ import {
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
 import { Chip } from '@/components/ui';
+// API SDK และฟังก์ชันจัดรูปแบบวันที่ภาษาไทย
 import { api, formatThaiDateTime } from '@/lib/api';
 
 export default function PublicVerifyPage() {
+  // ดึงพารามิเตอร์ token จาก URL
   const params = useParams<{ token: string }>();
   // สถานะการโหลดข้อมูลผลการตรวจสอบจากเซิร์ฟเวอร์
   const [loading, setLoading] = useState(true);
   // ผลลัพธ์การตรวจสอบเอกสารสาธารณะ
   const [result, setResult] = useState<PublicVerificationResult | null>(null);
 
-  // ดึงข้อมูลการตรวจสอบเอกสารทันทีที่ได้รับ token จาก URL
+  /**
+   * ดึงข้อมูลการตรวจสอบเอกสารทันทีที่ได้รับ token จาก URL
+   */
   useEffect(() => {
     if (!params.token) return;
     setLoading(true);
@@ -39,6 +47,7 @@ export default function PublicVerifyPage() {
       .publicVerify(params.token)
       .then(setResult)
       .catch(() => {
+        // กรณีเกิดข้อผิดพลาดในการเชื่อมต่อเครือข่าย
         setResult({
           status: 'INVALID',
           message: 'เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์ตรวจสอบเอกสาร',
@@ -47,7 +56,9 @@ export default function PublicVerifyPage() {
       .finally(() => setLoading(false));
   }, [params.token]);
 
+  // สถานะเอกสาร (VALID, REVOKED, หรือ NOT_FOUND)
   const status = result?.status || 'NOT_FOUND';
+  // โทนสีตามสถานะเอกสาร
   const tone = VERIFICATION_STATUS_TONE[status];
 
   return (
@@ -72,13 +83,14 @@ export default function PublicVerifyPage() {
 
         {/* แสดงผลการตรวจสอบ */}
         {loading ? (
+          // สถานะระหว่างส่ง Request ตรวจสอบ
           <div className="jw-card p-10 flex flex-col items-center justify-center gap-3 text-center">
             <div className="w-8 h-8 border-3 border-brand border-t-transparent rounded-full animate-spin"></div>
             <span className="text-[14px] text-ink-mute">กำลังตรวจสอบลายมือชื่อและรหัสเอกสารดิจิทัล...</span>
           </div>
         ) : (
           <div className="jw-card p-6 sm:p-8 flex flex-col gap-6">
-            {/* ป้ายสถานะหลัก */}
+            {/* ป้ายสถานะหลัก (เขียว = สมบูรณ์, ส้ม = ยกเลิก, แดง = ไม่ถูกต้อง) */}
             <div
               className={`p-5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                 status === 'VALID'
@@ -89,6 +101,7 @@ export default function PublicVerifyPage() {
               }`}
             >
               <div className="flex items-center gap-3.5">
+                {/* ไอคอนตามสถานะ */}
                 <div
                   className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
                     status === 'VALID'
@@ -113,6 +126,7 @@ export default function PublicVerifyPage() {
                 </div>
               </div>
 
+              {/* ชิปสถานะข้อความย่อ */}
               <div className="shrink-0">
                 <Chip tone={tone}>
                   {status === 'VALID'
@@ -124,7 +138,7 @@ export default function PublicVerifyPage() {
               </div>
             </div>
 
-            {/* รายละเอียดเอกสาร */}
+            {/* รายละเอียดเอกสารกรณีพบในระบบ */}
             {status !== 'NOT_FOUND' && result?.documentNumber && (
               <div className="flex flex-col gap-3 text-[14px]">
                 <h3 className="font-bold text-ink border-b border-line pb-2">
@@ -132,11 +146,13 @@ export default function PublicVerifyPage() {
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* เลขที่เอกสารราชการ */}
                   <div className="bg-soft/70 p-3.5 rounded-xl flex flex-col gap-1">
                     <span className="text-[12px] text-ink-mute font-medium">เลขที่เอกสาร</span>
                     <b className="text-[15px] text-ink font-mono">{result.documentNumber}</b>
                   </div>
 
+                  {/* ประเภทเอกสาร */}
                   <div className="bg-soft/70 p-3.5 rounded-xl flex flex-col gap-1">
                     <span className="text-[12px] text-ink-mute font-medium">ประเภทเอกสาร</span>
                     <b className="text-[15px] text-ink">
@@ -144,16 +160,19 @@ export default function PublicVerifyPage() {
                     </b>
                   </div>
 
+                  {/* หน่วยงานผู้ออกเอกสาร */}
                   <div className="bg-soft/70 p-3.5 rounded-xl flex flex-col gap-1">
                     <span className="text-[12px] text-ink-mute font-medium">หน่วยงานผู้ออกเอกสาร</span>
                     <b className="text-[15px] text-ink">{result.issuingOrg || 'องค์การบริหารส่วนตำบล (อบต.)'}</b>
                   </div>
 
+                  {/* วันที่ออกเอกสาร */}
                   <div className="bg-soft/70 p-3.5 rounded-xl flex flex-col gap-1">
                     <span className="text-[12px] text-ink-mute font-medium">วันที่ออกเอกสาร</span>
                     <b className="text-[15px] text-ink">{formatThaiDateTime(result.issuedAt, true)}</b>
                   </div>
 
+                  {/* กรณีเอกสารถูกเพิกถอน ให้แสดงวันเวลาที่ยกเลิก */}
                   {result.revokedAt && (
                     <div className="bg-[#FFF4E8] p-3.5 rounded-xl flex flex-col gap-1 sm:col-span-2">
                       <span className="text-[12px] text-status-amber font-semibold">วัน-เวลาที่ยกเลิกเอกสาร</span>
@@ -161,6 +180,7 @@ export default function PublicVerifyPage() {
                     </div>
                   )}
 
+                  {/* รหัสลายพิมพ์ดิจิทัล (SHA-256 Hash) เทียบความถูกต้อง */}
                   {result.documentHash && (
                     <div className="bg-soft/70 p-3.5 rounded-xl flex flex-col gap-1 sm:col-span-2">
                       <span className="text-[12px] text-ink-mute font-medium">รหัสลายพิมพ์ดิจิทัล (SHA-256 Hash)</span>
@@ -173,7 +193,7 @@ export default function PublicVerifyPage() {
               </div>
             )}
 
-            {/* ข้อความกำกับความปลอดภัย */}
+            {/* ข้อความกำกับความปลอดภัยและ PDPA */}
             <div className="p-4 rounded-xl bg-soft text-[12.5px] text-ink-mute leading-relaxed border border-line flex items-start gap-2.5">
               <Icon name="shield-check" className="w-4 h-4 text-brand shrink-0 mt-0.5" />
               <span>
@@ -182,6 +202,7 @@ export default function PublicVerifyPage() {
               </span>
             </div>
 
+            {/* ปุ่มกลับหน้าหลัก */}
             <div className="pt-2 flex justify-center">
               <Link href="/" className="jw-btn w-full sm:w-auto px-8">
                 กลับสู่หน้าหลักระบบ

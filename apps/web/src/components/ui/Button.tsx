@@ -1,5 +1,17 @@
 import React from 'react';
 
+/**
+ * =====================================================================
+ * ปุ่มมาตรฐานระบบราชการ (Button Component Primitive)
+ * =====================================================================
+ * รองรับ 5 รูปแบบสไตล์ (Variants):
+ * - primary: ปุ่มหลักโทนสีแบรนด์ (เขียวมรกตราชการ)
+ * - secondary: ปุ่มรองพื้นขาวขอบเทา
+ * - ghost: ปุ่มโปร่งใสไม่มีเส้นขอบ
+ * - icon: ปุ่มทรงจัตุรัสสำหรับไอคอนล้วน
+ * - danger: ปุ่มเตือนอันตราย/การลบ (สีแดง)
+ */
+
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'icon' | 'danger';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -7,6 +19,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   children?: React.ReactNode;
 }
 
+// ตารางคลาส Tailwind สำหรับแต่ละ Variant
 const VARIANTS: Record<ButtonVariant, string> = {
   primary:
     'inline-flex h-11 items-center justify-center gap-2 rounded-control bg-brand px-4 font-semibold text-white shadow-sm hover:bg-brand-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand',

@@ -1,4 +1,15 @@
-import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
@@ -22,32 +33,52 @@ import {
 import { CurrentUser, Permissions, Public } from '../auth/auth.guard';
 import { DbService } from '../db/db.service';
 
+// ประเภทสถานที่ที่ถูกต้องตามเกณฑ์ของระบบ
 const VALID_VENUE_TYPES: VenueType[] = ['meeting', 'pavilion', 'field', 'yard', 'training'];
+// หมวดหมู่อุปกรณ์ที่ถูกต้องตามเกณฑ์ของระบบ
 const VALID_EQUIPMENT_CATEGORIES: EquipmentCategory[] = ['audio', 'tent', 'it'];
 
+/**
+ * Controller บริหารจัดการทรัพยากรส่วนกลางขององค์กรปกครองส่วนท้องถิ่น (อบต.)
+ * ประกอบด้วย สถานที่ราชการ, อุปกรณ์ส่วนกลาง, การตรวจสอบคิวความว่าง และฐานข้อมูลภูมิศาสตร์ไทย
+ */
 @ApiTags('Resources')
 @Controller('resources')
 export class ResourcesController {
   constructor(private readonly db: DbService) {}
 
+  /**
+   * ดึงรายการสถานที่ทั้งหมดที่เปิดให้บริการ (Public)
+   * GET /resources/venues
+   */
   @Public()
   @Get('venues')
   listVenues() {
     return this.db.venues;
   }
 
+  /**
+   * ดึงรายการอุปกรณ์ทั้งหมดในคลังพัสดุ (Public)
+   * GET /resources/equipment
+   */
   @Public()
   @Get('equipment')
   listEquipment() {
     return this.db.equipment;
   }
 
+  /**
+   * สร้างสถานที่ราชการใหม่ (ต้องมีสิทธิ์ manageResources)
+   * POST /resources/venues
+   */
   @Permissions('manageResources')
   @Post('venues')
   async createVenue(@CurrentUser() user: Account, @Body() body: Partial<Venue>) {
     if (!body.name?.trim()) throw new BadRequestException('กรุณาระบุชื่อสถานที่');
     const capacity = Math.max(1, Math.min(10000, Math.floor(Number(body.capacity ?? 50))));
     const advanceDays = Math.max(0, Math.min(365, Math.floor(Number(body.advanceDays ?? 3))));
+    
+    // ประกอบโครงสร้างข้อมูลสถานที่
     const venue: Venue = {
       id: await this.db.nextId('v'),
       name: body.name.trim().slice(0, 120),
@@ -72,6 +103,8 @@ export class ResourcesController {
         ? body.images.map((img) => String(img).trim()).filter(Boolean).slice(0, 3)
         : [],
     };
+
+    // บันทึกลงหน่วยความจำและฐานข้อมูลถาวร
     this.db.venues.push(venue);
     await this.db.persistVenue(venue);
     await this.db.log('resource', `เพิ่มสถานที่ ${venue.name}`, `${venue.capacity} คน`, {
@@ -82,6 +115,10 @@ export class ResourcesController {
     return venue;
   }
 
+  /**
+   * แก้ไขข้อมูลสถานที่ราชการ (ต้องมีสิทธิ์ manageResources)
+   * PATCH /resources/venues/:id
+   */
   @Permissions('manageResources')
   @Patch('venues/:id')
   async updateVenue(@CurrentUser() user: Account, @Param('id') id: string, @Body() body: Partial<Venue>) {
@@ -126,6 +163,10 @@ export class ResourcesController {
     return venue;
   }
 
+  /**
+   * ลบสถานที่ราชการออกจากระบบ (ต้องมีสิทธิ์ manageResources)
+   * DELETE /resources/venues/:id
+   */
   @Permissions('manageResources')
   @Delete('venues/:id')
   async deleteVenue(@CurrentUser() user: Account, @Param('id') id: string) {
@@ -140,6 +181,10 @@ export class ResourcesController {
     return { ok: true, id };
   }
 
+  /**
+   * เพิ่มรายการอุปกรณ์พัสดุใหม่ (ต้องมีสิทธิ์ manageResources)
+   * POST /resources/equipment
+   */
   @Permissions('manageResources')
   @Post('equipment')
   async createEquipment(@CurrentUser() user: Account, @Body() body: Partial<Equipment>) {
@@ -171,6 +216,10 @@ export class ResourcesController {
     return eq;
   }
 
+  /**
+   * แก้ไขข้อมูลอุปกรณ์พัสดุ (ต้องมีสิทธิ์ manageResources)
+   * PATCH /resources/equipment/:id
+   */
   @Permissions('manageResources')
   @Patch('equipment/:id')
   async updateEquipment(@Param('id') id: string, @Body() body: Partial<Equipment>) {
@@ -195,6 +244,10 @@ export class ResourcesController {
     return eq;
   }
 
+  /**
+   * ลบอุปกรณ์พัสดุออกจากระบบ (ต้องมีสิทธิ์ manageResources)
+   * DELETE /resources/equipment/:id
+   */
   @Permissions('manageResources')
   @Delete('equipment/:id')
   async deleteEquipment(@CurrentUser() user: Account, @Param('id') id: string) {
@@ -209,7 +262,10 @@ export class ResourcesController {
     return { ok: true, id };
   }
 
-  /** ปฏิทินความว่างรายเดือนของสถานที่ */
+  /**
+   * ดึงข้อมูลสถานะความว่างรายเดือนของสถานที่ราชการ (สำหรับแสดงผลบนปฏิทิน)
+   * GET /resources/availability
+   */
   @Public()
   @SkipThrottle()
   @Get('availability')
@@ -218,6 +274,7 @@ export class ResourcesController {
     const venueIds = venueIdsParam.split(',').filter(Boolean);
     const [y, m] = targetMonth.split('-').map(Number);
     const daysInMonth = new Date(y, m, 0).getDate();
+    // คัดกรองคำขอจองสถานที่ที่อยู่ในสถานะดำเนินการอยู่
     const bookings = this.db.requests.filter(
       (r): r is BookingRequest =>
         r.type === 'booking' &&
@@ -240,6 +297,7 @@ export class ResourcesController {
           }
         }
       }
+      // จำแนกระดับความหนาแน่นของการจองในวันนั้นๆ
       const level: DayAvailability['level'] =
         bookedHours >= 7 ? 'full' : bookedHours >= 3 ? 'few' : 'many';
       out.push({ date: dateStr, level, bookedHours });
@@ -247,7 +305,10 @@ export class ResourcesController {
     return out;
   }
 
-  /** ตรวจสอบช่วงเวลาซ้อนทับ */
+  /**
+   * ตรวจสอบว่าช่วงเวลาที่เลือกขอใช้สถานที่ มีการชนหรือซ้อนทับกับคำขออื่นหรือไม่
+   * POST /resources/check-conflicts
+   */
   @Public()
   @SkipThrottle()
   @Post('check-conflicts')
@@ -262,6 +323,7 @@ export class ResourcesController {
         r.id !== body.excludeRequestId &&
         r.venueIds.some((v) => body.venueIds.includes(v)),
     );
+    // ตรวจสอบการทับซ้อนทีละช่วงเวลา
     body.periods.forEach((p, periodIndex) => {
       for (const b of active) {
         for (const bp of b.periods) {
@@ -283,7 +345,10 @@ export class ResourcesController {
     return { conflicts };
   }
 
-  /** ตรวจสอบความพร้อมใช้งานและจำนวนติดจองของอุปกรณ์ (รองรับทั้งยืมอุปกรณ์และการใช้อุปกรณ์เสริมในสถานที่) */
+  /**
+   * ตรวจสอบความพร้อมใช้งานและสต๊อกคงเหลือของอุปกรณ์ ทั้งการยืมอุปกรณ์และการขอใช้อุปกรณ์เสริมในสถานที่
+   * POST /resources/check-equipment-availability
+   */
   @Public()
   @SkipThrottle()
   @Post('check-equipment-availability')
@@ -302,6 +367,7 @@ export class ResourcesController {
     let pickupDate = String(body.pickupDate || '').slice(0, 10);
     let returnDate = String(body.returnDate || '').slice(0, 10);
 
+    // หากไม่ได้ส่งวันที่ยืม-คืนมาตรงๆ แต่มีช่วงเวลาจอง ให้ดึงวันที่เริ่มต้นและสิ้นสุดออกมา
     if ((!pickupDate || !returnDate) && body.periods && body.periods.length > 0) {
       const starts = body.periods.map((p) => p.start.slice(0, 10)).filter(Boolean).sort();
       const ends = body.periods.map((p) => p.end.slice(0, 10)).filter(Boolean).sort();
@@ -319,13 +385,14 @@ export class ResourcesController {
     const [y, m] = targetMonth.split('-').map(Number);
     const daysInMonth = new Date(y, m, 0).getDate();
 
-    // กรองเฉพาะคำขอจริงจากฐานข้อมูล (ไม่นำ mock/demo requests มารบกวนสต๊อกจริง)
+    // กรองเฉพาะคำขอจริงจากฐานข้อมูล (ไม่รวม Mock/Demo requests)
     const isRealRequest = (r: { id: string }) =>
       !(r as any).isDemo &&
       !r.id.startsWith('r-br-00') &&
       !r.id.startsWith('r-bk-01') &&
       !r.id.startsWith('r-rp-00');
 
+    // ดึงคำขอยืมอุปกรณ์ที่กำลังดำเนินรายการอยู่
     const activeBorrows = this.db.requests.filter(
       (r): r is BorrowRequest =>
         r.type === 'borrow' &&
@@ -334,6 +401,7 @@ export class ResourcesController {
         r.id !== body.excludeRequestId,
     );
 
+    // ดึงคำขอจองสถานที่ที่มีการระบุอุปกรณ์เสริม
     const activeBookingsWithItems = this.db.requests.filter(
       (r): r is BookingRequest =>
         r.type === 'booking' &&
@@ -343,7 +411,7 @@ export class ResourcesController {
         Boolean(r.extraItems && r.extraItems.length > 0),
     );
 
-    // คำนวณรายวันสำหรับปฏิทิน
+    // คำนวณความพร้อมใช้งานรายวันสำหรับแสดงในปฏิทิน
     const dayAvailability: {
       date: string;
       level: 'many' | 'few' | 'full';
@@ -370,6 +438,7 @@ export class ResourcesController {
         const name = eq?.name || item.equipmentId;
         const totalStock = eq?.stock || 0;
 
+        // คำนวณจำนวนอุปกรณ์ที่ติดจองจากการยืม
         const reservedBorrows = activeBorrows
           .filter((b) => b.pickupDate <= dateStr && b.returnDate >= dateStr)
           .reduce((sum, b) => {
@@ -377,6 +446,7 @@ export class ResourcesController {
             return sum + (found ? found.qty : 0);
           }, 0);
 
+        // คำนวณจำนวนอุปกรณ์ที่ติดจองจากการจองสถานที่
         const reservedBookings = activeBookingsWithItems
           .filter((b) =>
             b.periods.some((p) => p.start.slice(0, 10) <= dateStr && p.end.slice(0, 10) >= dateStr),
@@ -419,7 +489,7 @@ export class ResourcesController {
       });
     }
 
-    // คำนวณสรุปเฉพาะช่วงวันที่ขอใช้ (pickupDate ถึง returnDate)
+    // คำนวณภาพรวมความพร้อมใช้งานตลอดช่วงวันที่ต้องการ
     const summary = items.map((item) => {
       const eq = this.db.equipment.find((e) => e.id === item.equipmentId);
       const name = eq?.name || item.equipmentId;
@@ -478,8 +548,12 @@ export class ResourcesController {
     };
   }
 
-  // ===================== Thai Administrative Divisions (Province -> District -> Subdistrict) =====================
+  // ===================== ระบบข้อมูลการปกครองส่วนท้องถิ่นไทย (จังหวัด -> อำเภอ -> ตำบล) =====================
 
+  /**
+   * ดึงรายชื่อจังหวัดของประเทศไทย
+   * GET /resources/thai-address/provinces
+   */
   @Public()
   @SkipThrottle()
   @Get('thai-address/provinces')
@@ -490,6 +564,10 @@ export class ResourcesController {
     return provinces.filter((p) => p.nameTh.toLowerCase().includes(kw) || p.id === kw);
   }
 
+  /**
+   * ดึงรายชื่ออำเภอในจังหวัดที่กำหนด
+   * GET /resources/thai-address/districts
+   */
   @Public()
   @SkipThrottle()
   @Get('thai-address/districts')
@@ -500,6 +578,10 @@ export class ResourcesController {
     return districts.filter((d) => d.nameTh.toLowerCase().includes(kw) || d.id === kw);
   }
 
+  /**
+   * ดึงรายชื่อตำบลในอำเภอและจังหวัดที่กำหนด พร้อมรหัสไปรษณีย์
+   * GET /resources/thai-address/subdistricts
+   */
   @Public()
   @SkipThrottle()
   @Get('thai-address/subdistricts')
@@ -516,6 +598,10 @@ export class ResourcesController {
     );
   }
 
+  /**
+   * ตรวจสอบความถูกต้องและความสอดคล้องของที่อยู่ตามลำดับขั้นราชการ (จังหวัด -> อำเภอ -> ตำบล)
+   * POST /resources/thai-address/validate
+   */
   @Public()
   @SkipThrottle()
   @Post('thai-address/validate')

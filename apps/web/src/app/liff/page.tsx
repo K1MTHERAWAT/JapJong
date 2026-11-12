@@ -1,27 +1,40 @@
-'use client';
+'use client'; // กำหนดให้คอมโพเนนต์นี้ทำงานในฝั่ง Client (React Client Component)
 
+// นำเข้า React Hooks และ Suspense สำหรับดักจับการโหลด Client-side URL parameters
 import React, { Suspense, useEffect, useState } from 'react';
+// นำเข้า useRouter และ useSearchParams จาก Next.js navigation
 import { useRouter, useSearchParams } from 'next/navigation';
+// นำเข้า API client และฟังก์ชันจัดการ Auth Token
 import { api, getStoredToken, setStoredAuth } from '../../lib/api';
+// นำเข้าฟังก์ชันจัดการ LIFF SDK: ตรวจสอบ ID Token, เริ่มต้น LIFF, เข้าสู่ระบบ และคลี่เป้าหมาย Redirect
 import { getLiffIdToken, initLiff, loginWithLiff, resolveLiffTarget } from '../../lib/liff';
+// นำเข้าไอคอนแสดงสถานะจาก lucide-react
 import { AlertCircle, ArrowRight, CheckCircle2, Loader2, LogIn } from 'lucide-react';
 
+/**
+ * คอมโพเนนต์หลักสำหรับการยืนยันตัวตนอัตโนมัติผ่าน LINE Front-end Framework (LIFF SSO)
+ */
 function LiffAuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // คำนวณเส้นทางปลายทาง (Target URL) จาก Query Params หรือ liff.state
   const [target, setTarget] = useState(() =>
     resolveLiffTarget(searchParams, typeof window !== 'undefined' ? window.location.href : null),
   );
 
-  const [loading, setLoading] = useState(true);
-  const [statusMessage, setStatusMessage] = useState('กำลังเชื่อมต่อระบบจับจอง (JapJong)...');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isNewUser, setIsNewUser] = useState(false);
-  const [ticket, setTicket] = useState<string | null>(null);
+  // State การทำงาน
+  const [loading, setLoading] = useState(true); // กำลังประมวลผลการยืนยันตัวตน
+  const [statusMessage, setStatusMessage] = useState('กำลังเชื่อมต่อระบบจับจอง (JapJong)...'); // ข้อความแสดงขั้นตอน
+  const [errorMessage, setErrorMessage] = useState<string | null>(null); // ข้อความข้อผิดพลาด
+  const [isNewUser, setIsNewUser] = useState(false); // ผู้ใช้ใหม่ที่ยังไม่ได้ลงทะเบียน
+  const [ticket, setTicket] = useState<string | null>(null); // Ticket สำหรับใช้ในหน้าลงทะเบียนครั้งแรก
 
   useEffect(() => {
     let isMounted = true;
 
+    /**
+     * ฟังก์ชันจัดการขั้นตอนการ Authentication ผ่าน LIFF
+     */
     async function handleLiffAuth() {
       try {
         // ดึงค่า target ที่ถูกต้องที่สุดเสมอ (รองรับทั้ง target, redirect, และ liff.state)
@@ -107,6 +120,7 @@ function LiffAuthContent() {
         const authRes = await api.authLiff(idToken);
 
         if (authRes.status === 'AUTHENTICATED' && authRes.token && authRes.account) {
+          // ล็อกอินสำเร็จ: บันทึก Token และนำทางไปยังหน้าเป้าหมาย
           setStoredAuth(authRes.token, authRes.account.id);
           if (isMounted) {
             setStatusMessage(`ยินดีต้อนรับคุณ ${authRes.account.name || 'ผู้ใช้งาน'}`);
@@ -115,6 +129,7 @@ function LiffAuthContent() {
             }, 400);
           }
         } else if (authRes.status === 'NEW_USER' && authRes.ticket) {
+          // ผู้ใช้ใหม่: นำทางไปยังหน้าลงทะเบียนพร้อมส่ง Ticket
           if (isMounted) {
             setIsNewUser(true);
             setTicket(authRes.ticket);
@@ -153,7 +168,7 @@ function LiffAuthContent() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center px-4 py-8">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 sm:p-8 text-center">
-        {/* Brand Header */}
+        {/* โลโก้และชื่อระบบ */}
         <div className="flex items-center justify-center gap-2 mb-6">
           <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
             จ
@@ -164,7 +179,7 @@ function LiffAuthContent() {
           </div>
         </div>
 
-        {/* State Displays */}
+        {/* สถานะกำลังโหลดและประมวลผล */}
         {loading && (
           <div className="py-8 flex flex-col items-center">
             <Loader2 className="w-10 h-10 text-emerald-600 animate-spin mb-4" />
@@ -173,6 +188,7 @@ function LiffAuthContent() {
           </div>
         )}
 
+        {/* กรณีเป็นผู้ใช้ใหม่ที่ต้อง Onboarding */}
         {!loading && isNewUser && ticket && (
           <div className="py-6 flex flex-col items-center">
             <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3">
@@ -191,6 +207,7 @@ function LiffAuthContent() {
           </div>
         )}
 
+        {/* กรณีเกิดข้อผิดพลาดในการยืนยันตัวตน */}
         {!loading && errorMessage && (
           <div className="py-6 flex flex-col items-center">
             <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mb-3">
@@ -220,7 +237,7 @@ function LiffAuthContent() {
         )}
       </div>
 
-      {/* Footer Info */}
+      {/* ข้อความส่วนท้าย */}
       <p className="text-xs text-slate-400 mt-6 text-center">
         ระบบบริหารจัดการขอใช้สถานที่ ขอใช้อุปกรณ์ และแจ้งซ่อมบำรุง
       </p>
@@ -228,6 +245,9 @@ function LiffAuthContent() {
   );
 }
 
+/**
+ * หน้าจอ LIFF Authentication Page หุ้มด้วย Suspense Boundary
+ */
 export default function LiffPage() {
   return (
     <Suspense
@@ -241,4 +261,3 @@ export default function LiffPage() {
     </Suspense>
   );
 }
-

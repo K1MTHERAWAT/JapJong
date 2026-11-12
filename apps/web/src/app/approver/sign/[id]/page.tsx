@@ -1,5 +1,22 @@
 'use client';
 
+/**
+ * =====================================================================
+ * หน้าลงนามเอกสารคำขอสำหรับผู้มีอำนาจอนุมัติ (Approver Sign Document Page)
+ * =====================================================================
+ * รองรับการลงนามตามลำดับชั้นบังคับบัญชา 4 ฝ่าย:
+ * 1. ผู้ยื่นคำขอ (Requester)
+ * 2. เจ้าหน้าที่ธุรการ (Staff / Reviewer)
+ * 3. ปลัด อบต. (Approver L2)
+ * 4. นายก อบต. (Approver L1 - ผู้มีอำนาจอนุมัติสูงสุด)
+ *
+ * ฟีเจอร์ความปลอดภัย:
+ * - ตรวจสอบ Signing Session (OTP ยืนยันตัวตนผ่านอีเมล)
+ * - การยืนยันด้วยรหัส PIN ดิจิทัล 6 หลัก (PinKeypad)
+ * - แสดงสถานะและลายมือชื่อของแต่ละระดับชั้น (SignaturePreviewCard)
+ * - แสดงเอกสารแบบฟอร์มราชการแบบเต็มใบ (OfficialGovFormDocument)
+ */
+
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -11,27 +28,45 @@ import { Chip, OfficialGovFormDocument, PinKeypad, SignatureBox, SignaturePrevie
 import { api, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
 
 export default function ApproverSignDocumentPage() {
+  // ดึง ID ของคำขอจาก URL parameter
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  // ข้อมูลบัญชีผู้ใช้งานปัจจุบัน และฟังก์ชันออกจากระบบ
   const { account, logout } = useAuth();
+
+  // State ข้อมูลคำขอพร้อมเส้นทางลำดับเวลา (Timeline)
   const [req, setReq] = useState<RequestWithTimeline | null>(null);
+  // State ควบคุมการแสดงผลฟอร์มราชการฉบับเต็ม
   const [showOfficialForm, setShowOfficialForm] = useState(true);
+  // State ข้อมูลภาพลายเซ็น (Base64 data URL)
   const [signature, setSignature] = useState('');
+  // State ติ๊กถูกรับรองว่าได้ตรวจสอบเอกสารแล้ว
   const [confirmed, setConfirmed] = useState(true);
+  // State หน้าต่างยืนยัน OTP ก่อนลงนาม
   const [otpStep, setOtpStep] = useState(false);
+  // State ตรวจสอบว่าเซสชันการลงนามได้รับการยืนยันความปลอดภัยแล้วหรือไม่
   const [isSessionVerified, setIsSessionVerified] = useState(false);
+  // State มติการตัดสินใจ: 'approve' (เห็นชอบ/อนุมัติ) หรือ 'reject' (ไม่เห็นชอบ/ไม่อนุมัติ)
   const [pendingDecision, setPendingDecision] = useState<'approve' | 'reject'>('approve');
+  // State แสดง Modal แป้นพิมพ์ PIN 6 หลัก
   const [showPinModal, setShowPinModal] = useState(false);
+  // State ข้อความรหัส PIN ที่กำลังกรอก
   const [pin, setPin] = useState('');
+  // State ข้อความแจ้งเตือนเมื่อ PIN ไม่ถูกต้อง
   const [pinError, setPinError] = useState('');
+  // State แสดงหน้าสำเร็จเมื่อระดับ 2 (ปลัด อบต.) ลงนามเสร็จแล้วรอส่งต่อนายก อบต.
   const [completedL2, setCompletedL2] = useState(false);
+  // State ข้อความข้อผิดพลาดทั่วไป
   const [error, setError] = useState('');
+  // State กำลังบันทึกข้อมูลการลงนาม
   const [submitting, setSubmitting] = useState(false);
 
+  // ดึงลายเซ็นที่เคยบันทึกไว้ในบัญชีของผู้ใช้อัตโนมัติ
   useEffect(() => {
     setSignature(account?.signature || '');
   }, [account?.id, account?.signature]);
 
+  // โหลดข้อมูลคำขอจาก API ตาม id ที่ส่งมาใน URL
   useEffect(() => {
     if (!params.id) return;
     api
@@ -40,7 +75,7 @@ export default function ApproverSignDocumentPage() {
       .catch(() => {});
   }, [params.id]);
 
-  // ตรวจสอบสถานะ Signing Session (OTP)
+  // ตรวจสอบสถานะ Signing Session (OTP) จากเซิร์ฟเวอร์
   useEffect(() => {
     api
       .getSignSessionStatus()
@@ -50,6 +85,7 @@ export default function ApproverSignDocumentPage() {
       .catch(() => {});
   }, []);
 
+  // ฟังก์ชันส่งคำตัดสินการลงนามพร้อมรหัส PIN 6 หลัก
   const submitDecisionWithPin = async (enteredPin: string) => {
     if (!req) return;
     setError('');
@@ -66,12 +102,13 @@ export default function ApproverSignDocumentPage() {
       setShowPinModal(false);
 
       if (pendingDecision === 'reject') {
+        // หากไม่อนุมัติ ส่งกลับหน้าคิวงานผู้อนุมัติ
         router.push('/approver');
       } else if (updated.status === 'approved' || updated.status === 'borrowing') {
-        // ลงนามครบ 4 ฝ่าย → ไปหน้าใบอนุญาต (PDF)
+        // ลงนามครบ 4 ฝ่าย → ไปหน้าใบอนุญาตดิจิทัล (PDF) ทันที
         router.push(`/approver/permit/${updated.id}`);
       } else {
-        // ลงนามระดับ 2 เสร็จ → แสดงหน้าส่งต่อให้ระดับ 1 (นายก อบต.)
+        // ลงนามระดับ 2 (ปลัด อบต.) เสร็จ → แสดงข้อความส่งต่อให้นายก อบต.
         setCompletedL2(true);
       }
     } catch (err: unknown) {
@@ -93,6 +130,7 @@ export default function ApproverSignDocumentPage() {
     }
   };
 
+  // เริ่มต้นขั้นตอนลงนาม: เช็คว่าต้องยืนยัน OTP ก่อน หรือเปิด Modal ใส่ PIN ได้เลย
   const handleStartSign = (decision: 'approve' | 'reject') => {
     setPendingDecision(decision);
     setError('');
@@ -105,11 +143,13 @@ export default function ApproverSignDocumentPage() {
     }
   };
 
+  // ออกจากระบบและกลับไปหน้าล็อกอิน
   const handleLogoutToLogin = () => {
     logout();
     router.push('/login');
   };
 
+  // กรณีข้อมูลคำขอกำลังโหลด
   if (!req) {
     return (
       <AppShell title="ลงนามเอกสาร" backHref="/approver">
@@ -118,8 +158,10 @@ export default function ApproverSignDocumentPage() {
     );
   }
 
+  // ตรวจสอบสิทธิ์ว่าผู้ใช้ปัจจุบันสามารถลงนามในขั้นตอนนี้ได้หรือไม่
   const signCheck = canSignRequest(account, req);
 
+  // คำนวณลำดับขั้นตอนการลงนามปัจจุบัน
   const signedCount = req.type !== 'repair' ? req.signatures.length : 0;
   const currentStepNum = Math.min(3, signedCount + 1);
   const stepDesc =
@@ -129,10 +171,12 @@ export default function ApproverSignDocumentPage() {
       ? `ลงนามฝ่ายที่ 3 จาก 4 · ${SIGN_LEVEL_TITLE.l2}`
       : `ลงนามฝ่ายที่ 4 จาก 4 · ${SIGN_LEVEL_TITLE.l1}`;
 
+  // ค้นหาข้อมูลลายเซ็นของแต่ละระดับ
   const sigStaff = req.type !== 'repair' ? req.signatures.find((s) => s.level === 'staff') : undefined;
   const sigL2 = req.type !== 'repair' ? req.signatures.find((s) => s.level === 'l2') : undefined;
   const sigL1 = req.type !== 'repair' ? req.signatures.find((s) => s.level === 'l1') : undefined;
 
+  // ตรวจสอบว่าเป็นผู้อนุมัติขั้นสุดท้าย (นายก อบต. / APPROVER_L1) หรือไม่
   const isFinalApprover = account?.role === 'APPROVER_L1';
 
   return (
@@ -145,6 +189,7 @@ export default function ApproverSignDocumentPage() {
       footer={
         !otpStep && !completedL2 && signCheck.allowed ? (
           <div className="flex w-full sm:w-auto gap-2.5">
+            {/* ปุ่มลงนามไม่อนุมัติ / ไม่เห็นชอบ */}
             <button
               type="button"
               disabled={submitting || !signature.trim()}
@@ -153,6 +198,7 @@ export default function ApproverSignDocumentPage() {
             >
               ลงนาม{isFinalApprover ? 'ไม่อนุมัติ' : 'ไม่เห็นชอบ'}
             </button>
+            {/* ปุ่มลงนามอนุมัติ / เห็นชอบ */}
             <button
               type="button"
               disabled={!confirmed || !signature.trim() || submitting}
@@ -169,6 +215,7 @@ export default function ApproverSignDocumentPage() {
         ) : undefined
       }
     >
+      {/* กรณีระดับ 2 (ปลัด อบต.) ลงนามเสร็จแล้ว แสดงข้อความนำส่งระดับ 1 */}
       {completedL2 ? (
         <div className="jw-card p-6 flex flex-col items-center text-center gap-4">
           <div className="w-14 h-14 rounded-full bg-brand-mint text-brand flex items-center justify-center">
@@ -192,12 +239,13 @@ export default function ApproverSignDocumentPage() {
         </div>
       ) : !otpStep ? (
         <div className="flex flex-col gap-4">
+          {/* ส่วนหัวรหัสคำขอและป้ายสถานะ */}
           <div className="flex items-center justify-between">
             <b className="text-[16px]">{req.code}</b>
             <Chip tone="amber">รอคุณเขียนลายเซ็นลงนาม</Chip>
           </div>
 
-          {/* แถบสถานะเซสชัน OTP */}
+          {/* แถบสถานะเซสชัน OTP ยืนยันตัวตน */}
           <SignOtpVerifier
             initialEmail={account?.email}
             onVerified={() => {
@@ -205,6 +253,7 @@ export default function ApproverSignDocumentPage() {
             }}
           />
 
+          {/* สรุปข้อมูลคำขอเบื้องต้น */}
           <div className="jw-card p-4 flex flex-col gap-2 text-[14px]">
             <div className="flex gap-2">
               <b className="w-20 shrink-0 text-ink-mute">ผู้ขอ</b>
@@ -241,6 +290,7 @@ export default function ApproverSignDocumentPage() {
             )}
           </div>
 
+          {/* เอกสารแบบฟอร์มราชการขนาด A4 จำลอง */}
           {req.type !== 'repair' && showOfficialForm && <OfficialGovFormDocument req={req} />}
 
           {/* การ์ดแสดงลายเซ็น 4 ฝ่าย */}
@@ -281,7 +331,7 @@ export default function ApproverSignDocumentPage() {
             </div>
           </div>
 
-          {/* แถบขั้นตอน */}
+          {/* แถบสเต็ปลำดับการลงนาม */}
           <div className="flex flex-col gap-1.5">
             <div className="flex gap-1.5">
               {[1, 2, 3].map((n) => (
@@ -300,6 +350,7 @@ export default function ApproverSignDocumentPage() {
             <span className="text-[13px] text-ink-mute">{stepDesc}</span>
           </div>
 
+          {/* ตรวจสอบอำนาจการลงนาม หากไม่ตรงสเต็ปจะแจ้งเตือนและปิดช่องลงนาม */}
           {!signCheck.allowed ? (
             <div className="jw-card p-5 border-[#F5B7B1] bg-[#FFFDFD] flex flex-col gap-3">
               <div className="flex items-center justify-between gap-2">
@@ -319,6 +370,7 @@ export default function ApproverSignDocumentPage() {
               </button>
             </div>
           ) : (
+            /* กล่องวาดลายเซ็นดิจิทัล */
             <div className="jw-card p-4 flex flex-col gap-3">
               <label className="jw-lbl">
                 เขียนลายเซ็นของคุณบนหน้าจอ ({account?.name} · {account?.position})
@@ -332,6 +384,7 @@ export default function ApproverSignDocumentPage() {
                 skipPinPrompt
               />
 
+              {/* เช็คบ็อกซ์ยืนยันความถูกต้อง */}
               <div
                 onClick={() => setConfirmed((v) => !v)}
                 className="flex items-start gap-2.5 cursor-pointer select-none pt-1"
@@ -357,6 +410,7 @@ export default function ApproverSignDocumentPage() {
           )}
         </div>
       ) : (
+        /* สเต็ปยืนยัน OTP ก่อนเซ็น */
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <button
@@ -390,6 +444,7 @@ export default function ApproverSignDocumentPage() {
         </div>
       )}
 
+      {/* Modal แป้นพิมพ์กรอกรหัส PIN 6 หลัก */}
       {showPinModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
           <div className="w-full max-w-[420px] bg-white rounded-hard p-6 flex flex-col items-center gap-4 shadow-md">

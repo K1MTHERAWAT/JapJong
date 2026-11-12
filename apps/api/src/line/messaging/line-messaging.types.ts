@@ -1,32 +1,50 @@
 import { NotificationCategory, NotificationReferenceType } from '@japjong/shared';
 
+/**
+ * รูปแบบข้อความตัวอักษรธรรมดาของ LINE Messaging API
+ */
 export interface LineTextMessage {
   type: 'text';
   text: string;
 }
 
+/**
+ * รูปแบบข้อความ Flex Message แบบการ์ดสวยงามของ LINE Messaging API
+ */
 export interface LineFlexMessage {
   type: 'flex';
   altText: string;
   contents: Record<string, unknown>;
 }
 
+/**
+ * รวมชนิดของข้อความ LINE ที่ระบบรองรับ (ข้อความธรรมดา หรือ Flex Message)
+ */
 export type LineMessageObject = LineTextMessage | LineFlexMessage;
 
+/**
+ * ข้อมูลผลลัพธ์การส่งข้อความ Push Message ผ่าน LINE API
+ */
 export interface LinePushResult {
-  ok: boolean;
-  providerMessageId?: string;
-  statusCode?: number;
-  errorCode?: string;
-  errorMessage?: string;
-  retryable: boolean;
-  mock?: boolean;
+  ok: boolean;                     // สถานะความสำเร็จ
+  providerMessageId?: string;       // รหัสข้อความจากเซิร์ฟเวอร์ LINE
+  statusCode?: number;             // รหัส HTTP Status Code
+  errorCode?: string;              // รหัสข้อผิดพลาด
+  errorMessage?: string;           // คำอธิบายข้อผิดพลาด
+  retryable: boolean;              // สามารถลองส่งใหม่ได้หรือไม่ (เช่น กรณี Timeout/Network)
+  mock?: boolean;                  // เป็นการจำลองส่งในโหมดเดโมหรือไม่
 }
 
+/**
+ * ผลลัพธ์การเรียก LINE API ทั่วไป พร้อม Generic Data Payload
+ */
 export interface LineApiResult<T = unknown> extends LinePushResult {
   data?: T;
 }
 
+/**
+ * พื้นที่คลิกบนแถบเมนูด้านล่าง (Rich Menu Area)
+ */
 export interface LineRichMenuArea {
   bounds: {
     x: number;
@@ -44,6 +62,9 @@ export interface LineRichMenuArea {
   };
 }
 
+/**
+ * โครงสร้างข้อมูล Rich Menu ของ LINE
+ */
 export interface LineRichMenuObject {
   size: {
     width: number;
@@ -55,18 +76,21 @@ export interface LineRichMenuObject {
   areas: LineRichMenuArea[];
 }
 
+/**
+ * คีย์เหตุการณ์การแจ้งเตือนทั้งหมดในระบบราชการจับจอง
+ */
 export type NotificationEventKey =
-  // Booking — Citizen
+  // ขอใช้สถานที่ — ประชาชนผู้ขอ
   | 'BOOKING_SUBMITTED'
   | 'BOOKING_IN_REVIEW'
   | 'BOOKING_NEED_MORE_INFO'
   | 'BOOKING_APPROVED'
   | 'BOOKING_REJECTED'
   | 'BOOKING_REMINDER'
-  // Booking — Staff & Approver
+  // ขอใช้สถานที่ — เจ้าหน้าที่ & ผู้มีอำนาจลงนาม
   | 'STAFF_NEW_BOOKING'
   | 'STAFF_BOOKING_RESCHEDULED'
-  // Borrow — Citizen
+  // ขอยืมอุปกรณ์ — ประชาชนผู้ขอ
   | 'BORROW_SUBMITTED'
   | 'BORROW_IN_REVIEW'
   | 'BORROW_APPROVED'
@@ -75,11 +99,11 @@ export type NotificationEventKey =
   | 'BORROW_RETURN_REMINDER'
   | 'BORROW_OVERDUE'
   | 'BORROW_RETURNED'
-  // Borrow — Staff
+  // ขอยืมอุปกรณ์ — เจ้าหน้าที่
   | 'STAFF_NEW_BORROW'
   | 'STAFF_BORROW_RETURN_REQUESTED'
   | 'STAFF_BORROW_OVERDUE'
-  // Repair / Maintenance — Citizen
+  // แจ้งซ่อมบำรุง — ประชาชนผู้แจ้ง
   | 'REPAIR_SUBMITTED'
   | 'REPAIR_ACCEPTED'
   | 'REPAIR_IN_PROGRESS'
@@ -88,19 +112,22 @@ export type NotificationEventKey =
   | 'REPAIR_REJECTED'
   | 'REPAIR_FINISHED'
   | 'REPAIR_DONE'
-  // Repair — Staff
+  // แจ้งซ่อมบำรุง — เจ้าหน้าที่งานซ่อม
   | 'STAFF_NEW_REPAIR'
   | 'STAFF_REPAIR_REOPENED'
   | 'STAFF_REPAIR_CONFIRMED'
-  // Document Signing — Citizen & Staff/Approver
+  // ลงนามเอกสารอิเล็กทรอนิกส์ — ทุกฝ่าย
   | 'SIGNING_PENDING'
   | 'SIGNING_COMPLETED'
   | 'SIGNING_FULLY_APPROVED'
   | 'STAFF_SIGNING_REQUIRED'
   | 'STAFF_SIGNING_RETURNED'
-  // System / Test
+  // ข้อความทดสอบระบบ
   | 'TEST_NOTIFICATION';
 
+/**
+ * ข้อมูล Input สำหรับประกอบร่างเทมเพลตการแจ้งเตือน
+ */
 export interface NotificationTemplateInput {
   event: NotificationEventKey;
   recipientRole: 'CITIZEN' | 'STAFF';
@@ -117,6 +144,9 @@ export interface NotificationTemplateInput {
   useFlex?: boolean;
 }
 
+/**
+ * ข้อมูลการแจ้งเตือนที่สร้างเสร็จสมบูรณ์พร้อมส่งต่อ
+ */
 export interface BuiltNotificationContent {
   category: NotificationCategory;
   referenceType: NotificationReferenceType;
@@ -126,4 +156,3 @@ export interface BuiltNotificationContent {
   link: string;
   lineMessages: LineMessageObject[];
 }
-

@@ -1,5 +1,15 @@
 'use client';
 
+/**
+ * =====================================================================
+ * หน้าเอกสารราชการที่สร้างจากคำขอ (Admin Generated Documents Page)
+ * =====================================================================
+ * แสดงรายการเอกสารคำขอที่ถูกสร้างขึ้นจริงจากการยื่นขอใช้สถานที่หรือยืมครุภัณฑ์:
+ * 1. ตารางแสดงเลขที่เอกสาร, ชื่อเอกสาร, รหัสคำขอที่ผูก (Request ID), วันที่สร้าง
+ * 2. ค้นหาเอกสารตามเลขที่หรือชื่อเอกสาร
+ * 3. ลิงก์เชื่อมโยงไปยังหน้ารายละเอียดคำขอ และหน้าดูตัวอย่าง Snapshot ของเอกสาร
+ */
+
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { GeneratedDocumentItem } from '@japjong/shared';
@@ -8,11 +18,16 @@ import { Icon } from '@/components/icons';
 import { api, formatThaiDate } from '@/lib/api';
 
 export default function GeneratedDocumentsPage() {
+  // State รายการเอกสารที่ถูกสร้างขึ้น
   const [documents, setDocuments] = useState<GeneratedDocumentItem[]>([]);
+  // State กำลังโหลดข้อมูล
   const [loading, setLoading] = useState(true);
+  // State ข้อผิดพลาด
   const [error, setError] = useState('');
+  // State คำค้นหาเลขที่เอกสาร
   const [search, setSearch] = useState('');
 
+  // ฟังก์ชันดึงรายการเอกสารที่สร้างจากคำขอผ่าน API
   const fetchDocs = async () => {
     setLoading(true);
     try {
@@ -25,10 +40,12 @@ export default function GeneratedDocumentsPage() {
     }
   };
 
+  // โหลดรายการเมื่อ mount
   useEffect(() => {
     fetchDocs();
   }, []);
 
+  // ฟังก์ชันค้นหาเมื่อกด Submit แบบฟอร์ม
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     fetchDocs();
@@ -41,6 +58,7 @@ export default function GeneratedDocumentsPage() {
       rightLabel="แอดมิน"
     >
       <div className="w-full space-y-6">
+        {/* ส่วนหัวหน้าจอ */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-ink">เอกสารราชการที่สร้างจากคำขอ</h1>
@@ -57,7 +75,7 @@ export default function GeneratedDocumentsPage() {
           </Link>
         </div>
 
-        {/* Search */}
+        {/* ช่องค้นหาเอกสาร */}
         <div className="jw-card p-4">
           <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
@@ -79,7 +97,7 @@ export default function GeneratedDocumentsPage() {
           </form>
         </div>
 
-        {/* Documents Table */}
+        {/* ตารางแสดงเอกสาร */}
         {loading ? (
           <div className="jw-card p-12 text-center text-ink-mute">
             กำลังโหลดรายการเอกสาร...

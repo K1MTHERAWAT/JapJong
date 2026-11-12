@@ -14,6 +14,10 @@ import { CurrentUser, Public, Roles } from '../auth/auth.guard';
 import { DocumentsService } from './documents.service';
 import { DbService } from '../db/db.service';
 
+/**
+ * Controller บริหารจัดการเอกสารราชการอิเล็กทรอนิกส์ (Generated Documents)
+ * ให้บริการสร้างเอกสารจากแม่แบบ, ดึงรายละเอียด, สร้าง QR Code ตรวจสอบความถูกต้อง, และการเพิกถอนเอกสาร
+ */
 @ApiTags('Documents')
 @ApiBearerAuth('bearer')
 @Controller('documents')
@@ -24,7 +28,8 @@ export class DocumentsController {
   ) {}
 
   /**
-   * รายการเอกสารที่สร้างขึ้นทั้งหมด
+   * ดึงรายการเอกสารราชการที่สร้างขึ้นทั้งหมด (กรองตาม requestId หรือคำค้นหา)
+   * GET /documents
    */
   @Get()
   @Roles('USER', 'STAFF', 'APPROVER_L2', 'APPROVER_L1', 'ADMIN')
@@ -36,7 +41,8 @@ export class DocumentsController {
   }
 
   /**
-   * สร้างเอกสารใหม่จากแม่แบบ (Template)
+   * สร้างเอกสารราชการฉบับใหม่จากแม่แบบ (Template Engine)
+   * POST /documents/generate
    */
   @Post('generate')
   @Roles('USER', 'STAFF', 'APPROVER_L2', 'APPROVER_L1', 'ADMIN')
@@ -48,7 +54,8 @@ export class DocumentsController {
   }
 
   /**
-   * ดูรายละเอียดเอกสาร
+   * ดึงรายละเอียดเอกสารราชการรายฉบับ
+   * GET /documents/:id
    */
   @Get(':id')
   @Roles('USER', 'STAFF', 'APPROVER_L2', 'APPROVER_L1', 'ADMIN')
@@ -57,7 +64,8 @@ export class DocumentsController {
   }
 
   /**
-   * สร้างหรือดึงข้อมูลยืนยันเอกสารและ QR Code
+   * สร้างหรือดึงข้อมูลการยืนยันเอกสารและรูปภาพ QR Code (Digital Verification & QR Engine)
+   * POST /documents/:id/verification
    */
   @Post(':id/verification')
   @Roles('USER', 'STAFF', 'APPROVER_L2', 'APPROVER_L1', 'ADMIN')
@@ -74,7 +82,8 @@ export class DocumentsController {
   }
 
   /**
-   * ดึงข้อมูลการยืนยันเอกสารพร้อม QR Code
+   * ดึงข้อมูลการยืนยันเอกสารพร้อมภาพ QR Code (Public สำหรับให้ผู้เกี่ยวข้องตรวจสอบ)
+   * GET /documents/:id/verification
    */
   @Get(':id/verification')
   @Public()
@@ -83,7 +92,8 @@ export class DocumentsController {
   }
 
   /**
-   * ยกเลิกการยืนยันเอกสาร
+   * ยกเลิกหรือเพิกถอนความถูกต้องของเอกสารราชการ (Revoke Verification)
+   * POST /documents/:id/revoke
    */
   @Post(':id/revoke')
   @Roles('STAFF', 'APPROVER_L2', 'APPROVER_L1', 'ADMIN')
@@ -95,4 +105,3 @@ export class DocumentsController {
     return this.documentsService.revokeVerification(id, reason, user);
   }
 }
-

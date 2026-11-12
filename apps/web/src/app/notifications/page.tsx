@@ -1,8 +1,21 @@
 'use client';
 
+/**
+ * =====================================================================
+ * ศูนย์การแจ้งเตือน (Notification Center Page) - ระบบจับจอง
+ * =====================================================================
+ * ศูนย์กลางรวบรวมและติดตามการแจ้งเตือนทั้งหมดของผู้ใช้:
+ * 1. แสดงรายการแจ้งเตือนแบบเรียลไทม์ พร้อมจำแนกตามสีและไอคอนของประเภทบริการ
+ * 2. ตัวกรองหมวดหมู่ (Pill Filters): ทั้งหมด, ยังไม่อ่าน, จองสถานที่, ยืม-คืน, แจ้งซ่อม, และเอกสารลงนาม
+ * 3. ปุ่มทำเครื่องหมายว่าอ่านทั้งหมด (Mark All as Read)
+ * 4. คลิกเพื่ออ่านและนำทางตรงไปยังหน้าคำขอหรือเอกสารที่เกี่ยวข้อง (Deep Link)
+ * 5. ปุ่มทางลัดไปยังหน้าตั้งค่าช่องทางรับการแจ้งเตือน (/notifications/settings)
+ */
+
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+// ไอคอนสำหรับสถานะ ประเภทบริการ และปุ่มคำสั่ง
 import {
   Bell,
   Building2,
@@ -17,22 +30,33 @@ import {
   Wrench,
 } from 'lucide-react';
 import { AppNotification } from '@japjong/shared';
+// Context ระบบยืนยันตัวตนและการแจ้งเตือน
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Button, Card, Chip } from '@/components/ui';
+// ฟังก์ชันจัดรูปแบบวัน-เวลาภาษาไทย
 import { formatThaiDateTime } from '@/lib/api';
 
+/** ประเภทตัวกรองการแจ้งเตือน */
 type NotificationFilter = 'all' | 'unread' | 'booking' | 'borrow' | 'repair' | 'signing';
 
 export default function NotificationCenterPage() {
   const router = useRouter();
+  // ดึงรายการแจ้งเตือน จำนวนที่ยังไม่อ่าน และฟังก์ชันทำเครื่องหมายอ่านแล้ว
   const { notifications, unreadCount, markNotificationRead, markAllNotificationsRead } = useAuth();
+  // สถานะตัวกรองปัจจุบัน (ค่าเริ่มต้นคือ 'all')
   const [filter, setFilter] = useState<NotificationFilter>('all');
+  // สถานะการบันทึกเมื่อกดปุ่มอ่านทั้งหมด
   const [markingAll, setMarkingAll] = useState(false);
 
+  /**
+   * กรองรายการแจ้งเตือนตามหมวดหมู่ที่ผู้ใช้เลือก
+   */
   const filteredNotifications = useMemo(() => {
     return notifications.filter((n) => {
+      // กรองเฉพาะที่ยังไม่ได้อ่าน
       if (filter === 'unread') return !n.read;
+      // กรองเฉพาะบริการขอใช้สถานที่
       if (filter === 'booking') {
         return (
           n.referenceType === 'booking' ||
@@ -40,6 +64,7 @@ export default function NotificationCenterPage() {
           n.title?.includes('จอง')
         );
       }
+      // กรองเฉพาะบริการขอยืม-คืนอุปกรณ์
       if (filter === 'borrow') {
         return (
           n.referenceType === 'borrow' ||
@@ -49,6 +74,7 @@ export default function NotificationCenterPage() {
           n.title?.includes('คืน')
         );
       }
+      // กรองเฉพาะบริการแจ้งซ่อมบำรุง
       if (filter === 'repair') {
         return (
           n.referenceType === 'repair' ||
@@ -56,6 +82,7 @@ export default function NotificationCenterPage() {
           n.title?.includes('ซ่อม')
         );
       }
+      // กรองเฉพาะเอกสารราชการและการลงนามอนุมัติ
       if (filter === 'signing') {
         return (
           n.referenceType === 'signing' ||
@@ -68,6 +95,9 @@ export default function NotificationCenterPage() {
     });
   }, [notifications, filter]);
 
+  /**
+   * จัดการทำเครื่องหมายว่าอ่านข้อความแจ้งเตือนทั้งหมด
+   */
   const handleMarkAllRead = async () => {
     setMarkingAll(true);
     try {
@@ -77,6 +107,9 @@ export default function NotificationCenterPage() {
     }
   };
 
+  /**
+   * เมื่อคลิกรายการแจ้งเตือน: ทำเครื่องหมายอ่านแล้ว และเปิดลิงก์ปลายทาง
+   */
   const handleClickItem = async (n: AppNotification) => {
     if (!n.read) {
       await markNotificationRead(n.id);
@@ -86,6 +119,9 @@ export default function NotificationCenterPage() {
     }
   };
 
+  /**
+   * เลือกไอคอนประจำประเภทบริการเพื่อแสดงในกล่องแจ้งเตือน
+   */
   const getCategoryIcon = (n: AppNotification) => {
     if (n.referenceType === 'booking' || n.notificationType === 'BOOKING_STATUS') {
       return <Building2 className="size-5 text-brand" />;
@@ -109,7 +145,7 @@ export default function NotificationCenterPage() {
   return (
     <AppShell maxWidth="max-w-[960px]">
       <div className="flex flex-col gap-6">
-        {/* Header Bar */}
+        {/* แถบส่วนหัวแสดงชื่อหน้าและปุ่มคำสั่ง */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -126,12 +162,14 @@ export default function NotificationCenterPage() {
           </div>
 
           <div className="flex items-center gap-2.5">
+            {/* ปุ่มไปหน้าตั้งค่าช่องทางแจ้งเตือน */}
             <Link href="/notifications/settings">
               <Button variant="secondary" className="gap-2">
                 <Settings className="size-4" />
                 <span>ตั้งค่าการแจ้งเตือน</span>
               </Button>
             </Link>
+            {/* ปุ่มอ่านทั้งหมด (แสดงเมื่อมีข้อความที่ยังไม่ได้อ่าน) */}
             {unreadCount > 0 && (
               <Button
                 variant="primary"
@@ -146,8 +184,9 @@ export default function NotificationCenterPage() {
           </div>
         </div>
 
-        {/* Filter Pills */}
+        {/* แถบปุ่มแคปซูลเลือกตัวกรองหมวดหมู่ (Filter Pills) */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          {/* ตัวกรอง: ทั้งหมด */}
           <button
             type="button"
             onClick={() => setFilter('all')}
@@ -159,6 +198,7 @@ export default function NotificationCenterPage() {
           >
             ทั้งหมด ({notifications.length})
           </button>
+          {/* ตัวกรอง: ยังไม่อ่าน */}
           <button
             type="button"
             onClick={() => setFilter('unread')}
@@ -170,6 +210,7 @@ export default function NotificationCenterPage() {
           >
             ยังไม่อ่าน ({unreadCount})
           </button>
+          {/* ตัวกรอง: ขอใช้สถานที่ */}
           <button
             type="button"
             onClick={() => setFilter('booking')}
@@ -181,6 +222,7 @@ export default function NotificationCenterPage() {
           >
             จองสถานที่
           </button>
+          {/* ตัวกรอง: ยืม-คืนอุปกรณ์ */}
           <button
             type="button"
             onClick={() => setFilter('borrow')}
@@ -192,6 +234,7 @@ export default function NotificationCenterPage() {
           >
             ยืม-คืนอุปกรณ์
           </button>
+          {/* ตัวกรอง: งานแจ้งซ่อม */}
           <button
             type="button"
             onClick={() => setFilter('repair')}
@@ -203,6 +246,7 @@ export default function NotificationCenterPage() {
           >
             งานแจ้งซ่อม
           </button>
+          {/* ตัวกรอง: ลงนามเอกสาร */}
           <button
             type="button"
             onClick={() => setFilter('signing')}
@@ -216,9 +260,10 @@ export default function NotificationCenterPage() {
           </button>
         </div>
 
-        {/* Notifications List */}
+        {/* รายการแจ้งเตือน (Notifications List Card) */}
         <Card padding="none" className="overflow-hidden divide-y divide-line-soft">
           {filteredNotifications.length === 0 ? (
+            // กรณีไม่มีรายการแจ้งเตือนตามตัวกรอง
             <div className="py-16 text-center text-body text-muted flex flex-col items-center justify-center gap-3">
               <div className="size-12 rounded-full bg-surface-muted flex items-center justify-center text-ink-mute">
                 <Bell className="size-6" />
@@ -237,6 +282,7 @@ export default function NotificationCenterPage() {
                   !n.read ? 'bg-[#F2F7F4]/60 hover:bg-[#E8F1EC]' : 'bg-white hover:bg-surface-muted/60'
                 }`}
               >
+                {/* ไอคอนประจำประเภทบริการ */}
                 <div
                   className={`size-11 rounded-control flex items-center justify-center shrink-0 border ${
                     !n.read
@@ -247,6 +293,7 @@ export default function NotificationCenterPage() {
                   {getCategoryIcon(n)}
                 </div>
 
+                {/* รายละเอียดข้อความแจ้งเตือน */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <b
@@ -256,6 +303,7 @@ export default function NotificationCenterPage() {
                     >
                       {n.title}
                     </b>
+                    {/* เวลาที่ส่งแจ้งเตือน */}
                     <span className="text-[12px] text-ink-mute shrink-0 flex items-center gap-1">
                       <Clock className="size-3" />
                       {formatThaiDateTime(n.createdAt || n.at)}
@@ -266,6 +314,7 @@ export default function NotificationCenterPage() {
                     {n.message || n.body}
                   </p>
 
+                  {/* แถบลิงก์และรหัสอ้างอิงคำขอ */}
                   <div className="flex items-center gap-3 mt-3">
                     {n.referenceId && (
                       <span className="text-[12px] font-mono font-medium px-2 py-0.5 rounded bg-surface-muted border border-line text-ink-soft">
@@ -278,6 +327,7 @@ export default function NotificationCenterPage() {
                         <ExternalLink className="size-3" />
                       </span>
                     )}
+                    {/* จุดและข้อความระบุว่ายังไม่ได้อ่าน */}
                     {!n.read && (
                       <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-brand font-semibold">
                         <span className="size-2 rounded-full bg-brand" />
@@ -294,4 +344,5 @@ export default function NotificationCenterPage() {
     </AppShell>
   );
 }
+
 

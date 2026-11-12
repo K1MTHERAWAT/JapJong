@@ -1,7 +1,10 @@
-'use client';
+'use client'; // กำหนดให้คอมโพเนนต์นี้ทำงานในฝั่ง Client (React Client Component)
 
+// นำเข้า React Hooks พื้นฐานสำหรับจัดการ State, Effects, Memoization, Callbacks และ Refs
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+// นำเข้า Link สำหรับการนำทางระหว่างหน้า
 import Link from 'next/link';
+// นำเข้า Type และฟังก์ชันคำนวณสิทธิ์การรับอุปกรณ์จากแพ็กเกจกลาง shared
 import {
   BorrowRequest,
   checkBorrowReceiveEligibility,
@@ -9,31 +12,44 @@ import {
   getBangkokDateString,
   RequestWithTimeline,
 } from '@japjong/shared';
+// นำเข้า Auth Context สำหรับดึงข้อมูลบัญชีผู้ใช้งานที่ล็อกอินอยู่
 import { useAuth } from '@/components/auth-context';
+// นำเข้า AppShell คอมโพเนนต์เลย์เอาต์หลักของแอปพลิเคชัน
 import { AppShell } from '@/components/shell';
+// นำเข้า Icon แสดงรูปไอคอน SVG
 import { Icon } from '@/components/icons';
+// นำเข้า API client, ฟังก์ชันจัดรูปแบบวันเวลาภาษาไทย, และฟังก์ชันบีบอัดรูปภาพ
 import { api, formatThaiDate, formatThaiDateTime, readAndCompressImages } from '@/lib/api';
 
+// แท็บสถานะการยืม: 'borrowing' (กำลังยืม/รอรับ), 'inspect' (ตรวจรับสภาพ), 'history' (ประวัติการคืน)
 type BorrowTab = 'borrowing' | 'inspect' | 'history';
 
+// ชนิดข้อมูลคำขอยืมพร้อมไทม์ไลน์สถานะ
 type ExtendedBorrowRequest = RequestWithTimeline & BorrowRequest;
 
+// ชนิดไฟล์รูปภาพที่อนุญาตให้อัปโหลด
 const ALLOWED_IMAGE_MIMES = [
   'image/jpeg',
   'image/jpg',
   'image/png',
   'image/webp',
 ];
+// ขนาดไฟล์ภาพสูงสุดไม่เกิน 10 MB
 const MAX_IMAGE_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
+// จำนวนรายการที่แสดงเริ่มต้นก่อนกดดูเพิ่มเติม
 const INITIAL_VISIBLE_COUNT = 8;
 
+/**
+ * หน้าจอรายการยืม–คืนอุปกรณ์ของฉัน (/borrow/my)
+ * บังคับใช้ Account Isolation เด็ดขาด "บัญชีใครบัญชีมัน" (mine=1) สำหรับประชาชนในการติดตาม, บันทึกรับอุปกรณ์, ส่งคืน, และขอเลื่อนกำหนดส่ง
+ */
 export default function MyBorrowsPage() {
   const { account } = useAuth();
-  const [items, setItems] = useState<ExtendedBorrowRequest[]>([]);
-  const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
-  const [tab, setTab] = useState<BorrowTab>('borrowing');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [items, setItems] = useState<ExtendedBorrowRequest[]>([]); // รายการคำขอยืมของฉันทั้งหมด
+  const [equipmentList, setEquipmentList] = useState<Equipment[]>([]); // ข้อมูลอุปกรณ์สำหรับอ้างอิง
+  const [tab, setTab] = useState<BorrowTab>('borrowing'); // แท็บที่เลือกอยู่
+  const [searchQuery, setSearchQuery] = useState(''); // คำค้นหา
+  const [selectedId, setSelectedId] = useState<string | null>(null); // รหัสคำขอที่เลือกดูรายละเอียด
   const [visibleCount, setVisibleCount] = useState<number>(INITIAL_VISIBLE_COUNT);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);

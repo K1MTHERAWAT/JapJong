@@ -1,5 +1,16 @@
 'use client';
 
+/**
+ * =====================================================================
+ * หน้าแดชบอร์ดศูนย์ปฏิบัติการเจ้าหน้าที่ (Staff Operation Center Page)
+ * =====================================================================
+ * รวมศูนย์คิวงานที่เจ้าหน้าที่ต้องดำเนินการ:
+ * 1. ตรวจสอบคำขอใช้สถานที่/ยืมอุปกรณ์ (Review Queue)
+ * 2. รับงานและจัดการงานแจ้งซ่อมบำรุง (Repair Queue)
+ * 3. ตรวจสอบสภาพและตรวจรับคืนอุปกรณ์ (Inspect/Return Queue)
+ * 4. ทางลัดจัดการทรัพยากร สแกน QR ตรวจสอบ และยื่นคำขอแทนประชาชน
+ */
+
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -23,31 +34,46 @@ import { AppShell } from '@/components/shell';
 import { RequestTypeChip, StatusChip } from '@/components/ui';
 import { api, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
 
+// ชนิดแท็บกรองสถานะคิวงานของเจ้าหน้าที่
 type QueueTab = 'all' | 'review' | 'repair' | 'inspect';
 
 export default function StaffHomePage() {
   const router = useRouter();
+  // ดึงข้อมูลบัญชีผู้ใช้ปัจจุบันเพื่อตรวจสิทธิ์และการแสดงผลสังกัด/หน่วยงาน
   const { account } = useAuth();
 
+  // State เก็บรายการคำขอในคิวงานเจ้าหน้าที่
   const [queue, setQueue] = useState<RequestWithTimeline[]>([]);
+  // State เก็บรายการคำขอยืมอุปกรณ์ที่อยู่ในสถานะรอตรวจสอบสภาพรับคืน
   const [inspectQueue, setInspectQueue] = useState<RequestWithTimeline[]>([]);
+  // State เก็บรายการสถานที่ทั้งหมด
   const [venues, setVenues] = useState<Venue[]>([]);
+  // State เก็บรายการอุปกรณ์ทั้งหมด
   const [equipment, setEquipment] = useState<Equipment[]>([]);
+  // State สถานะกำลังโหลดข้อมูล
   const [loading, setLoading] = useState(true);
 
+  // State แท็บคิวงานที่กำลังเลือกดู
   const [activeTab, setActiveTab] = useState<QueueTab>('all');
+  // State คำค้นหา (เลขคำขอ, ชื่องาน, ชื่อผู้ยื่น)
   const [searchQuery, setSearchQuery] = useState('');
 
+  // โหลดข้อมูลคิวงานและข้อมูลทรัพยากรเมื่อ mount หรือบัญชีผู้ใช้เปลี่ยน
   useEffect(() => {
     setLoading(true);
     Promise.all([
+      // คิวงานตรวจสอบคำขอของเจ้าหน้าที่
       api.listRequests({ queue: 'staff' }).catch(() => [] as RequestWithTimeline[]),
+      // คิวงานรับมอบ-รับคืนอุปกรณ์
       api.listRequests({ type: 'borrow', queue: 'handover' }).catch(() => [] as RequestWithTimeline[]),
+      // รายการสถานที่ทั้งหมด
       api.venues().catch(() => [] as Venue[]),
+      // รายการอุปกรณ์ทั้งหมด
       api.equipment().catch(() => [] as Equipment[]),
     ])
       .then(([staffList, handoverList, venueList, eqList]) => {
         setQueue(staffList);
+        // คัดกรองเฉพาะคำขอยืมที่ผู้ยื่นนำของมาคืนแล้ว รอเจ้าหน้าที่ตรวจสภาพ
         setInspectQueue(handoverList.filter((r) => r.status === 'return_inspect'));
         setVenues(venueList);
         setEquipment(eqList);
@@ -55,10 +81,12 @@ export default function StaffHomePage() {
       .finally(() => setLoading(false));
   }, [account?.id]);
 
+  // คำขอด้านสถานที่และอุปกรณ์ที่รอเจ้าหน้าที่ตรวจสอบ (ไม่รวมงานซ่อม)
   const reviewItems = useMemo(() => queue.filter((r) => r.type !== 'repair'), [queue]);
+  // รายการแจ้งซ่อมที่รอเจ้าหน้าที่จัดการ/ประสานงาน
   const repairItems = useMemo(() => queue.filter((r) => r.type === 'repair'), [queue]);
 
-  // Combine queue items avoiding duplicates
+  // รวมรายการคิวงานทั้งหมดเข้าด้วยกัน โดยขจัดรายการที่รหัสซ้ำซ้อน
   const combinedQueue = useMemo(() => {
     const map = new Map<string, RequestWithTimeline>();
     for (const item of queue) map.set(item.id, item);
@@ -70,17 +98,22 @@ export default function StaffHomePage() {
     );
   }, [queue, inspectQueue]);
 
+  // กรองรายการคิวงานตามแท็บที่เลือก และคำค้นหา
   const filteredItems = useMemo(() => {
     return combinedQueue.filter((r) => {
+      // แท็บตรวจคำขอสถานที่/อุปกรณ์: กรองงานซ่อมและงานตรวจรับคืนออก
       if (activeTab === 'review' && (r.type === 'repair' || r.status === 'return_inspect')) {
         return false;
       }
+      // แท็บแจ้งซ่อม: กรองคำขออื่นออก
       if (activeTab === 'repair' && r.type !== 'repair') {
         return false;
       }
+      // แท็บตรวจรับคืน: กรองสถานะอื่นออก
       if (activeTab === 'inspect' && r.status !== 'return_inspect') {
         return false;
       }
+      // ค้นหาตามข้อความ (Case-insensitive)
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         return (
@@ -94,9 +127,11 @@ export default function StaffHomePage() {
     });
   }, [combinedQueue, activeTab, searchQuery]);
 
+  // จำนวนสถานที่และอุปกรณ์ที่เปิดใช้งานอยู่
   const enabledVenuesCount = venues.filter((v) => v.enabled).length;
   const enabledEquipmentCount = equipment.filter((e) => e.enabled).length;
 
+  // ฟังก์ชันนำทางไปยังหน้ารายละเอียดตามประเภทคำขอและสถานะ
   const handleRowNavigate = (r: RequestWithTimeline) => {
     if (r.type === 'repair') {
       router.push(`/staff/repairs?id=${r.id}`);
@@ -110,7 +145,7 @@ export default function StaffHomePage() {
   return (
     <AppShell title="หน้าหลักเจ้าหน้าที่" maxWidth="max-w-none">
       <div className="flex flex-col gap-6">
-        {/* 1. Top Header Banner */}
+        {/* 1. ส่วนหัวต้อนรับเจ้าหน้าที่และปุ่มลัด (Header Banner) */}
         <div className="jw-card p-5 sm:p-6 bg-gradient-to-r from-surface via-surface to-brand-tint/40 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="min-w-0">
             <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-brand-tint text-brand text-[12px] font-semibold mb-2">
@@ -125,6 +160,7 @@ export default function StaffHomePage() {
             </p>
           </div>
 
+          {/* ทางลัดสแกน QR, จัดการทรัพยากร, และเพิ่มทรัพยากรใหม่ */}
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
             <Link
               href="/staff/verify"
@@ -150,9 +186,9 @@ export default function StaffHomePage() {
           </div>
         </div>
 
-        {/* 2. 4 Primary KPI & Task Cards */}
+        {/* 2. การ์ดสถิติสรุปงานหลัก 4 ด้าน (KPI Cards) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          {/* Card 1: ตรวจคำขอ */}
+          {/* การ์ด 1: รอตรวจคำขอสถานที่/อุปกรณ์ */}
           <Link
             href="/staff/review"
             className={`jw-card p-5 flex flex-col justify-between gap-4 border-l-4 border-l-brand hover:border-brand hover:shadow-md transition group ${
@@ -182,7 +218,7 @@ export default function StaffHomePage() {
             </div>
           </Link>
 
-          {/* Card 2: จัดการงานซ่อม */}
+          {/* การ์ด 2: งานแจ้งซ่อมรอจัดการ */}
           <Link
             href="/staff/repairs"
             className={`jw-card p-5 flex flex-col justify-between gap-4 border-l-4 border-l-amber-500 hover:border-amber-500 hover:shadow-md transition group ${
@@ -212,7 +248,7 @@ export default function StaffHomePage() {
             </div>
           </Link>
 
-          {/* Card 3: รอตรวจรับคืนอุปกรณ์ */}
+          {/* การ์ด 3: รอตรวจรับคืนอุปกรณ์ */}
           <Link
             href="/borrow/my?tab=inspect"
             className="jw-card p-5 flex flex-col justify-between gap-4 border-l-4 border-l-blue-600 hover:border-blue-600 hover:shadow-md transition group"
@@ -240,7 +276,7 @@ export default function StaffHomePage() {
             </div>
           </Link>
 
-          {/* Card 4: จัดการทรัพยากร */}
+          {/* การ์ด 4: จัดการทรัพยากรสถานที่ & อุปกรณ์ */}
           <Link
             href="/staff/resources"
             className={`jw-card p-5 flex flex-col justify-between gap-4 border-l-4 border-l-emerald-600 hover:border-brand hover:shadow-md transition group ${
@@ -271,12 +307,12 @@ export default function StaffHomePage() {
           </Link>
         </div>
 
-        {/* 3. Main 2-Column Layout: Left = Work Queue Table (8 cols), Right = Quick Services & Resource Summary (4 cols) */}
+        {/* 3. ผังสองคอลัมน์: ซ้าย = ตารางคิวงาน (8 คอลัมน์), ขวา = เมนูบริการด่วน (4 คอลัมน์) */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-          {/* Left Column: Work Queue */}
+          {/* คอลัมน์ซ้าย: รายการตารางคิวงาน */}
           <div className="xl:col-span-8 flex flex-col gap-4 min-w-0">
             <div className="jw-card overflow-hidden">
-              {/* Queue Header & Filter Bar */}
+              {/* แถบหัวเรื่องและตัวกรองคิวงาน */}
               <div className="p-4 sm:p-5 border-b border-line flex flex-col gap-3.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
@@ -297,7 +333,7 @@ export default function StaffHomePage() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  {/* Filter Pills */}
+                  {/* ปุ่มแท็บเลือกหมวดหมู่งาน */}
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {(
                       [
@@ -322,7 +358,7 @@ export default function StaffHomePage() {
                     ))}
                   </div>
 
-                  {/* Search Input */}
+                  {/* ช่องค้นหารายการคำขอ */}
                   <div className="relative w-full sm:w-64">
                     <Search className="size-4 text-ink-mute absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
@@ -345,7 +381,7 @@ export default function StaffHomePage() {
                 </div>
               </div>
 
-              {/* Queue Table / List */}
+              {/* ส่วนเนื้อหาตารางคิวงาน */}
               {loading ? (
                 <div className="p-10 text-center text-[13.5px] text-ink-mute">
                   กำลังโหลดรายการคิวงาน...
@@ -362,7 +398,7 @@ export default function StaffHomePage() {
                 </div>
               ) : (
                 <>
-                  {/* Desktop Table */}
+                  {/* แสดงผลแบบตารางบนจอ Desktop */}
                   <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead>
@@ -378,6 +414,7 @@ export default function StaffHomePage() {
                       </thead>
                       <tbody className="divide-y divide-line text-[13.5px]">
                         {filteredItems.map((r) => {
+                          // จัดรูปแบบวันเวลาตามประเภทคำขอ
                           const scheduleText =
                             r.type === 'booking'
                               ? formatPeriodRange(r.periods?.[0])
@@ -443,7 +480,7 @@ export default function StaffHomePage() {
                     </table>
                   </div>
 
-                  {/* Mobile Card List */}
+                  {/* แสดงผลแบบการ์ดรายการบนจอมือถือ Mobile */}
                   <div className="md:hidden divide-y divide-line">
                     {filteredItems.map((r) => {
                       const sub =
@@ -477,9 +514,8 @@ export default function StaffHomePage() {
             </div>
           </div>
 
-          {/* Right Column: Quick Services & Resource Status */}
+          {/* คอลัมน์ขวา: ทางลัดเมนูปฏิบัติงานและบริการด่วน */}
           <div className="xl:col-span-4 flex flex-col gap-4">
-            {/* Quick Operations Card */}
             <div className="jw-card p-5 flex flex-col gap-3.5">
               <div>
                 <h2 className="text-[16px] font-bold text-ink">เมนูปฏิบัติงานและบริการด่วน</h2>
@@ -489,6 +525,7 @@ export default function StaffHomePage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2.5">
+                {/* ลิงก์จัดการสถานที่และอุปกรณ์ */}
                 <Link
                   href="/staff/resources"
                   className="p-3 rounded-xl border border-line hover:border-emerald-500 hover:bg-emerald-50/50 transition flex items-center gap-3 group"
@@ -507,6 +544,7 @@ export default function StaffHomePage() {
                   <ArrowRight className="size-4 text-ink-mute group-hover:text-emerald-700 shrink-0 transition" />
                 </Link>
 
+                {/* ลิงก์ตั้งค่าแม่แบบฟอร์มราชการ */}
                 <Link
                   href="/staff/resources?tab=forms"
                   className="p-3 rounded-xl border border-line hover:border-indigo-500 hover:bg-indigo-50/50 transition flex items-center gap-3 group"
@@ -525,6 +563,7 @@ export default function StaffHomePage() {
                   <ArrowRight className="size-4 text-ink-mute group-hover:text-indigo-700 shrink-0 transition" />
                 </Link>
 
+                {/* ลิงก์ยื่นคำขอใช้สถานที่แทนประชาชน */}
                 <Link
                   href="/booking"
                   className="p-3 rounded-xl border border-line hover:border-teal-500 hover:bg-teal-50/50 transition flex items-center gap-3 group"
@@ -543,6 +582,7 @@ export default function StaffHomePage() {
                   <ArrowRight className="size-4 text-ink-mute group-hover:text-teal-700 shrink-0 transition" />
                 </Link>
 
+                {/* ลิงก์ยื่นคำขอยืม–คืนอุปกรณ์แทนประชาชน */}
                 <Link
                   href="/borrow"
                   className="p-3 rounded-xl border border-line hover:border-amber-500 hover:bg-amber-50/50 transition flex items-center gap-3 group"
@@ -561,6 +601,7 @@ export default function StaffHomePage() {
                   <ArrowRight className="size-4 text-ink-mute group-hover:text-amber-700 shrink-0 transition" />
                 </Link>
 
+                {/* ลิงก์ดูประวัติคำขอทั้งหมดในระบบ */}
                 <Link
                   href="/history"
                   className="p-3 rounded-xl border border-line hover:border-blue-500 hover:bg-blue-50/50 transition flex items-center gap-3 group"

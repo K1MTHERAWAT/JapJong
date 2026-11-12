@@ -1,5 +1,15 @@
 'use client';
 
+/**
+ * =====================================================================
+ * หน้าประวัติเวอร์ชันแม่แบบเอกสารราชการ (Document Template Versions & Rollback)
+ * =====================================================================
+ * ควบคุมวงจรชีวิตและประวัติการเปลี่ยนแปลงของแม่แบบเอกสาร (Version Control):
+ * 1. แสดงไทม์ไลน์ของเวอร์ชันทั้งหมดที่เคย Publish (v1, v2, ...) พร้อมหมายเหตุและผู้เผยแพร่
+ * 2. ตรวจสอบ Snapshot โครงสร้างเอกสารของแต่ละเวอร์ชัน
+ * 3. ระบบย้อนกลับเวอร์ชัน (Rollback Version): แทนที่โครงสร้างปัจจุบันด้วยเวอร์ชันที่เลือกทันที
+ */
+
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -16,13 +26,20 @@ export default function DocumentTemplateVersionsPage() {
   const router = useRouter();
   const templateId = String(params.id || '');
 
+  // State ข้อมูลแม่แบบเอกสาร
   const [template, setTemplate] = useState<DocumentTemplateItem | null>(null);
+  // State รายการประวัติเวอร์ชันทั้งหมด
   const [versions, setVersions] = useState<DocumentTemplateVersionItem[]>([]);
+  // State เวอร์ชันที่กำลังคลิกเลือกดู Snapshot
   const [selectedVer, setSelectedVer] = useState<DocumentTemplateVersionItem | null>(null);
+  // State กำลังโหลด
   const [loading, setLoading] = useState(true);
+  // State ข้อผิดพลาด
   const [error, setError] = useState('');
+  // State กำลังประมวลผลคำสั่งย้อนกลับ (Rollback)
   const [actionLoading, setActionLoading] = useState(false);
 
+  // ดึงข้อมูลแม่แบบและประวัติเวอร์ชันจาก API
   useEffect(() => {
     async function loadData() {
       if (!templateId) return;
@@ -46,6 +63,7 @@ export default function DocumentTemplateVersionsPage() {
     loadData();
   }, [templateId]);
 
+  // ฟังก์ชันย้อนกลับไปใช้เวอร์ชันเก่า (Rollback)
   const handleRollback = async (verNum: number) => {
     if (!confirm(`ยืนยันการย้อนกลับ (Rollback) แม่แบบเอกสารนี้เป็นเวอร์ชัน v${verNum}? โครงสร้างปัจจุบันจะถูกแทนที่ด้วยเวอร์ชันนี้`)) {
       return;
@@ -69,7 +87,7 @@ export default function DocumentTemplateVersionsPage() {
       rightLabel="แอดมิน"
     >
       <div className="w-full space-y-6">
-        {/* Header bar */}
+        {/* ส่วนหัวหน้าจอ */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -110,7 +128,7 @@ export default function DocumentTemplateVersionsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-            {/* Version timeline list */}
+            {/* คอลัมน์ซ้าย: รายการเวอร์ชันทั้งหมด (Version timeline list) */}
             <div className="jw-card p-4 space-y-3 lg:col-span-1">
               <h2 className="text-sm font-bold text-ink mb-2">รายการเวอร์ชันทั้งหมด</h2>
               <div className="space-y-2">
@@ -153,7 +171,7 @@ export default function DocumentTemplateVersionsPage() {
               </div>
             </div>
 
-            {/* Version Snapshot Details & Preview */}
+            {/* คอลัมน์ขวา: รายละเอียด Snapshot ของเวอร์ชันที่เลือก */}
             <div className="jw-card p-6 lg:col-span-2 space-y-4">
               {selectedVer ? (
                 <>
@@ -175,6 +193,7 @@ export default function DocumentTemplateVersionsPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      {/* ปุ่มสั่ง Rollback ถอยกลับมาใช้เวอร์ชันนี้ */}
                       {template?.currentVersion !== selectedVer.version && (
                         <button
                           type="button"
@@ -196,7 +215,7 @@ export default function DocumentTemplateVersionsPage() {
                     </div>
                   )}
 
-                  {/* Document Structure Snapshot */}
+                  {/* โครงสร้างเนื้อหาของเวอร์ชันนี้ */}
                   <div className="space-y-3 pt-2">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-ink-mute">
                       โครงสร้างเนื้อหาของเวอร์ชันนี้

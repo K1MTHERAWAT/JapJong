@@ -1,5 +1,17 @@
 'use client';
 
+/**
+ * =====================================================================
+ * หน้ากรอกคำขอแทนประชาชนหน้าเคาน์เตอร์ (Staff Walk-in Desk Page)
+ * =====================================================================
+ * ระบบบริการอำนวยความสะดวกสำหรับประชาชนที่เดินทางมาติดต่อด้วยตนเอง:
+ * 1. ค้นหาฐานข้อมูลประชาชนเดิมด้วยชื่อหรือเบอร์โทรศัพท์ (Auto-fill) หรือสร้างผู้ใช้ใหม่
+ * 2. รองรับการยื่น 3 บริการ: ขอใช้สถานที่ (booking), ยืมอุปกรณ์ (borrow), และแจ้งซ่อม (repair)
+ * 3. ระบบลงนามร่วมกัน 2 ฝ่ายหน้าเคาน์เตอร์ (Dual-Sign Counter Modal):
+ *    - ฝ่ายที่ 1: ประชาชนผู้มาติดต่อลงนามบนหน้าจอ
+ *    - ฝ่ายที่ 2: เจ้าหน้าที่ธุรการผู้รับเรื่องลงนามกำกับ
+ */
+
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Equipment, PublicAccount, REPAIR_CATEGORIES, RequestType, Venue } from '@japjong/shared';
@@ -11,18 +23,22 @@ import { api } from '@/lib/api';
 
 export default function StaffWalkInPage() {
   const router = useRouter();
+  // ดึงบัญชีเจ้าหน้าที่ปัจจุบัน และรายชื่อบัญชีทั้งหมดในระบบ
   const { account, accounts } = useAuth();
+  // State ประเภทบริการที่เลือกทำรายการแทน
   const [serviceType, setServiceType] = useState<RequestType>('booking');
+  // State รายการสถานที่ทั้งหมด
   const [venues, setVenues] = useState<Venue[]>([]);
+  // State รายการอุปกรณ์ทั้งหมด
   const [equipment, setEquipment] = useState<Equipment[]>([]);
 
-  // ข้อมูลผู้มาติดต่อ
+  // State ข้อมูลค้นหาผู้มาติดต่อ
   const [query, setQuery] = useState('');
   const [foundUser, setFoundUser] = useState<PublicAccount | null>(null);
   const [borrowerName, setBorrowerName] = useState('');
   const [organization, setOrganization] = useState('');
 
-  // จองสถานที่ (booking)
+  // ฟิลด์สำหรับคำขอจองสถานที่ (booking)
   const [venueId, setVenueId] = useState('');
   const [date, setDate] = useState(() => {
     const d = new Date();
@@ -32,7 +48,7 @@ export default function StaffWalkInPage() {
   const [timeSlot, setTimeSlot] = useState('09:00–12:00');
   const [purpose, setPurpose] = useState('');
 
-  // ยืม–คืนอุปกรณ์ (borrow)
+  // ฟิลด์สำหรับคำขอยืม–คืนอุปกรณ์ (borrow)
   const [equipmentId, setEquipmentId] = useState('');
   const [equipmentQty, setEquipmentQty] = useState(1);
   const [pickupDate, setPickupDate] = useState(() => {
@@ -46,7 +62,7 @@ export default function StaffWalkInPage() {
     return d.toISOString().slice(0, 10);
   });
 
-  // แจ้งซ่อม (repair)
+  // ฟิลด์สำหรับแจ้งซ่อม (repair)
   const [building, setBuilding] = useState('อาคารสำนักงาน');
   const [floor, setFloor] = useState('ชั้น 1');
   const [location, setLocation] = useState('');
@@ -54,13 +70,14 @@ export default function StaffWalkInPage() {
   const [detail, setDetail] = useState('');
   const [photos, setPhotos] = useState(0);
 
-  // บันทึกร่าง & ลงนาม 2 ฝ่าย
+  // State บันทึกร่าง & ป็อปอัปเซ็น 2 ฝ่าย
   const [draftSaved, setDraftSaved] = useState(false);
   const [showSignModal, setShowSignModal] = useState(false);
   const [citizenSignature, setCitizenSignature] = useState('');
   const [staffSignature, setStaffSignature] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // โหลดรายการสถานที่และอุปกรณ์เพื่อใส่ในตัวเลือก Dropdown
   useEffect(() => {
     api
       .venues()
@@ -78,6 +95,7 @@ export default function StaffWalkInPage() {
       .catch(() => {});
   }, []);
 
+  // ฟังก์ชันค้นหาข้อมูลประชาชนเดิมจากชื่อ หรือเบอร์โทรศัพท์
   const handleSearch = () => {
     const q = query.trim().toLowerCase();
     const digits = q.replace(/\D/g, '');
@@ -96,6 +114,7 @@ export default function StaffWalkInPage() {
     }
   };
 
+  // ฟังก์ชันส่งบันทึกคำขอเข้าระบบ
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
@@ -164,6 +183,7 @@ export default function StaffWalkInPage() {
       maxWidth="max-w-[680px]"
       footer={
         <div className="flex w-full sm:w-auto gap-2.5">
+          {/* ปุ่มบันทึกร่างคำขอ */}
           <button
             type="button"
             onClick={() => {
@@ -174,6 +194,7 @@ export default function StaffWalkInPage() {
           >
             บันทึกร่าง
           </button>
+          {/* ปุ่มไปต่อยังขั้นตอนลงนาม 2 ฝ่าย */}
           <button
             type="button"
             disabled={submitting}
@@ -202,6 +223,7 @@ export default function StaffWalkInPage() {
         />
 
         <div className="jw-card p-5 sm:p-6 flex flex-col gap-4">
+          {/* แถบค้นหาข้อมูลผู้มาติดต่อ */}
           <div>
             <label className="jw-lbl">ค้นหาผู้ใช้ (เบอร์โทรหรือชื่อ)</label>
             <div className="flex gap-2">
@@ -229,6 +251,7 @@ export default function StaffWalkInPage() {
             <Chip tone="blue">กรอกแทนที่เคาน์เตอร์ · ต้องลงนาม 2 ฝ่าย</Chip>
           </div>
 
+          {/* ข้อมูลชื่อและหน่วยงาน */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <label className="jw-lbl">ชื่อ-นามสกุลผู้ยืม / ผู้แจ้ง</label>
@@ -252,6 +275,7 @@ export default function StaffWalkInPage() {
             </div>
           </div>
 
+          {/* ฟอร์มเฉพาะกรณีจองสถานที่ */}
           {serviceType === 'booking' && (
             <>
               <div>
@@ -293,6 +317,7 @@ export default function StaffWalkInPage() {
             </>
           )}
 
+          {/* ฟอร์มเฉพาะกรณียืมอุปกรณ์ */}
           {serviceType === 'borrow' && (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-3.5">
@@ -357,6 +382,7 @@ export default function StaffWalkInPage() {
             </>
           )}
 
+          {/* ฟอร์มเฉพาะกรณีแจ้งซ่อม */}
           {serviceType === 'repair' && (
             <>
               <div className="grid grid-cols-2 gap-3.5">
@@ -446,6 +472,7 @@ export default function StaffWalkInPage() {
               </button>
             </div>
 
+            {/* กล่องลายเซ็นที่ 1: ประชาชนผู้มาติดต่อ */}
             <div className="flex flex-col gap-1.5">
               <label className="jw-lbl">1. ลายเซ็นผู้มาติดต่อ / ผู้ยื่นคำขอ ({borrowerName})</label>
               <SignatureBox
@@ -458,6 +485,7 @@ export default function StaffWalkInPage() {
               />
             </div>
 
+            {/* กล่องลายเซ็นที่ 2: เจ้าหน้าที่ผู้รับเรื่อง */}
             <div className="flex flex-col gap-1.5 pt-2 border-t border-line">
               <label className="jw-lbl">
                 2. ลายเซ็นเจ้าหน้าที่ผู้รับเรื่องหน้าเคาน์เตอร์ ({account?.name || 'นางสาวสุดา รอบคอบ'})

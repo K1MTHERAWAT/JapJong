@@ -1,18 +1,29 @@
 'use client';
 
+/**
+ * =====================================================================
+ * หน้าแก้ไขข้อมูลทรัพยากร (Edit Resource Page: Venue / Equipment)
+ * =====================================================================
+ * จัดการแก้ไขและลบทรัพยากรที่มีอยู่ในระบบ:
+ * 1. โหลดข้อมูลเดิมตามรหัส idParam และ kindParam ('venue' หรือ 'equipment')
+ * 2. เปลี่ยนแปลงชื่อ, อาคาร, ชั้น, ความจุ, สต็อก, สิ่งอำนวยความสะดวก
+ * 3. จัดการรูปภาพ (ลบรูปเดิม/อัปโหลดรูปใหม่พร้อมบีบอัด)
+ * 4. แก้ไขเวลาเปิด-ปิด วันที่เปิด และจำนวนวันต้องจองล่วงหน้า
+ * 5. จัดการแบบฟอร์มราชการและสลับสถานะเปิดให้จอง (Toggle)
+ * 6. ระบบลบรายการ (Delete Confirmation Modal)
+ */
+
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  Equipment,
   EquipmentCategory,
   FACILITIES,
   VENUE_TYPE_LABEL,
-  Venue,
   VenueType,
 } from '@japjong/shared';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
-import { Chip, Stepper, Tabs, Toggle } from '@/components/ui';
+import { Chip, Stepper, Toggle } from '@/components/ui';
 import { OfficialDocumentEditor } from '@/components/official-document-editor';
 import { api, readAndCompressImages } from '@/lib/api';
 import {
@@ -20,7 +31,6 @@ import {
   getFormTemplates,
   getFormTemplate,
   saveNewFormTemplate,
-  saveFormTemplateConfig,
   fetchFormTemplatesFromApi,
   saveTemplateToDatabase,
 } from '@/lib/forms-store';
@@ -31,19 +41,23 @@ const DAYS_TH = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 function EditResourceContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // ดึงค่า id และ kind จาก URL search params
   const idParam = searchParams.get('id') || '';
   const kindParam = (searchParams.get('kind') as Kind) || (idParam.startsWith('e') ? 'equipment' : 'venue');
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [kind, setKind] = useState<Kind>(kindParam);
+  // ชนิดทรัพยากร (สถานที่ หรือ อุปกรณ์)
+  const [kind] = useState<Kind>(kindParam);
+  // สเต็ปบนมุมมองหน้าจอมือถือ
   const [mobileStep, setMobileStep] = useState(1);
+  // State กำลังโหลดข้อมูลเริ่มต้น
   const [loading, setLoading] = useState(true);
 
   // รูปภาพจริง (สูงสุด 3 รูป)
   const [images, setImages] = useState<string[]>([]);
   const [previewImg, setPreviewImg] = useState<string | null>(null);
 
-  // Venue / Equipment fields
+  // ฟิลด์ข้อมูลสถานที่ / อุปกรณ์
   const [name, setName] = useState('');
   const [venueType, setVenueType] = useState<VenueType>('meeting');
   const [building, setBuilding] = useState('');
@@ -60,12 +74,14 @@ function EditResourceContent() {
   const [isCreatingNewForm, setIsCreatingNewForm] = useState(false);
   const [enabled, setEnabled] = useState(true);
 
+  // โหลดรายการแบบฟอร์มที่มีในระบบ
   useEffect(() => {
     setAvailableForms(getFormTemplates());
     fetchFormTemplatesFromApi().then((templates) => {
       setAvailableForms(templates);
     });
   }, []);
+
   const [approvalOrder, setApprovalOrder] = useState<string[]>([
     'เจ้าหน้าที่ตรวจสอบ',
     'ผู้อนุมัติระดับ 2 (ปลัด อบต.)',
@@ -73,15 +89,17 @@ function EditResourceContent() {
   ]);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
 
-  // Equipment fields
+  // ฟิลด์ข้อมูลอุปกรณ์
   const [eqCategory, setEqCategory] = useState<EquipmentCategory>('audio');
   const [stock, setStock] = useState(1);
 
+  // State การทำงานและ Modal
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [error, setError] = useState('');
 
+  // ฟังก์ชันโหลดข้อมูลเดิมจาก API ตาม id ที่ส่งมา
   const loadData = useCallback(async () => {
     if (!idParam) {
       setLoading(false);
@@ -129,6 +147,7 @@ function EditResourceContent() {
     loadData();
   }, [loadData]);
 
+  // ฟังก์ชันเลื่อนตำแหน่งสายการอนุมัติ
   const moveApprovalStep = (from: number, to: number) => {
     if (to < 0 || to >= approvalOrder.length || from === to) return;
     setApprovalOrder((prev) => {
@@ -139,14 +158,17 @@ function EditResourceContent() {
     });
   };
 
+  // เปิด/ปิดสิ่งอำนวยความสะดวก
   const toggleFacility = (f: string) => {
     setFacilities((prev) => (prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]));
   };
 
+  // เปิด/ปิดวันให้บริการ
   const toggleDay = (d: number) => {
     setOpenDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
   };
 
+  // เลือกและบีบอัดรูปภาพ
   const handleSelectFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const remaining = Math.max(0, 3 - images.length);
     if (remaining === 0) return;
@@ -162,10 +184,12 @@ function EditResourceContent() {
     }
   };
 
+  // ลบรูปภาพ
   const removeImage = (idx: number) => {
     setImages((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  // ฟังก์ชันบันทึกการแก้ไข
   const handleSave = async () => {
     if (!name.trim()) {
       setError(kind === 'venue' ? 'กรุณากรอกชื่อสถานที่' : 'กรุณากรอกชื่ออุปกรณ์ / ครุภัณฑ์');
@@ -205,6 +229,7 @@ function EditResourceContent() {
     }
   };
 
+  // ฟังก์ชันลบรายการทรัพยากรออกจากระบบ
   const handleDelete = async () => {
     setDeleting(true);
     setError('');
@@ -244,6 +269,7 @@ function EditResourceContent() {
       rightLabel="เจ้าหน้าที่"
       footer={
         <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-2.5">
+          {/* ปุ่มเปิด Modal ลบรายการ */}
           <button
             type="button"
             onClick={() => setShowDeleteModal(true)}
@@ -305,7 +331,7 @@ function EditResourceContent() {
         </div>
       }
     >
-      {/* Header */}
+      {/* ส่วนหัวแสดงชื่อและแท็กชนิดทรัพยากร */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
         <div>
           <h1 className="text-[22px] font-bold text-ink">
@@ -340,6 +366,7 @@ function EditResourceContent() {
             mobileStep === 2 ? 'hidden lg:flex' : 'flex'
           }`}
         >
+          {/* จัดการรูปภาพ */}
           <div>
             <label className="jw-lbl">รูปภาพ (ไม่เกิน 3 รูป)</label>
             <input
@@ -403,6 +430,7 @@ function EditResourceContent() {
 
           {kind === 'venue' ? (
             <>
+              {/* ประเภทสถานที่ */}
               <div>
                 <label className="jw-lbl">ประเภท</label>
                 <div className="flex flex-wrap gap-2">
@@ -423,6 +451,7 @@ function EditResourceContent() {
                 </div>
               </div>
 
+              {/* อาคาร ชั้น และความจุ */}
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="jw-lbl">อาคาร</label>
@@ -468,6 +497,7 @@ function EditResourceContent() {
                 </div>
               </div>
 
+              {/* สิ่งอำนวยความสะดวก */}
               <div>
                 <label className="jw-lbl">สิ่งอำนวยความสะดวก</label>
                 <div className="flex flex-wrap gap-2">
@@ -591,6 +621,7 @@ function EditResourceContent() {
             </div>
           </div>
 
+          {/* ลำดับการอนุมัติ */}
           <div className="border border-line rounded-2xl px-4 py-2 bg-white">
             <div className="flex items-center justify-between py-2">
               <div>
@@ -802,4 +833,3 @@ export default function EditResourcePage() {
     </Suspense>
   );
 }
-
