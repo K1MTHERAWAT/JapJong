@@ -459,67 +459,76 @@ export class AuthController {
 
   // ===================== Email OTP for Signing (Resend) =====================
 
+  // จำกัดอัตราการขอ OTP สูงสุดไม่เกิน 10 ครั้งต่อ 60 วินาที เพื่อป้องกันการสแปม (Rate Limiting)
   @Throttle({ auth: { limit: 10, ttl: 60000 } })
   @Post('sign-otp/request')
   async requestSignOtp(
-    @CurrentUser() user: Account,
-    @Body() body: RequestSignOtpDto,
-    @Req() req: any,
+    @CurrentUser() user: Account,       // ผู้ใช้งานที่ล็อกอินอยู่ในระบบขณะนี้
+    @Body() body: RequestSignOtpDto,   // ข้อมูล Body จากคำขอ (อาจมี email ที่ส่งมาใหม่)
+    @Req() req: any,                   // คำขอ HTTP Request เพื่อดึง IP address
   ) {
+    // ดึงหมายเลข IP ของผู้ใช้งาน (รองรับทั้ง direct IP และ IP ผ่าน Proxy / Cloudflare)
     const ip = req.ip || req.headers['x-forwarded-for'];
+    // ใช้อีเมลที่ส่งมาใน Body หรือหากไม่มีให้ใช้อีเมลประจำบัญชีผู้ใช้
     const targetEmail = body?.email?.trim().toLowerCase() || user.email;
 
+    // หากบัญชีไม่มีอีเมล และไม่ได้ระบุอีเมลมา ให้แจ้งเตือนปฏิเสธ
     if (!targetEmail) {
       throw new BadRequestException('ไม่พบอีเมลของบัญชีนี้ กรุณาระบุหรือตั้งค่าอีเมลในหน้าจัดการบัญชีก่อน');
     }
 
+    // หากบัญชียังไม่เคยบันทึกอีเมล ให้บันทึกอีเมลนี้ลงในฐานข้อมูลผู้ใช้ทันที
     if (!user.email) {
       user.email = targetEmail;
       user.emailVerified = true;
       await this.db.persistAccount(user);
     }
 
-    // Rate limiting: ต้องเว้นระยะขอใหม่ 60 วินาที
+    // ตรวจสอบ Rate Limiting รายบุคคล: ต้องเว้นระยะห่างการขอ OTP ใหม่ 60 วินาที
     const latest = await this.db.getLatestSignOtp(user.id);
     if (latest && !latest.consumedAt) {
       const msSince = Date.now() - latest.createdAt.getTime();
       if (msSince < 60000) {
+        // คำนวณวินาทีที่ต้องรอคอยก่อนขอใหม่ได้
         const secLeft = Math.ceil((60000 - msSince) / 1000);
         throw new BadRequestException(`กรุณารออีก ${secLeft} วินาทีก่อนขอรหัส OTP ใหม่`);
       }
     }
 
-    // สร้าง OTP 6 หลักด้วย Node.js Crypto
+    // สุ่มสร้างรหัส OTP 6 หลักที่ปลอดภัยด้วย Node.js Crypto (ตั้งแต่ 100000 ถึง 999999)
     const otp = crypto.randomInt(100000, 1000000).toString();
+    // Salt ลับสำหรับเข้ารหัสทางเดียว (HMAC SHA-256)
     const salt = process.env.OTP_SECRET || 'japjong_sign_otp_secret_salt';
+    // ทำ Hash ของรหัส OTP เพื่อไม่เก็บรหัสผ่านตัวจริงลงฐานข้อมูล (ป้องกันฐานข้อมูลรั่วไหล)
     const codeHash = crypto.createHmac('sha256', salt).update(otp).digest('hex');
 
-    // อายุ 5 นาที
+    // กำหนดเวลาหมดอายุของรหัส OTP ไว้ที่ 5 นาที
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-    // บันทึกลงฐานข้อมูล
+    // บันทึกรายการ OTP (เฉพาะ Hash, อีเมลปลายทาง, เวลาหมดอายุ) ลงในฐานข้อมูล
     await this.db.createSignOtp(user.id, targetEmail, codeHash, expiresAt);
 
-    // ตรวจสอบว่าเป็นอีเมลจำลองของระบบเดโมหรือไม่
-    // อีเมลจำลอง เช่น @namcham.go.th, @example.com, @test.com
+    // ตรวจสอบว่าปลายทางเป็นอีเมลจำลองของระบบเดโมหรือไม่ (@namcham.go.th, @example.com, @test.com)
     const isMockEmail = isDemoEmail(targetEmail);
 
-    // ส่งผ่าน EmailService
-    // หากเป็นอีเมลจำลอง (Mock) จะข้าม Resend จริงและใช้วิธีจำลองเดิม
-    // หากเป็นอีเมลจริง (เช่น @gmail.com) จะส่งผ่าน Resend จริงเสมอ!
+    // ส่งรหัส OTP ผ่าน EmailService:
+    // - หากเป็นอีเมลจำลอง (isMockEmail = true): จะข้าม Resend จริงและใช้วิธีจำลองเดิมเพื่อไม่ให้ติด Error
+    // - หากเป็นอีเมลจริง (isMockEmail = false): จะส่งผ่าน Resend จริงเข้ากล่องจดหมายผู้รับเสมอ
     const sendResult = await this.emailService.sendSignOtpEmail(
       targetEmail,
       otp,
       user.name,
       { isDemo: isMockEmail },
     );
+    // หาก Resend เกิดข้อผิดพลาดในการส่งจริง ให้แจ้ง Error ทันที
     if (!sendResult.success) {
       throw new BadRequestException(`ไม่สามารถส่งรหัส OTP ผ่าน Resend ได้: ${sendResult.error}`);
     }
 
+    // ซ่อนตัวอักษรบางส่วนของอีเมล เช่น ki***@gmail.com สำหรับแสดงบนหน้าจอและ Audit Log
     const masked = maskEmail(targetEmail);
 
-    // บันทึก Audit Log
+    // บันทึกประวัติการทำงาน (Audit Log) ทางราชการเพื่อความโปร่งใสและตรวจสอบย้อนหลังได้
     await this.db.log(
       'user',
       'ขอรหัส OTP สำหรับยืนยันการลงนาม',
@@ -532,46 +541,59 @@ export class AuthController {
       },
     );
 
+    // ส่งผลลัพธ์กลับไปยัง Web Frontend
     return {
       ok: true,
       email: targetEmail,
       maskedEmail: masked,
-      expiresInSeconds: 300,
-      resendCooldownSeconds: 60,
+      expiresInSeconds: 300,        // รหัสหมดอายุใน 300 วินาที (5 นาที)
+      resendCooldownSeconds: 60,   // เว้นระยะขอใหม่ได้ใน 60 วินาที
+      // หากเป็นบัญชีทดสอบหรืออีเมลจำลอง จะแนบ demoOtp ไปให้เพื่อให้มีปุ่มกรอกสะดวกในการทดสอบ
       ...(user.isDemo || isMockEmail ? { demoOtp: otp } : {}),
     };
   }
 
+  // จำกัดอัตราการยืนยันรหัส OTP ไม่เกิน 15 ครั้งต่อ 60 วินาที เพื่อป้องกัน Brute-force Attack
   @Throttle({ auth: { limit: 15, ttl: 60000 } })
   @Post('sign-otp/verify')
   async verifySignOtp(
-    @CurrentUser() user: Account,
-    @Body() body: VerifySignOtpDto,
-    @Req() req: any,
+    @CurrentUser() user: Account,       // บัญชีผู้ใช้งานปัจจุบันที่กำลังยืนยัน
+    @Body() body: VerifySignOtpDto,     // ข้อมูล Body ที่มีรหัส OTP 6 หลักที่กรอกเข้ามา
+    @Req() req: any,                   // ข้อมูล HTTP Request
   ) {
+    // ดึง IP address ของผู้ใช้งานเพื่อบันทึกลง Audit Trail
     const ip = req.ip || req.headers['x-forwarded-for'];
+    // ตัดช่องว่างและรับค่ารหัส OTP ที่ผู้ใช้ส่งเข้ามา
     const submittedOtp = String(body.otp ?? '').trim();
+    // ตรวจสอบความถูกต้องเบื้องต้น: ต้องเป็นตัวเลข 6 หลักเท่านั้น
     if (!/^\d{6}$/.test(submittedOtp)) {
       throw new BadRequestException('รหัส OTP ต้องเป็นตัวเลข 6 หลัก');
     }
 
+    // ค้นหารายการ OTP ล่าสุดของบัญชีนี้จากฐานข้อมูล
     const latest = await this.db.getLatestSignOtp(user.id);
+    // ตรวจสอบว่ามี OTP อยู่จริง, ยังไม่เคยถูกใช้งาน (consumedAt), และยังไม่หมดอายุ (expiresAt)
     if (!latest || latest.consumedAt || latest.expiresAt.getTime() < Date.now()) {
       throw new BadRequestException('ไม่พบรหัส OTP ที่ใช้งานได้ หรือรหัสหมดอายุแล้ว กรุณาขอรหัสใหม่');
     }
 
+    // หากเคยกรอกผิดพลาดมาแล้ว 5 ครั้ง ให้ยกเลิก OTP ตัวนี้ทันที (Lockout)
     if (latest.attempts >= 5) {
       await this.db.consumeSignOtp(latest.id);
       throw new BadRequestException('รหัส OTP ถูกระงับเนื่องจากกรอกผิดเกิน 5 ครั้ง กรุณาขอรหัสใหม่');
     }
 
+    // เข้ารหัส OTP ที่ผู้ใช้กรอกเข้ามาด้วย HMAC SHA-256 เพื่อนำไปเปรียบเทียบกับค่า Hash ในฐานข้อมูล
     const salt = process.env.OTP_SECRET || 'japjong_sign_otp_secret_salt';
     const submittedHash = crypto.createHmac('sha256', salt).update(submittedOtp).digest('hex');
 
+    // หากรหัสผ่านที่ส่งมาไม่ตรงกับ Hash ในฐานข้อมูล
     if (submittedHash !== latest.codeHash) {
+      // เพิ่มจำนวนครั้งที่กรอกผิดอีก 1 ครั้ง
       const newAttempts = latest.attempts + 1;
       await this.db.recordSignOtpAttempt(latest.id, newAttempts);
 
+      // บันทึก Log การกรอกรหัสผิดพลาด
       await this.db.log('user', 'ยืนยันรหัส OTP ลงนามไม่สำเร็จ', `กรอกรหัสผิดครั้งที่ ${newAttempts}/5`, {
         id: user.id,
         name: user.name,
@@ -579,27 +601,26 @@ export class AuthController {
         ip,
       });
 
+      // หากครบ 5 ครั้ง ให้ยกเลิกรหัสทันที
       if (newAttempts >= 5) {
         await this.db.consumeSignOtp(latest.id);
         throw new BadRequestException('รหัส OTP ไม่ถูกต้อง และถูกระงับเนื่องจากกรอกผิดครบ 5 ครั้ง กรุณาขอรหัสใหม่');
       }
 
+      // แจ้งเตือนข้อผิดพลาดพร้อมบอกจำนวนครั้งที่เหลือ
       throw new UnauthorizedException(`รหัส OTP ไม่ถูกต้อง (เหลือโอกาสอีก ${5 - newAttempts} ครั้ง)`);
     }
 
-    // รหัสถูกต้อง -> ใช้ได้ครั้งเดียว มาร์ก consumed ทันที ป้องกัน OTP reuse
+    // รหัสถูกต้อง -> ใช้ได้ครั้งเดียว มาร์ก consumed ทันที ป้องกัน Replay Attack
     await this.db.consumeSignOtp(latest.id);
 
     // สร้าง Verified Session ผูกกับ User ID และ Session Token (มีผล 30 นาที)
     const sessionToken = req.token;
-    if (!sessionToken) {
-      throw new UnauthorizedException('ไม่พบโทเคนเซสชันการเข้าสู่ระบบ');
-    }
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+    await this.db.createSignVerifiedSession(user.id, sessionToken, expiresAt);
 
-    const verifiedExpiresAt = new Date(Date.now() + 30 * 60 * 1000);
-    const verifiedSession = await this.db.createSignVerifiedSession(user.id, sessionToken, verifiedExpiresAt);
-
-    await this.db.log('user', 'ยืนยัน OTP สำหรับลงนามสำเร็จ', 'สร้าง Verified Signing Session ระยะเวลา 30 นาที', {
+    // บันทึก Audit Log ความสำเร็จ
+    await this.db.log('user', 'ยืนยันรหัส OTP สำเร็จ', `เปิดเซสชันลงนามเอกสาร (30 นาที) ถึง ${expiresAt.toLocaleTimeString('th-TH')}`, {
       id: user.id,
       name: user.name,
       role: user.role,
@@ -609,8 +630,8 @@ export class AuthController {
     return {
       ok: true,
       verified: true,
-      expiresAt: verifiedSession.expiresAt.toISOString(),
-      message: 'ยืนยันตัวตนสำเร็จ สามารถลงนามเอกสารได้ตลอดเซสชัน',
+      expiresAt: expiresAt.toISOString(),
+      message: 'ยืนยันตัวตนสำเร็จ สามารถลงนามเอกสารได้ตลอดเซสชัน (30 นาที)',
     };
   }
 
