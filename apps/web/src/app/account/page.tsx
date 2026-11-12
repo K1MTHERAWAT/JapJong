@@ -33,7 +33,6 @@ import {
   Input,
   PinKeypad,
   SignatureBox,
-  SignOtpVerifier,
   Tabs,
 } from '@/components/ui';
 import { api, formatThaiDate } from '@/lib/api';
@@ -644,9 +643,9 @@ export default function AccountPage() {
                 <div className="flex items-start gap-2.5">
                   <KeyRound className="size-5 text-brand shrink-0 mt-0.5" />
                   <div>
-                    <b className="text-ink font-semibold block text-[13.5px]">ระบบยืนยันตัวตน 2 ชั้นสำหรับการลงนาม (OTP + PIN)</b>
+                    <b className="text-ink font-semibold block text-[13.5px]">ระบบยืนยันตัวตนสำหรับการลงนาม (ลายเซ็น + PIN)</b>
                     <span className="text-muted leading-relaxed">
-                      1. ยืนยันเซสชันด้วย <b>Email OTP (Resend)</b> หนึ่งครั้งต่อการใช้งาน · 2. ยืนยันรหัส <b>PIN 6 หลัก</b> ส่วนบุคคลในแต่ละครั้งที่ลงนาม
+                      1. วาดบันทึกลายมือชื่อประจำตัว · 2. ตั้งรหัส <b>PIN 6 หลัก</b> ส่วนบุคคลสำหรับยืนยันการลงนาม
                     </span>
                   </div>
                 </div>
@@ -700,49 +699,32 @@ export default function AccountPage() {
                   </Button>
                 </Card>
 
-                {/* PIN & Email OTP Column */}
-                <div className="flex flex-col gap-4">
-                  {/* PIN 6 หลัก Card */}
-                  <Card className="flex min-w-0 flex-col gap-4 p-4 sm:p-6">
-                    <div className="flex items-center justify-between border-b border-line-soft pb-3">
-                      <div className="flex items-center gap-2.5">
-                        <KeyRound className="size-5 text-brand" />
-                        <div>
-                          <h2 className="text-heading font-bold text-ink">
-                            2. รหัส PIN 6 หลักสำหรับการลงนาม
-                          </h2>
-                          <p className="text-caption text-muted">
-                            ใช้ยืนยันการอนุมัติในแต่ละเอกสารร่วมกับลายเซ็นดิจิทัล
-                          </p>
-                        </div>
+                {/* PIN 6 หลัก Card */}
+                <Card className="flex min-w-0 flex-col gap-4 p-4 sm:p-6">
+                  <div className="flex items-center justify-between border-b border-line-soft pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <KeyRound className="size-5 text-brand" />
+                      <div>
+                        <h2 className="text-heading font-bold text-ink">
+                          2. รหัส PIN 6 หลักสำหรับการลงนาม
+                        </h2>
+                        <p className="text-caption text-muted">
+                          ใช้ยืนยันการอนุมัติในแต่ละเอกสารร่วมกับลายเซ็นดิจิทัล
+                        </p>
                       </div>
-                      <Chip tone="green">กดเพื่อเปลี่ยน PIN</Chip>
                     </div>
+                    <Chip tone="green">กดเพื่อเปลี่ยน PIN</Chip>
+                  </div>
 
-                    <div className="flex flex-col items-center gap-3">
-                      <PinKeypad
-                        pin={pin}
-                        onChange={setPin}
-                        subtitle="กดตัวเลข 6 หลักเพื่อตั้งหรือเปลี่ยนรหัส PIN ประจำตัวของคุณ"
-                        onComplete={handleSavePin}
-                      />
-                    </div>
-                  </Card>
-
-                  {/* Email OTP Sign Session Card */}
-                  <Card className="flex min-w-0 flex-col gap-4 p-4 sm:p-6">
-                    <div className="border-b border-line-soft pb-3">
-                      <h2 className="text-heading font-bold text-ink">
-                        3. เซสชัน Email OTP (Resend)
-                      </h2>
-                      <p className="text-caption text-muted mt-0.5">
-                        ขอรหัส OTP ทางอีเมลเพื่อเปิดใช้งานเซสชันการลงนาม (มีผล 30 นาที)
-                      </p>
-                    </div>
-
-                    <SignOtpVerifier initialEmail={account.email} />
-                  </Card>
-                </div>
+                  <div className="flex flex-col items-center gap-3">
+                    <PinKeypad
+                      pin={pin}
+                      onChange={setPin}
+                      subtitle="กดตัวเลข 6 หลักเพื่อตั้งหรือเปลี่ยนรหัส PIN ประจำตัวของคุณ"
+                      onComplete={handleSavePin}
+                    />
+                  </div>
+                </Card>
               </div>
             </div>
           )}

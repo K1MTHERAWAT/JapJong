@@ -724,38 +724,6 @@ export default function StaffVerifyPage() {
               </form>
             )}
 
-            {cameraError && (
-              <div className="p-4 rounded-2xl bg-[#FFF2F2] dark:bg-status-crit/15 border border-[#F9C2C2] dark:border-status-crit/30 text-status-crit text-[13px] flex flex-col gap-3">
-                <div className="flex items-start gap-2.5">
-                  <Icon name="alert-triangle" className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span className="leading-relaxed text-ink">{cameraError}</span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[#F9C2C2]/60 dark:border-status-crit/20">
-                  <button
-                    type="button"
-                    onClick={() => startCamera()}
-                    className="px-3.5 py-1.5 rounded-xl bg-brand text-white text-[12px] font-semibold hover:opacity-90 transition cursor-pointer flex items-center gap-1.5 shadow-xs"
-                  >
-                    <Icon name="rotate-cw" className="w-3.5 h-3.5" />
-                    ลองเปิดกล้องอีกครั้ง
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMode('upload')}
-                    className="px-3.5 py-1.5 rounded-xl border border-line bg-white text-ink text-[12px] font-semibold hover:bg-soft transition cursor-pointer"
-                  >
-                    📁 สลับไปอัปโหลดภาพ QR
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMode('manual')}
-                    className="px-3.5 py-1.5 rounded-xl border border-line bg-white text-ink text-[12px] font-semibold hover:bg-soft transition cursor-pointer"
-                  >
-                    ⌨️ กรอกรหัสเอกสาร
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         )}
 

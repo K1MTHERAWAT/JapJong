@@ -188,20 +188,20 @@ export function Sidebar({
             onClick={toggleTheme}
             title={theme === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด'}
             aria-label={theme === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด'}
-            className={`flex h-10 items-center gap-2.5 rounded-control text-ink-soft hover:bg-hover transition-colors font-medium text-caption cursor-pointer ${open ? 'w-full px-2.5 justify-between' : 'justify-center px-0 lg:size-11'}`}
+            className={`flex h-10 items-center rounded-control text-ink-soft hover:bg-hover transition-colors font-medium text-caption cursor-pointer whitespace-nowrap ${open ? 'w-full px-2.5 justify-between gap-2' : 'justify-center px-0 lg:size-11'}`}
           >
-            <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex items-center gap-2 min-w-0 shrink-0 whitespace-nowrap">
               {theme === 'dark' ? (
                 <Sun className="size-4 shrink-0 text-amber-400" />
               ) : (
                 <Moon className="size-4 shrink-0 text-brand" />
               )}
-              <span className={open ? 'text-ink font-medium' : 'lg:sr-only'}>
+              <span className={open ? 'text-ink font-medium whitespace-nowrap text-[12.5px]' : 'lg:sr-only'}>
                 {theme === 'dark' ? 'โหมดมืด (Dark)' : 'โหมดสว่าง (Light)'}
               </span>
             </div>
             {open && (
-              <span className="text-[11px] text-muted px-2 py-0.5 rounded-md bg-surface-muted border border-line-soft">
+              <span className="text-[11px] text-muted px-1.5 py-0.5 rounded-md bg-surface-muted border border-line-soft whitespace-nowrap shrink-0">
                 สลับโหมด
               </span>
             )}
