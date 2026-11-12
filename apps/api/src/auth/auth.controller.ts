@@ -500,17 +500,18 @@ export class AuthController {
     // บันทึกลงฐานข้อมูล
     await this.db.createSignOtp(user.id, targetEmail, codeHash, expiresAt);
 
-    // ตรวจสอบสถานะการส่ง (โหมดเดโม vs Resend จริง)
-    const isTargetDemoDomain = isDemoEmail(targetEmail);
-    const hasCustomRealEmail = Boolean(body?.email && !isTargetDemoDomain);
-    const isDemo = (!hasCustomRealEmail && Boolean(user.isDemo || isTargetDemoDomain)) || isTargetDemoDomain;
+    // ตรวจสอบว่าเป็นอีเมลจำลองของระบบเดโมหรือไม่
+    // อีเมลจำลอง เช่น @namcham.go.th, @example.com, @test.com
+    const isMockEmail = isDemoEmail(targetEmail);
 
-    // ส่งผ่าน EmailService (หากเป็น Demo จะข้าม Resend จริงและใช้วิธีจำลองเดิม)
+    // ส่งผ่าน EmailService
+    // หากเป็นอีเมลจำลอง (Mock) จะข้าม Resend จริงและใช้วิธีจำลองเดิม
+    // หากเป็นอีเมลจริง (เช่น @gmail.com) จะส่งผ่าน Resend จริงเสมอ!
     const sendResult = await this.emailService.sendSignOtpEmail(
       targetEmail,
       otp,
       user.name,
-      { isDemo },
+      { isDemo: isMockEmail },
     );
     if (!sendResult.success) {
       throw new BadRequestException(`ไม่สามารถส่งรหัส OTP ผ่าน Resend ได้: ${sendResult.error}`);
@@ -522,7 +523,7 @@ export class AuthController {
     await this.db.log(
       'user',
       'ขอรหัส OTP สำหรับยืนยันการลงนาม',
-      `ส่งรหัส OTP 6 หลักไปยัง ${masked} (${isDemo ? 'โหมดเดโม' : 'Resend จริง'})`,
+      `ส่งรหัส OTP 6 หลักไปยัง ${masked} (${isMockEmail ? 'โหมดเดโม (Mock)' : 'Resend จริง'})`,
       {
         id: user.id,
         name: user.name,
@@ -537,7 +538,7 @@ export class AuthController {
       maskedEmail: masked,
       expiresInSeconds: 300,
       resendCooldownSeconds: 60,
-      ...(isDemo ? { demoOtp: otp } : {}),
+      ...(user.isDemo || isMockEmail ? { demoOtp: otp } : {}),
     };
   }
 
