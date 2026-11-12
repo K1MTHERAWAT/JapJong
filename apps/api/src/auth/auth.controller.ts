@@ -10,7 +10,7 @@ import {
   validateThaiPhone,
 } from '@japjong/shared';
 import { DbService } from '../db/db.service';
-import { EmailService } from './email.service';
+import { EmailService, isDemoEmail } from './email.service';
 import {
   CurrentUser,
   Public,
@@ -500,8 +500,18 @@ export class AuthController {
     // บันทึกลงฐานข้อมูล
     await this.db.createSignOtp(user.id, targetEmail, codeHash, expiresAt);
 
-    // ส่งผ่าน Resend
-    const sendResult = await this.emailService.sendSignOtpEmail(targetEmail, otp, user.name);
+    // ตรวจสอบสถานะการส่ง (โหมดเดโม vs Resend จริง)
+    const isTargetDemoDomain = isDemoEmail(targetEmail);
+    const hasCustomRealEmail = Boolean(body?.email && !isTargetDemoDomain);
+    const isDemo = (!hasCustomRealEmail && Boolean(user.isDemo || isTargetDemoDomain)) || isTargetDemoDomain;
+
+    // ส่งผ่าน EmailService (หากเป็น Demo จะข้าม Resend จริงและใช้วิธีจำลองเดิม)
+    const sendResult = await this.emailService.sendSignOtpEmail(
+      targetEmail,
+      otp,
+      user.name,
+      { isDemo },
+    );
     if (!sendResult.success) {
       throw new BadRequestException(`ไม่สามารถส่งรหัส OTP ผ่าน Resend ได้: ${sendResult.error}`);
     }
@@ -509,12 +519,17 @@ export class AuthController {
     const masked = maskEmail(targetEmail);
 
     // บันทึก Audit Log
-    await this.db.log('user', 'ขอรหัส OTP สำหรับยืนยันการลงนาม', `ส่งรหัส OTP 6 หลักไปยัง ${masked}`, {
-      id: user.id,
-      name: user.name,
-      role: user.role,
-      ip,
-    });
+    await this.db.log(
+      'user',
+      'ขอรหัส OTP สำหรับยืนยันการลงนาม',
+      `ส่งรหัส OTP 6 หลักไปยัง ${masked} (${isDemo ? 'โหมดเดโม' : 'Resend จริง'})`,
+      {
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        ip,
+      },
+    );
 
     return {
       ok: true,
@@ -522,7 +537,7 @@ export class AuthController {
       maskedEmail: masked,
       expiresInSeconds: 300,
       resendCooldownSeconds: 60,
-      demoOtp: otp, // Mock OTP mode สำหรับการทดสอบ
+      ...(isDemo ? { demoOtp: otp } : {}),
     };
   }
 

@@ -7,12 +7,37 @@ export interface SendOtpResult {
   error?: string;
 }
 
+export interface SendSignOtpOptions {
+  isDemo?: boolean;
+}
+
+/**
+ * ตรวจสอบว่าเป็นอีเมลจำลองสำหรับโหมดทดสอบ/เดโมหรือไม่
+ */
+export function isDemoEmail(email?: string | null): boolean {
+  if (!email) return false;
+  const lower = email.trim().toLowerCase();
+  return (
+    lower.endsWith('@namcham.go.th') ||
+    lower.endsWith('@example.com') ||
+    lower.endsWith('@example.org') ||
+    lower.endsWith('@test.com') ||
+    lower.endsWith('@demo.local') ||
+    lower.endsWith('.local')
+  );
+}
+
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private resend: Resend | null = null;
 
   constructor() {
+    this.ensureClient();
+  }
+
+  private ensureClient(): Resend | null {
+    if (this.resend) return this.resend;
     const apiKey = process.env.RESEND_API_KEY?.trim();
     if (apiKey) {
       try {
@@ -26,21 +51,40 @@ export class EmailService {
         'RESEND_API_KEY is not set. OTP emails will be logged to console in demo/development mode.',
       );
     }
+    return this.resend;
   }
 
   async sendSignOtpEmail(
     toEmail: string,
     otpCode: string,
     recipientName?: string,
+    options?: SendSignOtpOptions,
   ): Promise<SendOtpResult> {
+    const subject = `รหัส OTP สำหรับยืนยันการลงนามเอกสาร: ${otpCode} (อบต.)`;
+    const isDemo = Boolean(options?.isDemo || isDemoEmail(toEmail));
+
+    // โหมดเดโม: ข้าม Resend จริงเพื่อป้องกัน Error จากอีเมลตัวอย่างที่ไม่ได้รับอนุญาต
+    if (isDemo) {
+      this.logger.log(
+        `\n========================================\n` +
+        `📨 [DEMO RESEND EMAIL DISPATCH (โหมดเดโม)]\n` +
+        `To: ${toEmail} (${recipientName || 'User'})\n` +
+        `Subject: ${subject}\n` +
+        `OTP CODE: >>> ${otpCode} <<<\n` +
+        `Expires in: 5 minutes\n` +
+        `หมายเหตุ: จำลองการส่งสำเร็จสำหรับโหมดเดโมตามเดิม\n` +
+        `========================================\n`,
+      );
+      return { success: true, id: 'demo-mock-dispatch' };
+    }
+
     // In test environment, skip external network call to Resend
     if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
       return { success: true, id: 'mock-local-dispatch' };
     }
 
     const fromAddress =
-      process.env.RESEND_FROM?.trim() || 'JapJong อบต. <onboarding@resend.dev>';
-    const subject = `รหัส OTP สำหรับยืนยันการลงนามเอกสาร: ${otpCode} (อบต.)`;
+      process.env.RESEND_FROM?.trim() || 'Jongwen อบต.[บิซ่า] <onboarding@resend.dev>';
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -105,9 +149,10 @@ export class EmailService {
 </html>
     `.trim();
 
-    if (this.resend) {
+    const client = this.ensureClient();
+    if (client) {
       try {
-        const { data, error } = await this.resend.emails.send({
+        const { data, error } = await client.emails.send({
           from: fromAddress,
           to: [toEmail],
           subject,
@@ -131,7 +176,7 @@ export class EmailService {
     // Demo/Development Fallback (when RESEND_API_KEY is not configured)
     this.logger.log(
       `\n========================================\n` +
-      `📨 [DEMO / DEV RESEND EMAIL DISPATCH]\n` +
+      `📨 [DEMO / DEV RESEND EMAIL DISPATCH (NO API KEY)]\n` +
       `To: ${toEmail} (${recipientName || 'User'})\n` +
       `Subject: ${subject}\n` +
       `OTP CODE: >>> ${otpCode} <<<\n` +
@@ -142,4 +187,5 @@ export class EmailService {
     return { success: true, id: 'mock-local-dispatch' };
   }
 }
+
 

@@ -229,11 +229,24 @@ describe('AuthController Unit Tests', () => {
   });
 
   describe('Sign OTP & Session Management', () => {
-    it('requests email OTP for signing', async () => {
+    it('requests email OTP for signing in demo mode (returns demoOtp)', async () => {
       const res = await controller.requestSignOtp(testUser, {}, { ip: '127.0.0.1', headers: {} });
       expect(res.ok).toBe(true);
       expect(res.maskedEmail).toBeDefined();
       expect(res.demoOtp).toBeDefined();
+    });
+
+    it('requests email OTP for real user (omits demoOtp for security)', async () => {
+      const realUser = {
+        ...testUser,
+        id: 'u-real-123',
+        isDemo: false,
+        email: 'real.citizen@gmail.com',
+      };
+      const res = await controller.requestSignOtp(realUser, {}, { ip: '127.0.0.1', headers: {} });
+      expect(res.ok).toBe(true);
+      expect(res.maskedEmail).toBeDefined();
+      expect(res.demoOtp).toBeUndefined();
     });
 
     it('checks signing session status', async () => {

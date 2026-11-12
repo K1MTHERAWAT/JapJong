@@ -85,6 +85,8 @@ export function SignOtpVerifier({
       setSuccessMsg(`ระบบได้จัดส่งรหัส OTP 6 หลักไปยัง ${res.maskedEmail} แล้ว`);
       if (res.demoOtp) {
         setDemoOtp(res.demoOtp);
+      } else {
+        setDemoOtp(null);
       }
       setDigits(['', '', '', '', '', '']);
       setTimeout(() => inputRefs.current[0]?.focus(), 100);
