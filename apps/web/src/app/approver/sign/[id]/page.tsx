@@ -17,8 +17,7 @@
  * - แสดงเอกสารแบบฟอร์มราชการแบบเต็มใบ (OfficialGovFormDocument)
  */
 
-import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ROLE_LABEL, RequestWithTimeline, SIGN_LEVEL_TITLE, canSignRequest } from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
@@ -54,12 +53,23 @@ export default function ApproverSignDocumentPage() {
   const [pin, setPin] = useState('');
   // State ข้อความแจ้งเตือนเมื่อ PIN ไม่ถูกต้อง
   const [pinError, setPinError] = useState('');
-  // State แสดงหน้าสำเร็จเมื่อระดับ 2 (ปลัด อบต.) ลงนามเสร็จแล้วรอส่งต่อนายก อบต.
-  const [completedL2, setCompletedL2] = useState(false);
+  // State ข้อความแจ้งเตือนหลังลงนามเสร็จสิ้นก่อนเด้งกลับหน้าหลัก
+  const [successNotice, setSuccessNotice] = useState('');
+  // Timer สำหรับเด้งกลับหน้าหลักอัตโนมัติ
+  const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // State ข้อความข้อผิดพลาดทั่วไป
   const [error, setError] = useState('');
   // State กำลังบันทึกข้อมูลการลงนาม
   const [submitting, setSubmitting] = useState(false);
+
+  // ล้าง timer หากผู้ใช้ออกจากหน้าก่อนครบเวลา
+  useEffect(() => {
+    return () => {
+      if (redirectTimerRef.current) {
+        clearTimeout(redirectTimerRef.current);
+      }
+    };
+  }, []);
 
   // ดึงลายเซ็นที่เคยบันทึกไว้ในบัญชีของผู้ใช้อัตโนมัติ
   useEffect(() => {
@@ -101,16 +111,15 @@ export default function ApproverSignDocumentPage() {
       setOtpStep(false);
       setShowPinModal(false);
 
-      if (pendingDecision === 'reject') {
-        // หากไม่อนุมัติ ส่งกลับหน้าคิวงานผู้อนุมัติ
+      // แสดงการแจ้งเตือนเมื่อปลัด อบต. / นายก อบต. ลงนามเสร็จ แล้วเด้งกลับไปหน้าหลักผู้มีอำนาจ
+      setSuccessNotice(
+        pendingDecision === 'reject'
+          ? 'ลงนามไม่เห็นชอบเรียบร้อยแล้ว'
+          : 'ลงนามเห็นชอบเรียบร้อยแล้ว',
+      );
+      redirectTimerRef.current = setTimeout(() => {
         router.push('/approver');
-      } else if (updated.status === 'approved' || updated.status === 'borrowing') {
-        // ลงนามครบ 4 ฝ่าย → ไปหน้าใบอนุญาตดิจิทัล (PDF) ทันที
-        router.push(`/approver/permit/${updated.id}`);
-      } else {
-        // ลงนามระดับ 2 (ปลัด อบต.) เสร็จ → แสดงข้อความส่งต่อให้นายก อบต.
-        setCompletedL2(true);
-      }
+      }, 1500);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการลงนาม';
       if (msg.includes('PIN')) {
@@ -187,7 +196,7 @@ export default function ApproverSignDocumentPage() {
       rightLabel={account?.position || 'ปลัด อบต.'}
       maxWidth="max-w-[960px]"
       footer={
-        !otpStep && !completedL2 && signCheck.allowed ? (
+        !otpStep && !successNotice && signCheck.allowed ? (
           <div className="flex w-full sm:w-auto gap-2.5">
             {/* ปุ่มลงนามไม่อนุมัติ / ไม่เห็นชอบ */}
             <button
@@ -215,29 +224,7 @@ export default function ApproverSignDocumentPage() {
         ) : undefined
       }
     >
-      {/* กรณีระดับ 2 (ปลัด อบต.) ลงนามเสร็จแล้ว แสดงข้อความนำส่งระดับ 1 */}
-      {completedL2 ? (
-        <div className="jw-card p-6 flex flex-col items-center text-center gap-4">
-          <div className="w-14 h-14 rounded-full bg-brand-mint text-brand flex items-center justify-center">
-            <Icon name="check" className="w-7 h-7" strokeWidth={3} />
-          </div>
-          <div>
-            <b className="text-[18px] text-ink block">ลงนามเห็นชอบ (ฝ่ายที่ 3 · ปลัด อบต.) เรียบร้อยแล้ว</b>
-            <span className="text-[13px] text-ink-mute">
-              เอกสาร {req.code} ถูกส่งต่อให้ <b>นายก อบต. (ฝ่ายที่ 4 · ผู้อนุมัติระดับ 1)</b> ลงนามขั้นสุดท้าย
-            </span>
-          </div>
-
-          <div className="w-full flex flex-col sm:flex-row gap-2.5 pt-2">
-            <Link href="/approver" className="jw-btn-sec flex-1">
-              กลับหน้าหลักผู้มีอำนาจ
-            </Link>
-            <button type="button" onClick={handleLogoutToLogin} className="jw-btn flex-1">
-              ออกจากระบบ
-            </button>
-          </div>
-        </div>
-      ) : !otpStep ? (
+      {!otpStep ? (
         <div className="flex flex-col gap-4">
           {/* ส่วนหัวรหัสคำขอและป้ายสถานะ */}
           <div className="flex items-center justify-between">
@@ -482,6 +469,18 @@ export default function ApproverSignDocumentPage() {
                 กำลังตรวจสอบ PIN และบันทึกลายมือชื่อดิจิทัล...
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* แจ้งเตือนหลังลงนามเสร็จสิ้นก่อนเด้งกลับหน้าหลัก */}
+      {successNotice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-[380px] rounded-2xl bg-surface border border-emerald-500/30 p-6 shadow-xl flex flex-col items-center text-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-emerald-500/15 text-emerald-600 flex items-center justify-center">
+              <Icon name="check" className="w-6 h-6" strokeWidth={3} />
+            </div>
+            <b className="text-[17px] text-ink">{successNotice}</b>
+            <span className="text-[13px] text-ink-mute">กำลังกลับไปหน้าหลัก...</span>
           </div>
         </div>
       )}

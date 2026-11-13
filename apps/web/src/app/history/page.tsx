@@ -68,14 +68,33 @@ export default function RequestHistoryPage() {
   const [search, setSearch] = useState('');
 
   /**
-   * ดึงรายการประวัติคำขอของผู้ใช้ (mine=true) จาก Backend API
+   * ดึงรายการประวัติคำขอจาก Backend API ตามบทบาทของผู้ใช้งาน
+   * - USER: ดึงเฉพาะคำขอของตนเอง (mine=true)
+   * - APPROVER_L2 / APPROVER_L1: ดึงคำขอที่ตนเองเป็นผู้ยื่น, ลงนามแล้ว, หรือรอลงนาม
+   * - STAFF / ADMIN: ดึงคำขอทั้งหมดในความรับผิดชอบ
    */
   useEffect(() => {
     if (!account) return;
     setLoading(true);
+    const isUser = account.role === 'USER';
     api
-      .listRequests({ mine: true })
-      .then(setRequests)
+      .listRequests(isUser ? { mine: true } : undefined)
+      .then((list) => {
+        if (isUser) {
+          setRequests(list.filter((r) => r.requesterId === account.id));
+        } else if (account.role === 'APPROVER_L2' || account.role === 'APPROVER_L1') {
+          const relevant = list.filter((r) => {
+            if (r.requesterId === account.id) return true;
+            if (r.type !== 'repair' && r.signatures?.some((s) => s.signerId === account.id)) return true;
+            if (account.role === 'APPROVER_L2' && r.status === 'pending_l2') return true;
+            if (account.role === 'APPROVER_L1' && r.status === 'pending_l1') return true;
+            return false;
+          });
+          setRequests(relevant);
+        } else {
+          setRequests(list);
+        }
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [account]);
@@ -84,8 +103,6 @@ export default function RequestHistoryPage() {
    * กรองรายการคำขอตามเงื่อนไขที่เลือก (ประเภท, สถานะ, และคำค้นหา)
    */
   const filtered = requests.filter((r) => {
-    // กรองเฉพาะคำขอของตนเอง
-    if (account?.id && r.requesterId !== account.id) return false;
     // กรองตามประเภทบริการ
     if (typeFilter !== 'all' && r.type !== typeFilter) return false;
     // กรองตามกลุ่มสถานะ
