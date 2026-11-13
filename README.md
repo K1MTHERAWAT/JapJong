@@ -18,7 +18,7 @@
 * **LINE Login & Onboarding (Phase 2)**: เข้าสู่ระบบและเชื่อมต่อบัญชีด้วย LINE พร้อมระบบลงทะเบียนผู้ใช้ใหม่และบันทึกความยินยอม **PDPA Consent**
 * **Document Security**: ระบบตรวจสอบเอกสารดิจิทัล QR Code ความเร็วสูง (`@nimiq/qr-scanner`, `qrcode`), รหัสยืนยันสุ่ม 32-byte, SHA-256 Document Hashing และบันทึกประวัติการสแกน
 * **Shared Package**: `@japjong/shared` (TypeScript Types, Labels, RBAC Logic, Date Helpers, Period Conflict Checks)
-* **Testing & CI/CD**: Vitest (Unit & Integration Tests 433 ข้อ ครอบคลุม 31 Test Files ใน Monorepo 100% Pass) + GitHub Actions CI Pipeline + Multi-stage Dockerfile
+* **Testing & CI/CD**: Vitest (Unit & Integration Tests 434 ข้อ ครอบคลุม 31 Test Files ใน Monorepo 100% Pass) + GitHub Actions CI Pipeline + Multi-stage Dockerfile
 * **Gov Center SSO & Residence API Integration**: ระบบบูรณาการการเข้าสู่ระบบแบบจุดเดียว (Single Sign-On) ร่วมกับ Gov Center / IAM-GOV ผ่านมาตรฐาน OAuth2 / OpenID Connect (Authorization Code flow, Direct ticket exchange, Server-to-Server login), ป้องกัน CSRF ด้วย state parameter, เชื่อมโยงบัญชีและนำเข้าข้อมูลประชากรจาก Residence API (`/api/residences/search`) เข้าสู่ระบบอัตโนมัติ
 * **Document Templates & Digital Verification Engine**: ระบบบริหารจัดการเทมเพลตเอกสารราชการอิเล็กทรอนิกส์ (`/admin/document-templates`), เครื่องมือแก้ไขโครงสร้างเทมเพลตแบบ Interactive (`/editor`), จำลองตัวอย่างขนาด A4 เสมือนจริง (`/preview`), จัดการประวัติเวอร์ชันและ Rollback (`/versions`), สร้างเอกสารราชการ (`/admin/documents`), ประทับตรา QR Code ความเร็วสูงและตรวจสอบความถูกต้องแบบแยกสิทธิ์ประชาชนทั่วไป (`/verify/[token]`) และเจ้าหน้าที่ (`/staff/verify`)
 * **LINE Webhook & LIFF Integration (Phase 4)**: รองรับการเข้าสู่ระบบอัตโนมัติผ่าน **LINE Front-end Framework (LIFF SDK)**, Direct Routing ถอดรหัส `liff.state`, ป้องกัน Open Redirect และระบบตรวจสอบ Webhook Signature (HMAC-SHA256) ป้องกัน Replay Attack
@@ -858,7 +858,7 @@ erDiagram
 
 ## มาตรฐานการทดสอบและการรับประกันคุณภาพ (Quality Assurance)
 
-* **Vitest Suite**: รันแบบคู่ขนานผ่าน `pnpm test` ครอบคลุม **31 Test Files** รวม **433 ข้อทดสอบ (100% Pass)**
+* **Vitest Suite**: รันแบบคู่ขนานผ่าน `pnpm test` ครอบคลุม **31 Test Files** รวม **434 ข้อทดสอบ (100% Pass)**
 * **TypeScript Strictness**: ตรวจสอบ Types ทุกโปรเจกต์ (`@japjong/shared`, `@japjong/api`, `@japjong/web`) ไร้ข้อผิดพลาด
 * **Production Build Validation**: Next.js App Router คอมไพล์และสร้าง Static/Dynamic Pages สำเร็จครบทุกเส้นทาง
 * **Discipline**: มีการจัดเก็บบันทึกประวัติและโครงสร้างข้อมูลอย่างเป็นระบบ ปลอดภัยตามมาตรฐานสถาปัตยกรรมภาครัฐ

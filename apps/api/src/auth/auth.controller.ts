@@ -185,7 +185,8 @@ export class AuthController {
   @Public()
   @Post('request-otp')
   async requestOtp(@Body() body: RequestOtpDto) {
-    const isRegistrationOpen = process.env.DEMO_MODE === 'true' || process.env.REGISTRATION_OPEN === 'true';
+    // ตรวจสอบว่าระบบเปิดรับการลงทะเบียนด้วยตนเองหรือไม่ (ค่าเริ่มต้นเปิดรับ ยกเว้นระบุ REGISTRATION_OPEN=false)
+    const isRegistrationOpen = process.env.REGISTRATION_OPEN !== 'false';
     if (!isRegistrationOpen) {
       throw new ForbiddenException('ปิดรับการลงทะเบียนด้วยตนเองชั่วคราว');
     }
@@ -229,7 +230,8 @@ export class AuthController {
     @Body()
     body: RegisterDto,
   ) {
-    const isRegistrationOpen = process.env.DEMO_MODE === 'true' || process.env.REGISTRATION_OPEN === 'true';
+    // ตรวจสอบว่าระบบเปิดรับการลงทะเบียนด้วยตนเองหรือไม่ (ค่าเริ่มต้นเปิดรับ ยกเว้นระบุ REGISTRATION_OPEN=false)
+    const isRegistrationOpen = process.env.REGISTRATION_OPEN !== 'false';
     if (!isRegistrationOpen) {
       throw new ForbiddenException('ปิดรับการลงทะเบียนด้วยตนเองชั่วคราว กรุณาติดต่อเจ้าหน้าที่เพื่อสร้างบัญชี');
     }

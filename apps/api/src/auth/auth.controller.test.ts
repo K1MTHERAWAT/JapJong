@@ -171,6 +171,31 @@ describe('AuthController Unit Tests', () => {
       expect(res.account.phone).toBe('0891112233');
       expect(res.account.username).toBe('0891112233');
     });
+
+    it('rejects registration when REGISTRATION_OPEN is explicitly false', async () => {
+      const originalVal = process.env.REGISTRATION_OPEN;
+      try {
+        process.env.REGISTRATION_OPEN = 'false';
+        await expect(
+          controller.register({
+            name: 'นาย ทดสอบ',
+            phone: '0899998888',
+            password: 'Password123',
+            otp: '000000',
+          }),
+        ).rejects.toThrow(/ปิดรับการลงทะเบียนด้วยตนเองชั่วคราว กรุณาติดต่อเจ้าหน้าที่เพื่อสร้างบัญชี/);
+
+        await expect(controller.requestOtp({ phone: '0899998888' })).rejects.toThrow(
+          /ปิดรับการลงทะเบียนด้วยตนเองชั่วคราว/,
+        );
+      } finally {
+        if (originalVal !== undefined) {
+          process.env.REGISTRATION_OPEN = originalVal;
+        } else {
+          delete process.env.REGISTRATION_OPEN;
+        }
+      }
+    });
   });
 
   describe('Profile & Password Management', () => {
