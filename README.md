@@ -18,7 +18,9 @@
 * **LINE Login & Onboarding (Phase 2)**: เข้าสู่ระบบและเชื่อมต่อบัญชีด้วย LINE พร้อมระบบลงทะเบียนผู้ใช้ใหม่และบันทึกความยินยอม **PDPA Consent**
 * **Document Security**: ระบบตรวจสอบเอกสารดิจิทัล QR Code ความเร็วสูง (`@nimiq/qr-scanner`, `qrcode`), รหัสยืนยันสุ่ม 32-byte, SHA-256 Document Hashing และบันทึกประวัติการสแกน
 * **Shared Package**: `@japjong/shared` (TypeScript Types, Labels, RBAC Logic, Date Helpers, Period Conflict Checks)
-* **Testing & CI/CD**: Vitest (Unit & Integration Tests 429 ข้อ ครอบคลุม 31 Test Files ใน Monorepo 100% Pass) + GitHub Actions CI Pipeline + Multi-stage Dockerfile
+* **Testing & CI/CD**: Vitest (Unit & Integration Tests 433 ข้อ ครอบคลุม 31 Test Files ใน Monorepo 100% Pass) + GitHub Actions CI Pipeline + Multi-stage Dockerfile
+* **Gov Center SSO & Residence API Integration**: ระบบบูรณาการการเข้าสู่ระบบแบบจุดเดียว (Single Sign-On) ร่วมกับ Gov Center / IAM-GOV ผ่านมาตรฐาน OAuth2 / OpenID Connect (Authorization Code flow, Direct ticket exchange, Server-to-Server login), ป้องกัน CSRF ด้วย state parameter, เชื่อมโยงบัญชีและนำเข้าข้อมูลประชากรจาก Residence API (`/api/residences/search`) เข้าสู่ระบบอัตโนมัติ
+* **Document Templates & Digital Verification Engine**: ระบบบริหารจัดการเทมเพลตเอกสารราชการอิเล็กทรอนิกส์ (`/admin/document-templates`), เครื่องมือแก้ไขโครงสร้างเทมเพลตแบบ Interactive (`/editor`), จำลองตัวอย่างขนาด A4 เสมือนจริง (`/preview`), จัดการประวัติเวอร์ชันและ Rollback (`/versions`), สร้างเอกสารราชการ (`/admin/documents`), ประทับตรา QR Code ความเร็วสูงและตรวจสอบความถูกต้องแบบแยกสิทธิ์ประชาชนทั่วไป (`/verify/[token]`) และเจ้าหน้าที่ (`/staff/verify`)
 * **LINE Webhook & LIFF Integration (Phase 4)**: รองรับการเข้าสู่ระบบอัตโนมัติผ่าน **LINE Front-end Framework (LIFF SDK)**, Direct Routing ถอดรหัส `liff.state`, ป้องกัน Open Redirect และระบบตรวจสอบ Webhook Signature (HMAC-SHA256) ป้องกัน Replay Attack
 * **LINE Rich Menu & Flex Message Engine (Phase 5)**: ระบบ Rich Menu อัจฉริยะแบบแยกบทบาท (Citizen, Staff, Admin, Guest) สลับเมนูอัตโนมัติตาม Role ของผู้ใช้งาน พร้อมระบบสร้างภาพกราฟิกด้วย Pure Node.js (2500x1686, RGB PNG, zlib deflate) และหน้าจอแอดมินบริหารจัดการครบวงจร (`/admin/line`)
 * **Dynamic Sidebar Navigation & Service Management (`/admin/services`)**: ระบบจัดการบริการและเมนู Sidebar จากฐานข้อมูล (Database-driven) จัดหมวดหมู่บริการ กำหนดสิทธิ์ตามบทบาท จัดเรียงลำดับเมนูด้วย Drag & Drop พร้อมหน้าจอ Interactive Preview และการตรวจสอบสิทธิ์ความปลอดภัยที่ Backend ทุก API
@@ -52,27 +54,30 @@ BookingV1/
 ├── apps/
 │   ├── api/                    # @japjong/api — NestJS REST API (:4000/api)
 │   │   ├── prisma/
-│   │   │   ├── schema.prisma       # Prisma Data Model (25 ตาราง รวม LINE accounts, notifications, webhooks, rich_menus, flex_templates)
+│   │   │   ├── schema.prisma       # Prisma Data Model (30 ตาราง รวม LINE, Templates, Gov SSO, Thai Administrative Divisions)
 │   │   │   ├── migrations/         # SQL Migration Files
-│   │   │   ├── migrate-supabase.ts # สคริปต์สร้างและอัปเดตตารางบน Supabase PostgreSQL (Migration 1-8)
+│   │   │   ├── migrate-supabase.ts # สคริปต์สร้างและอัปเดตตารางบน Supabase PostgreSQL (Migration 1-9)
 │   │   │   └── seed.ts             # Standalone Seed Script (รองรับ argon2id hash)
 │   │   └── src/
-│   │       ├── auth/             # Login, Register, LINE Login, Email OTP, Profile, Signature, PIN
+│   │       ├── auth/             # Login, Register, LINE Login, Gov Center SSO & Residence API, Email OTP, PIN
 │   │       ├── line/             # LINE Messaging API Client, Flex Template Service, Webhook Handler, Rich Menu Service
 │   │       ├── notifications/    # In-App Notifications, Outbox Queue, Preferences, Business Events, Admin Retry
 │   │       ├── resources/        # Venues, Equipment, Monthly Availability, Conflict & Stock Check
 │   │       ├── requests/         # Booking, Borrow, Repair, 3-Level Sign, Handover, Reschedule
-│   │       ├── documents/        # QR Code Verification, Document Hashing, Public & Staff Verify API
+│   │       ├── documents/        # Document Templates, A4 Versioning, QR Code Verification, Public & Staff Verify API
+│   │       ├── users/            # Profile, Address Management, IAM-GOV Residence Search & PDPA Consent
 │   │       ├── admin/            # Role Management, Sidebar Services, LINE & Rich Menu Manager, Overview
+│   │       ├── storage/          # Document & Attachment Storage Provider
 │   │       └── db/               # Prisma Database Service (Persistent DB Sessions & Sequences)
 │   └── web/                    # @japjong/web — Next.js 15 (App Router) + Tailwind CSS (:3000)
-│       ├── public/               # Static Assets (โลโก้, ไอคอน)
+│       ├── public/               # Static Assets (โลโก้, ไอคอน, ตราครุฑ)
 │       └── src/
 │           ├── app/              # หน้าจอทั้งหมดตามบทบาท (Responsive Phone/Tablet/Desktop)
-│           │   ├── login/        # เข้าสู่ระบบ + LINE Login + โหมดคลิกเดียว (One-Click Demo)
+│           │   ├── login/        # เข้าสู่ระบบ + Gov Center SSO + LINE Login + โหมดคลิกเดียว (One-Click Demo)
 │           │   ├── register/     # ลงทะเบียนผู้ใช้ทั่วไป และ /register/line (ลงทะเบียนครั้งแรกผ่าน LINE + PDPA)
+│           │   ├── auth/callback # หน้ารับ Authorization Code / Ticket จาก Gov Center SSO
 │           │   ├── liff/         # LINE Front-end Framework (LIFF SSO Login & Dynamic Route Resolver)
-│           │   ├── account/      # จัดการบัญชีผู้ใช้งาน (โปรไฟล์, ที่อยู่, เปลี่ยนรหัสผ่าน, ลายเซ็น & PIN)
+│           │   ├── account/      # จัดการบัญชีผู้ใช้งาน (โปรไฟล์, ที่อยู่ตามทะเบียนราษฎร์, ลายเซ็น & PIN)
 │           │   ├── notifications/# ศูนย์การแจ้งเตือน (/notifications) และตั้งค่าช่องทางรับแจ้งเตือน (/settings)
 │           │   ├── booking/      # ขอใช้สถานที่ราชการ (5 ขั้นตอน รองรับรายวัน/รายชั่วโมง + ล็อกรายการ)
 │           │   ├── borrow/       # ขอยืม–คืนอุปกรณ์ราชการ (4 ขั้นตอน + เช็คสต็อกอัตโนมัติ) และ /borrow/my (แยกสิทธิ์บัญชี)
@@ -82,9 +87,9 @@ BookingV1/
 │           │   ├── staff/        # เจ้าหน้าที่ (ตรวจคำขอ, รับมอบ–รับคืน, กรอกแทน, ตรวจสอบ QR Code /staff/verify)
 │           │   ├── verify/       # ตรวจสอบเอกสารดิจิทัลสาธารณะสำหรับประชาชน (/verify/[token])
 │           │   ├── approver/     # ปลัด อบต. / นายก อบต. (คิวลงนามอนุมัติด้วย PIN 6 หลัก, ใบอนุญาต PDF)
-│           │   └── admin/        # แอดมิน (ภาพรวม, จัดการทรัพยากร, จัดการบริการ /admin/services, จัดการบทบาทผู้ใช้ /admin/permissions, จัดการ LINE /admin/line)
-│           ├── components/       # AppShell, Sidebar (Badge แจ้งเตือน + Dynamic Services), UI Primitives, DatePicker & OfficialGovFormDocument
-│           └── lib/api.ts        # Client API SDK (Notifications, Preferences, LINE Status, Services & Roles API)
+│           │   └── admin/        # แอดมิน (ภาพรวม, จัดการทรัพยากร, เทมเพลตเอกสาร /document-templates, จัดการบริการ /services, บทบาทผู้ใช้ /permissions, LINE /line)
+│           ├── components/       # AppShell, Sidebar (Dynamic Services), UI Primitives, DatePicker, OfficialGovFormDocument
+│           └── lib/api.ts        # Client API SDK (SSO, Document Templates, Verification, Roles & Services API)
 ├── package.json
 └── pnpm-workspace.yaml
 ```
@@ -277,7 +282,15 @@ pnpm dev
     - ออกแบบคอมโพเนนต์ `OfficialGovFormDocument` ให้จัดหน้ากระดาษขนาด A4 แนวตั้งพอดีหน้าอย่างสมบูรณ์แบบ
     - บังคับการแสดงผลชุดสีสว่าง (Light Theme Enforcement) ในโหมดพิมพ์ เพื่อให้เอกสารคมชัดและประหยัดหมึกพิมพ์ แม้หน้าจอจะเปิดใช้งานโหมดมืด (Dark Mode) อยู่ก็ตาม
     - ซ่อน URL วันที่ และ Header ของเว็บเบราว์เซอร์อัตโนมัติขณะสั่งพิมพ์ผ่าน CSS `@media print`
-15. **เอกสารระบบการออกแบบกลางและคู่มือระบบ (Centralized Documentation):**
+15. **ระบบการเชื่อมต่อ Gov Center SSO & IAM-GOV Residence API:**
+    - **Single Sign-On (SSO):** เข้าสู่ระบบสะดวกรวดเร็วผ่านพอร์ทัลกลาง Gov Center รองรับทั้งแบบ Authorization Code Flow (ผ่าน `/auth/callback`), การแลก Ticket ของ LINE Integration และ Server-to-Server Authentication พร้อมป้องกันการโจมตีข้ามไซต์ (CSRF Protection) ด้วย State Token
+    - **Thai Administrative Divisions & Residence Lookup:** ดึงข้อมูลที่อยู่และสำมะโนประชากรจากฐานข้อมูลการปกครองส่วนท้องถิ่นและ IAM-GOV Residence API (`/api/residences/search`) เชื่อมโยงบ้านเลขที่ หมู่ที่ ตำบล อำเภอ จังหวัด เข้าสู่โปรไฟล์ผู้ใช้โดยอัตโนมัติ
+16. **ระบบบริหารจัดการเทมเพลตเอกสารราชการอิเล็กทรอนิกส์ (Document Templates & Versioning Engine):**
+    - **Interactive Template Editor (`/admin/document-templates/[id]/editor`):** เครื่องมือสร้างและแก้ไขแบบฟอร์มเอกสารราชการ จัดการส่วนหัว ตราครุฑ เนื้อหา ช่องลงนาม และข้อความทางกฎหมายแบบ Drag & Configure
+    - **A4 Real-Time Preview (`/admin/document-templates/[id]/preview`):** จำลองตัวอย่างเอกสารขนาดมาตรฐาน A4 แบบทันทีตามโครงสร้างและข้อมูลจำลอง พร้อมการควบคุมระยะขอบและฟอนต์ Sarabun ทางการ
+    - **Versioning & Safe Rollback (`/admin/document-templates/[id]/versions`):** ทุกครั้งที่มีการเผยแพร่ (Publish) เอกสาร ระบบจะสร้าง Snapshot เวอร์ชันประวัติอย่างถาวร สามารถตรวจสอบความแตกต่างและกดย้อนกลับ (Rollback) ได้อย่างปลอดภัย
+    - **Generated Documents Tracking (`/admin/documents`):** ตรวจสอบรายการเอกสารราชการที่ระบบสร้างขึ้นทั้งหมด พร้อมข้อมูล Snapshot ของฟอร์ม ณ ขณะออกเอกสาร
+17. **เอกสารระบบการออกแบบกลางและคู่มือระบบ (Centralized Documentation):**
     - **[`DESIGN.md`](./DESIGN.md):** เอกสารมาตรฐานกลางสำหรับกำหนดแนวทางการออกแบบ UI/UX ทั้งโปรเจกต์ (Design Principles, Design Tokens, Typography, Spacing Scale, Component Guidelines, Interaction Patterns, Responsive Guidelines) ทำหน้าที่เป็น Single Source of Truth
     - **[`USER_MANUAL.md`](./USER_MANUAL.md):** คู่มือการใช้งานระบบฉบับสมบูรณ์สำหรับประชาชนและเจ้าหน้าที่ (Flowcharts, วิธีการสมัคร/เข้าสู่ระบบ, การยื่นคำขอทุกประเภท, การสแกน QR Code และการใช้งานผ่าน LINE OA / LIFF)
 
@@ -334,6 +347,12 @@ erDiagram
     notifications ||--o{ line_notification_logs : "notification_id"
 
     rich_menus ||--o{ rich_menu_actions : "rich_menu_id"
+
+    document_templates ||--o{ document_template_versions : "template_id"
+    document_templates ||--o{ generated_documents : "template_id"
+
+    thai_provinces ||--o{ thai_districts : "province_id"
+    thai_districts ||--o{ thai_subdistricts : "district_id"
 
     requests ||--o{ request_venues : "request_id"
     requests ||--o{ request_periods : "request_id"
@@ -697,6 +716,64 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
     }
+
+    document_templates {
+        string id PK
+        string name
+        string description
+        string category "venue, equipment, memo, general"
+        string status "draft, published, archived"
+        int current_version
+        json structure
+        json settings
+        string created_by
+        string updated_by
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    document_template_versions {
+        string id PK
+        string template_id FK
+        int version
+        json structure
+        json settings
+        string note
+        timestamptz published_at
+        string published_by
+    }
+
+    generated_documents {
+        string id PK
+        string template_id FK
+        string template_version_id
+        string request_id
+        string document_number
+        json snapshot
+        string rendered_file
+        string status "draft, issued, revoked"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    thai_provinces {
+        string id PK
+        string name_th
+    }
+
+    thai_districts {
+        string id PK
+        string province_id FK
+        string name_th
+    }
+
+    thai_subdistricts {
+        string id PK
+        string district_id FK
+        string province_id
+        string name_th
+        string zip_code
+    }
 ```
 
 ---
@@ -736,11 +813,52 @@ erDiagram
 | `PATCH` | `/api/auth/profile` | Authenticated | ปรับปรุงข้อมูลส่วนตัวและที่อยู่ |
 | `POST` | `/api/auth/pin` | Authenticated | ตั้งค่าหรือเปลี่ยนรหัส PIN 6 หลักสำหรับการลงนาม |
 
+### 4. ระบบเชื่อมต่อ Gov Center SSO & Residence API
+| Method | Path | สิทธิ์การเข้าถึง | คำอธิบาย |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/auth/sso-callback` | Public | รับ Authorization Code หรือ Ticket จาก Gov Center SSO เพื่อยืนยันตัวตนและสร้างเซสชัน |
+| `POST` | `/api/auth/sso-login` | Public | เข้าสู่ระบบด้วยอีเมลและรหัสผ่านของ Gov Center โดยตรง (Server-to-Server) |
+| `POST` | `/api/auth/sso-session` | Public | แลก SSO session token จาก Gov Center เป็นเซสชันของระบบจับจอง |
+| `GET` | `/api/residences/search` | Public | ค้นหาข้อมูลที่อยู่ ทะเบียนบ้าน และประชากรจาก IAM-GOV Residence API |
+
+### 5. ระบบจัดการเทมเพลตเอกสารราชการ (Document Templates API)
+| Method | Path | สิทธิ์การเข้าถึง | คำอธิบาย |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/document-templates` | เจ้าหน้าที่/ผู้บริหาร/แอดมิน | ดึงรายการเทมเพลตเอกสารราชการทั้งหมด (กรองตามหมวดหมู่ สถานะ หรือคำค้น) |
+| `GET` | `/api/document-templates/:id` | เจ้าหน้าที่/ผู้บริหาร/แอดมิน | ดึงรายละเอียดโครงสร้างเทมเพลตเอกสารรายฉบับ |
+| `POST` | `/api/document-templates` | `ADMIN` | สร้างเทมเพลตเอกสารราชการใหม่ พร้อมกำหนดโครงสร้างฟิลด์และการจัดวาง |
+| `PATCH` | `/api/document-templates/:id` | `ADMIN` | แก้ไขข้อมูลและการตั้งค่าของเทมเพลตเอกสาร |
+| `DELETE` | `/api/document-templates/:id` | `ADMIN` | ลบเทมเพลตเอกสารที่ไม่ได้ใช้งานออกจากระบบ |
+| `POST` | `/api/document-templates/:id/duplicate` | `ADMIN` | ทำสำเนา (Clone) เทมเพลตเอกสารเป็นฉบับร่างใหม่ |
+| `POST` | `/api/document-templates/:id/publish` | `ADMIN` | เผยแพร่เทมเพลตพร้อมบันทึก Snapshot ประวัติเวอร์ชัน |
+| `POST` | `/api/document-templates/:id/archive` | `ADMIN` | จัดเก็บเทมเพลตเข้าคลังประวัติเมื่อยกเลิกใช้งาน |
+| `GET` | `/api/document-templates/:id/versions` | `ADMIN`, `STAFF` | ดึงประวัติการแก้ไขและเวอร์ชันทั้งหมดของเทมเพลต |
+| `GET` | `/api/document-templates/:id/versions/:version` | `ADMIN`, `STAFF` | ดึงโครงสร้างเทมเพลตของเวอร์ชันที่ระบุ |
+| `POST` | `/api/document-templates/:id/versions/:version/rollback` | `ADMIN` | ย้อนกลับเทมเพลตไปยังเวอร์ชันที่กำหนด (Rollback) |
+
+### 6. ระบบเอกสารราชการและการตรวจสอบดิจิทัล (Documents & Digital Verification API)
+| Method | Path | สิทธิ์การเข้าถึง | คำอธิบาย |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/documents` | Authenticated | ดึงรายการเอกสารราชการที่สร้างขึ้นทั้งหมด |
+| `POST` | `/api/documents/generate` | Authenticated | สร้างเอกสารราชการฉบับใหม่จากแม่แบบ (Template Engine) |
+| `GET` | `/api/documents/:id` | Authenticated | ดึงรายละเอียดข้อมูลเอกสารราชการรายฉบับ |
+| `POST` | `/api/documents/:id/verification` | Authenticated | สร้างหรือดึงข้อมูล QR Code ประจำเอกสารและ Verification Token |
+| `POST` | `/api/documents/:id/revoke` | `ADMIN` | เพิกถอนความถูกต้องของเอกสารราชการ |
+| `GET` | `/api/documents/public-verify/:token` | Public | ตรวจสอบสถานะความถูกต้องของเอกสารสำหรับประชาชน (PII-Safe) |
+| `POST` | `/api/documents/verify/scan` | `STAFF`, `ADMIN` | สแกน QR Code สำหรับเจ้าหน้าที่ พร้อมบันทึกประวัติการสแกนลง Audit Log |
+
+### 7. ระบบผู้ใช้งานและสิทธิความยินยอม PDPA (Users & PDPA API)
+| Method | Path | สิทธิ์การเข้าถึง | คำอธิบาย |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/users/me` | Authenticated | ดึงข้อมูลผู้ใช้งานปัจจุบันพร้อมสิทธิ์การเข้าถึง |
+| `PATCH` | `/api/users/me` | Authenticated | อัปเดตข้อมูลส่วนตัว (ชื่อ, เบอร์โทร, ตำแหน่ง, แผนก) |
+| `POST` | `/api/users/consent/withdraw` | Authenticated | แจ้งเพิกถอนความยินยอมในการประมวลผลข้อมูลส่วนบุคคลตาม PDPA |
+
 ---
 
 ## มาตรฐานการทดสอบและการรับประกันคุณภาพ (Quality Assurance)
 
-* **Vitest Suite**: รันแบบคู่ขนานผ่าน `pnpm test` ครอบคลุม **31 Test Files** รวม **429 ข้อทดสอบ (100% Pass)**
+* **Vitest Suite**: รันแบบคู่ขนานผ่าน `pnpm test` ครอบคลุม **31 Test Files** รวม **433 ข้อทดสอบ (100% Pass)**
 * **TypeScript Strictness**: ตรวจสอบ Types ทุกโปรเจกต์ (`@japjong/shared`, `@japjong/api`, `@japjong/web`) ไร้ข้อผิดพลาด
 * **Production Build Validation**: Next.js App Router คอมไพล์และสร้าง Static/Dynamic Pages สำเร็จครบทุกเส้นทาง
 * **Discipline**: มีการจัดเก็บบันทึกประวัติและโครงสร้างข้อมูลอย่างเป็นระบบ ปลอดภัยตามมาตรฐานสถาปัตยกรรมภาครัฐ

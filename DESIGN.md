@@ -34,6 +34,11 @@
    - 4.11 [Stepper & Progress Tracking](#411-stepper--progress-tracking)
    - 4.12 [Feedback, Alerts, Skeleton & Empty State](#412-feedback-alerts-skeleton--empty-state)
    - 4.13 [Official Gov Form Document Paper](#413-official-gov-form-document-paper)
+   - 4.14 [Interactive Document Template Editor & A4 Real-Time Preview](#414-interactive-document-template-editor--a4-real-time-preview)
+   - 4.15 [High-Speed QR Scanner & Verification Overlay](#415-high-speed-qr-scanner--verification-overlay)
+   - 4.16 [Dynamic Sidebar Services Manager & Drag-and-Drop Interaction](#416-dynamic-sidebar-services-manager--drag-and-drop-interaction)
+   - 4.17 [Two-Factor Signing Verification Modal (OTP + PIN + Canvas)](#417-two-factor-signing-verification-modal-otp--pin--canvas)
+   - 4.18 [LINE Rich Menu Management & Graphic Tiles Grid](#418-line-rich-menu-management--graphic-tiles-grid)
 5. [Interaction Patterns (พฤติกรรมการโต้ตอบ)](#5-interaction-patterns)
 6. [Page Design Patterns (รูปแบบหน้าจอมาตรฐาน)](#6-page-design-patterns)
 7. [Responsive Guidelines (แนวทางการปรับขนาดหน้าจอ)](#7-responsive-guidelines)
@@ -447,6 +452,73 @@
 
 ---
 
+### 4.14 Interactive Document Template Editor & A4 Real-Time Preview
+
+ออกแบบสำหรับสตูดิโอจัดการแบบฟอร์มเอกสารราชการ (`/admin/document-templates`):
+- **Split-View Canvas Layout:**
+  - **ฝั่งซ้าย (Structure & Property Inspector):** รายการส่วนประกอบของเอกสาร (Emblem, Header, Subject, Variables, Signer Blocks, Legal Footer) สามารถเปิด-ปิด ปรับแต่งข้อความ และเลือกตัวแปรแบบ Dynamic Chips (`{{requesterName}}`, `{{venueName}}`, `{{periodStart}}`)
+  - **ฝั่งขวา (Live A4 Preview Panel):** แสดงผลจำลองหน้ากระดาษ A4 เสมือนจริง (สัดส่วน 210mm x 297mm) ปรับเปลี่ยนข้อความตามที่แก้ไขแบบทันที (Zero-lag Reactive Preview)
+- **Official Typography & Margins:**
+  - กำหนดระยะขอบกระดาษมาตรฐาน: ขอบบน-ล่าง `25mm`, ขอบซ้าย-ขวา `20mm`
+  - ฟอนต์ทางการ: `TH Sarabun New` หรือ Sans-serif ทางการ ขนาด 16pt สำหรับเนื้อหา และ 24pt สำหรับหัวเรื่อง
+  - ตราครุฑกลางหัวกระดาษ: อัตราส่วนคมชัด ความสูงมาตรฐาน 3 ซม. (`h-12` ถึง `h-16`)
+- **Version History & Rollback Badges:** แสดงหมายเลขเวอร์ชันปัจจุบัน (`v1`, `v2`) พร้อม Badge สถานะ (`DRAFT`, `PUBLISHED`, `ARCHIVED`) และปุ่มเปรียบเทียบการเปลี่ยนแปลง
+
+---
+
+### 4.15 High-Speed QR Scanner & Verification Overlay
+
+ออกแบบสำหรับเครื่องสแกนความเร็วสูงประจำจุดตรวจของเจ้าหน้าที่ (`/staff/verify`):
+- **Viewfinder Frame:** กรอบเล็งสแกนทรงสี่เหลี่ยมจัตุรัสขอบโค้งมน (`size-64` ถึง `size-72`) พร้อมแอนิเมชันเส้นสแกนเลเซอร์สีเขียว (`animate-scanline`) วิ่งขึ้น-ลง
+- **Floating Controls Overlay:** ปุ่มควบคุมลอยแบบกึ่งโปร่งแสงบนภาพกล้อง:
+  - ปุ่มเปิด-ปิดไฟฉาย (Flashlight Toggle): `p-3 rounded-full bg-black/40 backdrop-blur text-white hover:bg-black/60`
+  - ปุ่มสลับกล้องหน้า-หลัง (Switch Camera): รองรับการทำงานทั้งบนมือถือและแท็บเล็ต
+- **Verification Result Banner:** แสดงผลการตรวจทันทีโดยไม่ต้องโหลดหน้าใหม่:
+  - ผ่านการอนุมัติ (VALID): พื้นหลังสีเขียว `bg-ok-bg text-ok-fg border-ok-fg/30` พร้อมไอคอน Check ขนาดใหญ่
+  - ถูกเพิกถอนสิทธิ์ (REVOKED): พื้นหลังสีส้ม `bg-warn-bg text-warn-fg border-warn-fg/30`
+  - ไม่ถูกต้อง/ไม่พบข้อมูล (INVALID): พื้นหลังสีแดง `bg-danger-bg text-danger-fg border-danger-fg/30`
+
+---
+
+### 4.16 Dynamic Sidebar Services Manager & Drag-and-Drop Interaction
+
+ออกแบบสำหรับระบบจัดระเบียบเมนู Sidebar จากฐานข้อมูล (`/admin/services`):
+- **Draggable Service Row:**
+  - ไอคอนจับลาก (Drag Handle): `cursor-grab active:cursor-grabbing text-ink-mute hover:text-ink`
+  - Drop Target Indicator: แสดงเส้นนำสายตาสี `brand` (`h-0.5 bg-brand`) ระหว่างแถวเมื่อลากผ่าน
+  - สลับเปิด-ปิดด่วน (Inline Toggle Switch): เปิดใช้งานหรือซ่อนเมนูได้ทันที
+  - Badge แสดงสิทธิ์บทบาทที่เข้าถึงได้: ชิปแสดง Role แต่ละประเภทตามโทนสีเฉพาะตัว
+- **Interactive Sidebar Preview Drawer:** มีแผงจำลองการแสดงผล Sidebar ขนาดจริง สามารถเลือกสลับบทบาท (`ADMIN`, `STAFF`, `USER`) เพื่อดูตัวอย่างเมนูที่แต่ละบทบาทจะมองเห็นได้ทันที
+
+---
+
+### 4.17 Two-Factor Signing Verification Modal (OTP + PIN + Canvas)
+
+ออกแบบกระบวนการลงนามเอกสารให้ปลอดภัยและมีความน่าเชื่อถือทางกฎหมาย:
+- **Phase 1: Email OTP Input Verification:**
+  - กล่องกรอกรหัส 6 ช่องเรียงเดี่ยว (`size-12 rounded-xl text-center text-xl font-bold tracking-widest border border-line-input focus:border-brand focus:ring-2 focus:ring-brand/20`)
+  - รองรับ Auto-Focus ถัดไปอัตโนมัติเมื่อพิมพ์ตัวเลข และลบย้อนกลับด้วย Backspace
+  - ตัวนับถอยหลังอายุรหัส (5 นาที) และปุ่มขอรหัสใหม่พร้อม Cooldown 60 วินาที
+- **Phase 2: PIN Keypad Dialog (`PinKeypad`):**
+  - แป้นตัวเลขจำลอง 0-9 แบบ 3 คอลัมน์ ออกแบบป้องกัน Shoulder Surfing
+  - จุดแสดงสถานะรหัสผ่าน 6 จุด (`size-3.5 rounded-full border-2 border-brand`) เติมเต็มเมื่อกดตัวเลข
+  - ปุ่ม Backspace และปุ่มยกเลิก พร้อมระบบสั่น/เอฟเฟกต์ Error Shake เมื่อกรอกรหัสผิด
+- **Phase 3: Digital Signature Pad:**
+  - พื้นที่วาดลายเซ็น HTML5 Canvas พร้อมเครื่องมือล้างลายเซ็น (`ล้าง`), วาดใหม่, และปุ่มลัด `ใช้ลายเซ็นที่บันทึกไว้`
+
+---
+
+### 4.18 LINE Rich Menu Management & Graphic Tiles Grid
+
+ออกแบบสำหรับระบบจัดการ Rich Menu แยกตาม Role (`/admin/line`):
+- **Role Tabs Selector:** แถบเลือกบทบาท 4 ประเภท (`CITIZEN`, `STAFF`, `ADMIN`, `DEFAULT`)
+- **6-Tile Grid Preview (สัดส่วน 2500x1686):**
+  - จำลองหน้าตาเมนูแชทบอท LINE ขนาดจริงแบบ Responsive (อัตราส่วน 2.5:1.68)
+  - มีหมายเลขและขอบเขตช่องการกด (`Area 1-6`) พร้อมสีไฮไลต์ระบุประเภท Action (URL, Message, Postback)
+- **Node.js Pure Canvas Generation Indicator:** แถบแสดงสถานะการสร้างภาพกราฟิก PNG ระบุความละเอียด ขนาดไฟล์ และสถานะการซิงก์กับ LINE Messaging API Backend
+
+---
+
 ## 5. Interaction Patterns
 
 1. **การกดและการวางเมาส์ (Hover & Active):**
@@ -474,6 +546,18 @@
    - ส่วนบน: Step Header การ์ดบอกขั้นตอนปัจจุบันและจำนวนที่เลือก ตรึงติดบนสุด (`sticky top-0`)
    - ส่วนกลาง: ตัวเลือกสถานที่หรือครุภัณฑ์ในรูปแบบ Grid การ์ด
    - ส่วนล่าง: Footer แคปซูลลอย แสดงรายการที่เลือกทั้งหมดพร้อมปุ่ม "ถัดไป" ตรึงติดล่างสุด (`sticky bottom-0`)
+4. **Document Template Studio Pattern (`/admin/document-templates`):**
+   - ส่วนบน: แถบเครื่องมือจัดการสถานะเทมเพลต (Draft / Published), ปุ่มบันทึกร่าง, ปุ่มพรีวิว และปุ่มเผยแพร่
+   - ส่วนกลาง: แบ่งออกเป็นแผงโครงสร้าง (Section Tree) ทางซ้าย และกระดาษพรีวิวจำลองขนาด A4 อัตราส่วนจริงทางขวา
+   - การโต้ตอบ: รองรับการเลือกใส่ชิปตัวแปรไดนามิก และการอัปเดตตัวอย่างแบบเรียลไทม์
+5. **High-Speed Scanner Viewfinder Pattern (`/staff/verify`):**
+   - ส่วนบน: ตัวเลือกโหมดตรวจ (กล้องสด / อัปโหลดไฟล์ / ค้นหาด้วยรหัส)
+   - ส่วนกลาง: ช่องมองภาพกล้องสด (Viewfinder) อัตราส่วน 1:1 มีกรอบเล็ง ขอบมน แอนิเมชันเลเซอร์ และปุ่มควบคุมกล้องลอยตัว
+   - ส่วนล่าง: การ์ดสรุปผลการตรวจสอบความถูกต้อง ประวัติการสแกนล่าสุด พร้อมปุ่มเปิดดูเอกสารฉบับเต็ม
+6. **Dynamic Drag-and-Drop Management Pattern (`/admin/services`):**
+   - แถบเครื่องมือค้นหาและกรองหมวดหมู่ พร้อมปุ่ม "สร้างบริการใหม่"
+   - รายการบริการแบบตารางพร้อม Drag Handle สำหรับลากสลับตำแหน่งได้อิสระ
+   - แผง Interactive Preview Drawer ทางขวาเพื่อตรวจสอบการแสดงผล Sidebar เมนูตาม Role ได้ทันที
 
 ---
 
