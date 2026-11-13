@@ -45,7 +45,8 @@ const INITIAL_VISIBLE_COUNT = 8;
  */
 export default function MyBorrowsPage() {
   const { account } = useAuth();
-  const [items, setItems] = useState<ExtendedBorrowRequest[]>([]); // รายการคำขอยืมของฉันทั้งหมด
+  const [myItems, setMyItems] = useState<ExtendedBorrowRequest[]>([]); // รายการคำขอยืมของฉัน
+  const [inspectQueue, setInspectQueue] = useState<ExtendedBorrowRequest[]>([]); // คิวงานตรวจรับคืนของเจ้าหน้าที่ (สถานะ return_inspect)
   const [equipmentList, setEquipmentList] = useState<Equipment[]>([]); // ข้อมูลอุปกรณ์สำหรับอ้างอิง
   const [tab, setTab] = useState<BorrowTab>('borrowing'); // แท็บที่เลือกอยู่
   const [searchQuery, setSearchQuery] = useState(''); // คำค้นหา
@@ -81,30 +82,50 @@ export default function MyBorrowsPage() {
   const isStaffOrAdmin =
     account?.role === 'STAFF' || account?.role === 'ADMIN' || Boolean(account?.permissions?.review);
 
-  // โหมดขอบเขตรายการสำหรับเจ้าหน้าที่: 'all' = ดูคำขอทั้งหมดในระบบเพื่อตรวจรับคืน, 'mine' = ดูเฉพาะคำขอที่ตนเองยื่น
-  const [staffScope, setStaffScope] = useState<'all' | 'mine'>('all');
-
   // Load equipment & borrow requests from real API
   const load = useCallback(async () => {
     setLoading(true);
     setErrorMsg('');
     try {
-      const shouldFetchAll = isStaffOrAdmin && staffScope === 'all';
-      const [eqs, reqs] = await Promise.all([
-        api.equipment().catch(() => [] as Equipment[]),
-        api.listRequests(shouldFetchAll ? { type: 'borrow' } : { mine: true, type: 'borrow' }),
-      ]);
-      setEquipmentList(eqs);
-      const borrowReqs = ((reqs as ExtendedBorrowRequest[]) || []).filter(
-        (r) => shouldFetchAll || !account?.id || r.requesterId === account.id,
-      );
-      setItems(borrowReqs);
+      if (isStaffOrAdmin) {
+        // สำหรับเจ้าหน้าที่/แอดมิน:
+        // 1. ดึงคำขอของตนเอง (สำหรับแท็บ "ที่กำลังใช้งาน" และ "ประวัติ")
+        // 2. ดึงคำขอยืมทั้งหมดในระบบ เพื่อคัดกรองเฉพาะสถานะ "รอตรวจสอบ" (return_inspect) ของประชาชนมาให้ตรวจรับคืน
+        const [eqs, myReqs, allBorrowReqs] = await Promise.all([
+          api.equipment().catch(() => [] as Equipment[]),
+          api.listRequests({ mine: true, type: 'borrow' }).catch(() => [] as ExtendedBorrowRequest[]),
+          api.listRequests({ type: 'borrow', queue: 'handover' }).catch(() => [] as ExtendedBorrowRequest[]),
+        ]);
+        setEquipmentList(eqs);
+        // บังคับกรองเฉพาะคำขอของตนเองสำหรับ myItems (คำขอของคนอื่นจะไม่มาปนในแท็บที่กำลังใช้งานหรือประวัติ)
+        const myFiltered = ((myReqs as ExtendedBorrowRequest[]) || []).filter(
+          (r) => !account?.id || r.requesterId === account.id,
+        );
+        setMyItems(myFiltered);
+        // คัดกรองเฉพาะคำขอที่ประชาชนส่งคืนแล้วและรอตรวจสภาพ (return_inspect) เท่านั้น
+        const inspectFiltered = ((allBorrowReqs as ExtendedBorrowRequest[]) || []).filter(
+          (r) => r.status === 'return_inspect',
+        );
+        setInspectQueue(inspectFiltered);
+      } else {
+        // สำหรับประชาชนทั่วไป: ดึงเฉพาะคำขอของตนเอง
+        const [eqs, myReqs] = await Promise.all([
+          api.equipment().catch(() => [] as Equipment[]),
+          api.listRequests({ mine: true, type: 'borrow' }),
+        ]);
+        setEquipmentList(eqs);
+        const myFiltered = ((myReqs as ExtendedBorrowRequest[]) || []).filter(
+          (r) => !account?.id || r.requesterId === account.id,
+        );
+        setMyItems(myFiltered);
+        setInspectQueue([]);
+      }
     } catch (err: unknown) {
       setErrorMsg((err as Error).message || 'ไม่สามารถดึงข้อมูลรายการยืม–คืนอุปกรณ์ได้');
     } finally {
       setLoading(false);
     }
-  }, [account?.id, isStaffOrAdmin, staffScope]);
+  }, [account?.id, isStaffOrAdmin]);
 
   // อ่าน Query parameters จาก URL (เช่น ?tab=inspect&id=xxx จากแดชบอร์ดเจ้าหน้าที่)
   useEffect(() => {
@@ -155,26 +176,43 @@ export default function MyBorrowsPage() {
   };
 
   // Counts per tab
+  // แท็บ 1: ที่กำลังใช้งาน — เฉพาะคำขอของบัญชีตนเองเท่านั้น (ไม่นำคำขอของคนอื่นมาปน)
   const borrowingItems = useMemo(
-    () => items.filter((r) => r.status === 'approved' || r.status === 'borrowing'),
-    [items],
+    () => myItems.filter((r) => r.status === 'approved' || r.status === 'borrowing'),
+    [myItems],
   );
-  const inspectItems = useMemo(
-    () => items.filter((r) => r.status === 'return_inspect'),
-    [items],
-  );
+
+  // แท็บ 2: รอตรวจสอบ
+  // - ถ้าเป็นเจ้าหน้าที่/แอดมิน: แสดงคำขอทั้งหมดในระบบที่ประชาชนส่งคืนแล้วรอตรวจสภาพ
+  // - ถ้าเป็นประชาชน: แสดงเฉพาะคำขอของตนเองที่ส่งคืนแล้ว
+  const inspectItems = useMemo(() => {
+    if (isStaffOrAdmin) {
+      const map = new Map<string, ExtendedBorrowRequest>();
+      for (const r of inspectQueue) map.set(r.id, r);
+      for (const r of myItems) {
+        if (r.status === 'return_inspect') map.set(r.id, r);
+      }
+      return Array.from(map.values()).sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      );
+    }
+    return myItems.filter((r) => r.status === 'return_inspect');
+  }, [isStaffOrAdmin, inspectQueue, myItems]);
+
+  // แท็บ 3: ประวัติ — เฉพาะประวัติการยืม-คืนของบัญชีตนเองเท่านั้น
   const historyItems = useMemo(
     () =>
-      items.filter(
+      myItems.filter(
         (r) => r.status === 'returned' || r.status === 'cancelled' || r.status === 'rejected',
       ),
-    [items],
+    [myItems],
   );
 
   // Auto-switch to a populated tab on initial load if "borrowing" is empty
   const hasAutoSelectedTab = useRef(false);
   useEffect(() => {
-    if (!loading && !hasAutoSelectedTab.current && items.length > 0) {
+    const totalCount = borrowingItems.length + inspectItems.length + historyItems.length;
+    if (!loading && !hasAutoSelectedTab.current && totalCount > 0) {
       hasAutoSelectedTab.current = true;
       if (borrowingItems.length > 0) {
         setTab('borrowing');
@@ -184,7 +222,7 @@ export default function MyBorrowsPage() {
         setTab('history');
       }
     }
-  }, [loading, items.length, borrowingItems.length, inspectItems.length, historyItems.length]);
+  }, [loading, borrowingItems.length, inspectItems.length, historyItems.length]);
 
   // Filter items by active tab and search query
   const tabFiltered = useMemo(() => {
@@ -386,12 +424,17 @@ export default function MyBorrowsPage() {
         note: formNote.trim(),
         photos: formPhotos,
       });
-      setSuccessMsg('บันทึกผลการตรวจสอบและรูปภาพหลังส่งคืนเรียบร้อยแล้ว สถานะเปลี่ยนเป็น "เสร็จสิ้น" และย้ายไปที่หมวด "ประวัติ"');
+      setSuccessMsg('บันทึกผลการตรวจสอบและรูปภาพหลังส่งคืนเรียบร้อยแล้ว สถานะเปลี่ยนเป็น "เสร็จสิ้น"');
       setInspectModalTarget(null);
       setFormPhotos([]);
       setFormNote('');
-      setTab('history');
-      setSelectedId(targetId);
+      if (inspectModalTarget.requesterId === account?.id) {
+        setTab('history');
+        setSelectedId(targetId);
+      } else {
+        setTab('inspect');
+        setSelectedId(null);
+      }
       await load();
     } catch (err: unknown) {
       setModalError((err as Error).message || 'เกิดข้อผิดพลาดในการบันทึกผลการตรวจสอบ');
@@ -488,67 +531,31 @@ export default function MyBorrowsPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-ink tracking-tight m-0">
-              {isStaffOrAdmin ? 'จัดการและตรวจรับคืนอุปกรณ์' : 'รายการยืม–คืนอุปกรณ์'}
+              รายการยืม–คืนอุปกรณ์
             </h1>
             <p className="text-sm text-ink-mute mt-1 leading-relaxed">
-              {isStaffOrAdmin
-                ? 'ตรวจสภาพอุปกรณ์ที่ประชาชนส่งคืน บันทึกรูปภาพ และยืนยันรับคืนอุปกรณ์เข้าคลัง'
-                : 'ติดตามสถานะและหลักฐานรูปภาพของแต่ละคำขอ เลือกรายการทางซ้ายเพื่อดูรายละเอียด'}
+              ติดตามสถานะและหลักฐานรูปภาพของแต่ละคำขอ เลือกรายการทางซ้ายเพื่อดูรายละเอียด
             </p>
           </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            {isStaffOrAdmin && (
-              <div className="flex items-center gap-1.5 p-1 bg-surface-muted/80 border border-line rounded-xl text-xs font-semibold">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStaffScope('all');
-                    setSelectedId(null);
-                  }}
-                  className={`px-3 py-1.5 rounded-lg transition-all ${
-                    staffScope === 'all'
-                      ? 'bg-brand text-white shadow-xs'
-                      : 'text-ink-mute hover:text-ink'
-                  }`}
-                >
-                  คำขอทั้งหมดในระบบ (ตรวจรับคืน)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStaffScope('mine');
-                    setSelectedId(null);
-                  }}
-                  className={`px-3 py-1.5 rounded-lg transition-all ${
-                    staffScope === 'mine'
-                      ? 'bg-brand text-white shadow-xs'
-                      : 'text-ink-mute hover:text-ink'
-                  }`}
-                >
-                  เฉพาะคำขอของฉัน
-                </button>
-              </div>
-            )}
-            <Link
-              href="/borrow"
-              className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-brand text-white text-sm font-semibold transition hover:bg-brand-ink shadow-xs active:scale-[0.98]"
+          <Link
+            href="/borrow"
+            className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-brand text-white text-sm font-semibold transition hover:bg-brand-ink shadow-xs active:scale-[0.98]"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 256 256"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="20"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
             >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 256 256"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="20"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M40 128h176M128 40v176" />
-              </svg>
-              <span>ยื่นขอยืมอุปกรณ์ใหม่</span>
-            </Link>
-          </div>
+              <path d="M40 128h176M128 40v176" />
+            </svg>
+            <span>ยื่นขอยืมอุปกรณ์ใหม่</span>
+          </Link>
         </div>
 
         {/* ==================== ALERTS (Success / Error) ==================== */}
