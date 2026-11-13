@@ -81,18 +81,22 @@ export default function MyBorrowsPage() {
   const isStaffOrAdmin =
     account?.role === 'STAFF' || account?.role === 'ADMIN' || Boolean(account?.permissions?.review);
 
+  // โหมดขอบเขตรายการสำหรับเจ้าหน้าที่: 'all' = ดูคำขอทั้งหมดในระบบเพื่อตรวจรับคืน, 'mine' = ดูเฉพาะคำขอที่ตนเองยื่น
+  const [staffScope, setStaffScope] = useState<'all' | 'mine'>('all');
+
   // Load equipment & borrow requests from real API
   const load = useCallback(async () => {
     setLoading(true);
     setErrorMsg('');
     try {
+      const shouldFetchAll = isStaffOrAdmin && staffScope === 'all';
       const [eqs, reqs] = await Promise.all([
         api.equipment().catch(() => [] as Equipment[]),
-        api.listRequests({ mine: true, type: 'borrow' }),
+        api.listRequests(shouldFetchAll ? { type: 'borrow' } : { mine: true, type: 'borrow' }),
       ]);
       setEquipmentList(eqs);
       const borrowReqs = ((reqs as ExtendedBorrowRequest[]) || []).filter(
-        (r) => !account?.id || r.requesterId === account.id,
+        (r) => shouldFetchAll || !account?.id || r.requesterId === account.id,
       );
       setItems(borrowReqs);
     } catch (err: unknown) {
@@ -100,11 +104,27 @@ export default function MyBorrowsPage() {
     } finally {
       setLoading(false);
     }
-  }, [account?.id]);
+  }, [account?.id, isStaffOrAdmin, staffScope]);
+
+  // อ่าน Query parameters จาก URL (เช่น ?tab=inspect&id=xxx จากแดชบอร์ดเจ้าหน้าที่)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      const urlTab = sp.get('tab');
+      if (urlTab === 'inspect' || urlTab === 'borrowing' || urlTab === 'history') {
+        setTab(urlTab);
+        hasAutoSelectedTab.current = true;
+      }
+      const urlId = sp.get('id');
+      if (urlId) {
+        setSelectedId(urlId);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     load();
-  }, [load, account?.id]);
+  }, [load]);
 
   // Helper to find equipment metadata
   const getEquipmentInfo = useCallback(
@@ -468,31 +488,67 @@ export default function MyBorrowsPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-ink tracking-tight m-0">
-              รายการยืม–คืนอุปกรณ์
+              {isStaffOrAdmin ? 'จัดการและตรวจรับคืนอุปกรณ์' : 'รายการยืม–คืนอุปกรณ์'}
             </h1>
             <p className="text-sm text-ink-mute mt-1 leading-relaxed">
-              ติดตามสถานะและหลักฐานรูปภาพของแต่ละคำขอ เลือกรายการทางซ้ายเพื่อดูรายละเอียด
+              {isStaffOrAdmin
+                ? 'ตรวจสภาพอุปกรณ์ที่ประชาชนส่งคืน บันทึกรูปภาพ และยืนยันรับคืนอุปกรณ์เข้าคลัง'
+                : 'ติดตามสถานะและหลักฐานรูปภาพของแต่ละคำขอ เลือกรายการทางซ้ายเพื่อดูรายละเอียด'}
             </p>
           </div>
-          <Link
-            href="/borrow"
-            className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-brand text-white text-sm font-semibold transition hover:bg-brand-ink shadow-xs active:scale-[0.98]"
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 256 256"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="20"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
+          <div className="flex items-center gap-3 flex-wrap">
+            {isStaffOrAdmin && (
+              <div className="flex items-center gap-1.5 p-1 bg-surface-muted/80 border border-line rounded-xl text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStaffScope('all');
+                    setSelectedId(null);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    staffScope === 'all'
+                      ? 'bg-brand text-white shadow-xs'
+                      : 'text-ink-mute hover:text-ink'
+                  }`}
+                >
+                  คำขอทั้งหมดในระบบ (ตรวจรับคืน)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStaffScope('mine');
+                    setSelectedId(null);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    staffScope === 'mine'
+                      ? 'bg-brand text-white shadow-xs'
+                      : 'text-ink-mute hover:text-ink'
+                  }`}
+                >
+                  เฉพาะคำขอของฉัน
+                </button>
+              </div>
+            )}
+            <Link
+              href="/borrow"
+              className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-brand text-white text-sm font-semibold transition hover:bg-brand-ink shadow-xs active:scale-[0.98]"
             >
-              <path d="M40 128h176M128 40v176" />
-            </svg>
-            <span>ยื่นขอยืมอุปกรณ์ใหม่</span>
-          </Link>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 256 256"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="20"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M40 128h176M128 40v176" />
+              </svg>
+              <span>ยื่นขอยืมอุปกรณ์ใหม่</span>
+            </Link>
+          </div>
         </div>
 
         {/* ==================== ALERTS (Success / Error) ==================== */}
