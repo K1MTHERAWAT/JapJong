@@ -7,11 +7,14 @@ import Link from 'next/link';
 // นำเข้าไอคอนจากไลบรารี lucide-react
 import {
   Building2,
+  Check,
   CheckCircle2,
   ExternalLink,
   KeyRound,
+  Moon,
   PenTool,
   Phone,
+  Sun,
   UserCircle,
   AlertCircle,
 } from 'lucide-react';
@@ -26,6 +29,7 @@ import {
 } from '@japjong/shared';
 // นำเข้า Custom Hook สำหรับดึงข้อมูลผู้ใช้งานที่ล็อกอินอยู่และฟังก์ชัน Refresh Session
 import { useAuth } from '@/components/auth-context';
+import { useTheme } from '@/components/theme-provider';
 // นำเข้า AppShell คอมโพเนนต์เลย์เอาต์หลักของแอปพลิเคชัน
 import { AppShell } from '@/components/shell';
 // นำเข้าคอมโพเนนต์ฟอร์มเฉพาะทางสำหรับเบอร์โทรศัพท์ 10 หลัก และการเลือกที่อยู่ภาษาไทย
@@ -67,6 +71,7 @@ function LineIcon({ className = 'w-5 h-5' }: { className?: string }) {
 export default function AccountPage() {
   // ดึงข้อมูลบัญชีผู้ใช้ปัจจุบัน และฟังก์ชันรีเฟรชข้อมูลโปรไฟล์จาก Auth Context
   const { account, refreshMe } = useAuth();
+  const { actualTheme, setTheme } = useTheme();
   // State สำหรับแท็บที่กำลังเปิดอยู่ (ค่าเริ่มต้น: แท็บข้อมูลโปรไฟล์)
   const [activeTab, setActiveTab] = useState<AccountTab>('profile');
 
@@ -370,7 +375,7 @@ export default function AccountPage() {
 
   return (
     // โครงเลย์เอาต์หลักของหน้าบัญชีผู้ใช้
-    <AppShell title="จัดการบัญชีผู้ใช้งาน" maxWidth="max-w-none">
+    <AppShell title="จัดการบัญชีผู้ใช้งาน" maxWidth="max-w-[1160px]">
       {account && (
         <div className="flex w-full flex-col gap-4 sm:gap-5">
           {/* การ์ดสรุปข้อมูลโปรไฟล์ส่วนหัว (Header Card Summary) */}
@@ -489,13 +494,15 @@ export default function AccountPage() {
                     value={phone}
                     onChange={setPhone}
                   />
-                  <Input
-                    label="อีเมล (สำหรับรับรหัส OTP ยืนยันการลงนาม)"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="เช่น user@namcham.go.th"
-                  />
+                  <div className="sm:col-span-2">
+                    <Input
+                      label="อีเมล (สำหรับรับรหัส OTP ยืนยันการลงนาม)"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="เช่น user@namcham.go.th"
+                    />
+                  </div>
                 </div>
 
                 {/* ส่วนที่อยู่สำหรับดึงไปกรอกแบบคำขอราชการอัตโนมัติ */}
@@ -537,6 +544,63 @@ export default function AccountPage() {
                       setAddressSubdistrict(val.subdistrict);
                     }}
                   />
+                </div>
+
+                {/* ส่วนการตั้งค่าโหมดการแสดงผล (Theme Selector Cards: สว่าง / มืด) */}
+                <div className="pt-2 border-t border-line-soft flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-surface-muted p-4 border border-line">
+                  <div>
+                    <b className="text-body font-bold text-ink block">โหมดการแสดงผล (Theme Mode)</b>
+                    <span className="text-caption text-muted">
+                      เลือกรูปแบบโทนสีของระบบที่ต้องการใช้งาน (โหมดสว่าง หรือ โหมดมืด)
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5 w-full sm:w-auto shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setTheme('light')}
+                      aria-pressed={actualTheme === 'light'}
+                      className={`w-full sm:w-[116px] flex flex-col items-center justify-center gap-1.5 rounded-xl py-2.5 px-3 border transition cursor-pointer ${
+                        actualTheme === 'light'
+                          ? 'bg-surface border-2 border-brand shadow-xs'
+                          : 'bg-surface/60 border-line hover:bg-hover'
+                      }`}
+                    >
+                      <Sun className={`size-5 ${actualTheme === 'light' ? 'text-brand' : 'text-ink-soft'}`} />
+                      <span className="text-[12.5px] font-bold text-ink leading-none">สว่าง</span>
+                      <span
+                        className={`size-5 rounded-full flex items-center justify-center transition ${
+                          actualTheme === 'light'
+                            ? 'bg-brand text-white'
+                            : 'border border-line-input text-transparent'
+                        }`}
+                      >
+                        <Check className="size-3 stroke-[3]" />
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setTheme('dark')}
+                      aria-pressed={actualTheme === 'dark'}
+                      className={`w-full sm:w-[116px] flex flex-col items-center justify-center gap-1.5 rounded-xl py-2.5 px-3 border transition cursor-pointer ${
+                        actualTheme === 'dark'
+                          ? 'bg-surface border-2 border-brand shadow-xs'
+                          : 'bg-surface/60 border-line hover:bg-hover'
+                      }`}
+                    >
+                      <Moon className={`size-5 ${actualTheme === 'dark' ? 'text-white' : 'text-ink-soft'}`} />
+                      <span className="text-[12.5px] font-bold text-ink leading-none">มืด</span>
+                      <span
+                        className={`size-5 rounded-full flex items-center justify-center transition ${
+                          actualTheme === 'dark'
+                            ? 'bg-brand text-white'
+                            : 'border border-line-input text-transparent'
+                        }`}
+                      >
+                        <Check className="size-3 stroke-[3]" />
+                      </span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* ส่วนการเชื่อมต่อบัญชี LINE (LINE Link) */}

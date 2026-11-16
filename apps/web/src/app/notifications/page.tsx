@@ -192,7 +192,7 @@ export default function NotificationCenterPage() {
             onClick={() => setFilter('all')}
             className={`px-3.5 py-1.5 rounded-full text-caption font-medium transition-colors shrink-0 ${
               filter === 'all'
-                ? 'bg-ink text-white'
+                ? 'bg-ink text-white dark:bg-brand dark:text-white'
                 : 'bg-surface border border-line text-ink-soft hover:bg-hover'
             }`}
           >
@@ -279,14 +279,16 @@ export default function NotificationCenterPage() {
                 key={n.id}
                 onClick={() => handleClickItem(n)}
                 className={`p-4 sm:p-5 flex items-start gap-4 cursor-pointer transition-colors ${
-                  !n.read ? 'bg-[#F2F7F4]/60 hover:bg-[#E8F1EC]' : 'bg-white hover:bg-surface-muted/60'
+                  !n.read
+                    ? 'bg-[#F2F7F4]/60 hover:bg-[#E8F1EC] dark:bg-surface-muted/55 dark:hover:bg-hover'
+                    : 'bg-white hover:bg-surface-muted/60 dark:bg-surface dark:hover:bg-hover'
                 }`}
               >
                 {/* ไอคอนประจำประเภทบริการ */}
                 <div
                   className={`size-11 rounded-control flex items-center justify-center shrink-0 border ${
                     !n.read
-                      ? 'bg-white border-brand/20 shadow-xs'
+                      ? 'bg-white dark:bg-surface border-brand/20 dark:border-brand/35 shadow-xs'
                       : 'bg-surface-muted border-line-soft'
                   }`}
                 >

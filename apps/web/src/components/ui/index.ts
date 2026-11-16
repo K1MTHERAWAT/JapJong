@@ -13,6 +13,8 @@ export * from './Input';
 export * from './ServiceCard';
 export * from './ListRow';
 export * from './Feedback';
+export * from './Modal';
+export * from './Table';
 
 // วิดเจ็ตเฉพาะทางที่นำเข้าจาก ui-widgets
 export {

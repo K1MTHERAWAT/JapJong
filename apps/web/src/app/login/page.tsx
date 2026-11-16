@@ -319,7 +319,7 @@ export default function LoginPage() {
         onClick={toggleTheme}
         aria-label={actualTheme === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด'}
         title={actualTheme === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด'}
-        className="fixed top-[max(0.75rem,env(safe-area-inset-top,0px))] right-[max(0.75rem,env(safe-area-inset-right,0px))] z-50 size-9 sm:size-10 rounded-full bg-white/80 dark:bg-[#182420]/85 backdrop-blur-md border border-[#e3e1d8] dark:border-[#2b3e37] shadow-sm flex items-center justify-center text-ink hover:bg-hover active:scale-95 transition cursor-pointer"
+        className="fixed top-[max(0.75rem,env(safe-area-inset-top,0px))] right-[max(0.75rem,env(safe-area-inset-right,0px))] z-50 size-9 sm:size-10 rounded-full bg-white/80 dark:bg-surface/90 backdrop-blur-md border border-[#e3e1d8] dark:border-line shadow-sm flex items-center justify-center text-ink hover:bg-hover active:scale-95 transition cursor-pointer"
       >
         {actualTheme === 'dark' ? (
           <Sun className="size-4.5 text-amber-400" />

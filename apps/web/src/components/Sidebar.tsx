@@ -16,9 +16,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 // ไอคอนสัญลักษณ์สำหรับเมนู ปุ่มควบคุม และโปรไฟล์
-import { LogIn, LogOut, Menu, Moon, Sun, X } from 'lucide-react';
-// Context สลับธีมแสดงผล
-import { useTheme } from './theme-provider';
+import { LogIn, LogOut, Menu, X } from 'lucide-react';
 // Context ข้อมูลผู้ใช้และสถานะการยืนยันตัวตน
 import { useAuth } from './auth-context';
 import type { NavItem } from './nav';
@@ -44,8 +42,6 @@ export function Sidebar({
   const path = usePathname();
   // ข้อมูลบัญชีผู้ใช้ ฟังก์ชันออกจากระบบ และจำนวนแจ้งเตือนที่ยังไม่ได้อ่าน
   const { account, logout, unreadCount } = useAuth();
-  // สถานะธีมสว่างหรือมืด
-  const { theme, toggleTheme } = useTheme();
 
   // สถานะเมื่อนำเมาส์ไปชี้แถบเมนูบน Desktop เพื่อขยายกว้าง
   const [hovered, setHovered] = useState(false);
@@ -146,7 +142,7 @@ export function Sidebar({
         className={[
           'print:hidden',
           // โหมดมือถือ: เมนูลอยสไลด์จากซ้าย
-          'fixed inset-y-0 left-0 z-50 flex w-drawer max-w-[85vw] flex-col justify-between bg-[#FBFCFA] p-3 shadow-pop lg:flex-none',
+          'fixed inset-y-0 left-0 z-50 flex w-drawer max-w-[85vw] flex-col justify-between bg-[#FBFCFA] dark:bg-bg p-3 shadow-pop lg:flex-none',
           'transition-[transform,width] duration-300 ease-in-out',
           drawer ? 'translate-x-0' : '-translate-x-full',
           // คำนวณระยะ Safe-Area สำหรับมือถือที่มีรอยบาก
@@ -156,7 +152,7 @@ export function Sidebar({
           'lg:pt-3 lg:pb-3 lg:pl-3',
           // โหมด Desktop: เมนูลอยมุมซ้าย ติดตรึงตาม Scroll (Sticky)
           'lg:sticky lg:top-3 lg:z-auto lg:m-3 lg:h-[calc(100dvh-24px)] lg:translate-x-0',
-          'lg:rounded-float lg:border lg:border-line-soft lg:shadow-float overflow-hidden',
+          'lg:rounded-float lg:border lg:border-line-soft dark:lg:border-line lg:shadow-float overflow-hidden',
           // สลับขนาดความกว้างตามสถานะการเปิด/ชี้เมาส์ (72px ขณะย่อ / w-sidebar เมื่อขยาย)
           open ? 'lg:w-sidebar' : 'lg:w-[72px]',
         ].join(' ')}
@@ -169,12 +165,12 @@ export function Sidebar({
               className={`flex items-center gap-2.5 min-w-0 ${open ? '' : 'justify-center'}`}
               title="จับจอง"
             >
-              <div className={`size-8 rounded-control overflow-hidden shrink-0 flex items-center justify-center bg-surface-muted border border-line-soft ${open ? '' : 'lg:mx-auto'}`}>
+              <div className={`w-8 h-8 size-8 rounded-control overflow-hidden shrink-0 flex items-center justify-center bg-surface-muted border border-line-soft ${open ? '' : 'lg:mx-auto'}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/logo.png"
                   alt="โลโก้จับจอง"
-                  className="size-full object-contain"
+                  className="w-full h-full object-contain"
                 />
               </div>
               <span className={['text-heading text-ink font-bold tracking-tight', open ? '' : 'lg:sr-only'].join(' ')}>
@@ -197,7 +193,7 @@ export function Sidebar({
             className="flex flex-col gap-1 overflow-y-auto overflow-x-hidden flex-1 min-h-0 pr-0.5 overscroll-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-line [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
           >
             {navGroups.map((group, groupIndex) => (
-              <div key={`group-${groupIndex}`} className={`flex flex-col gap-1 ${groupIndex > 0 ? 'mt-2 border-t border-[#CDD5E0] pt-2' : ''}`}>
+              <div key={`group-${groupIndex}`} className={`flex flex-col gap-1 ${groupIndex > 0 ? 'mt-2 border-t border-[#CDD5E0] dark:border-line pt-2' : ''}`}>
                 {group.map((i) => {
                   // ตรวจสอบว่ากำลังเปิดหน้านี้อยู่หรือไม่เพื่อเน้นสีแถบเมนู (Active Route)
                   const active = i.exact || i.href === '/' ? path === i.href : path.startsWith(i.href);
@@ -207,7 +203,7 @@ export function Sidebar({
                       href={i.href}
                       title={i.label}
                       aria-current={active ? 'page' : undefined}
-                      className={`flex h-11 items-center gap-3 rounded-control text-ink-soft hover:bg-hover transition-colors aria-[current=page]:bg-brand-tint aria-[current=page]:font-semibold aria-[current=page]:text-brand-ink aria-[current=page]:shadow-sm ${open ? 'px-3' : 'justify-center px-0 lg:mx-auto lg:size-11'}`}
+                      className={`flex h-11 items-center gap-3 rounded-control text-ink-soft hover:bg-hover hover:text-ink transition-colors aria-[current=page]:bg-brand-tint aria-[current=page]:font-semibold aria-[current=page]:text-brand-ink aria-[current=page]:shadow-sm dark:aria-[current=page]:ring-1 dark:aria-[current=page]:ring-brand/40 ${open ? 'px-3' : 'justify-center px-0 lg:mx-auto lg:size-11'}`}
                     >
                       {/* ไอคอนประจำเมนู และจุดแจ้งเตือนสีแดงกรณีเมนูย่อ */}
                       <div className="relative shrink-0">
@@ -233,33 +229,8 @@ export function Sidebar({
           </nav>
         </div>
 
-        {/* ส่วนท้ายแถบเมนู (Footer): ปุ่มสลับธีมและโปรไฟล์ผู้ใช้ */}
-        <div className={`border-t border-line-soft pt-2.5 mt-2 flex flex-col gap-1.5 shrink-0 ${open ? '' : 'lg:items-center'}`}>
-          {/* ปุ่มสลับโหมดมืด/สว่าง (Dark Mode Toggle) */}
-          <button
-            type="button"
-            onClick={toggleTheme}
-            title={theme === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด'}
-            aria-label={theme === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด'}
-            className={`flex h-10 items-center rounded-control text-ink-soft hover:bg-hover transition-colors font-medium text-caption cursor-pointer whitespace-nowrap ${open ? 'w-full px-2.5 justify-between gap-2' : 'justify-center px-0 lg:size-11'}`}
-          >
-            <div className="flex items-center gap-2 min-w-0 shrink-0 whitespace-nowrap">
-              {theme === 'dark' ? (
-                <Sun className="size-4 shrink-0 text-amber-400" />
-              ) : (
-                <Moon className="size-4 shrink-0 text-brand" />
-              )}
-              <span className={open ? 'text-ink font-medium whitespace-nowrap text-[12.5px]' : 'lg:sr-only'}>
-                {theme === 'dark' ? 'โหมดมืด (Dark)' : 'โหมดสว่าง (Light)'}
-              </span>
-            </div>
-            {open && (
-              <span className="text-[11px] text-muted px-1.5 py-0.5 rounded-md bg-surface-muted border border-line-soft whitespace-nowrap shrink-0">
-                สลับโหมด
-              </span>
-            )}
-          </button>
-
+        {/* ส่วนท้ายแถบเมนู (Footer): โปรไฟล์ผู้ใช้ และปุ่มออกจากระบบ */}
+        <div className={`border-t border-line-soft dark:border-line pt-2.5 mt-2 flex flex-col gap-1.5 shrink-0 ${open ? '' : 'lg:items-center'}`}>
           {/* กล่องแสดงโปรไฟล์ผู้ใช้ หรือปุ่มเข้าสู่ระบบหากยังไม่ล็อกอิน */}
           {account ? (
             <>
@@ -271,7 +242,7 @@ export function Sidebar({
                   className="flex items-center gap-2.5 min-w-0 flex-1 rounded-lg hover:opacity-85 transition-opacity"
                 >
                   {/* รูปย่อหรือตัวอักษรแรกของชื่อ */}
-                  <div className="w-8 h-8 rounded-full bg-brand-tint text-brand-ink font-bold flex items-center justify-center text-caption shrink-0">
+                  <div className="w-8 h-8 size-8 rounded-full bg-brand-tint text-brand-ink font-bold flex items-center justify-center text-caption shrink-0">
                     {account.initial || account.name.charAt(0) || 'ผ'}
                   </div>
                   <div className={['min-w-0 flex-1 leading-tight', open ? '' : 'lg:sr-only'].join(' ')}>
@@ -281,31 +252,18 @@ export function Sidebar({
                     </div>
                   </div>
                 </Link>
-                {/* ปุ่มออกจากระบบเมื่อเมนูกางออก */}
-                {open && (
-                  <button
-                    type="button"
-                    onClick={logout}
-                    title="ออกจากระบบ"
-                    aria-label="ออกจากระบบ"
-                    className="size-8 grid place-items-center rounded-control hover:bg-hover text-ink-soft hover:text-danger-fg shrink-0 cursor-pointer"
-                  >
-                    <LogOut className="size-4" />
-                  </button>
-                )}
               </div>
-              {/* ปุ่มออกจากระบบแยกเดี่ยวกรณีแถบเมนูย่อเล็กบน Desktop */}
-              {!open && (
-                <button
-                  type="button"
-                  onClick={logout}
-                  title="ออกจากระบบ"
-                  aria-label="ออกจากระบบ"
-                  className="hidden lg:grid size-11 place-items-center rounded-control text-danger-fg hover:bg-[#FDE7E7] cursor-pointer"
-                >
-                  <LogOut className="size-5" />
-                </button>
-              )}
+              {/* ปุ่มออกจากระบบ (แสดงชัดเจนด้วยโทนสีออกจากระบบตามภาพตัวอย่าง) */}
+              <button
+                type="button"
+                onClick={logout}
+                title="ออกจากระบบ"
+                aria-label="ออกจากระบบ"
+                className={`flex h-10 items-center gap-3 rounded-control text-danger-fg hover:bg-danger-bg/60 transition-colors font-semibold text-body cursor-pointer ${open ? 'w-full px-3' : 'justify-center px-0 lg:size-11'}`}
+              >
+                <LogOut className="size-5 shrink-0" />
+                <span className={open ? 'truncate' : 'lg:sr-only'}>ออกจากระบบ</span>
+              </button>
             </>
           ) : (
             // ปุ่มลิงก์เข้าสู่ระบบกรณีผู้ใช้ทั่วไปยังไม่ได้ยืนยันตัวตน
