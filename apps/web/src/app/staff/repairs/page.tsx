@@ -238,7 +238,7 @@ export default function StaffRepairsPage() {
                   type="button"
                   disabled={submitting}
                   onClick={() => handleStartAction('reject')}
-                  className="jw-btn-red flex-1 sm:w-44"
+                  className="jw-btn-sec border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10 flex-1 sm:min-w-[170px]"
                 >
                   ส่งกลับ / ไม่รับเรื่อง
                 </button>
@@ -247,7 +247,7 @@ export default function StaffRepairsPage() {
                   type="button"
                   disabled={submitting || !confirmed}
                   onClick={() => handleStartAction('accept')}
-                  className="jw-btn flex-[1.5] sm:w-64"
+                  className="jw-btn flex-[1.5] sm:min-w-[230px]"
                 >
                   {submitting ? 'กำลังบันทึก...' : 'รับเรื่องซ่อม (เริ่มดำเนินการ)'}
                 </button>

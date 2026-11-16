@@ -309,10 +309,10 @@ export default function RequestHistoryPage() {
                       </span>
                     </div>
                     {/* หัวข้อคำขอและสถานที่/อุปกรณ์ */}
-                    <b className="text-[15.5px] text-ink truncate">
+                    <b className="text-[15.5px] text-ink break-words leading-snug">
                       {req.title} {req.subtitle && req.type !== 'repair' ? `(${req.subtitle})` : ''}
                     </b>
-                    <span className="text-[13px] text-ink-mute">
+                    <span className="text-[13px] text-ink-mute break-words">
                       ผู้ขอ: {req.requesterName} ({req.organization}) · {dateText}
                     </span>
                   </div>

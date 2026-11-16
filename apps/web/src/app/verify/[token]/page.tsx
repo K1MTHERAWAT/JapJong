@@ -24,6 +24,7 @@ import {
   VERIFICATION_STATUS_TONE,
 } from '@japjong/shared';
 import { AppShell } from '@/components/shell';
+import { useAuth } from '@/components/auth-context';
 import { Icon } from '@/components/icons';
 import { Chip } from '@/components/ui';
 // API SDK และฟังก์ชันจัดรูปแบบวันที่ภาษาไทย
@@ -32,6 +33,8 @@ import { api, formatThaiDateTime } from '@/lib/api';
 export default function PublicVerifyPage() {
   // ดึงพารามิเตอร์ token จาก URL
   const params = useParams<{ token: string }>();
+  const { account } = useAuth();
+  const isStaffOrAdmin = account?.role === 'STAFF' || account?.role === 'ADMIN';
   // สถานะการโหลดข้อมูลผลการตรวจสอบจากเซิร์ฟเวอร์
   const [loading, setLoading] = useState(true);
   // ผลลัพธ์การตรวจสอบเอกสารสาธารณะ
@@ -202,9 +205,24 @@ export default function PublicVerifyPage() {
               </span>
             </div>
 
-            {/* ปุ่มกลับหน้าหลัก */}
-            <div className="pt-2 flex justify-center">
-              <Link href="/" className="jw-btn w-full sm:w-auto px-8">
+            {/* ปุ่มดำเนินการ */}
+            <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5">
+              {isStaffOrAdmin && params.token && (
+                <Link
+                  href={`/staff/verify?q=${encodeURIComponent(params.token)}`}
+                  className="jw-btn px-6"
+                >
+                  <Icon name="shield-check" className="w-4 h-4 shrink-0" />
+                  <span>เปิดตรวจสอบฉบับเต็ม (เจ้าหน้าที่)</span>
+                </Link>
+              )}
+              <Link href="/verify" className="jw-btn-sec px-6">
+                ตรวจสอบเอกสารอื่น
+              </Link>
+              <Link
+                href="/"
+                className={isStaffOrAdmin ? 'jw-btn-sec px-6' : 'jw-btn px-8'}
+              >
                 กลับสู่หน้าหลักระบบ
               </Link>
             </div>

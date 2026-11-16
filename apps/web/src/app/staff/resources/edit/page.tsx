@@ -274,7 +274,7 @@ function EditResourceContent() {
             type="button"
             onClick={() => setShowDeleteModal(true)}
             disabled={submitting || deleting}
-            className="jw-btn-red flex items-center justify-center gap-1.5 px-4 h-11 text-[13.5px] disabled:opacity-40"
+            className="jw-btn-sec border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10 px-4 text-[13.5px] disabled:opacity-40"
             title="ลบรายการนี้"
           >
             <Icon name="trash" className="w-4 h-4" />

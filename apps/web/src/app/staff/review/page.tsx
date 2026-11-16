@@ -234,7 +234,7 @@ export default function StaffReviewPage() {
                     type="button"
                     disabled={submitting || !staffSignature.trim()}
                     onClick={() => handleStartDecision('reject')}
-                    className="jw-btn-red flex-1 sm:w-44"
+                    className="jw-btn-sec border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10 flex-1 sm:min-w-[160px]"
                   >
                     ลงนามไม่ผ่าน
                   </button>
@@ -243,7 +243,7 @@ export default function StaffReviewPage() {
                     type="button"
                     disabled={submitting || !confirmed || !staffSignature.trim()}
                     onClick={() => handleStartDecision('approve')}
-                    className="jw-btn flex-[1.5] sm:w-64"
+                    className="jw-btn flex-[1.5] sm:min-w-[220px]"
                   >
                     {submitting
                       ? 'กำลังบันทึก...'

@@ -1298,7 +1298,7 @@ export default function BookingWizardPage() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-bold text-[15px] text-ink truncate">{v.name}</span>
+                          <span className="font-bold text-[15px] text-ink break-words leading-snug">{v.name}</span>
                           <span className="text-[11.5px] px-2 py-0.5 rounded-full bg-soft border border-line text-ink-soft font-semibold">
                             {VENUE_TYPE_LABEL[v.type]}
                           </span>
@@ -1446,12 +1446,12 @@ export default function BookingWizardPage() {
                         {/* ข้อความซ้อนด้านล่างของรูปภาพ: ชื่อสถานที่ + อาคาร & ชั้น + ป้ายจองล่วงหน้า */}
                         <div className="absolute bottom-2.5 inset-x-3 text-white flex items-end justify-between gap-2 z-10">
                           <div className="min-w-0 flex-1">
-                            <h3 className="font-bold text-[15.5px] leading-snug truncate drop-shadow-sm text-white" title={v.name}>
+                            <h3 className="font-bold text-[15.5px] leading-snug line-clamp-2 break-words drop-shadow-sm text-white" title={v.name}>
                               {v.name}
                             </h3>
-                            <p className="text-[12px] text-white/90 truncate flex items-center gap-1 mt-0.5">
-                              <Icon name="building" className="w-3.5 h-3.5 text-white/80 shrink-0" />
-                              <span className="truncate">
+                            <p className="text-[12px] text-white/90 flex items-start gap-1 mt-0.5">
+                              <Icon name="building" className="w-3.5 h-3.5 text-white/80 shrink-0 mt-0.5" />
+                              <span className="line-clamp-1 break-words">
                                 {v.building}
                                 {v.floor ? ` · ${v.floor}` : ''}
                               </span>
@@ -2135,7 +2135,7 @@ export default function BookingWizardPage() {
                         />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <b className="block text-[15px] text-ink truncate">{eq.name}</b>
+                        <b className="block text-[15px] text-ink break-words leading-snug">{eq.name}</b>
                         <div className="flex flex-wrap items-center gap-1.5 text-[12.5px] mt-0.5">
                           <span className="text-ink-mute">{EQUIPMENT_CATEGORY_LABEL[eq.category]}</span>
                           <span className="text-ink-mute">·</span>

@@ -148,6 +148,20 @@ export default function StaffVerifyPage() {
     [loadHistory, stopCamera],
   );
 
+  // รองรับการเปิดจากกล้องมือถือ / แอปสแกนทั่วไปผ่าน ?q=... หรือ ?token=...
+  const initialQueryHandledRef = useRef(false);
+  useEffect(() => {
+    if (initialQueryHandledRef.current || typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    const q = (sp.get('q') || sp.get('token') || '').trim();
+    if (q) {
+      initialQueryHandledRef.current = true;
+      setManualQuery(q);
+      setMode('manual');
+      void handleVerify(q, false);
+    }
+  }, [handleVerify]);
+
   const startCamera = useCallback(async (targetCamId?: string) => {
     setCameraError('');
     setScanning(true);

@@ -497,13 +497,13 @@ export default function AdminPermissionsPage() {
                           {user.initial || user.name.charAt(0) || 'ผ'}
                         </div>
 
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-bold text-ink truncate">
+                            <span className="text-sm font-bold text-ink break-words leading-snug">
                               {user.name}
                             </span>
                             {user.nickname && (
-                              <span className="text-xs text-ink-mute">
+                              <span className="text-xs text-ink-mute break-words">
                                 ({user.nickname})
                               </span>
                             )}
@@ -518,7 +518,7 @@ export default function AdminPermissionsPage() {
                               </span>
                             )}
                           </div>
-                          <div className="text-xs text-ink-mute mt-0.5 truncate">
+                          <div className="text-xs text-ink-mute mt-0.5 break-words leading-relaxed">
                             {user.position || 'ตำแหน่งไม่ระบุ'} ·{' '}
                             {user.department || 'หน่วยงานไม่ระบุ'} ·{' '}
                             {user.phone || '-'} (@{user.username})

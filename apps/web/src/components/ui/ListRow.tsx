@@ -34,17 +34,17 @@ export function ListRow({
   const innerContent = (
     <div
       className={[
-        'flex items-center justify-between gap-3 border-t border-line-soft py-3 first:border-t-0 transition-colors',
+        'flex flex-wrap sm:flex-nowrap items-start sm:items-center justify-between gap-2.5 sm:gap-3 border-t border-line-soft py-3 first:border-t-0 transition-colors',
         href ? 'group-hover:text-brand' : '',
         className,
       ].join(' ')}
     >
-      <div className="min-w-0 flex-1">
-        {code && <div className="flex items-center gap-2 text-caption text-muted">{code}</div>}
-        <div className="text-body font-medium text-ink truncate">{title}</div>
-        {subtitle && <div className="text-caption text-muted truncate mt-0.5">{subtitle}</div>}
+      <div className="min-w-0 flex-1 basis-full sm:basis-auto">
+        {code && <div className="flex flex-wrap items-center gap-2 text-caption text-muted">{code}</div>}
+        <div className="text-body font-medium text-ink break-words leading-snug">{title}</div>
+        {subtitle && <div className="text-caption text-muted break-words leading-relaxed mt-0.5">{subtitle}</div>}
       </div>
-      <div className="flex items-center gap-2.5 shrink-0">
+      <div className="flex flex-wrap items-center gap-2 shrink-0">
         {chip}
         {rightExtra}
       </div>

@@ -178,9 +178,9 @@ export default function ApproverHomePage() {
                   onClick={() => router.push(`/approver/sign/${r.id}`)}
                   className="jw-card p-4 flex items-center justify-between gap-3 cursor-pointer hover:ring-1 hover:ring-brand transition"
                 >
-                  <div className="min-w-0">
-                    <b className="block text-[15px] text-ink">{r.code}</b>
-                    <span className="text-[13px] text-ink-mute truncate block">{sub}</span>
+                  <div className="min-w-0 flex-1">
+                    <b className="block text-[15px] text-ink break-words">{r.code}</b>
+                    <span className="text-[13px] text-ink-mute break-words block leading-relaxed">{sub}</span>
                   </div>
                   {/* ชิประบุขั้นตอนการลงนาม */}
                   <Chip tone="amber">{r.status === 'pending_l1' ? 'ลงนามที่ 3' : stepLabel}</Chip>

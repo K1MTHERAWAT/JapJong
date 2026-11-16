@@ -330,7 +330,7 @@ export default function RepairPage() {
               type="button"
               disabled={submitting}
               onClick={() => handleAction(activeRepair.id, 'reopen')}
-              className="jw-btn-red flex-1 sm:w-44"
+              className="jw-btn-sec border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10 flex-1 sm:min-w-[160px]"
             >
               ยังไม่เรียบร้อย
             </button>
@@ -338,7 +338,7 @@ export default function RepairPage() {
               type="button"
               disabled={submitting}
               onClick={() => handleAction(activeRepair.id, 'confirm')}
-              className="jw-btn flex-1 sm:w-52"
+              className="jw-btn flex-[1.5] sm:min-w-[200px]"
             >
               ยืนยันตรวจรับงานซ่อม
             </button>

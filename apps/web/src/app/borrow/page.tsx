@@ -845,7 +845,7 @@ export default function BorrowWizardPage() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-bold text-[15px] text-ink truncate" title={eq.name}>
+                          <span className="font-bold text-[15px] text-ink break-words leading-snug" title={eq.name}>
                             {eq.name}
                           </span>
                           <span className="text-[11.5px] px-2 py-0.5 rounded-full bg-soft border border-line text-ink-soft font-semibold">
@@ -977,7 +977,7 @@ export default function BorrowWizardPage() {
                         {/* ข้อความซ้อนด้านล่างของรูปภาพ: ชื่ออุปกรณ์ + หมวดหมู่ & จำนวนคงเหลือ */}
                         <div className="absolute bottom-2.5 inset-x-3 text-white flex items-end justify-between gap-2 z-10">
                           <div className="min-w-0 flex-1">
-                            <h3 className="font-bold text-[15.5px] leading-snug truncate drop-shadow-sm text-white" title={eq.name}>
+                            <h3 className="font-bold text-[15.5px] leading-snug line-clamp-2 break-words drop-shadow-sm text-white" title={eq.name}>
                               {eq.name}
                             </h3>
                             <p className="text-[12px] text-white/90 truncate flex items-center gap-1 mt-0.5">
@@ -1348,7 +1348,7 @@ export default function BorrowWizardPage() {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <b className="text-[13.5px] truncate">{item.name}</b>
+                        <b className="text-[13.5px] break-words leading-snug">{item.name}</b>
                         <span className={`font-bold ${item.isShortage ? 'text-red-700' : 'text-brand'}`}>
                           ขอยืม {item.requestedQty} ชิ้น
                         </span>

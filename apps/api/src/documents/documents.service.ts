@@ -54,8 +54,8 @@ export class DocumentsService {
   async generateQrCodeDataUrl(text: string): Promise<string> {
     return QRCode.toDataURL(text, {
       errorCorrectionLevel: 'M',
-      margin: 1,
-      width: 260,
+      margin: 3, // Quiet zone มาตรฐาน 3 modules เพื่อให้อ่านด้วยกล้องมือถือและแอปสแกนทั่วไปได้แม่นยำ
+      width: 300,
       color: {
         dark: '#0B2545', // สีกรมท่าทางการของ อบต.น้ำชำ
         light: '#FFFFFF',
@@ -231,8 +231,15 @@ export class DocumentsService {
    * ตรวจสอบเอกสารผ่าน Public Token (สำหรับประชาชนทั่วไป ไม่ต้องเข้าสู่ระบบและไม่เปิดเผยข้อมูลส่วนบุคคล)
    */
   async verifyPublic(token: string, ip?: string, userAgent?: string): Promise<PublicVerificationResult> {
-    const cleanToken = token.trim();
-    const ver = this.db.verifications.find((v) => v.verificationToken === cleanToken);
+    const cleanToken = decodeURIComponent(token || '').trim();
+    let ver = this.db.verifications.find(
+      (v) => v.verificationToken.toLowerCase() === cleanToken.toLowerCase(),
+    );
+    if (!ver) {
+      ver = this.db.verifications.find(
+        (v) => v.documentNumber.toLowerCase() === cleanToken.toLowerCase(),
+      );
+    }
 
     if (!ver) {
       // บันทึกประวัติกรณีไม่พบข้อมูล

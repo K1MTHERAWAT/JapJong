@@ -172,9 +172,9 @@ function ManageResourcesContent() {
                           <img src={v.images[0]} alt={v.name} className="w-full h-full object-cover" />
                         </button>
                       )}
-                      <div className="min-w-0">
-                        <b className="text-[15px] text-ink block truncate">{v.name}</b>
-                        <span className="text-[13px] text-ink-mute block">
+                      <div className="min-w-0 flex-1">
+                        <b className="text-[15px] text-ink block break-words leading-snug">{v.name}</b>
+                        <span className="text-[13px] text-ink-mute block break-words">
                           {VENUE_TYPE_LABEL[v.type]} · {v.capacity} คน · ล่วงหน้า {v.advanceDays} วัน
                           {!v.enabled ? ' · ปิดชั่วคราว' : ''}
                         </span>
@@ -207,9 +207,9 @@ function ManageResourcesContent() {
               equipment.map((e) => (
                 <div
                   key={e.id}
-                  className="p-4 rounded-2xl border border-line bg-white flex items-center justify-between gap-3"
+                  className="p-4 rounded-2xl border border-line bg-white flex flex-wrap sm:flex-nowrap items-start sm:items-center justify-between gap-3"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                     {e.images?.[0] && (
                       <button
                         type="button"
@@ -220,9 +220,9 @@ function ManageResourcesContent() {
                         <img src={e.images[0]} alt={e.name} className="w-full h-full object-cover" />
                       </button>
                     )}
-                    <div className="min-w-0">
-                      <b className="text-[15px] text-ink block truncate">{e.name}</b>
-                      <span className="text-[13px] text-ink-mute block">
+                    <div className="min-w-0 flex-1">
+                      <b className="text-[15px] text-ink block break-words leading-snug">{e.name}</b>
+                      <span className="text-[13px] text-ink-mute block break-words">
                         หมวด: {EQUIPMENT_CATEGORY_LABEL[e.category]} · คงเหลือ {e.stock} ชิ้น
                         {!e.enabled ? ' · ปิดให้ยืมชั่วคราว' : ''}
                       </span>
@@ -301,16 +301,16 @@ function ManageResourcesContent() {
                         : 'border-line bg-white hover:bg-soft/40'
                     }`}
                   >
-                    <div className="min-w-0 pr-3">
-                      <div className="flex items-center gap-2">
-                        <b className="text-[15px] text-ink truncate">{f.title}</b>
+                    <div className="min-w-0 flex-1 pr-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <b className="text-[15px] text-ink break-words leading-snug">{f.title}</b>
                         {f.isCustom && (
                           <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-brand text-white shrink-0">
                             สร้างขึ้นใหม่
                           </span>
                         )}
                       </div>
-                      <span className="text-[12px] text-ink-mute block truncate">{f.sub}</span>
+                      <span className="text-[12px] text-ink-mute block break-words">{f.sub}</span>
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
