@@ -66,12 +66,17 @@ export class DocumentsService {
   /**
    * สร้าง Verification URL สำหรับใส่ใน QR Code
    */
-  getVerificationUrl(token: string): string {
+  getVerificationUrl(token: string, requestOrigin?: string): string {
+    const envOrigin = process.env.APP_ORIGIN || process.env.NEXT_PUBLIC_APP_URL;
+    const isEnvLocalhost =
+      !envOrigin ||
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(envOrigin.trim());
     const origin =
-      process.env.APP_ORIGIN ||
-      process.env.NEXT_PUBLIC_APP_URL ||
+      (!isEnvLocalhost ? envOrigin : undefined) ||
+      requestOrigin ||
+      envOrigin ||
       'http://localhost:3000';
-    return `${origin}/verify/${token}`;
+    return `${origin.replace(/\/+$/, '')}/verify/${token}`;
   }
 
   /**
@@ -83,6 +88,7 @@ export class DocumentsService {
       documentType?: VerificationDocumentType;
       title?: string;
       forceNew?: boolean;
+      requestOrigin?: string;
     },
   ): Promise<DocumentVerification> {
     const req = this.db.requests.find((r) => r.id === documentId || r.code === documentId);
@@ -131,7 +137,10 @@ export class DocumentsService {
         await this.db.persistVerification(activeVer);
       } else {
         // คืนค่ารายการเดิมพร้อม QR Code Data URL
-        const verifyUrl = this.getVerificationUrl(activeVer.verificationToken);
+        const verifyUrl = this.getVerificationUrl(
+          activeVer.verificationToken,
+          options?.requestOrigin,
+        );
         const qrCodeDataUrl = await this.generateQrCodeDataUrl(verifyUrl);
         return {
           ...activeVer,
@@ -195,7 +204,7 @@ export class DocumentsService {
 
     await this.db.persistVerification(newVer);
 
-    const verifyUrl = this.getVerificationUrl(verificationToken);
+    const verifyUrl = this.getVerificationUrl(verificationToken, options?.requestOrigin);
     const qrCodeDataUrl = await this.generateQrCodeDataUrl(verifyUrl);
 
     return {
@@ -208,7 +217,10 @@ export class DocumentsService {
   /**
    * ดึงข้อมูลการยืนยันเอกสารของคำขอ
    */
-  async getVerificationByDocumentId(documentId: string): Promise<DocumentVerification | null> {
+  async getVerificationByDocumentId(
+    documentId: string,
+    requestOrigin?: string,
+  ): Promise<DocumentVerification | null> {
     const req = this.db.requests.find((r) => r.id === documentId || r.code === documentId);
     const targetId = req?.id || documentId;
 
@@ -217,7 +229,7 @@ export class DocumentsService {
 
     if (!latest) return null;
 
-    const verifyUrl = this.getVerificationUrl(latest.verificationToken);
+    const verifyUrl = this.getVerificationUrl(latest.verificationToken, requestOrigin);
     const qrCodeDataUrl = await this.generateQrCodeDataUrl(verifyUrl);
 
     return {

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
 import {
   DayAvailability,
   DocumentVerification,
@@ -1009,6 +1010,34 @@ export function OfficialGovFormDocument({
   }, [req?.id, req?.status, verification]);
 
   const activeVer = verification !== undefined ? verification : internalVer;
+  const [clientQrDataUrl, setClientQrDataUrl] = useState<string>('');
+
+  useEffect(() => {
+    if (!activeVer?.verificationToken || typeof window === 'undefined') {
+      setClientQrDataUrl('');
+      return;
+    }
+    const targetUrl = `${window.location.origin}/verify/${activeVer.verificationToken}`;
+    let cancelled = false;
+    QRCode.toDataURL(targetUrl, {
+      errorCorrectionLevel: 'M',
+      margin: 3,
+      width: 300,
+      color: {
+        dark: '#0B2545',
+        light: '#FFFFFF',
+      },
+    })
+      .then((url) => {
+        if (!cancelled) setClientQrDataUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) setClientQrDataUrl('');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeVer?.verificationToken]);
 
   const isBorrow = req?.type === 'borrow';
   const formTitle =
@@ -1352,13 +1381,13 @@ export function OfficialGovFormDocument({
         </div>
 
         {/* QR Code Document Verification (ฝั่งประชาชน: มุมล่างขวาของเอกสาร) */}
-        {activeVer && activeVer.qrCodeDataUrl && (
+        {activeVer && (clientQrDataUrl || activeVer.qrCodeDataUrl) && (
           <div className="mt-6 pt-3 border-t border-dashed border-[#8A8A8A] flex flex-wrap items-center justify-between gap-3 text-[11px] leading-relaxed text-[#2C3E50]">
             <div className="flex items-center gap-3">
               <div className="w-[74px] h-[74px] shrink-0 border border-[#CBD5E1] rounded-lg p-1 bg-white shadow-xs">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={activeVer.qrCodeDataUrl}
+                  src={clientQrDataUrl || activeVer.qrCodeDataUrl}
                   alt={`QR Code ตรวจสอบเอกสาร ${activeVer.documentNumber}`}
                   className="w-full h-full object-contain"
                 />

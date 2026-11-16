@@ -63,6 +63,22 @@ export class DocumentsController {
     return this.db.getGeneratedDocumentById(id);
   }
 
+  private extractRequestOrigin(req?: Request): string | undefined {
+    const rawOrigin = req?.headers?.origin;
+    if (typeof rawOrigin === 'string' && /^https?:\/\//i.test(rawOrigin)) {
+      return rawOrigin;
+    }
+    const rawReferer = req?.headers?.referer;
+    if (typeof rawReferer === 'string') {
+      try {
+        return new URL(rawReferer).origin;
+      } catch {
+        // ignore invalid referer
+      }
+    }
+    return undefined;
+  }
+
   /**
    * สร้างหรือดึงข้อมูลการยืนยันเอกสารและรูปภาพ QR Code (Digital Verification & QR Engine)
    * POST /documents/:id/verification
@@ -77,8 +93,13 @@ export class DocumentsController {
       title?: string;
       forceNew?: boolean;
     },
+    @Req() req?: Request,
   ) {
-    return this.documentsService.createOrGetVerification(id, body);
+    const requestOrigin = this.extractRequestOrigin(req);
+    return this.documentsService.createOrGetVerification(
+      id,
+      requestOrigin ? { ...body, requestOrigin } : body,
+    );
   }
 
   /**
@@ -87,8 +108,11 @@ export class DocumentsController {
    */
   @Get(':id/verification')
   @Public()
-  async getVerification(@Param('id') id: string) {
-    return this.documentsService.getVerificationByDocumentId(id);
+  async getVerification(@Param('id') id: string, @Req() req?: Request) {
+    const requestOrigin = this.extractRequestOrigin(req);
+    return requestOrigin
+      ? this.documentsService.getVerificationByDocumentId(id, requestOrigin)
+      : this.documentsService.getVerificationByDocumentId(id);
   }
 
   /**
