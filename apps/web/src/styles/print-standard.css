@@ -20,15 +20,20 @@
 
 /* =====================================================================
    Screen UI Protection: เอกสารราชการคงกระดาษขาว-หมึกดำเสมอแม้เปิด Dark Mode
+   ใช้ html.dark เพื่อความเฉพาะเจาะจงสูงกว่า .dark .bg-white ใน globals.css เสมอ
    ===================================================================== */
 .print-doc,
-.dark .print-doc,
+html.dark .print-doc,
+html.dark .print-doc.bg-white,
 .gov-form-paper,
-.dark .gov-form-paper,
+html.dark .gov-form-paper,
+html.dark .gov-form-paper.bg-white,
 #official-doc-print-area,
-.dark #official-doc-print-area,
+html.dark #official-doc-print-area,
+html.dark #official-doc-print-area.bg-white,
 #a4-editor-page,
-.dark #a4-editor-page {
+html.dark #a4-editor-page,
+html.dark #a4-editor-page.bg-white {
   background-color: #ffffff !important;
   color: #000000 !important;
   color-scheme: light !important;
@@ -37,90 +42,90 @@
 }
 
 .print-doc *,
-.dark .print-doc *,
+html.dark .print-doc *,
 .gov-form-paper *,
-.dark .gov-form-paper *,
+html.dark .gov-form-paper *,
 #official-doc-print-area *,
-.dark #official-doc-print-area *,
+html.dark #official-doc-print-area *,
 #a4-editor-page *,
-.dark #a4-editor-page * {
+html.dark #a4-editor-page * {
   color-scheme: light !important;
 }
 
-.dark .print-doc .bg-white,
-.dark .gov-form-paper .bg-white,
-.dark .gov-form-paper [class*="bg-white"],
-.dark #official-doc-print-area .bg-white,
-.dark #a4-editor-page .bg-white {
+html.dark .print-doc .bg-white,
+html.dark .gov-form-paper .bg-white,
+html.dark .gov-form-paper [class*="bg-white"],
+html.dark #official-doc-print-area .bg-white,
+html.dark #a4-editor-page .bg-white {
   background-color: #ffffff !important;
 }
 
-.dark .print-doc .text-black,
-.dark .print-doc .text-ink,
-.dark .gov-form-paper .text-black,
-.dark .gov-form-paper h1,
-.dark .gov-form-paper h2,
-.dark .gov-form-paper h3,
-.dark .gov-form-paper b,
-.dark .gov-form-paper strong,
-.dark .gov-form-paper span,
-.dark .gov-form-paper div,
-.dark #official-doc-print-area .text-black,
-.dark #official-doc-print-area .text-ink,
-.dark #official-doc-print-area h1,
-.dark #official-doc-print-area h2,
-.dark #official-doc-print-area b,
-.dark #a4-editor-page .text-black,
-.dark #a4-editor-page h1,
-.dark #a4-editor-page h2,
-.dark #a4-editor-page b {
+html.dark .print-doc .text-black,
+html.dark .print-doc .text-ink,
+html.dark .gov-form-paper .text-black,
+html.dark .gov-form-paper h1,
+html.dark .gov-form-paper h2,
+html.dark .gov-form-paper h3,
+html.dark .gov-form-paper b,
+html.dark .gov-form-paper strong,
+html.dark .gov-form-paper span,
+html.dark .gov-form-paper div,
+html.dark #official-doc-print-area .text-black,
+html.dark #official-doc-print-area .text-ink,
+html.dark #official-doc-print-area h1,
+html.dark #official-doc-print-area h2,
+html.dark #official-doc-print-area b,
+html.dark #a4-editor-page .text-black,
+html.dark #a4-editor-page h1,
+html.dark #a4-editor-page h2,
+html.dark #a4-editor-page b {
   color: #000000 !important;
 }
 
-.dark .gov-form-paper .text-\[\#0B2545\],
-.dark .gov-form-paper .text-\[\#0b2545\],
-.dark .gov-form-paper [class*="0B2545"],
-.dark .gov-form-paper [class*="0b2545"] {
+html.dark .gov-form-paper .text-\[\#0B2545\],
+html.dark .gov-form-paper .text-\[\#0b2545\],
+html.dark .gov-form-paper [class*="0B2545"],
+html.dark .gov-form-paper [class*="0b2545"] {
   color: #0B2545 !important;
 }
 
-.dark .gov-form-paper .text-\[\#2C3E50\],
-.dark .gov-form-paper .text-\[\#2c3e50\],
-.dark .gov-form-paper [class*="2C3E50"],
-.dark .gov-form-paper [class*="2c3e50"] {
+html.dark .gov-form-paper .text-\[\#2C3E50\],
+html.dark .gov-form-paper .text-\[\#2c3e50\],
+html.dark .gov-form-paper [class*="2C3E50"],
+html.dark .gov-form-paper [class*="2c3e50"] {
   color: #2C3E50 !important;
 }
 
-.dark .gov-form-paper .text-\[\#475569\],
-.dark .gov-form-paper [class*="475569"] {
+html.dark .gov-form-paper .text-\[\#475569\],
+html.dark .gov-form-paper [class*="475569"] {
   color: #475569 !important;
 }
 
-.dark .gov-form-paper .text-\[\#64748B\],
-.dark .gov-form-paper .text-\[\#64748b\],
-.dark .gov-form-paper [class*="64748B"],
-.dark .gov-form-paper [class*="64748b"] {
+html.dark .gov-form-paper .text-\[\#64748B\],
+html.dark .gov-form-paper .text-\[\#64748b\],
+html.dark .gov-form-paper [class*="64748B"],
+html.dark .gov-form-paper [class*="64748b"] {
   color: #64748B !important;
 }
 
-.dark .gov-form-paper .border-\[\#4A4A4A\],
-.dark .gov-form-paper .border-\[\#4a4a4a\],
-.dark .gov-form-paper [class*="4A4A4A"],
-.dark .gov-form-paper [class*="4a4a4a"] {
+html.dark .gov-form-paper .border-\[\#4A4A4A\],
+html.dark .gov-form-paper .border-\[\#4a4a4a\],
+html.dark .gov-form-paper [class*="4A4A4A"],
+html.dark .gov-form-paper [class*="4a4a4a"] {
   border-color: #4A4A4A !important;
 }
 
-.dark .gov-form-paper .border-\[\#8A8A8A\],
-.dark .gov-form-paper .border-\[\#8a8a8a\],
-.dark .gov-form-paper [class*="8A8A8A"],
-.dark .gov-form-paper [class*="8a8a8a"] {
+html.dark .gov-form-paper .border-\[\#8A8A8A\],
+html.dark .gov-form-paper .border-\[\#8a8a8a\],
+html.dark .gov-form-paper [class*="8A8A8A"],
+html.dark .gov-form-paper [class*="8a8a8a"] {
   border-color: #8A8A8A !important;
 }
 
-.dark .gov-form-paper .border-\[\#CBD5E1\],
-.dark .gov-form-paper .border-\[\#cbd5e1\],
-.dark .gov-form-paper [class*="CBD5E1"],
-.dark .gov-form-paper [class*="cbd5e1"] {
+html.dark .gov-form-paper .border-\[\#CBD5E1\],
+html.dark .gov-form-paper .border-\[\#cbd5e1\],
+html.dark .gov-form-paper [class*="CBD5E1"],
+html.dark .gov-form-paper [class*="cbd5e1"] {
   border-color: #CBD5E1 !important;
 }
 
