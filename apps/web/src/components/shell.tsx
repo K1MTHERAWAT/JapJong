@@ -19,7 +19,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   Bell,
   ChevronLeft,
-  Lock,
   Menu,
   Moon,
   ShieldAlert,
@@ -167,8 +166,25 @@ export function AppShell({
     router.push('/login');
   };
 
+  const isPublicRoute = pathname === '/verify' || pathname.startsWith('/verify/');
+
+  useEffect(() => {
+    if (!loading && !account && !isPublicRoute) {
+      router.replace('/');
+    }
+  }, [loading, account, isPublicRoute, router]);
+
   // ตรวจสอบว่าหน้านี้มีการกำหนดปุ่มย้อนกลับหรือไม่
   const hasBackAction = Boolean(onBack || backHref);
+
+  if (!loading && !account && !isPublicRoute) {
+    return (
+      <div className="min-h-dvh bg-bg flex flex-col items-center justify-center gap-3 text-body text-ink-mute">
+        <div className="size-7 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+        <span>กำลังนำคุณไปยังหน้าหลัก...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-dvh bg-ground text-ink font-sans selection:bg-brand-tint selection:text-brand-ink print:bg-white print:block transition-colors duration-200">
@@ -329,24 +345,6 @@ export function AppShell({
             <Card className="p-8 max-w-[480px] mx-auto my-8 text-center text-body text-muted flex flex-col items-center justify-center gap-3">
               <div className="size-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
               <span>กำลังตรวจสอบสถานะการเข้าสู่ระบบ...</span>
-            </Card>
-          ) : !account && !(pathname === '/verify' || pathname.startsWith('/verify/')) ? (
-            /* สถานะที่ 2: ยังไม่ได้เข้าสู่ระบบ (ยกเว้นหน้าสาธารณะเช่น /verify) */
-            <Card className="p-6 sm:p-8 max-w-[500px] w-full mx-auto my-6 sm:my-8 flex flex-col items-center text-center gap-4">
-              <div className="size-12 rounded-full bg-brand-tint text-brand-ink flex items-center justify-center">
-                <Lock className="size-6" />
-              </div>
-              <div>
-                <h2 className="text-heading font-bold text-ink">กรุณาเข้าสู่ระบบก่อนใช้งาน</h2>
-                <p className="text-body text-muted mt-1">
-                  เข้าสู่ระบบด้วยชื่อผู้ใช้และรหัสผ่านตามบทบาทที่ต้องการใช้งาน
-                </p>
-              </div>
-              <Link href="/login" className="w-full sm:w-auto">
-                <Button variant="primary" className="w-full sm:w-56">
-                  ไปหน้าเข้าสู่ระบบ
-                </Button>
-              </Link>
             </Card>
           ) : account && !access.allowed ? (
             /* สถานะที่ 3: ไม่มีสิทธิ์เข้าถึงหน้านี้ (Permission & Role Guard) */
