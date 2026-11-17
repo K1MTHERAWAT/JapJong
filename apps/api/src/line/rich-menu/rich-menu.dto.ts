@@ -16,6 +16,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { NAME_MAX_LENGTH } from '@japjong/shared';
 
 // ประเภทกลุ่มเป้าหมายของ Rich Menu (ประชาชน, เจ้าหน้าที่, แอดมิน, ทั่วไป, กำหนดเอง)
 export type RichMenuType = 'CITIZEN' | 'STAFF' | 'ADMIN' | 'DEFAULT' | 'CUSTOM';
@@ -57,7 +58,7 @@ export class RichMenuActionDto {
   // ป้ายกำกับชื่อปุ่ม
   @IsString()
   @IsNotEmpty()
-  @MaxLength(40)
+  @MaxLength(NAME_MAX_LENGTH.RICH_MENU_ACTION_LABEL)
   label!: string;
 
   // ชนิดของการทำงาน (เปิดเว็บ URI, ส่งข้อความ MESSAGE, หรือส่งข้อมูล POSTBACK)
@@ -94,7 +95,7 @@ export class CreateRichMenuDto {
   // ชื่อเมนูสำหรับอ้างอิงในระบบ
   @IsString()
   @IsNotEmpty()
-  @MaxLength(100)
+  @MaxLength(NAME_MAX_LENGTH.RICH_MENU_NAME)
   name!: string;
 
   // ประเภทบทบาทผู้ใช้งานที่เมนูนี้รองรับ
@@ -105,7 +106,7 @@ export class CreateRichMenuDto {
   // ข้อความที่แสดงบนแถบเปิด-ปิดเมนูด้านล่างห้องแชท (สูงสุด 14 ตัวอักษร)
   @IsString()
   @IsNotEmpty()
-  @MaxLength(14)
+  @MaxLength(NAME_MAX_LENGTH.RICH_MENU_BAR_TEXT)
   chatBarText!: string;
 
   // ความกว้างมาตรฐาน (2500 พิกเซล)
@@ -138,7 +139,7 @@ export class CreateRichMenuDto {
 export class UpdateRichMenuDto {
   @IsOptional()
   @IsString()
-  @MaxLength(100)
+  @MaxLength(NAME_MAX_LENGTH.RICH_MENU_NAME)
   name?: string;
 
   @IsOptional()
@@ -148,7 +149,7 @@ export class UpdateRichMenuDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(14)
+  @MaxLength(NAME_MAX_LENGTH.RICH_MENU_BAR_TEXT)
   chatBarText?: string;
 
   @IsOptional()
@@ -205,6 +206,7 @@ export class UnlinkRichMenuUserDto {
 export class FlexTemplateUpsertDto {
   @IsString()
   @IsNotEmpty()
+  @MaxLength(NAME_MAX_LENGTH.RICH_MENU_NAME)
   name!: string;
 
   @IsString()

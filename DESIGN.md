@@ -171,6 +171,32 @@
    - Danger / Destructive: `bg-danger-solid text-white`
 2. **Inputs, Textareas & Selects (`@/components/ui/Input` / `.jw-in`):**
    - พื้นหลัง `bg-surface` (`#151926`), เส้นขอบ `border-line-input` (`#38435E`), ข้อความ `text-ink` (`#F8FAFC`), Placeholder `placeholder:text-ink-ph` (`#64748B`), และวงแหวน Focus สีเขียว `focus:border-brand focus:ring-2 focus:ring-brand/25`
+   - **มาตรฐานการจำกัดความยาวการกรอกชื่อ (Name Input Length Standard — [`packages/shared/src/name-limits.ts`](file:///d:/ngan/Biza/BookingV1/packages/shared/src/name-limits.ts)):**
+     - กำหนดความยาวสูงสุด (`NAME_MAX_LENGTH`) จากจุดศูนย์กลางและบังคับใช้ร่วมกันทั้งฝั่ง Frontend (`maxLength` + `clampNameInput`) และ Backend (`@MaxLength` DTO + Controller Slicing):
+       | ประเภทข้อมูลชื่อ (Field Key) | ความยาวสูงสุด (`maxLength`) | ตัวอย่างการใช้งานในระบบ |
+       | :--- | :---: | :--- |
+       | `PERSON_NAME` (ชื่อ-นามสกุล) | `40` | ชื่อผู้ใช้, ผู้ยื่นคำขอ, ผู้แจ้งซ่อม |
+       | `NICKNAME` (ชื่อเล่น / ชื่อเรียก) | `20` | ชื่อเล่นในหน้าจัดการบัญชี |
+       | `USERNAME` (ชื่อบัญชีผู้ใช้) | `30` | `@username` สำหรับเข้าสู่ระบบ |
+       | `POSITION` (ชื่อตำแหน่ง) | `40` | ตำแหน่งในแบบคำขอ / โปรไฟล์ |
+       | `ORGANIZATION` (ชื่อหน่วยงาน / สังกัด) | `60` | หน่วยงาน, ชุมชน, กอง/สำนัก |
+       | `VENUE_NAME` (ชื่อสถานที่ราชการ) | `50` | ห้องประชุม, ศาลาประชาคม, สนามกีฬา |
+       | `EQUIPMENT_NAME` (ชื่ออุปกรณ์ / ครุภัณฑ์) | `60` | ชุดเครื่องเสียง, เต็นท์, โปรเจกเตอร์ |
+       | `BUILDING_NAME` (ชื่ออาคาร) | `40` | อาคารสำนักงาน, ศูนย์กีฬาชุมชน |
+       | `FLOOR_NAME` (ชื่อชั้น / โซน) | `20` | ชั้น 1, ชั้น 2, กลางแจ้ง |
+       | `LOCATION_NAME` (จุดเกิดเหตุ / ห้องที่แจ้งซ่อม) | `60` | ห้องประชุมใหญ่ · เครื่องปรับอากาศ |
+       | `WRITTEN_AT` (สถานที่เขียนคำขอ) | `50` | ที่ทำการองค์การบริหารส่วนตำบล |
+       | `ACTIVITY_NAME` (ชื่องาน / กิจกรรม) | `80` | ชื่อโครงการหรือกิจกรรมที่ขอใช้สถานที่ |
+       | `SERVICE_NAME` (ชื่อบริการ / เมนู Sidebar) | `40` | ชื่อเมนูบริการในหน้าแอดมิน |
+       | `CATEGORY_NAME` (ชื่อหมวดหมู่) | `30` | หมวดหมู่บริการ, หมวดหมู่งานซ่อม |
+       | `ROLE_NAME` (ชื่อบทบาทผู้ใช้งาน) | `40` | ชื่อบทบาทในระบบจัดการสิทธิ์ |
+       | `TEMPLATE_NAME` (ชื่อแม่แบบเอกสาร / แบบฟอร์ม) | `60` | ชื่อแม่แบบเอกสารราชการและหัวเรื่องฟอร์ม |
+       | `SLOT_LABEL` (ชื่อช่องดึงข้อมูล) | `30` | ป้ายกำกับ Data Slot ในตัวแก้ไขเอกสาร |
+       | `RICH_MENU_NAME` (ชื่อ Rich Menu / หัวข้อ Flex) | `50` | ชื่อ LINE Rich Menu และหัวข้อ Flex Message |
+       | `RICH_MENU_BAR_TEXT` (ข้อความแถบแชท LINE) | `14` | ข้อความแถบเมนูแชทตามเกณฑ์ LINE API |
+       | `RICH_MENU_ACTION_LABEL` (ชื่อปุ่มเมนู LINE) | `20` | ป้ายกำกับปุ่มกดใน Rich Menu และ Flex Card |
+     - **ตัวนับจำนวนตัวอักษร (`<NameLengthBadge />`):** แสดงตัวนับแบบเรียลไทม์มุมขวาบนของช่องกรอก เช่น `25/40` ด้วยฟอนต์ `font-mono tabular-nums`
+     - **การป้องกันและแจ้งเตือนเมื่อครบขีดจำกัด (`<NameLimitWarning />`):** เมื่อกรอกครบจำนวนสูงสุด ระบบจะบล็อกการพิมพ์/วางข้อความเกินขนาด เปลี่ยนสีขอบและตัวนับเป็นโทนแจ้งเตือน (`text-warn-fg`, `border-warn-fg`) และแสดงข้อความ `"ถึงขีดจำกัดความยาวสูงสุดแล้ว (40/40 ตัวอักษร)"`
 3. **Tables (`.jw-table` & Native Tables):**
    - หัวตารางใช้ `bg-surface-muted/70` (`#1D2436`) เส้นคั่นแถวใช้ `divide-line` (`#2B334A`) และเมื่อชี้เมาส์ใช้ `hover:bg-hover`
 4. **Modals & Popovers:**

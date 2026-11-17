@@ -15,10 +15,17 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { EquipmentCategory, FACILITIES, VENUE_TYPE_LABEL, VenueType } from '@japjong/shared';
+import {
+  EquipmentCategory,
+  FACILITIES,
+  NAME_MAX_LENGTH,
+  VENUE_TYPE_LABEL,
+  VenueType,
+  clampNameInput,
+} from '@japjong/shared';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
-import { Stepper, Tabs, Toggle } from '@/components/ui';
+import { NameLengthBadge, NameLimitWarning, Stepper, Tabs, Toggle } from '@/components/ui';
 import { OfficialDocumentEditor } from '@/components/official-document-editor';
 import { api, readAndCompressImages } from '@/lib/api';
 import {
@@ -320,10 +327,16 @@ export default function AddResourcePage() {
 
           {/* ชื่อสถานที่ หรือ ชื่ออุปกรณ์ */}
           <div>
-            <label className="jw-lbl">
-              {kind === 'venue' ? 'ชื่อสถานที่' : 'ชื่ออุปกรณ์ / ครุภัณฑ์'}{' '}
-              <span className="text-red-500">*</span>
-            </label>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <label className="jw-lbl mb-0">
+                {kind === 'venue' ? 'ชื่อสถานที่' : 'ชื่ออุปกรณ์ / ครุภัณฑ์'}{' '}
+                <span className="text-red-500">*</span>
+              </label>
+              <NameLengthBadge
+                value={name}
+                maxLength={kind === 'venue' ? NAME_MAX_LENGTH.VENUE_NAME : NAME_MAX_LENGTH.EQUIPMENT_NAME}
+              />
+            </div>
             <input
               type="text"
               placeholder={
@@ -332,8 +345,20 @@ export default function AddResourcePage() {
                   : 'เช่น ชุดเครื่องเสียงเคลื่อนที่ หรือ เต็นท์โค้งขาว'
               }
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              maxLength={kind === 'venue' ? NAME_MAX_LENGTH.VENUE_NAME : NAME_MAX_LENGTH.EQUIPMENT_NAME}
+              onChange={(e) =>
+                setName(
+                  clampNameInput(
+                    e.target.value,
+                    kind === 'venue' ? NAME_MAX_LENGTH.VENUE_NAME : NAME_MAX_LENGTH.EQUIPMENT_NAME,
+                  ),
+                )
+              }
               className="jw-in"
+            />
+            <NameLimitWarning
+              value={name}
+              maxLength={kind === 'venue' ? NAME_MAX_LENGTH.VENUE_NAME : NAME_MAX_LENGTH.EQUIPMENT_NAME}
             />
           </div>
 
@@ -363,24 +388,34 @@ export default function AddResourcePage() {
               {/* อาคารและชั้น */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="jw-lbl">อาคาร</label>
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <label className="jw-lbl mb-0">อาคาร</label>
+                    <NameLengthBadge value={building} maxLength={NAME_MAX_LENGTH.BUILDING_NAME} />
+                  </div>
                   <input
                     type="text"
                     placeholder="เช่น อาคารสำนักงาน"
                     value={building}
-                    onChange={(e) => setBuilding(e.target.value)}
+                    maxLength={NAME_MAX_LENGTH.BUILDING_NAME}
+                    onChange={(e) => setBuilding(clampNameInput(e.target.value, NAME_MAX_LENGTH.BUILDING_NAME))}
                     className="jw-in"
                   />
+                  <NameLimitWarning value={building} maxLength={NAME_MAX_LENGTH.BUILDING_NAME} />
                 </div>
                 <div>
-                  <label className="jw-lbl">ชั้น</label>
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <label className="jw-lbl mb-0">ชั้น</label>
+                    <NameLengthBadge value={floor} maxLength={NAME_MAX_LENGTH.FLOOR_NAME} />
+                  </div>
                   <input
                     type="text"
                     placeholder="เช่น ชั้น 1"
                     value={floor}
-                    onChange={(e) => setFloor(e.target.value)}
+                    maxLength={NAME_MAX_LENGTH.FLOOR_NAME}
+                    onChange={(e) => setFloor(clampNameInput(e.target.value, NAME_MAX_LENGTH.FLOOR_NAME))}
                     className="jw-in"
                   />
+                  <NameLimitWarning value={floor} maxLength={NAME_MAX_LENGTH.FLOOR_NAME} />
                 </div>
               </div>
 

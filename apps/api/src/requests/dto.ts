@@ -6,9 +6,10 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  MaxLength,
   Min,
 } from 'class-validator';
-import { ItemQty, Period } from '@japjong/shared';
+import { ItemQty, NAME_MAX_LENGTH, Period } from '@japjong/shared';
 
 /**
  * Data Transfer Object (DTO) สำหรับสร้างคำขอจองใช้สถานที่ราชการ
@@ -33,6 +34,7 @@ export class CreateBookingDto {
   // ชื่องานหรือกิจกรรม
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.ACTIVITY_NAME, { message: `ชื่องาน/กิจกรรมต้องไม่เกิน ${NAME_MAX_LENGTH.ACTIVITY_NAME} ตัวอักษร` })
   activity?: string;
 
   // วัตถุประสงค์ในการขอใช้สถานที่
@@ -43,6 +45,7 @@ export class CreateBookingDto {
   // หน่วยงาน / องค์กร / กลุ่มบุคคลที่ยื่นขอ
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.ORGANIZATION, { message: `ชื่อหน่วยงานต้องไม่เกิน ${NAME_MAX_LENGTH.ORGANIZATION} ตัวอักษร` })
   organization?: string;
 
   // เอกสารแนบประกอบคำขอ (URLs หรือ Base64)
@@ -63,6 +66,7 @@ export class CreateBookingDto {
   // ชื่อผู้ยื่นคำขอ
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.PERSON_NAME, { message: `ชื่อผู้ยื่นคำขอต้องไม่เกิน ${NAME_MAX_LENGTH.PERSON_NAME} ตัวอักษร` })
   requesterName?: string;
 
   // เบอร์โทรศัพท์ติดต่อของผู้ยื่นคำขอ
@@ -83,11 +87,13 @@ export class CreateBookingDto {
   // เขียนที่ (สถานที่ทำบันทึกคำขอ)
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.WRITTEN_AT, { message: `สถานที่เขียนคำขอต้องไม่เกิน ${NAME_MAX_LENGTH.WRITTEN_AT} ตัวอักษร` })
   writtenAt?: string;
 
   // ตำแหน่งของผู้ยื่นคำขอ
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.POSITION, { message: `ชื่อตำแหน่งต้องไม่เกิน ${NAME_MAX_LENGTH.POSITION} ตัวอักษร` })
   requesterPosition?: string;
 
   // ข้อมูลที่อยู่: บ้านเลขที่
@@ -163,6 +169,7 @@ export class CreateBorrowDto {
   // หน่วยงาน / องค์กรที่ขอยืม
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.ORGANIZATION, { message: `ชื่อหน่วยงานต้องไม่เกิน ${NAME_MAX_LENGTH.ORGANIZATION} ตัวอักษร` })
   organization?: string;
 
   // เอกสารแนบ
@@ -178,6 +185,7 @@ export class CreateBorrowDto {
   // ชื่อผู้ยื่นคำขอ
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.PERSON_NAME, { message: `ชื่อผู้ยื่นคำขอต้องไม่เกิน ${NAME_MAX_LENGTH.PERSON_NAME} ตัวอักษร` })
   requesterName?: string;
 
   // เบอร์โทรศัพท์ผู้ยื่นคำขอ
@@ -198,11 +206,13 @@ export class CreateBorrowDto {
   // เขียนที่
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.WRITTEN_AT, { message: `สถานที่เขียนคำขอต้องไม่เกิน ${NAME_MAX_LENGTH.WRITTEN_AT} ตัวอักษร` })
   writtenAt?: string;
 
   // ตำแหน่งผู้ยื่นคำขอ
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.POSITION, { message: `ชื่อตำแหน่งต้องไม่เกิน ${NAME_MAX_LENGTH.POSITION} ตัวอักษร` })
   requesterPosition?: string;
 
   // ข้อมูลที่อยู่ผู้ยืม
@@ -256,21 +266,25 @@ export class CreateRepairDto {
   // อาคาร / สิ่งปลูกสร้างที่ชำรุด
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.BUILDING_NAME, { message: `ชื่ออาคารต้องไม่เกิน ${NAME_MAX_LENGTH.BUILDING_NAME} ตัวอักษร` })
   building?: string;
 
   // ชั้น
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.FLOOR_NAME, { message: `ชื่อชั้นต้องไม่เกิน ${NAME_MAX_LENGTH.FLOOR_NAME} ตัวอักษร` })
   floor?: string;
 
   // สถานที่ / จุดสังเกต
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.LOCATION_NAME, { message: `ชื่อสถานที่/จุดเกิดเหตุต้องไม่เกิน ${NAME_MAX_LENGTH.LOCATION_NAME} ตัวอักษร` })
   location?: string;
 
   // หมวดหมู่งานซ่อม (เช่น ไฟฟ้า, ประปา, ปรับอากาศ, โครงสร้าง)
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.CATEGORY_NAME, { message: `ชื่อหมวดหมู่ต้องไม่เกิน ${NAME_MAX_LENGTH.CATEGORY_NAME} ตัวอักษร` })
   category?: string;
 
   // จำนวนภาพถ่ายความเสียหาย
@@ -292,6 +306,7 @@ export class CreateRepairDto {
   // ชื่อผู้แจ้งซ่อม
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.PERSON_NAME, { message: `ชื่อผู้แจ้งซ่อมต้องไม่เกิน ${NAME_MAX_LENGTH.PERSON_NAME} ตัวอักษร` })
   requesterName?: string;
 
   // เบอร์โทรศัพท์ผู้แจ้งซ่อม
@@ -302,6 +317,7 @@ export class CreateRepairDto {
   // สังกัด / หน่วยงาน
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.ORGANIZATION, { message: `ชื่อหน่วยงานต้องไม่เกิน ${NAME_MAX_LENGTH.ORGANIZATION} ตัวอักษร` })
   organization?: string;
 
   // ลายเซ็นผู้แจ้งซ่อม

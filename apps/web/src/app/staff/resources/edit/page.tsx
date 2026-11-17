@@ -18,12 +18,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   EquipmentCategory,
   FACILITIES,
+  NAME_MAX_LENGTH,
   VENUE_TYPE_LABEL,
   VenueType,
+  clampNameInput,
 } from '@japjong/shared';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
-import { Chip, Stepper, Toggle } from '@/components/ui';
+import { Chip, NameLengthBadge, NameLimitWarning, Stepper, Toggle } from '@/components/ui';
 import { OfficialDocumentEditor } from '@/components/official-document-editor';
 import { api, readAndCompressImages } from '@/lib/api';
 import {
@@ -414,17 +416,35 @@ function EditResourceContent() {
           </div>
 
           <div>
-            <label className="jw-lbl">{kind === 'venue' ? 'ชื่อสถานที่' : 'ชื่ออุปกรณ์ / ครุภัณฑ์'}</label>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <label className="jw-lbl mb-0">{kind === 'venue' ? 'ชื่อสถานที่' : 'ชื่ออุปกรณ์ / ครุภัณฑ์'}</label>
+              <NameLengthBadge
+                value={name}
+                maxLength={kind === 'venue' ? NAME_MAX_LENGTH.VENUE_NAME : NAME_MAX_LENGTH.EQUIPMENT_NAME}
+              />
+            </div>
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              maxLength={kind === 'venue' ? NAME_MAX_LENGTH.VENUE_NAME : NAME_MAX_LENGTH.EQUIPMENT_NAME}
+              onChange={(e) =>
+                setName(
+                  clampNameInput(
+                    e.target.value,
+                    kind === 'venue' ? NAME_MAX_LENGTH.VENUE_NAME : NAME_MAX_LENGTH.EQUIPMENT_NAME,
+                  ),
+                )
+              }
               placeholder={
                 kind === 'venue'
                   ? 'เช่น ห้องประชุมใหญ่ อบต. หรือ ศาลาประชาคม'
                   : 'เช่น ชุดเครื่องเสียงเคลื่อนที่ หรือ เต็นท์โค้งขาว'
               }
               className="jw-in"
+            />
+            <NameLimitWarning
+              value={name}
+              maxLength={kind === 'venue' ? NAME_MAX_LENGTH.VENUE_NAME : NAME_MAX_LENGTH.EQUIPMENT_NAME}
             />
           </div>
 
@@ -454,24 +474,34 @@ function EditResourceContent() {
               {/* อาคาร ชั้น และความจุ */}
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="jw-lbl">อาคาร</label>
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <label className="jw-lbl mb-0">อาคาร</label>
+                    <NameLengthBadge value={building} maxLength={NAME_MAX_LENGTH.BUILDING_NAME} />
+                  </div>
                   <input
                     type="text"
                     value={building}
-                    onChange={(e) => setBuilding(e.target.value)}
+                    maxLength={NAME_MAX_LENGTH.BUILDING_NAME}
+                    onChange={(e) => setBuilding(clampNameInput(e.target.value, NAME_MAX_LENGTH.BUILDING_NAME))}
                     placeholder="เช่น อาคารสำนักงาน"
                     className="jw-in"
                   />
+                  <NameLimitWarning value={building} maxLength={NAME_MAX_LENGTH.BUILDING_NAME} />
                 </div>
                 <div>
-                  <label className="jw-lbl">ชั้น</label>
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <label className="jw-lbl mb-0">ชั้น</label>
+                    <NameLengthBadge value={floor} maxLength={NAME_MAX_LENGTH.FLOOR_NAME} />
+                  </div>
                   <input
                     type="text"
                     value={floor}
-                    onChange={(e) => setFloor(e.target.value)}
+                    maxLength={NAME_MAX_LENGTH.FLOOR_NAME}
+                    onChange={(e) => setFloor(clampNameInput(e.target.value, NAME_MAX_LENGTH.FLOOR_NAME))}
                     placeholder="เช่น ชั้น 1"
                     className="jw-in"
                   />
+                  <NameLimitWarning value={floor} maxLength={NAME_MAX_LENGTH.FLOOR_NAME} />
                 </div>
                 <div>
                   <label className="jw-lbl">ความจุ (คน)</label>

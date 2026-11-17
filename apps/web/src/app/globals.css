@@ -346,10 +346,11 @@
     background: var(--color-brand);
   }
   .jw-card {
-    @apply rounded-card border shadow-card transition-colors;
+    @apply rounded-card border shadow-card transition-colors min-w-0;
     background-color: var(--color-surface);
     border-color: var(--color-line);
     box-shadow: 0 3px 12px rgba(16, 24, 40, .045);
+    overflow-wrap: anywhere;
   }
   .dark .jw-card {
     box-shadow: 0 4px 16px rgba(0, 0, 0, .28);
@@ -430,7 +431,8 @@
     @apply fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/50 backdrop-blur-[2px];
   }
   .jw-modal-panel {
-    @apply w-full rounded-card border border-line bg-surface p-5 sm:p-6 shadow-pop flex flex-col gap-4 max-h-[90dvh] overflow-y-auto;
+    @apply w-full min-w-0 rounded-card border border-line bg-surface p-5 sm:p-6 shadow-pop flex flex-col gap-4 max-h-[90dvh] overflow-y-auto;
+    overflow-wrap: anywhere;
   }
 
   /* Semantic Feedback Banners using Existing Tokens */

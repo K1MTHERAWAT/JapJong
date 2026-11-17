@@ -20,8 +20,11 @@ import {
   DocumentDataSlot,
   DocumentStructure,
   DocumentTemplateItem,
+  NAME_MAX_LENGTH,
+  clampNameInput,
 } from '@japjong/shared';
 import { Icon } from '@/components/icons';
+import { NameLengthBadge, NameLimitWarning } from '@/components/ui';
 import { api } from '@/lib/api';
 
 // รายการตัวเลือกสำหรับผูกข้อมูลอัตโนมัติ (Data Binding Options)
@@ -649,12 +652,19 @@ export default function DocumentEditorWorkspacePage() {
                 }`}
               >
                 {mode === 'design' ? (
-                  <input
-                    type="text"
-                    value={doc.title}
-                    onChange={(e) => updateDoc({ ...doc, title: e.target.value })}
-                    className="w-full text-center text-[22px] font-bold text-ink bg-transparent border-none outline-none focus:ring-0 p-0"
-                  />
+                  <div className="flex flex-col items-center gap-0.5">
+                    <input
+                      type="text"
+                      value={doc.title}
+                      maxLength={NAME_MAX_LENGTH.TEMPLATE_NAME}
+                      onChange={(e) =>
+                        updateDoc({ ...doc, title: clampNameInput(e.target.value, NAME_MAX_LENGTH.TEMPLATE_NAME) })
+                      }
+                      className="w-full text-center text-[22px] font-bold text-ink bg-transparent border-none outline-none focus:ring-0 p-0"
+                    />
+                    <NameLengthBadge value={doc.title} maxLength={NAME_MAX_LENGTH.TEMPLATE_NAME} />
+                    <NameLimitWarning value={doc.title} maxLength={NAME_MAX_LENGTH.TEMPLATE_NAME} />
+                  </div>
                 ) : (
                   <h1 className="text-[22px] font-bold text-ink">{doc.title}</h1>
                 )}
@@ -1014,18 +1024,24 @@ export default function DocumentEditorWorkspacePage() {
             {selectedType === 'slot' && currentSlot && (
               <div className="space-y-4">
                 <div>
-                  <label className="jw-lbl">ชื่อช่องข้อมูล (Label)</label>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <label className="jw-lbl mb-0">ชื่อช่องข้อมูล (Label)</label>
+                    <NameLengthBadge value={currentSlot.label} maxLength={NAME_MAX_LENGTH.SLOT_LABEL} />
+                  </div>
                   <input
                     type="text"
                     value={currentSlot.label}
+                    maxLength={NAME_MAX_LENGTH.SLOT_LABEL}
                     onChange={(e) => {
+                      const clamped = clampNameInput(e.target.value, NAME_MAX_LENGTH.SLOT_LABEL);
                       const nextSlots = doc.requesterSlots.map((s) =>
-                        s.id === currentSlot.id ? { ...s, label: e.target.value } : s,
+                        s.id === currentSlot.id ? { ...s, label: clamped } : s,
                       );
                       updateDoc({ ...doc, requesterSlots: nextSlots });
                     }}
                     className="jw-in text-xs"
                   />
+                  <NameLimitWarning value={currentSlot.label} maxLength={NAME_MAX_LENGTH.SLOT_LABEL} />
                 </div>
 
                 <div>

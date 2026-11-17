@@ -19,12 +19,14 @@ import {
   BulkAssignRoleDto,
   CreateRoleDto,
   DEFAULT_PERMISSIONS,
+  NAME_MAX_LENGTH,
   PERMISSION_KEYS,
   PermissionKey,
   ROLE_LABEL,
   Role,
   RoleItem,
   UpdateRoleDto,
+  clampNameInput,
 } from '@japjong/shared';
 import { CurrentUser, Permissions, Roles } from '../auth/auth.guard';
 import { hashSecret } from '../auth/secret';
@@ -122,7 +124,7 @@ export class AdminController {
     // 1. อัปเดตข้อมูลโปรไฟล์ส่วนตัว (Profile Attributes)
     let profileUpdated = false;
     if (typeof body.name === 'string' && body.name.trim()) {
-      const nextName = body.name.trim().slice(0, 100);
+      const nextName = clampNameInput(body.name, NAME_MAX_LENGTH.PERSON_NAME).trim();
       if (nextName !== target.name) {
         target.name = nextName;
         target.initial = nextName.charAt(0) || 'ผ';
@@ -130,21 +132,23 @@ export class AdminController {
       }
     }
     if (typeof body.nickname === 'string') {
-      const nextNick = body.nickname.trim().slice(0, 50) || target.name.split(' ')[0] || target.name;
+      const nextNick =
+        clampNameInput(body.nickname, NAME_MAX_LENGTH.NICKNAME).trim() ||
+        clampNameInput(target.name.split(' ')[0] || target.name, NAME_MAX_LENGTH.NICKNAME);
       if (nextNick !== target.nickname) {
         target.nickname = nextNick;
         profileUpdated = true;
       }
     }
     if (typeof body.position === 'string' && body.position.trim()) {
-      const nextPos = body.position.trim().slice(0, 100);
+      const nextPos = clampNameInput(body.position, NAME_MAX_LENGTH.POSITION).trim();
       if (nextPos !== target.position) {
         target.position = nextPos;
         profileUpdated = true;
       }
     }
     if (typeof body.department === 'string' && body.department.trim()) {
-      const nextDept = body.department.trim().slice(0, 100);
+      const nextDept = clampNameInput(body.department, NAME_MAX_LENGTH.ORGANIZATION).trim();
       if (nextDept !== target.department) {
         target.department = nextDept;
         profileUpdated = true;

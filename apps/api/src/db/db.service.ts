@@ -47,6 +47,8 @@ import {
   DocumentTemplateItem,
   DocumentTemplateVersionItem,
   GeneratedDocumentItem,
+  NAME_MAX_LENGTH,
+  clampNameInput,
 } from '@japjong/shared';
 import {
   mockAccounts,
@@ -3131,11 +3133,11 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     const newItem: SidebarServiceItem = {
       id,
       slug: id,
-      label: dto.label.trim(),
+      label: clampNameInput(dto.label, NAME_MAX_LENGTH.SERVICE_NAME).trim(),
       description: dto.description?.trim() || '',
       icon: dto.icon || 'FolderTree',
       href,
-      category: dto.category.trim() || 'บริการทั่วไป',
+      category: clampNameInput(dto.category, NAME_MAX_LENGTH.CATEGORY_NAME).trim() || 'บริการทั่วไป',
       sortOrder: typeof dto.sortOrder === 'number' ? dto.sortOrder : maxOrder + 1,
       enabled: dto.enabled !== false,
       isSystem: false,
@@ -3216,10 +3218,10 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       item.href = nextHref;
     }
 
-    if (dto.label !== undefined) item.label = dto.label.trim();
+    if (dto.label !== undefined) item.label = clampNameInput(dto.label, NAME_MAX_LENGTH.SERVICE_NAME).trim();
     if (dto.description !== undefined) item.description = dto.description.trim();
     if (dto.icon !== undefined) item.icon = dto.icon.trim();
-    if (dto.category !== undefined) item.category = dto.category.trim();
+    if (dto.category !== undefined) item.category = clampNameInput(dto.category, NAME_MAX_LENGTH.CATEGORY_NAME).trim();
     if (typeof dto.sortOrder === 'number') item.sortOrder = dto.sortOrder;
     if (typeof dto.enabled === 'boolean') item.enabled = dto.enabled;
     if (Array.isArray(dto.roles)) item.roles = dto.roles;
@@ -3454,7 +3456,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   }
 
   async createRole(dto: CreateRoleDto, actor: Account): Promise<RoleItem> {
-    const name = (dto.name || '').trim();
+    const name = clampNameInput(dto.name || '', NAME_MAX_LENGTH.ROLE_NAME).trim();
     if (!name) {
       throw new BadRequestException('กรุณาระบุชื่อบทบาท');
     }
@@ -3530,7 +3532,10 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     const now = new Date().toISOString();
     const updated: RoleItem = {
       ...existing,
-      name: typeof dto.name === 'string' && dto.name.trim() ? dto.name.trim() : existing.name,
+      name:
+        typeof dto.name === 'string' && dto.name.trim()
+          ? clampNameInput(dto.name, NAME_MAX_LENGTH.ROLE_NAME).trim()
+          : existing.name,
       description: typeof dto.description === 'string' ? dto.description.trim() : existing.description,
       tone: dto.tone || existing.tone,
       enabled: typeof dto.enabled === 'boolean' ? dto.enabled : existing.enabled,
@@ -3896,15 +3901,16 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   ): DocumentTemplateItem {
     const id = `tpl-${Date.now()}`;
     const now = new Date().toISOString();
+    const tplName = clampNameInput(dto.name, NAME_MAX_LENGTH.TEMPLATE_NAME).trim();
     const newTemplate: DocumentTemplateItem = {
       id,
-      name: dto.name.trim(),
+      name: tplName,
       description: dto.description?.trim() || '',
       category: dto.category || 'venue',
       status: dto.status || 'draft',
       currentVersion: 1,
       structure: dto.structure || {
-        title: dto.name.trim(),
+        title: tplName,
         writtenAt: 'ที่ทำการองค์การบริหารส่วนตำบล',
         writtenDate: '',
         subject: 'ขออนุญาต...',
@@ -3954,7 +3960,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     const updated: DocumentTemplateItem = {
       ...cur,
       ...dto,
-      name: dto.name !== undefined ? dto.name.trim() : cur.name,
+      name: dto.name !== undefined ? clampNameInput(dto.name, NAME_MAX_LENGTH.TEMPLATE_NAME).trim() : cur.name,
       description: dto.description !== undefined ? dto.description : cur.description,
       structure: dto.structure ? clone(dto.structure) : cur.structure,
       settings: dto.settings ? clone(dto.settings) : cur.settings,

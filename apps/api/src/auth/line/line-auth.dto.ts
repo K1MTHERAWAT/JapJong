@@ -7,8 +7,10 @@ import {
   IsOptional,
   IsString,
   Matches,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
+import { NAME_MAX_LENGTH } from '@japjong/shared';
 
 /**
  * Data Transfer Object (DTO) สำหรับรับค่า Query Parameters ในขั้นตอน LINE OAuth Callback
@@ -76,6 +78,7 @@ export class LineRegisterDto {
   // ชื่อ-นามสกุลจริงของประชาชนผู้ลงทะเบียน
   @IsNotEmpty({ message: 'กรุณากรอกชื่อ-นามสกุล' })
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.PERSON_NAME, { message: `ชื่อ-นามสกุลต้องไม่เกิน ${NAME_MAX_LENGTH.PERSON_NAME} ตัวอักษร` })
   name!: string;
 
   // เบอร์โทรศัพท์มือถือ 10 หลัก ขึ้นต้นด้วย 06, 08 หรือ 09

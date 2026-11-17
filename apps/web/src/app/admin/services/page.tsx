@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 // นำเข้า Type นิยามประเภทข้อมูลบริการ, บทบาท, และสิทธิ์จากแพ็กเกจกลาง shared
 import {
+  NAME_MAX_LENGTH,
   PublicAccount,
   Role,
   ROLE_LABEL,
@@ -38,11 +39,12 @@ import {
   ServiceRelationCheckResult,
   SidebarServiceItem,
   Tone,
+  clampNameInput,
 } from '@japjong/shared';
 // นำเข้า AppShell คอมโพเนนต์เลย์เอาต์หลักของหน้าจอ
 import { AppShell } from '@/components/shell';
 // นำเข้าคอมโพเนนต์ UI พื้นฐาน: Button, Card, Chip, Feedback, Input, Toggle
-import { Button, Card, Chip, Feedback, Input, Toggle } from '@/components/ui';
+import { Button, Card, Chip, Feedback, Input, NameLengthBadge, NameLimitWarning, Toggle } from '@/components/ui';
 // นำเข้า API client สำหรับติดต่อ Backend REST API
 import { api } from '@/lib/api';
 // นำเข้าฟังก์ชัน resolveNavIcon สำหรับแปลงชื่อไอคอนเป็น React Component ไอคอนที่ถูกต้อง
@@ -962,17 +964,22 @@ export default function AdminServicesPage() {
                   {/* ชื่อบริการ และ เส้นทาง URL */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[13px] font-medium text-ink">
-                        ชื่อบริการ / เมนู <span className="text-danger-fg">*</span>
-                      </label>
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-[13px] font-medium text-ink">
+                          ชื่อบริการ / เมนู <span className="text-danger-fg">*</span>
+                        </label>
+                        <NameLengthBadge value={formLabel} maxLength={NAME_MAX_LENGTH.SERVICE_NAME} />
+                      </div>
                       <input
                         type="text"
                         value={formLabel}
-                        onChange={(e) => setFormLabel(e.target.value)}
+                        maxLength={NAME_MAX_LENGTH.SERVICE_NAME}
+                        onChange={(e) => setFormLabel(clampNameInput(e.target.value, NAME_MAX_LENGTH.SERVICE_NAME))}
                         placeholder="เช่น ขอใช้สถานที่, แจ้งซ่อม"
                         className="px-3 py-2 text-[13px] rounded-control border border-line bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
                         required
                       />
+                      <NameLimitWarning value={formLabel} maxLength={NAME_MAX_LENGTH.SERVICE_NAME} className="mt-0" />
                     </div>
 
                     <div className="flex flex-col gap-1.5">
@@ -1023,15 +1030,20 @@ export default function AdminServicesPage() {
 
                     {formCategory === 'CUSTOM' && (
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-[13px] font-medium text-ink">ชื่อหมวดหมู่ใหม่</label>
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="text-[13px] font-medium text-ink">ชื่อหมวดหมู่ใหม่</label>
+                          <NameLengthBadge value={formCustomCategory} maxLength={NAME_MAX_LENGTH.CATEGORY_NAME} />
+                        </div>
                         <input
                           type="text"
                           value={formCustomCategory}
-                          onChange={(e) => setFormCustomCategory(e.target.value)}
+                          maxLength={NAME_MAX_LENGTH.CATEGORY_NAME}
+                          onChange={(e) => setFormCustomCategory(clampNameInput(e.target.value, NAME_MAX_LENGTH.CATEGORY_NAME))}
                           placeholder="เช่น บริการสาธารณสุข, กิจการพาณิชย์"
                           className="px-3 py-2 text-[13px] rounded-control border border-line bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
                           required
                         />
+                        <NameLimitWarning value={formCustomCategory} maxLength={NAME_MAX_LENGTH.CATEGORY_NAME} className="mt-0" />
                       </div>
                     )}
                   </div>

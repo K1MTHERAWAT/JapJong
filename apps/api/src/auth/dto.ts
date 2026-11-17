@@ -1,4 +1,5 @@
-import { IsArray, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Length, Min } from 'class-validator';
+import { IsArray, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Length, MaxLength, Min } from 'class-validator';
+import { NAME_MAX_LENGTH } from '@japjong/shared';
 
 /**
  * Data Transfer Object (DTO) สำหรับการเข้าสู่ระบบแบบปกติ (Username & Password)
@@ -42,6 +43,7 @@ export class RegisterDto {
   // ชื่อผู้ใช้งาน (ทางเลือก: หากไม่กรอก ระบบจะใช้เบอร์โทรศัพท์หรือ auto-generate ให้)
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.USERNAME, { message: `ชื่อผู้ใช้ต้องไม่เกิน ${NAME_MAX_LENGTH.USERNAME} ตัวอักษร` })
   username?: string;
 
   // รหัสผ่านสำหรับการเข้าใช้งานระบบ (ห้ามว่าง)
@@ -52,6 +54,7 @@ export class RegisterDto {
   // ชื่อ-นามสกุลจริงของผู้ลงทะเบียน (ห้ามว่าง)
   @IsString()
   @IsNotEmpty({ message: 'กรุณากรอกชื่อ-นามสกุล' })
+  @MaxLength(NAME_MAX_LENGTH.PERSON_NAME, { message: `ชื่อ-นามสกุลต้องไม่เกิน ${NAME_MAX_LENGTH.PERSON_NAME} ตัวอักษร` })
   name!: string;
 
   // เบอร์โทรศัพท์ติดต่อ (ทางเลือก)
@@ -67,11 +70,13 @@ export class RegisterDto {
   // กอง / สำนัก / ฝ่ายงาน (กรณีเป็นเจ้าหน้าที่หรือหน่วยงาน)
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.ORGANIZATION, { message: `ชื่อหน่วยงานต้องไม่เกิน ${NAME_MAX_LENGTH.ORGANIZATION} ตัวอักษร` })
   department?: string;
 
   // ตำแหน่งหน้าที่งาน (ทางเลือก)
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.POSITION, { message: `ชื่อตำแหน่งต้องไม่เกิน ${NAME_MAX_LENGTH.POSITION} ตัวอักษร` })
   position?: string;
 
   // ชื่อบัญชี LINE หรือชื่อแสดงใน LINE (ทางเลือก)
@@ -127,21 +132,25 @@ export class UpdateProfileDto {
   // ชื่อ-นามสกุล
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.PERSON_NAME, { message: `ชื่อ-นามสกุลต้องไม่เกิน ${NAME_MAX_LENGTH.PERSON_NAME} ตัวอักษร` })
   name?: string;
 
   // ชื่อเล่น / ชื่อเรียกทั่วไป
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.NICKNAME, { message: `ชื่อเล่นต้องไม่เกิน ${NAME_MAX_LENGTH.NICKNAME} ตัวอักษร` })
   nickname?: string;
 
   // ตำแหน่งงาน
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.POSITION, { message: `ชื่อตำแหน่งต้องไม่เกิน ${NAME_MAX_LENGTH.POSITION} ตัวอักษร` })
   position?: string;
 
   // สำนัก / กอง / แผนก
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.ORGANIZATION, { message: `ชื่อหน่วยงานต้องไม่เกิน ${NAME_MAX_LENGTH.ORGANIZATION} ตัวอักษร` })
   department?: string;
 
   // หมายเลขโทรศัพท์

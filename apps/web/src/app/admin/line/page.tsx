@@ -24,10 +24,11 @@ import {
   Upload,
   UserCheck,
 } from 'lucide-react';
+import { NAME_MAX_LENGTH, clampNameInput } from '@japjong/shared';
 // นำเข้า AppShell คอมโพเนนต์เลย์เอาต์หลักของแอปพลิเคชัน
 import { AppShell } from '@/components/shell';
 // นำเข้าคอมโพเนนต์ UI พื้นฐาน: Button, Card, Chip, Feedback
-import { Button, Card, Chip, Feedback } from '@/components/ui';
+import { Button, Card, Chip, Feedback, NameLengthBadge, NameLimitWarning } from '@/components/ui';
 // นำเข้า API client SDK และฟังก์ชันจัดรูปแบบวันเวลาภาษาไทย
 import { api, formatThaiDateTime } from '@/lib/api';
 
@@ -775,28 +776,38 @@ export default function AdminLinePage() {
                 </h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      หัวข้อหลัก (Headline Override)
-                    </label>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        หัวข้อหลัก (Headline Override)
+                      </label>
+                      <NameLengthBadge value={flexHeadline} maxLength={NAME_MAX_LENGTH.RICH_MENU_NAME} />
+                    </div>
                     <input
                       type="text"
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none"
                       placeholder="ใช้ค่าเริ่มต้นของระบบ"
                       value={flexHeadline}
-                      onChange={(e) => setFlexHeadline(e.target.value)}
+                      maxLength={NAME_MAX_LENGTH.RICH_MENU_NAME}
+                      onChange={(e) => setFlexHeadline(clampNameInput(e.target.value, NAME_MAX_LENGTH.RICH_MENU_NAME))}
                     />
+                    <NameLimitWarning value={flexHeadline} maxLength={NAME_MAX_LENGTH.RICH_MENU_NAME} />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      ข้อความปุ่มเปิดบริการ (Button Label)
-                    </label>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        ข้อความปุ่มเปิดบริการ (Button Label)
+                      </label>
+                      <NameLengthBadge value={flexButtonLabel} maxLength={NAME_MAX_LENGTH.RICH_MENU_ACTION_LABEL} />
+                    </div>
                     <input
                       type="text"
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none"
                       placeholder="ดูรายละเอียดในระบบ"
                       value={flexButtonLabel}
-                      onChange={(e) => setFlexButtonLabel(e.target.value)}
+                      maxLength={NAME_MAX_LENGTH.RICH_MENU_ACTION_LABEL}
+                      onChange={(e) => setFlexButtonLabel(clampNameInput(e.target.value, NAME_MAX_LENGTH.RICH_MENU_ACTION_LABEL))}
                     />
+                    <NameLimitWarning value={flexButtonLabel} maxLength={NAME_MAX_LENGTH.RICH_MENU_ACTION_LABEL} />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">

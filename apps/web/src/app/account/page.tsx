@@ -21,8 +21,10 @@ import {
 // นำเข้า Type, ค่าคงที่ และฟังก์ชันตรวจสอบความถูกต้องจากแพ็กเกจกลาง shared
 import {
   LineAuthStatusResponse,
+  NAME_MAX_LENGTH,
   ROLE_LABEL,
   ROLE_TONE,
+  clampNameInput,
   sanitizePhoneInput,
   validateThaiAddressHierarchy,
   validateThaiPhone,
@@ -385,9 +387,9 @@ export default function AccountPage() {
               <div className="size-14 rounded-full bg-brand-tint text-brand-ink font-bold text-title flex items-center justify-center shrink-0 border border-brand/20 sm:size-16">
                 {account.initial || account.name.charAt(0) || 'ผ'}
               </div>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-heading sm:text-title font-bold text-ink truncate">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2 min-w-0">
+                  <h1 className="text-heading sm:text-title font-bold text-ink truncate max-w-full">
                     {account.name}
                   </h1>
                   {/* ป้ายแสดงบทบาทของผู้ใช้ */}
@@ -396,18 +398,18 @@ export default function AccountPage() {
                   </Chip>
                 </div>
                 {/* ข้อมูลชื่อผู้ใช้ ตำแหน่ง สังกัด และเบอร์โทร */}
-                <div className="text-body text-muted mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span className="inline-flex items-center gap-1">
+                <div className="text-body text-muted mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 min-w-0">
+                  <span className="inline-flex items-center gap-1 min-w-0 max-w-full">
                     <UserCircle className="size-4 shrink-0" />
-                    ชื่อผู้ใช้: <b className="text-ink">{account.username}</b>
+                    <span className="truncate">ชื่อผู้ใช้: <b className="text-ink">{account.username}</b></span>
                   </span>
-                  <span className="inline-flex items-center gap-1">
+                  <span className="inline-flex items-center gap-1 min-w-0 max-w-full">
                     <Building2 className="size-4 shrink-0" />
-                    {account.position} · {account.department}
+                    <span className="break-words min-w-0">{account.position} · {account.department}</span>
                   </span>
-                  <span className="inline-flex items-center gap-1">
+                  <span className="inline-flex items-center gap-1 min-w-0 max-w-full">
                     <Phone className="size-4 shrink-0" />
-                    {account.phone}
+                    <span className="truncate">{account.phone}</span>
                   </span>
                 </div>
               </div>
@@ -467,14 +469,16 @@ export default function AccountPage() {
                   <Input
                     label="ชื่อ-นามสกุล *"
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    maxLength={NAME_MAX_LENGTH.PERSON_NAME}
+                    onChange={(e) => setName(clampNameInput(e.target.value, NAME_MAX_LENGTH.PERSON_NAME))}
                     placeholder="เช่น สมชาย ใจดี"
                     required
                   />
                   <Input
                     label="ชื่อเล่น / ชื่อเรียก"
                     value={nickname}
-                    onChange={(e) => setNickname(e.target.value)}
+                    maxLength={NAME_MAX_LENGTH.NICKNAME}
+                    onChange={(e) => setNickname(clampNameInput(e.target.value, NAME_MAX_LENGTH.NICKNAME))}
                     placeholder="เช่น สมชาย"
                   />
                 </div>
@@ -484,7 +488,8 @@ export default function AccountPage() {
                   <Input
                     label="หน่วยงาน / ชุมชน / สังกัด *"
                     value={department}
-                    onChange={(e) => setDepartment(e.target.value)}
+                    maxLength={NAME_MAX_LENGTH.ORGANIZATION}
+                    onChange={(e) => setDepartment(clampNameInput(e.target.value, NAME_MAX_LENGTH.ORGANIZATION))}
                     placeholder="ระบุหน่วยงาน ชุมชน หรือกลุ่มของคุณ"
                     required
                   />

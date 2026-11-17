@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { NAME_MAX_LENGTH, clampNameInput } from '@japjong/shared';
 import { Icon } from '@/components/icons';
+import { NameLengthBadge, NameLimitWarning } from '@/components/ui';
 import {
   FormDocumentConfig,
   getFormTemplate,
@@ -811,14 +813,21 @@ export function OfficialDocumentEditor({
               )}
 
               {/* 2. FORM TITLE (Editable) */}
-              <div className="text-center mb-6">
+              <div className="text-center mb-6 flex flex-col items-center">
                 <input
                   type="text"
                   value={formTitle}
-                  onChange={(e) => setFormTitle(e.target.value)}
+                  maxLength={NAME_MAX_LENGTH.TEMPLATE_NAME}
+                  onChange={(e) => setFormTitle(clampNameInput(e.target.value, NAME_MAX_LENGTH.TEMPLATE_NAME))}
                   className="text-xl sm:text-2xl font-bold text-center text-black bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-brand focus:outline-none w-full max-w-[500px]"
                   title="คลิกเพื่อแก้ไขชื่อแบบฟอร์ม"
                 />
+                {viewMode === 'design' && (
+                  <div className="flex flex-col items-center mt-0.5 font-sans">
+                    <NameLengthBadge value={formTitle} maxLength={NAME_MAX_LENGTH.TEMPLATE_NAME} />
+                    <NameLimitWarning value={formTitle} maxLength={NAME_MAX_LENGTH.TEMPLATE_NAME} />
+                  </div>
+                )}
               </div>
 
               {/* 3. WRITTEN AT & DATE (Right Aligned) */}

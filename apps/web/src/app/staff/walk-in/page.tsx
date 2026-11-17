@@ -14,11 +14,19 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Equipment, PublicAccount, REPAIR_CATEGORIES, RequestType, Venue } from '@japjong/shared';
+import {
+  Equipment,
+  NAME_MAX_LENGTH,
+  PublicAccount,
+  REPAIR_CATEGORIES,
+  RequestType,
+  Venue,
+  clampNameInput,
+} from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
-import { Chip, SignatureBox, Tabs } from '@/components/ui';
+import { Chip, NameLengthBadge, NameLimitWarning, SignatureBox, Tabs } from '@/components/ui';
 import { api } from '@/lib/api';
 
 export default function StaffWalkInPage() {
@@ -254,24 +262,34 @@ export default function StaffWalkInPage() {
           {/* ข้อมูลชื่อและหน่วยงาน */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <label className="jw-lbl">ชื่อ-นามสกุลผู้ยืม / ผู้แจ้ง</label>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <label className="jw-lbl mb-0">ชื่อ-นามสกุลผู้ยืม / ผู้แจ้ง</label>
+                <NameLengthBadge value={borrowerName} maxLength={NAME_MAX_LENGTH.PERSON_NAME} />
+              </div>
               <input
                 type="text"
                 value={borrowerName}
-                onChange={(e) => setBorrowerName(e.target.value)}
+                maxLength={NAME_MAX_LENGTH.PERSON_NAME}
+                onChange={(e) => setBorrowerName(clampNameInput(e.target.value, NAME_MAX_LENGTH.PERSON_NAME))}
                 placeholder="กรอกชื่อ-นามสกุล"
                 className="jw-in"
               />
+              <NameLimitWarning value={borrowerName} maxLength={NAME_MAX_LENGTH.PERSON_NAME} />
             </div>
             <div>
-              <label className="jw-lbl">หน่วยงาน / ชุมชน</label>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <label className="jw-lbl mb-0">หน่วยงาน / ชุมชน</label>
+                <NameLengthBadge value={organization} maxLength={NAME_MAX_LENGTH.ORGANIZATION} />
+              </div>
               <input
                 type="text"
                 value={organization}
-                onChange={(e) => setOrganization(e.target.value)}
+                maxLength={NAME_MAX_LENGTH.ORGANIZATION}
+                onChange={(e) => setOrganization(clampNameInput(e.target.value, NAME_MAX_LENGTH.ORGANIZATION))}
                 placeholder="กรอกชื่อหน่วยงานหรือชุมชน"
                 className="jw-in"
               />
+              <NameLimitWarning value={organization} maxLength={NAME_MAX_LENGTH.ORGANIZATION} />
             </div>
           </div>
 
@@ -405,14 +423,19 @@ export default function StaffWalkInPage() {
               </div>
 
               <div>
-                <label className="jw-lbl">ห้อง / อุปกรณ์</label>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <label className="jw-lbl mb-0">ห้อง / อุปกรณ์</label>
+                  <NameLengthBadge value={location} maxLength={NAME_MAX_LENGTH.LOCATION_NAME} />
+                </div>
                 <input
                   type="text"
                   value={location}
-                  onChange={(e) => setLocation(e.target.value)}
+                  maxLength={NAME_MAX_LENGTH.LOCATION_NAME}
+                  onChange={(e) => setLocation(clampNameInput(e.target.value, NAME_MAX_LENGTH.LOCATION_NAME))}
                   placeholder="เช่น ห้องประชุมใหญ่ · เครื่องปรับอากาศ"
                   className="jw-in"
                 />
+                <NameLimitWarning value={location} maxLength={NAME_MAX_LENGTH.LOCATION_NAME} />
               </div>
 
               <div>

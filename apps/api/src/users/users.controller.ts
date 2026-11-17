@@ -7,10 +7,10 @@ import {
   Post,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { Account } from '@japjong/shared';
+import { Account, NAME_MAX_LENGTH, clampNameInput } from '@japjong/shared';
 import { CurrentUser } from '../auth/auth.guard';
 import { DbService } from '../db/db.service';
-import { IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 
 /**
  * Data Transfer Object (DTO) สำหรับอัปเดตข้อมูลผู้ใช้งานส่วนตัว (/users/me)
@@ -19,21 +19,25 @@ export class UpdateUserMeDto {
   // ชื่อ-นามสกุล
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.PERSON_NAME, { message: `ชื่อ-นามสกุลต้องไม่เกิน ${NAME_MAX_LENGTH.PERSON_NAME} ตัวอักษร` })
   name?: string;
 
   // ชื่อเล่น
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.NICKNAME, { message: `ชื่อเล่นต้องไม่เกิน ${NAME_MAX_LENGTH.NICKNAME} ตัวอักษร` })
   nickname?: string;
 
   // ตำแหน่งหน้าที่
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.POSITION, { message: `ชื่อตำแหน่งต้องไม่เกิน ${NAME_MAX_LENGTH.POSITION} ตัวอักษร` })
   position?: string;
 
   // สำนัก / กอง / แผนก
   @IsOptional()
   @IsString()
+  @MaxLength(NAME_MAX_LENGTH.ORGANIZATION, { message: `ชื่อหน่วยงานต้องไม่เกิน ${NAME_MAX_LENGTH.ORGANIZATION} ตัวอักษร` })
   department?: string;
 
   // เบอร์โทรศัพท์ 10 หลัก
@@ -101,10 +105,10 @@ export class UsersController {
     if (!acc) throw new BadRequestException('ไม่พบบัญชีผู้ใช้งาน');
 
     // นำเข้าข้อมูลที่มีการส่งมาแก้ไข
-    if (body.name !== undefined) acc.name = body.name.trim();
-    if (body.nickname !== undefined) acc.nickname = body.nickname.trim();
-    if (body.position !== undefined) acc.position = body.position.trim();
-    if (body.department !== undefined) acc.department = body.department.trim();
+    if (body.name !== undefined) acc.name = clampNameInput(body.name, NAME_MAX_LENGTH.PERSON_NAME).trim();
+    if (body.nickname !== undefined) acc.nickname = clampNameInput(body.nickname, NAME_MAX_LENGTH.NICKNAME).trim();
+    if (body.position !== undefined) acc.position = clampNameInput(body.position, NAME_MAX_LENGTH.POSITION).trim();
+    if (body.department !== undefined) acc.department = clampNameInput(body.department, NAME_MAX_LENGTH.ORGANIZATION).trim();
     if (body.phone !== undefined) acc.phone = body.phone.trim();
     if (body.email !== undefined) acc.email = body.email.trim();
 

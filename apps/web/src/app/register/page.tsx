@@ -10,6 +10,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth-context';
 // นำเข้า Icon แสดงรูปไอคอน SVG
 import { Icon } from '@/components/icons';
+import { NAME_MAX_LENGTH, clampNameInput } from '@japjong/shared';
+import { NameLengthBadge, NameLimitWarning } from '@/components/ui';
 
 /**
  * หน้าลงทะเบียนผู้ใช้งานทั่วไป (Register Page)
@@ -122,29 +124,39 @@ export default function RegisterPage() {
 
           {/* ช่องกรอกชื่อ-นามสกุล */}
           <div>
-            <label className="jw-lbl">
-              ชื่อ-นามสกุล <span className="text-status-crit">*</span>
-            </label>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <label className="jw-lbl mb-0">
+                ชื่อ-นามสกุล <span className="text-status-crit">*</span>
+              </label>
+              <NameLengthBadge value={name} maxLength={NAME_MAX_LENGTH.PERSON_NAME} />
+            </div>
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              maxLength={NAME_MAX_LENGTH.PERSON_NAME}
+              onChange={(e) => setName(clampNameInput(e.target.value, NAME_MAX_LENGTH.PERSON_NAME))}
               placeholder="เช่น สมชาย ใจดี"
               className="jw-in"
               required
             />
+            <NameLimitWarning value={name} maxLength={NAME_MAX_LENGTH.PERSON_NAME} />
           </div>
 
           {/* ช่องกรอกหน่วยงาน/ชุมชน */}
           <div>
-            <label className="jw-lbl">หน่วยงาน / ชุมชน / กลุ่ม</label>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <label className="jw-lbl mb-0">หน่วยงาน / ชุมชน / กลุ่ม</label>
+              <NameLengthBadge value={department} maxLength={NAME_MAX_LENGTH.ORGANIZATION} />
+            </div>
             <input
               type="text"
               value={department}
-              onChange={(e) => setDepartment(e.target.value)}
+              maxLength={NAME_MAX_LENGTH.ORGANIZATION}
+              onChange={(e) => setDepartment(clampNameInput(e.target.value, NAME_MAX_LENGTH.ORGANIZATION))}
               placeholder="ระบุหน่วยงาน ชุมชน หรือกลุ่มของคุณ"
               className="jw-in"
             />
+            <NameLimitWarning value={department} maxLength={NAME_MAX_LENGTH.ORGANIZATION} />
           </div>
 
           {/* ช่องกรอกอีเมล */}

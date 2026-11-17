@@ -18,6 +18,8 @@ import {
   DEFAULT_PERMISSIONS,
   Account,
   DemoAccountSummary,
+  NAME_MAX_LENGTH,
+  clampNameInput,
   validateThaiAddressHierarchy,
   validateThaiPhone,
 } from '@japjong/shared';
@@ -236,7 +238,7 @@ export class AuthController {
       throw new ForbiddenException('ปิดรับการลงทะเบียนด้วยตนเองชั่วคราว กรุณาติดต่อเจ้าหน้าที่เพื่อสร้างบัญชี');
     }
 
-    const name = String(body.name ?? '').trim().slice(0, 100);
+    const name = clampNameInput(body.name, NAME_MAX_LENGTH.PERSON_NAME).trim();
     const email = String(body.email ?? '').trim().toLowerCase();
     const phone = String(body.phone ?? '').trim();
     const password = String(body.password ?? '');
@@ -317,14 +319,14 @@ export class AuthController {
       username,
       password: hashedPassword,
       name,
-      nickname: name.split(' ')[0] || name,
+      nickname: clampNameInput(name.split(' ')[0] || name, NAME_MAX_LENGTH.NICKNAME),
       initial: name.charAt(0) || 'ผ',
       role: 'USER',
       position: 'ประชาชน',
-      department: String(body.department ?? '').trim().slice(0, 100) || 'ประชาชนทั่วไป',
+      department: clampNameInput(body.department, NAME_MAX_LENGTH.ORGANIZATION).trim() || 'ประชาชนทั่วไป',
       phone: digits ? phone : '',
       email: email || undefined,
-      lineName: String(body.lineName ?? '').slice(0, 50) || name.split(' ')[0],
+      lineName: clampNameInput(body.lineName, NAME_MAX_LENGTH.NICKNAME) || name.split(' ')[0],
       permissions: { ...DEFAULT_PERMISSIONS.USER },
       signature: null,
       pin: null,
@@ -362,21 +364,21 @@ export class AuthController {
   @Patch('profile')
   async updateProfile(@CurrentUser() user: Account, @Body() body: UpdateProfileDto) {
     if (body.name !== undefined) {
-      const name = String(body.name).trim().slice(0, 100);
+      const name = clampNameInput(body.name, NAME_MAX_LENGTH.PERSON_NAME).trim();
       if (!name) throw new BadRequestException('กรุณากรอกชื่อ-นามสกุล');
       user.name = name;
       user.initial = name.charAt(0) || 'ผ';
     }
     if (body.nickname !== undefined) {
-      const nickname = String(body.nickname).trim().slice(0, 50);
-      user.nickname = nickname || user.name.split(' ')[0] || user.name;
+      const nickname = clampNameInput(body.nickname, NAME_MAX_LENGTH.NICKNAME).trim();
+      user.nickname = nickname || clampNameInput(user.name.split(' ')[0] || user.name, NAME_MAX_LENGTH.NICKNAME);
     }
     if (body.position !== undefined) {
-      const position = String(body.position).trim().slice(0, 100);
+      const position = clampNameInput(body.position, NAME_MAX_LENGTH.POSITION).trim();
       if (position) user.position = position;
     }
     if (body.department !== undefined) {
-      const department = String(body.department).trim().slice(0, 100);
+      const department = clampNameInput(body.department, NAME_MAX_LENGTH.ORGANIZATION).trim();
       if (!department) throw new BadRequestException('กรุณาระบุหน่วยงาน/สังกัด');
       user.department = department;
     }

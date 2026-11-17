@@ -21,9 +21,11 @@ import {
   DayAvailability,
   Equipment,
   EquipmentCategory,
+  NAME_MAX_LENGTH,
   Period,
   Venue,
   VenueType,
+  clampNameInput,
   getThaiDistricts,
   getThaiProvinces,
   getThaiSubdistricts,
@@ -81,15 +83,15 @@ export class ResourcesController {
     // ประกอบโครงสร้างข้อมูลสถานที่
     const venue: Venue = {
       id: await this.db.nextId('v'),
-      name: body.name.trim().slice(0, 120),
+      name: clampNameInput(body.name, NAME_MAX_LENGTH.VENUE_NAME).trim(),
       type: body.type && VALID_VENUE_TYPES.includes(body.type) ? body.type : 'meeting',
-      building: (body.building ?? 'อาคารสำนักงาน').trim().slice(0, 120),
-      floor: (body.floor ?? 'ชั้น 1').trim().slice(0, 60),
+      building: clampNameInput(body.building ?? 'อาคารสำนักงาน', NAME_MAX_LENGTH.BUILDING_NAME).trim() || 'อาคารสำนักงาน',
+      floor: clampNameInput(body.floor ?? 'ชั้น 1', NAME_MAX_LENGTH.FLOOR_NAME).trim() || 'ชั้น 1',
       capacity: Number.isFinite(capacity) ? capacity : 50,
       status: body.enabled === false ? 'maintenance' : 'available',
       enabled: body.enabled ?? true,
       facilities: Array.isArray(body.facilities)
-        ? body.facilities.map((f) => String(f).trim()).filter(Boolean).slice(0, 20)
+        ? body.facilities.map((f) => clampNameInput(String(f), NAME_MAX_LENGTH.FACILITY_NAME).trim()).filter(Boolean).slice(0, 20)
         : ['เครื่องปรับอากาศ'],
       openTime: /^\d{2}:\d{2}$/.test(body.openTime ?? '') ? body.openTime! : '08:00',
       closeTime: /^\d{2}:\d{2}$/.test(body.closeTime ?? '') ? body.closeTime! : '17:00',
@@ -97,7 +99,7 @@ export class ResourcesController {
         ? body.openDays.map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
         : [1, 2, 3, 4, 5],
       advanceDays: Number.isFinite(advanceDays) ? advanceDays : 3,
-      formName: (body.formName ?? 'แบบคำขอใช้สถานที่').trim().slice(0, 120),
+      formName: clampNameInput(body.formName ?? 'แบบคำขอใช้สถานที่', NAME_MAX_LENGTH.TEMPLATE_NAME).trim() || 'แบบคำขอใช้สถานที่',
       approvalLevels: 3,
       images: Array.isArray(body.images)
         ? body.images.map((img) => String(img).trim()).filter(Boolean).slice(0, 3)
@@ -124,10 +126,16 @@ export class ResourcesController {
   async updateVenue(@CurrentUser() user: Account, @Param('id') id: string, @Body() body: Partial<Venue>) {
     const venue = this.db.venues.find((v) => v.id === id);
     if (!venue) throw new NotFoundException('ไม่พบสถานที่');
-    if (typeof body.name === 'string' && body.name.trim()) venue.name = body.name.trim().slice(0, 120);
+    if (typeof body.name === 'string' && body.name.trim()) {
+      venue.name = clampNameInput(body.name, NAME_MAX_LENGTH.VENUE_NAME).trim();
+    }
     if (body.type && VALID_VENUE_TYPES.includes(body.type)) venue.type = body.type;
-    if (typeof body.building === 'string') venue.building = body.building.trim().slice(0, 120);
-    if (typeof body.floor === 'string') venue.floor = body.floor.trim().slice(0, 60);
+    if (typeof body.building === 'string') {
+      venue.building = clampNameInput(body.building, NAME_MAX_LENGTH.BUILDING_NAME).trim();
+    }
+    if (typeof body.floor === 'string') {
+      venue.floor = clampNameInput(body.floor, NAME_MAX_LENGTH.FLOOR_NAME).trim();
+    }
     if (body.capacity !== undefined) {
       const cap = Math.floor(Number(body.capacity));
       if (!Number.isFinite(cap) || cap < 1 || cap > 10000) {
@@ -195,7 +203,7 @@ export class ResourcesController {
     }
     const eq: Equipment = {
       id: await this.db.nextId('e'),
-      name: body.name.trim().slice(0, 120),
+      name: clampNameInput(body.name, NAME_MAX_LENGTH.EQUIPMENT_NAME).trim(),
       category:
         body.category && VALID_EQUIPMENT_CATEGORIES.includes(body.category)
           ? body.category
@@ -225,7 +233,9 @@ export class ResourcesController {
   async updateEquipment(@Param('id') id: string, @Body() body: Partial<Equipment>) {
     const eq = this.db.equipment.find((e) => e.id === id);
     if (!eq) throw new NotFoundException('ไม่พบอุปกรณ์');
-    if (typeof body.name === 'string' && body.name.trim()) eq.name = body.name.trim().slice(0, 120);
+    if (typeof body.name === 'string' && body.name.trim()) {
+      eq.name = clampNameInput(body.name, NAME_MAX_LENGTH.EQUIPMENT_NAME).trim();
+    }
     if (body.category && VALID_EQUIPMENT_CATEGORIES.includes(body.category)) {
       eq.category = body.category;
     }

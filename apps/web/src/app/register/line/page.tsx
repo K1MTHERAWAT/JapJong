@@ -14,6 +14,8 @@ import { roleHomePath } from '@/components/shell';
 import { Icon } from '@/components/icons';
 // นำเข้า API client และฟังก์ชันจัดเก็บ Auth Token ลงใน LocalStorage
 import { api, setStoredAuth } from '@/lib/api';
+import { NAME_MAX_LENGTH, clampNameInput } from '@japjong/shared';
+import { NameLengthBadge, NameLimitWarning } from '@/components/ui';
 
 /**
  * คอมโพเนนต์ฟอร์มลงทะเบียนผู้ใช้ครั้งแรกผ่าน LINE (Onboarding Form)
@@ -61,7 +63,7 @@ function LineRegisterContent() {
         } else {
           setLineProfile(res.lineProfile || null);
           if (res.lineProfile?.displayName) {
-            setName(res.lineProfile.displayName);
+            setName(clampNameInput(res.lineProfile.displayName, NAME_MAX_LENGTH.PERSON_NAME));
           }
         }
       })
@@ -199,17 +201,22 @@ function LineRegisterContent() {
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {/* ช่องกรอกชื่อ-นามสกุลจริง */}
             <div>
-              <label className="jw-lbl">
-                ชื่อ - นามสกุลจริง <span className="text-status-crit">*</span>
-              </label>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <label className="jw-lbl mb-0">
+                  ชื่อ - นามสกุลจริง <span className="text-status-crit">*</span>
+                </label>
+                <NameLengthBadge value={name} maxLength={NAME_MAX_LENGTH.PERSON_NAME} />
+              </div>
               <input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                maxLength={NAME_MAX_LENGTH.PERSON_NAME}
+                onChange={(e) => setName(clampNameInput(e.target.value, NAME_MAX_LENGTH.PERSON_NAME))}
                 placeholder="เช่น สมชาย ใจดี"
                 className="jw-in"
                 required
               />
+              <NameLimitWarning value={name} maxLength={NAME_MAX_LENGTH.PERSON_NAME} />
             </div>
 
             {/* ช่องกรอกเบอร์โทรศัพท์มือถือ 10 หลัก */}

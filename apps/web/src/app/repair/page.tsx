@@ -5,10 +5,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 // นำเข้า Type และข้อมูลคงที่ของงานแจ้งซ่อมบำรุงจากแพ็กเกจกลาง shared
 import {
   Equipment,
+  NAME_MAX_LENGTH,
   PublicAccount,
   REPAIR_CATEGORIES,
   RepairRequest,
   RequestWithTimeline,
+  clampNameInput,
   sanitizePhoneInput,
   validateThaiPhone,
   Venue,
@@ -22,7 +24,7 @@ import { Icon } from '@/components/icons';
 // นำเข้าคอมโพเนนต์ฟอร์มกรอกเบอร์โทรศัพท์ 10 หลัก
 import { Phone10DigitInput } from '@/components/thai-address-select';
 // นำเข้า UI Components: Chip, StatusChip, Tabs, Timeline
-import { Chip, StatusChip, Tabs, Timeline } from '@/components/ui';
+import { Chip, NameLengthBadge, NameLimitWarning, StatusChip, Tabs, Timeline } from '@/components/ui';
 // นำเข้า API client, ฟังก์ชันจัดรูปแบบวันเวลาภาษาไทย, และฟังก์ชันบีบอัดรูปภาพ
 import { api, formatThaiDateTime, readAndCompressImages } from '@/lib/api';
 
@@ -439,14 +441,19 @@ export default function RepairPage() {
             {/* ข้อมูลชื่อและเบอร์โทรศัพท์ผู้แจ้ง */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
-                <label className="jw-lbl">ชื่อ-นามสกุลผู้แจ้ง</label>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <label className="jw-lbl mb-0">ชื่อ-นามสกุลผู้แจ้ง</label>
+                  <NameLengthBadge value={requesterName} maxLength={NAME_MAX_LENGTH.PERSON_NAME} />
+                </div>
                 <input
                   type="text"
                   value={requesterName}
-                  onChange={(e) => setRequesterName(e.target.value)}
+                  maxLength={NAME_MAX_LENGTH.PERSON_NAME}
+                  onChange={(e) => setRequesterName(clampNameInput(e.target.value, NAME_MAX_LENGTH.PERSON_NAME))}
                   placeholder="ระบุชื่อ-นามสกุลผู้แจ้ง"
                   className="jw-in"
                 />
+                <NameLimitWarning value={requesterName} maxLength={NAME_MAX_LENGTH.PERSON_NAME} />
               </div>
               <Phone10DigitInput
                 label="เบอร์โทรศัพท์ติดต่อ (ตัวเลข 10 หลัก)"
@@ -543,13 +550,19 @@ export default function RepairPage() {
               {/* กรณีเลือกระบุเอง */}
               {targetType === 'other' && (
                 <div>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-[12px] text-ink-mute font-medium">ชื่อสถานที่ / จุดเกิดเหตุ / อุปกรณ์</span>
+                    <NameLengthBadge value={customLocation} maxLength={NAME_MAX_LENGTH.LOCATION_NAME} />
+                  </div>
                   <input
                     type="text"
                     value={customLocation}
-                    onChange={(e) => setCustomLocation(e.target.value)}
+                    maxLength={NAME_MAX_LENGTH.LOCATION_NAME}
+                    onChange={(e) => setCustomLocation(clampNameInput(e.target.value, NAME_MAX_LENGTH.LOCATION_NAME))}
                     placeholder="ระบุสถานที่ จุดเกิดเหตุ หรืออุปกรณ์ที่ต้องการแจ้งซ่อม"
                     className="jw-in"
                   />
+                  <NameLimitWarning value={customLocation} maxLength={NAME_MAX_LENGTH.LOCATION_NAME} />
                 </div>
               )}
             </div>

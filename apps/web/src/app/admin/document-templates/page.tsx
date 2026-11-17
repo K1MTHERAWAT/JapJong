@@ -11,11 +11,14 @@ import {
   DocumentTemplateCategory,
   DocumentTemplateItem,
   DocumentTemplateStatus,
+  NAME_MAX_LENGTH,
+  clampNameInput,
 } from '@japjong/shared';
 // นำเข้า AppShell คอมโพเนนต์เลย์เอาต์หลักของแอปพลิเคชัน (มี Header และ Sidebar)
 import { AppShell } from '@/components/shell';
 // นำเข้า Icon คอมโพเนนต์แสดงไอคอน SVG
 import { Icon } from '@/components/icons';
+import { NameLengthBadge, NameLimitWarning } from '@/components/ui';
 // นำเข้า API client SDK และฟังก์ชันจัดรูปแบบวันที่ภาษาไทย
 import { api, formatThaiDate } from '@/lib/api';
 
@@ -440,14 +443,19 @@ export default function DocumentTemplatesPage() {
 
             {/* ช่องกรอกชื่อแม่แบบเอกสาร */}
             <div>
-              <label className="jw-lbl">ชื่อแม่แบบเอกสาร <span className="text-red-500">*</span></label>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <label className="jw-lbl mb-0">ชื่อแม่แบบเอกสาร <span className="text-red-500">*</span></label>
+                <NameLengthBadge value={newTemplateName} maxLength={NAME_MAX_LENGTH.TEMPLATE_NAME} />
+              </div>
               <input
                 type="text"
                 placeholder="เช่น แบบขอใช้สถานที่ราชการ (ฉบับ อบต.)"
                 value={newTemplateName}
-                onChange={(e) => setNewTemplateName(e.target.value)}
+                maxLength={NAME_MAX_LENGTH.TEMPLATE_NAME}
+                onChange={(e) => setNewTemplateName(clampNameInput(e.target.value, NAME_MAX_LENGTH.TEMPLATE_NAME))}
                 className="jw-in"
               />
+              <NameLimitWarning value={newTemplateName} maxLength={NAME_MAX_LENGTH.TEMPLATE_NAME} />
             </div>
 
             {/* ตัวเลือกประเภทเอกสาร */}

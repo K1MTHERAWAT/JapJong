@@ -11,8 +11,10 @@ import {
   EQUIPMENT_CATEGORY_LABEL,
   Equipment,
   EquipmentCategory,
+  NAME_MAX_LENGTH,
   OfficialFormPurposeItem,
   PublicAccount,
+  clampNameInput,
   sanitizePhoneInput,
   validateThaiAddressHierarchy,
   validateThaiPhone,
@@ -30,6 +32,8 @@ import {
   CalendarC4,
   Chip,
   DatePickerField,
+  NameLengthBadge,
+  NameLimitWarning,
   OfficialGovFormDocument,
   SignatureBox,
   Stepper,
@@ -1518,15 +1522,20 @@ export default function BorrowWizardPage() {
             {/* ข้อมูลผู้ยื่นคำขอในแบบ Grid ตามมาตรฐาน */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3.5">
               <div className="lg:col-span-3">
-                <label className="jw-lbl">เขียนที่<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <label className="jw-lbl mb-0">เขียนที่<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
+                  <NameLengthBadge value={writtenAt} maxLength={NAME_MAX_LENGTH.WRITTEN_AT} />
+                </div>
                 <input
                   type="text"
                   value={writtenAt}
-                  onChange={(e) => setWrittenAt(e.target.value)}
+                  maxLength={NAME_MAX_LENGTH.WRITTEN_AT}
+                  onChange={(e) => setWrittenAt(clampNameInput(e.target.value, NAME_MAX_LENGTH.WRITTEN_AT))}
                   className="jw-in"
                   placeholder="เช่น ที่ทำการ อบต."
                   required
                 />
+                <NameLimitWarning value={writtenAt} maxLength={NAME_MAX_LENGTH.WRITTEN_AT} />
               </div>
               <div className="lg:col-span-2">
                 <label className="jw-lbl">คำนำหน้า<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
@@ -1542,15 +1551,20 @@ export default function BorrowWizardPage() {
                 </select>
               </div>
               <div className="lg:col-span-3">
-                <label className="jw-lbl">ข้าพเจ้า<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <label className="jw-lbl mb-0">ข้าพเจ้า<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
+                  <NameLengthBadge value={requesterName} maxLength={NAME_MAX_LENGTH.PERSON_NAME} />
+                </div>
                 <input
                   type="text"
                   value={requesterName}
-                  onChange={(e) => setRequesterName(e.target.value)}
+                  maxLength={NAME_MAX_LENGTH.PERSON_NAME}
+                  onChange={(e) => setRequesterName(clampNameInput(e.target.value, NAME_MAX_LENGTH.PERSON_NAME))}
                   className="jw-in"
                   placeholder="ชื่อ-นามสกุล"
                   required
                 />
+                <NameLimitWarning value={requesterName} maxLength={NAME_MAX_LENGTH.PERSON_NAME} />
               </div>
               <div className="lg:col-span-2">
                 <Phone10DigitInput
@@ -1561,15 +1575,20 @@ export default function BorrowWizardPage() {
                 />
               </div>
               <div className="lg:col-span-2">
-                <label className="jw-lbl">ตำแหน่ง<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <label className="jw-lbl mb-0">ตำแหน่ง<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
+                  <NameLengthBadge value={requesterPosition} maxLength={NAME_MAX_LENGTH.POSITION} />
+                </div>
                 <input
                   type="text"
                   value={requesterPosition}
-                  onChange={(e) => setRequesterPosition(e.target.value)}
+                  maxLength={NAME_MAX_LENGTH.POSITION}
+                  onChange={(e) => setRequesterPosition(clampNameInput(e.target.value, NAME_MAX_LENGTH.POSITION))}
                   className="jw-in"
                   placeholder="เช่น ประชาชน / ประธานชุมชน"
                   required
                 />
+                <NameLimitWarning value={requesterPosition} maxLength={NAME_MAX_LENGTH.POSITION} />
               </div>
             </div>
 
@@ -1613,15 +1632,20 @@ export default function BorrowWizardPage() {
             </div>
 
             <div>
-              <label className="jw-lbl">หน่วยงาน / ชุมชน<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <label className="jw-lbl mb-0">หน่วยงาน / ชุมชน<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
+                <NameLengthBadge value={organization} maxLength={NAME_MAX_LENGTH.ORGANIZATION} />
+              </div>
               <input
                 type="text"
                 value={organization}
-                onChange={(e) => setOrganization(e.target.value)}
+                maxLength={NAME_MAX_LENGTH.ORGANIZATION}
+                onChange={(e) => setOrganization(clampNameInput(e.target.value, NAME_MAX_LENGTH.ORGANIZATION))}
                 className="jw-in"
                 placeholder="ระบุหน่วยงาน หรือกลุ่มชุมชน"
                 required
               />
+              <NameLimitWarning value={organization} maxLength={NAME_MAX_LENGTH.ORGANIZATION} />
             </div>
 
             {/* แสดงกำหนดวันรับและคืนอุปกรณ์ */}
