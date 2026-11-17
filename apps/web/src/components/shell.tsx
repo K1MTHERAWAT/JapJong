@@ -330,8 +330,8 @@ export function AppShell({
               <div className="size-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
               <span>กำลังตรวจสอบสถานะการเข้าสู่ระบบ...</span>
             </Card>
-          ) : !account ? (
-            /* สถานะที่ 2: ยังไม่ได้เข้าสู่ระบบ */
+          ) : !account && !(pathname === '/verify' || pathname.startsWith('/verify/')) ? (
+            /* สถานะที่ 2: ยังไม่ได้เข้าสู่ระบบ (ยกเว้นหน้าสาธารณะเช่น /verify) */
             <Card className="p-6 sm:p-8 max-w-[500px] w-full mx-auto my-6 sm:my-8 flex flex-col items-center text-center gap-4">
               <div className="size-12 rounded-full bg-brand-tint text-brand-ink flex items-center justify-center">
                 <Lock className="size-6" />
@@ -348,7 +348,7 @@ export function AppShell({
                 </Button>
               </Link>
             </Card>
-          ) : !access.allowed ? (
+          ) : account && !access.allowed ? (
             /* สถานะที่ 3: ไม่มีสิทธิ์เข้าถึงหน้านี้ (Permission & Role Guard) */
             <Card className="p-6 max-w-[620px] mx-auto my-6 border-danger-fg/30 flex flex-col gap-4">
               <div className="flex items-start gap-4">

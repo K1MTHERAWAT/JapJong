@@ -18,6 +18,7 @@ import {
   RequestWithTimeline,
 } from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
+import { LandingPage } from '@/components/landing';
 import { AppShell, roleHomePath } from '@/components/shell';
 import {
   Button,
@@ -36,7 +37,7 @@ type TabFilter = 'all' | RequestType;
 
 export default function HomePage() {
   const router = useRouter();
-  const { account, notifications } = useAuth();
+  const { account, notifications, loading } = useAuth();
   const [requests, setRequests] = useState<RequestWithTimeline[]>([]);
   const [tab, setTab] = useState<TabFilter>('all');
   const [search, setSearch] = useState('');
@@ -70,7 +71,7 @@ export default function HomePage() {
   }, [account, router]);
 
   useEffect(() => {
-    if (account && account.role !== 'USER') return;
+    if (!account || account.role !== 'USER') return;
     api
       .listRequests({ mine: true })
       .then(setRequests)
@@ -94,6 +95,19 @@ export default function HomePage() {
     (r): r is RequestWithTimeline & BorrowRequest =>
       r.type === 'borrow' && r.status === 'borrowing',
   );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-3 text-body text-ink-mute">
+        <div className="size-7 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+        <span>กำลังตรวจสอบสถานะการเข้าสู่ระบบ...</span>
+      </div>
+    );
+  }
+
+  if (!account) {
+    return <LandingPage />;
+  }
 
   if (account && account.role !== 'USER') {
     return (
@@ -220,7 +234,20 @@ export default function HomePage() {
                         ? `/repair?mode=track&id=${req.id}`
                         : `/requests/${req.id}`;
 
-                    if (account && account.role !== 'USER') {
+                    if (loading) {
+    return (
+      <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-3 text-body text-ink-mute">
+        <div className="size-7 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+        <span>กำลังตรวจสอบสถานะการเข้าสู่ระบบ...</span>
+      </div>
+    );
+  }
+
+  if (!account) {
+    return <LandingPage />;
+  }
+
+  if (account && account.role !== 'USER') {
     return (
       <AppShell>
         <div className="jw-card p-12 text-center text-ink-mute">

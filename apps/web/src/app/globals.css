@@ -806,6 +806,82 @@
   }
 }
 
+/* =====================================================================
+   Landing Page Motion & Utility Classes (Respects prefers-reduced-motion)
+   ===================================================================== */
+.landing-tech-grid {
+  background-image:
+    linear-gradient(to right, rgb(var(--rgb-ink) / 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(var(--rgb-ink) / 0.04) 1px, transparent 1px);
+  background-size: 36px 36px;
+}
+
+@keyframes landingFloatSlow {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes landingPulseRing {
+  0% { transform: scale(0.95); opacity: 0.7; }
+  70% { transform: scale(1.7); opacity: 0; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+
+@keyframes landingShimmerSweep {
+  0% { transform: translateX(-140%) skewX(-18deg); }
+  100% { transform: translateX(240%) skewX(-18deg); }
+}
+
+@keyframes landingScanLaser {
+  0%, 100% { top: 14%; }
+  50% { top: 82%; }
+}
+
+.landing-float {
+  animation: landingFloatSlow 5.5s ease-in-out infinite;
+}
+
+.landing-pulse-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: currentColor;
+  animation: landingPulseRing 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+}
+
+.landing-qr-laser {
+  animation: landingScanLaser 2.4s ease-in-out infinite;
+}
+
+.landing-sleek-card {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.35s ease, box-shadow 0.35s ease;
+}
+
+.landing-sleek-card:hover {
+  transform: translateY(-5px);
+  border-color: rgb(var(--rgb-brand) / 0.65);
+  box-shadow: 0 18px 40px -15px rgb(var(--rgb-brand) / 0.22);
+}
+
+.landing-sleek-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+  transform: translateX(-160%) skewX(-18deg);
+  pointer-events: none;
+}
+
+.landing-sleek-card:hover::before {
+  animation: landingShimmerSweep 0.85s ease forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     scroll-behavior: auto !important;

@@ -263,8 +263,14 @@ export function canAccessRoute(
   pathname: string,
 ): RouteAccessResult {
   // หน้าสาธารณะ
-  if (pathname === '/login' || pathname === '/register' || pathname.startsWith('/register/line')) {
-    return { allowed: true, title: 'เข้าสู่ระบบ / ลงทะเบียน', requiredRoles: [] };
+  if (
+    pathname === '/login' ||
+    pathname === '/register' ||
+    pathname.startsWith('/register/line') ||
+    pathname === '/verify' ||
+    pathname.startsWith('/verify/')
+  ) {
+    return { allowed: true, title: 'หน้าสาธารณะ', requiredRoles: [] };
   }
 
   if (!account) {
