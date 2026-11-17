@@ -276,7 +276,7 @@ export default function BorrowWizardPage() {
     } else {
       setFoundUser(null);
       if (digits.length >= 9) {
-        setRequesterPhone(walkInQuery.trim());
+        setRequesterPhone(sanitizePhoneInput(walkInQuery.trim(), 10));
       } else {
         setRequesterName(walkInQuery.trim());
       }
@@ -298,7 +298,7 @@ export default function BorrowWizardPage() {
       const { title, name } = parseTitleAndName(account.name);
       setRequesterTitle(title);
       setRequesterName(name);
-      setRequesterPhone(account.phone || '');
+      setRequesterPhone(sanitizePhoneInput(account.phone || '', 10));
       setOrganization(account.department || '');
       if (account.position && account.position !== 'ประชาชน') setRequesterPosition(account.position);
       if (account.addressHouseNo) setAddressHouseNo(account.addressHouseNo);

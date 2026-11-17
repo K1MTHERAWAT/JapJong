@@ -16,6 +16,7 @@ import { AppShell, roleHomePath } from '@/components/shell';
 import { OfficialGovFormDocument, RequestTypeChip, SignaturePreviewCard, StatusChip, Timeline } from '@/components/ui';
 // นำเข้า API client และฟังก์ชันจัดรูปแบบวันที่เวลาภาษาไทย
 import { api, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
+import { triggerDocumentPrint } from '@/lib/print';
 
 /**
  * หน้ารายละเอียดคำขอ (/requests/[id])
@@ -150,13 +151,13 @@ export default function RequestDetailPage() {
     >
       <div className="flex flex-col gap-4">
         {/* แถบหัวข้อสถานะคำขอ */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between print:hidden">
           <b className="text-[17px] text-ink">สถานะคำขอ</b>
           <StatusChip status={req.status} />
         </div>
 
         {/* การ์ดสรุปข้อมูลสำคัญของคำขอ */}
-        <div className="jw-card p-5 flex flex-col gap-2 text-[14px]">
+        <div className="jw-card p-5 flex flex-col gap-2 text-[14px] print:hidden">
           {/* เลขคำขอ */}
           <div className="flex gap-2">
             <b className="w-24 shrink-0 text-ink-mute">เลขคำขอ</b>
@@ -268,19 +269,30 @@ export default function RequestDetailPage() {
         {/* แบบฟอร์มเอกสารราชการจริงขนาด A4: แบบขอใช้สถานที่ หรือแบบขอยืมครุภัณฑ์ */}
         {req.type !== 'repair' && (
           <div className="flex flex-col gap-2.5">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
               <b className="text-[16px] text-ink">
                 {req.type === 'booking'
                   ? 'เอกสารราชการ: แบบขอใช้สถานที่ราชการ'
                   : 'เอกสารราชการ: แบบคำขอใช้อุปกรณ์ราชการ'}
               </b>
-              <button
-                type="button"
-                onClick={() => setShowOfficialForm((v) => !v)}
-                className="text-[12.5px] font-semibold text-brand hover:underline"
-              >
-                {showOfficialForm ? 'ซ่อนแบบฟอร์มราชการ' : 'แสดงแบบฟอร์มราชการเต็มใบ'}
-              </button>
+              <div className="flex items-center gap-3">
+                {showOfficialForm && (
+                  <button
+                    type="button"
+                    onClick={() => triggerDocumentPrint()}
+                    className="jw-btn-sec !min-h-[34px] !h-8 !px-3 text-[12.5px]"
+                  >
+                    พิมพ์แบบฟอร์ม / PDF
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowOfficialForm((v) => !v)}
+                  className="text-[12.5px] font-semibold text-brand hover:underline"
+                >
+                  {showOfficialForm ? 'ซ่อนแบบฟอร์มราชการ' : 'แสดงแบบฟอร์มราชการเต็มใบ'}
+                </button>
+              </div>
             </div>
             {/* คอมโพเนนต์แสดงแบบฟอร์ม A4 ตามระเบียบงานสารบรรณ พร้อมพิมพ์ */}
             {showOfficialForm && <OfficialGovFormDocument req={req} />}
@@ -288,7 +300,7 @@ export default function RequestDetailPage() {
         )}
 
         {/* ส่วนแสดงลายมือชื่อดิจิทัลของผู้เกี่ยวข้องทุกฝ่าย */}
-        <div className="jw-card p-5 flex flex-col gap-3">
+        <div className="jw-card p-5 flex flex-col gap-3 print:hidden">
           <div>
             <b className="text-[16px] text-ink block">
               {req.type === 'repair' ? 'ความคืบหน้าการดำเนินงาน (3 ขั้นตอน)' : 'ลายมือชื่อผู้เกี่ยวข้องทุกฝ่าย (4 ฝ่าย)'}
@@ -392,7 +404,7 @@ export default function RequestDetailPage() {
         </div>
 
         {/* แถบแสดงประวัติไทม์ไลน์การเปลี่ยนแปลงสถานะ */}
-        <div className="jw-card p-5 flex flex-col gap-3">
+        <div className="jw-card p-5 flex flex-col gap-3 print:hidden">
           <b className="text-[16px]">ความคืบหน้า</b>
           <Timeline steps={req.timeline} />
         </div>

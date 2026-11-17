@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { NAME_MAX_LENGTH, clampNameInput } from '@japjong/shared';
 import { Icon } from '@/components/icons';
 import { NameLengthBadge, NameLimitWarning } from '@/components/ui';
+import { triggerDocumentPrint } from '@/lib/print';
 import {
   FormDocumentConfig,
   getFormTemplate,
@@ -741,7 +742,7 @@ export function OfficialDocumentEditor({
               type="button"
               onClick={() => {
                 setViewMode('preview');
-                setTimeout(() => window.print(), 200);
+                setTimeout(() => triggerDocumentPrint(), 200);
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-line bg-white hover:bg-slate-50 text-[12px] font-semibold text-ink transition shadow-xs"
               title="พิมพ์เอกสารออกเครื่องพิมพ์หรือดาวน์โหลด PDF"
@@ -780,12 +781,12 @@ export function OfficialDocumentEditor({
               transform: `scale(${zoomScale / 100})`,
               transformOrigin: 'top center',
             }}
-            className="transition-transform duration-150"
+            className="transition-transform duration-150 print:!transform-none"
           >
             {/* A4 Paper Canvas: Authentic Government Memo Format */}
             <div
               id="a4-editor-page"
-              className="w-[820px] min-h-[1160px] bg-white p-12 sm:p-16 text-black text-[15px] leading-[2.1] shadow-2xl rounded-sm border border-slate-300 relative select-text"
+              className="print-doc w-[820px] min-h-[1160px] bg-white p-12 sm:p-16 text-black text-[15px] leading-[2.1] shadow-2xl rounded-sm border border-slate-300 relative select-text"
               style={{ fontFamily: "'TH Sarabun New', 'Sarabun', 'Cordia New', sans-serif" }}
             >
               {/* 1. LOGO SECTION (เฉพาะเมื่อมีการอัปโหลดไฟล์ตราสัญลักษณ์จริง) */}

@@ -18,6 +18,7 @@ import {
 } from '@japjong/shared';
 import { Icon, IconName } from './icons';
 import { api, formatMonthTitle, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
+import { chunkDocumentItems } from '@/lib/print';
 
 // ===== Chip / Status Badge =====
 const TONE_CLASS: Record<Tone, string> = {
@@ -999,14 +1000,14 @@ export function OfficialGovFormDocument({
     if (verification !== undefined) return;
     if (!req?.id) return;
     api.getVerification(req.id)
+      .catch(() => null)
       .then((v) => {
         if (v) {
           setInternalVer(v);
         } else if (req.status === 'approved' || req.status === 'borrowing' || req.status === 'returned') {
           api.createVerification(req.id).then(setInternalVer).catch(() => {});
         }
-      })
-      .catch(() => {});
+      });
   }, [req?.id, req?.status, verification]);
 
   const activeVer = verification !== undefined ? verification : internalVer;
@@ -1168,15 +1169,27 @@ export function OfficialGovFormDocument({
     className?: string;
   }) => (
     <span
-      className={`inline-block border-b border-dotted border-[#4A4A4A] px-2 text-center font-semibold text-[#0B2545] leading-snug ${minW} ${className}`}
+      className={`inline-block max-w-full break-words [overflow-wrap:anywhere] border-b border-dotted border-[#4A4A4A] px-2 text-center font-semibold text-[#0B2545] leading-snug ${minW} ${className}`}
     >
       {children || '\u00A0'}
     </span>
   );
 
+  const itemPages = chunkDocumentItems(items, 3);
+
   return (
-    <div className="gov-form-paper bg-white p-6 sm:p-10 text-black text-[13.5px] sm:text-[14.5px] leading-[1.65] relative w-full max-w-[820px] mx-auto shadow-md sm:shadow-xl rounded-sm sm:rounded-md border border-line-soft/80 select-text">
-      <div>
+    <div className="flex flex-col gap-6 w-full items-center print:block print:gap-0">
+      {itemPages.map((pageItems, pageIdx) => (
+        <div
+          key={pageIdx}
+          className={`gov-form-paper print-doc bg-white p-6 sm:p-10 text-black text-[13.5px] sm:text-[14.5px] leading-[1.65] relative w-full max-w-[820px] mx-auto shadow-md sm:shadow-xl rounded-sm sm:rounded-md border border-line-soft/80 select-text ${
+            pageIdx > 0 ? 'print-page-break' : ''
+          }`}
+        >
+          <div className="text-right text-[12px] text-[#475569] mb-1">
+            หน้าที่ {pageIdx + 1} / {itemPages.length}
+          </div>
+          <div>
         {customFields?.logoUrl && (
           <div className="text-center mb-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1249,9 +1262,9 @@ export function OfficialGovFormDocument({
           <div>{desireLabel}</div>
         </div>
 
-        {/* รายการ 1..N เพื่อ... */}
+        {/* รายการ 1..3 ต่อหน้า (เริ่มนับ 1 ใหม่ในหน้าถัดไปเมื่อมีข้อ 4 ขึ้นไป) */}
         <div className="flex flex-col gap-2 pl-5 sm:pl-10 mb-3">
-          {items.map((row, idx) => (
+          {pageItems.map((row, idx) => (
             <div
               key={idx}
               className="gov-form-purpose grid grid-cols-[1.15fr_1fr] gap-2 sm:gap-3 items-baseline"
@@ -1272,9 +1285,9 @@ export function OfficialGovFormDocument({
           ))}
         </div>
 
-        {/* จึงเรียนมาเพื่อพิจารณาอนุญาต */}
+        {/* จึงเรียนมาเพื่อโปรดพิจารณาอนุญาต */}
         <div className="pl-6 sm:pl-10 mb-3">
-          {customFields?.closingText || 'จึงเรียนมาเพื่อพิจารณาอนุญาต'}
+          {customFields?.closingText || 'จึงเรียนมาเพื่อโปรดพิจารณาอนุญาต'}
         </div>
 
         {/* ขอแสดงความนับถือ + ลายมือชื่อผู้ขออนุญาตใช้สถานที่ราชการ (ฝ่ายที่ 1) */}
@@ -1303,9 +1316,9 @@ export function OfficialGovFormDocument({
         </div>
       </div>
 
-      <div>
+      <div className="print-keep-together">
         {/* ความเห็นของเจ้าหน้าที่ (2 คอลัมน์ซ้าย-ขวา ตามแบบฟอร์มราชการ) */}
-        <div className="mb-3">
+        <div className="mb-3 print-keep-together">
           <b className="block text-[14px] underline underline-offset-4 mb-1.5">
             ความเห็นของเจ้าหน้าที่ผู้ตรวจสอบและผู้พิจารณา
           </b>
@@ -1355,7 +1368,7 @@ export function OfficialGovFormDocument({
         </div>
 
         {/* คำสั่งของนายกองค์การบริหารส่วนตำบล */}
-        <div>
+        <div className="print-keep-together">
           <b className="block text-[14px] underline underline-offset-4 mb-1.5">
             คำสั่งของนายกองค์การบริหารส่วนตำบล
           </b>
@@ -1382,7 +1395,7 @@ export function OfficialGovFormDocument({
 
         {/* QR Code Document Verification (ฝั่งประชาชน: มุมล่างขวาของเอกสาร) */}
         {activeVer && (clientQrDataUrl || activeVer.qrCodeDataUrl) && (
-          <div className="mt-6 pt-3 border-t border-dashed border-[#8A8A8A] flex flex-wrap items-center justify-between gap-3 text-[11px] leading-relaxed text-[#2C3E50]">
+          <div className="print-keep-together mt-6 pt-3 border-t border-dashed border-[#8A8A8A] flex flex-wrap items-center justify-between gap-3 text-[11px] leading-relaxed text-[#2C3E50]">
             <div className="flex items-center gap-3">
               <div className="w-[74px] h-[74px] shrink-0 border border-[#CBD5E1] rounded-lg p-1 bg-white shadow-xs">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1419,6 +1432,8 @@ export function OfficialGovFormDocument({
           </div>
         )}
       </div>
+    </div>
+      ))}
     </div>
   );
 }

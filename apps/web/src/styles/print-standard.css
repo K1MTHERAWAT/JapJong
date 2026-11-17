@@ -1,0 +1,353 @@
+/**
+ * =====================================================================
+ * มาตรฐานกลางสำหรับการพิมพ์เอกสารและส่งออก PDF (Document Print Standard)
+ * =====================================================================
+ * ใช้ร่วมกันทุก Module ที่มีเอกสารราชการหรือรายงานสำหรับพิมพ์:
+ * - .print-doc / .gov-form-paper / #official-doc-print-area / #a4-editor-page
+ * - รองรับทั้ง A4 แนวตั้ง (Portrait) และแนวนอน (.print-doc-landscape)
+ * - รองรับเอกสารหลายหน้า, ตารางข้ามหน้าพร้อมหัวตารางซ้ำ และป้องกันการตัดแบ่งช่องลงนาม
+ */
+
+@page {
+  size: A4 portrait;
+  margin: 0 !important;
+}
+
+@page landscape {
+  size: A4 landscape;
+  margin: 0 !important;
+}
+
+/* =====================================================================
+   Screen UI Protection: เอกสารราชการคงกระดาษขาว-หมึกดำเสมอแม้เปิด Dark Mode
+   ===================================================================== */
+.print-doc,
+.dark .print-doc,
+.gov-form-paper,
+.dark .gov-form-paper,
+#official-doc-print-area,
+.dark #official-doc-print-area,
+#a4-editor-page,
+.dark #a4-editor-page {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  color-scheme: light !important;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.print-doc *,
+.dark .print-doc *,
+.gov-form-paper *,
+.dark .gov-form-paper *,
+#official-doc-print-area *,
+.dark #official-doc-print-area *,
+#a4-editor-page *,
+.dark #a4-editor-page * {
+  color-scheme: light !important;
+}
+
+.dark .print-doc .bg-white,
+.dark .gov-form-paper .bg-white,
+.dark .gov-form-paper [class*="bg-white"],
+.dark #official-doc-print-area .bg-white,
+.dark #a4-editor-page .bg-white {
+  background-color: #ffffff !important;
+}
+
+.dark .print-doc .text-black,
+.dark .print-doc .text-ink,
+.dark .gov-form-paper .text-black,
+.dark .gov-form-paper h1,
+.dark .gov-form-paper h2,
+.dark .gov-form-paper h3,
+.dark .gov-form-paper b,
+.dark .gov-form-paper strong,
+.dark .gov-form-paper span,
+.dark .gov-form-paper div,
+.dark #official-doc-print-area .text-black,
+.dark #official-doc-print-area .text-ink,
+.dark #official-doc-print-area h1,
+.dark #official-doc-print-area h2,
+.dark #official-doc-print-area b,
+.dark #a4-editor-page .text-black,
+.dark #a4-editor-page h1,
+.dark #a4-editor-page h2,
+.dark #a4-editor-page b {
+  color: #000000 !important;
+}
+
+.dark .gov-form-paper .text-\[\#0B2545\],
+.dark .gov-form-paper .text-\[\#0b2545\],
+.dark .gov-form-paper [class*="0B2545"],
+.dark .gov-form-paper [class*="0b2545"] {
+  color: #0B2545 !important;
+}
+
+.dark .gov-form-paper .text-\[\#2C3E50\],
+.dark .gov-form-paper .text-\[\#2c3e50\],
+.dark .gov-form-paper [class*="2C3E50"],
+.dark .gov-form-paper [class*="2c3e50"] {
+  color: #2C3E50 !important;
+}
+
+.dark .gov-form-paper .text-\[\#475569\],
+.dark .gov-form-paper [class*="475569"] {
+  color: #475569 !important;
+}
+
+.dark .gov-form-paper .text-\[\#64748B\],
+.dark .gov-form-paper .text-\[\#64748b\],
+.dark .gov-form-paper [class*="64748B"],
+.dark .gov-form-paper [class*="64748b"] {
+  color: #64748B !important;
+}
+
+.dark .gov-form-paper .border-\[\#4A4A4A\],
+.dark .gov-form-paper .border-\[\#4a4a4a\],
+.dark .gov-form-paper [class*="4A4A4A"],
+.dark .gov-form-paper [class*="4a4a4a"] {
+  border-color: #4A4A4A !important;
+}
+
+.dark .gov-form-paper .border-\[\#8A8A8A\],
+.dark .gov-form-paper .border-\[\#8a8a8a\],
+.dark .gov-form-paper [class*="8A8A8A"],
+.dark .gov-form-paper [class*="8a8a8a"] {
+  border-color: #8A8A8A !important;
+}
+
+.dark .gov-form-paper .border-\[\#CBD5E1\],
+.dark .gov-form-paper .border-\[\#cbd5e1\],
+.dark .gov-form-paper [class*="CBD5E1"],
+.dark .gov-form-paper [class*="cbd5e1"] {
+  border-color: #CBD5E1 !important;
+}
+
+/* ป้องกันองค์ประกอบสำคัญถูกตัดแบ่งครึ่งหน้าทั้งบน Preview และ Print */
+.print-keep-together,
+.gov-form-paper .gov-form-date-line,
+.gov-form-paper .gov-form-address,
+.gov-form-paper .gov-form-purpose,
+.gov-form-paper .gov-form-requester-signature,
+.gov-form-paper .gov-form-staff-signature,
+.gov-form-paper .gov-form-approver-signature {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+/* =====================================================================
+   @media print — กฎกลางสำหรับการพิมพ์และส่งออก PDF ทุกหน้าจอ
+   ===================================================================== */
+@media print {
+  *,
+  *::before,
+  *::after {
+    color-scheme: light !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    -webkit-text-size-adjust: 100% !important;
+    text-size-adjust: 100% !important;
+  }
+
+  html,
+  body {
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+  }
+
+  /* ซ่อน Sidebar, Navbar, ปุ่ม, Footer และองค์ประกอบที่ไม่ใช่เนื้อหาเอกสาร */
+  aside,
+  header,
+  footer,
+  nav,
+  .no-print,
+  button,
+  .jw-btn,
+  .jw-btn-sec,
+  .jw-btn-ter,
+  .jw-btn-red,
+  [class*="print:hidden"],
+  [class*="sticky"] {
+    display: none !important;
+  }
+
+  /* รีเซ็ต Shell / Wrapper รอบนอกไม่ให้จำกัดความกว้างหรือตัดหน้า */
+  body > div,
+  main,
+  [class*="min-h-dvh"],
+  [class*="min-h-screen"] {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+  }
+
+  /* รองรับเอกสารแนวนอน (A4 Landscape) */
+  html[data-print-orientation="landscape"] .print-doc,
+  .print-doc-landscape {
+    page: landscape;
+  }
+
+  /* มาตรฐานพื้นที่เอกสาร (รองรับหลายหน้าอัตโนมัติ ไม่ตัดขอบ และซ่อนหัว/ท้ายเบราว์เซอร์) */
+  .print-doc,
+  .gov-form-paper,
+  #official-doc-print-area,
+  #a4-editor-page {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 16mm 18mm 16mm 20mm !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    font-family: 'TH Sarabun New', 'Sarabun', var(--font-noto-thai), 'Noto Sans Thai', sans-serif !important;
+    font-size: 15.5px !important;
+    line-height: 1.62 !important;
+    overflow: visible !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+  }
+
+  html[data-print-orientation="landscape"] .print-doc,
+  .print-doc-landscape {
+    padding: 14mm 16mm !important;
+  }
+
+  .gov-form-paper {
+    display: block !important;
+    padding: 12mm 16mm 12mm 18mm !important;
+    font-size: 14.5px !important;
+    line-height: 1.48 !important;
+  }
+
+  .gov-form-paper h2,
+  #official-doc-print-area h1,
+  .print-doc h1,
+  .print-doc h2,
+  .print-doc h3 {
+    color: #000000 !important;
+    letter-spacing: 0 !important;
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  .gov-form-paper h2 {
+    font-size: 19px !important;
+    margin-bottom: 8px !important;
+  }
+
+  /* ควบคุมย่อหน้าไม่ให้เหลือบรรทัดเดียวค้างหัว/ท้ายหน้า */
+  .print-doc p,
+  .print-doc li,
+  .gov-form-paper p,
+  #official-doc-print-area p,
+  #a4-editor-page p {
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* การจัดการตารางมาตรฐานสำหรับการพิมพ์หลายหน้า */
+  .print-doc table,
+  .gov-form-paper table,
+  #official-doc-print-area table,
+  #a4-editor-page table,
+  table.print-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-collapse: collapse !important;
+    table-layout: auto;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  .print-doc thead,
+  .gov-form-paper thead,
+  #official-doc-print-area thead,
+  #a4-editor-page thead,
+  table.print-table thead {
+    display: table-header-group !important;
+  }
+
+  .print-doc tfoot,
+  .gov-form-paper tfoot,
+  #official-doc-print-area tfoot,
+  #a4-editor-page tfoot,
+  table.print-table tfoot {
+    display: table-footer-group !important;
+  }
+
+  .print-doc tr,
+  .gov-form-paper tr,
+  #official-doc-print-area tr,
+  #a4-editor-page tr,
+  table.print-table tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .print-doc th,
+  .print-doc td,
+  .gov-form-paper th,
+  .gov-form-paper td,
+  #official-doc-print-area th,
+  #official-doc-print-area td,
+  #a4-editor-page th,
+  #a4-editor-page td,
+  table.print-table th,
+  table.print-table td {
+    overflow-wrap: anywhere !important;
+    word-wrap: break-word !important;
+  }
+
+  /* ป้องกันรูปภาพ ตราครุฑ ลายเซ็น และ QR Code ล้นขอบหรือถูกตัดครึ่ง */
+  .print-doc img,
+  .print-doc svg,
+  .gov-form-paper img,
+  #official-doc-print-area img,
+  #a4-editor-page img {
+    max-width: 100% !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .print-keep-together,
+  .gov-form-paper .gov-form-date-line,
+  .gov-form-paper .gov-form-address,
+  .gov-form-paper .gov-form-purpose,
+  .gov-form-paper .gov-form-requester-signature,
+  .gov-form-paper .gov-form-staff-signature,
+  .gov-form-paper .gov-form-approver-signature {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .print-page-break {
+    break-before: page !important;
+    page-break-before: always !important;
+  }
+}

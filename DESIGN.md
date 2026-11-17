@@ -208,4 +208,25 @@
 
 1. **ห้ามเปลี่ยนสีหลักของ Light Mode:** ค่าสีใน `:root` ของ `globals.css` ต้องคงตามมาตรฐานเดิมของโปรเจกต์
 2. **ใช้ Semantic Tokens เสมอ:** ใช้ `bg-bg`, `bg-surface`, `bg-surface-muted`, `bg-hover`, `text-ink`, `text-ink-soft`, `text-ink-mute`, `border-line`, `border-line-input` เพื่อให้ทุกหน้าจอสลับระหว่าง Light Mode และ Navy Dark Mode ได้ทันที
-3. **เอกสารราชการต้องเป็นกระดาษขาวเสมอ:** พื้นที่ภายใต้ `.gov-form-paper`, `#official-doc-print-area`, และ `#a4-editor-page` ต้องคงสีพื้นขาว `#FFFFFF` และตัวอักษรสีดำ `#000000` เสมอในทุกโหมด
+3. **เอกสารราชการต้องเป็นกระดาษขาวเสมอ:** พื้นที่ภายใต้ `.print-doc`, `.gov-form-paper`, `#official-doc-print-area`, และ `#a4-editor-page` ต้องคงสีพื้นขาว `#FFFFFF` และตัวอักษรสีดำ `#000000` เสมอในทุกโหมด
+
+---
+
+## 8. Document Print & PDF Standardization
+
+มาตรฐานกลางสำหรับการพิมพ์และส่งออก PDF อยู่ที่ [`apps/web/src/styles/print-standard.css`](file:///d:/ngan/Biza/BookingV1/apps/web/src/styles/print-standard.css) และ [`apps/web/src/lib/print.ts`](file:///d:/ngan/Biza/BookingV1/apps/web/src/lib/print.ts):
+
+1. **ขนาดกระดาษและระยะขอบ (`@page`):**
+   - **A4 แนวตั้ง (ค่าเริ่มต้น):** `size: A4 portrait; margin: 16mm 18mm 16mm 20mm;`
+   - **A4 แนวนอน (`.print-doc-landscape` หรือ `orientation: 'landscape'`):** `size: A4 landscape; margin: 14mm 16mm 14mm 16mm;`
+   - ซ่อน Browser header/URL อัตโนมัติ และแสดงเลขหน้าต่อเนื่องที่มุมขวาล่าง (`หน้า X / Y`)
+2. **ฟอนต์และข้อความ (Typography & Wrapping):**
+   - ใช้ชุดฟอนต์ `'TH Sarabun New', 'Sarabun', 'Noto Sans Thai', sans-serif` ขนาด `15.5px` (`line-height: 1.62`) พร้อม `-webkit-text-size-adjust: 100%` (ไม่ย่อฟอนต์อัตโนมัติ)
+   - ใช้ `overflow-wrap: anywhere` ป้องกันข้อความภาษาไทย/อังกฤษยาวเกินขอบกระดาษ
+3. **ตารางและการแบ่งหน้า (Tables & Pagination):**
+   - รองรับเอกสารหลายหน้าโดยไม่ตัดความสูง (`overflow: visible`, `height: auto`)
+   - ตารางใช้ `thead { display: table-header-group }` (แสดงหัวตารางซ้ำทุกหน้า), `tr { break-inside: avoid }` และ `th, td { overflow-wrap: anywhere }`
+   - หัวข้อใช้ `break-after: avoid`, ย่อหน้าใช้ `orphans: 3; widows: 3`, และกลุ่มช่องลงนาม/ตราประทับ/QR Code ใช้ `.print-keep-together` (`break-inside: avoid`)
+4. **การสั่งพิมพ์จาก UI (`triggerDocumentPrint`):**
+   - ทุกหน้าที่มีปุ่มพิมพ์/ส่งออก PDF ต้องเรียก `triggerDocumentPrint()` เพื่อจัดการ `document.title` และทิศทางกระดาษชั่วคราวอย่างเป็นมาตรฐานเดียวกัน
+   - องค์ประกอบที่ไม่ใช่เอกสาร (Sidebar, Header, Footer, ปุ่มกด) ต้องซ่อนด้วย `print:hidden` / `.no-print` เสมอ

@@ -52,7 +52,7 @@ export default function RepairPage() {
   const [walkInQuery, setWalkInQuery] = useState(''); // คำค้นหาชื่อหรือเบอร์โทรของผู้มาติดต่อ
   const [foundUser, setFoundUser] = useState<PublicAccount | null>(null); // ข้อมูลผู้ใช้ในระบบที่ค้นพบ
   const [requesterName, setRequesterName] = useState(account?.name || ''); // ชื่อผู้แจ้ง
-  const [requesterPhone, setRequesterPhone] = useState(account?.phone || ''); // เบอร์โทรผู้แจ้ง
+  const [requesterPhone, setRequesterPhone] = useState(() => sanitizePhoneInput(account?.phone || '', 10)); // เบอร์โทรผู้แจ้ง
   const [organization, setOrganization] = useState(account?.department || ''); // หน่วยงาน/สังกัดผู้แจ้ง
 
   // --- Resource State: ข้อมูลสถานที่และอุปกรณ์สำหรับเลือกแจ้งซ่อม ---
@@ -225,7 +225,7 @@ export default function RepairPage() {
     const resolvedLocation = getResolvedLocation();
     if (!resolvedLocation || !detail.trim()) return;
     // ตรวจสอบเบอร์โทรศัพท์ 10 หลัก
-    const phoneCheck = validateThaiPhone(requesterPhone || account?.phone || '');
+    const phoneCheck = validateThaiPhone(sanitizePhoneInput(requesterPhone || account?.phone || '', 10));
     if (!phoneCheck.valid) {
       alert(phoneCheck.error || 'กรุณากรอกเบอร์โทรศัพท์เป็นตัวเลข 10 หลัก');
       return;

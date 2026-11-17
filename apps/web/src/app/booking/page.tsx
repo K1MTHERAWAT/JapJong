@@ -356,7 +356,7 @@ export default function BookingWizardPage() {
     } else {
       setFoundUser(null);
       if (digits.length >= 9) {
-        setRequesterPhone(walkInQuery.trim());
+        setRequesterPhone(sanitizePhoneInput(walkInQuery.trim(), 10));
       } else {
         setRequesterName(walkInQuery.trim());
       }
@@ -366,7 +366,7 @@ export default function BookingWizardPage() {
   useEffect(() => {
     if (account && !isWalkIn) {
       setRequesterName(account.name);
-      setRequesterPhone(account.phone || '');
+      setRequesterPhone(sanitizePhoneInput(account.phone || '', 10));
       setOrganization(account.department);
       if (account.addressHouseNo) setAddressHouseNo(account.addressHouseNo);
       if (account.addressMoo) setAddressMoo(account.addressMoo);

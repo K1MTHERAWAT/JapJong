@@ -18,6 +18,7 @@ import { useParams } from 'next/navigation';
 import { DocumentTemplateItem } from '@japjong/shared';
 import { Icon } from '@/components/icons';
 import { api } from '@/lib/api';
+import { chunkDocumentItems, triggerDocumentPrint } from '@/lib/print';
 
 export default function DocumentTemplatePreviewPage() {
   const params = useParams();
@@ -46,9 +47,9 @@ export default function DocumentTemplatePreviewPage() {
     loadData();
   }, [templateId]);
 
-  // ฟังก์ชันสั่งพิมพ์ผ่านหน้าต่าง Print ของเบราว์เซอร์
+  // ฟังก์ชันสั่งพิมพ์ผ่านหน้าต่าง Print มาตรฐานกลาง
   const handlePrint = () => {
-    window.print();
+    triggerDocumentPrint();
   };
 
   if (loading) {
@@ -72,6 +73,7 @@ export default function DocumentTemplatePreviewPage() {
 
   // โครงสร้างเอกสารราชการ
   const doc = template.structure;
+  const itemPages = chunkDocumentItems(doc.purposeItems || [], 3);
 
   return (
     <div className="min-h-screen bg-slate-200 py-6 px-4 flex flex-col items-center">
@@ -99,12 +101,20 @@ export default function DocumentTemplatePreviewPage() {
         </div>
       </div>
 
-      {/* หน้ากระดาษมาตรฐาน A4 จำลอง (210mm x 297mm, ระยะขอบ 25mm) */}
-      <div
-        id="official-doc-print-area"
-        className="bg-white shadow-xl w-[210mm] min-h-[297mm] p-[25mm] rounded-xs text-[#111] flex flex-col justify-between print:shadow-none print:p-0 print:w-full print:min-h-0"
-        style={{ fontFamily: "'TH Sarabun New', 'Sarabun', sans-serif" }}
-      >
+      {/* หน้ากระดาษมาตรฐาน A4 จำลอง (1-3 ข้อต่อหน้า ถ้ามีข้อ 4 เริ่มนับ 1 ใหม่หน้า 2) */}
+      <div className="flex flex-col gap-6 items-center w-full print:block print:gap-0">
+        {itemPages.map((pageItems, pageIdx) => (
+          <div
+            key={pageIdx}
+            id={pageIdx === 0 ? 'official-doc-print-area' : undefined}
+            className={`print-doc bg-white shadow-xl w-[210mm] max-w-full min-h-[297mm] p-[25mm] rounded-xs text-[#111] flex flex-col justify-between print:shadow-none print:p-0 print:w-full print:min-h-0 ${
+              pageIdx > 0 ? 'print-page-break' : ''
+            }`}
+            style={{ fontFamily: "'TH Sarabun New', 'Sarabun', sans-serif" }}
+          >
+            <div className="text-right text-xs text-slate-500 mb-1">
+              หน้าที่ {pageIdx + 1} / {itemPages.length}
+            </div>
         <div className="space-y-4">
           {/* ตราสัญลักษณ์ / ตราครุฑ */}
           {doc.logoUrl && (
@@ -175,7 +185,7 @@ export default function DocumentTemplatePreviewPage() {
                 <span
                   key={slot.id}
                   style={{ width: `${slot.width}px` }}
-                  className="inline-flex items-center justify-center border-b border-dotted border-ink-mute h-6 text-center text-xs text-ink-mute/40 select-none align-middle"
+                  className="inline-flex max-w-full break-words items-center justify-center border-b border-dotted border-ink-mute h-6 text-center text-xs text-ink-mute/40 select-none align-middle"
                 >
                   ..................................................................
                 </span>
@@ -187,8 +197,8 @@ export default function DocumentTemplatePreviewPage() {
           <div className="pt-2 space-y-2 text-[15px]">
             <p className="font-medium">{doc.purposeText}</p>
             <div className="space-y-1.5 pl-6">
-              {doc.purposeItems.map((item, idx) => (
-                <div key={item.id} className="flex items-baseline gap-2">
+              {pageItems.map((item, idx) => (
+                <div key={item.id || idx} className="flex items-baseline gap-2">
                   <span className="font-bold">{idx + 1}.</span>
                   <span className="flex-1 border-b border-dotted border-ink-mute">
                     {item.target || '...........................................................................'}
@@ -209,7 +219,7 @@ export default function DocumentTemplatePreviewPage() {
         </div>
 
         {/* ส่วนลงนามลายมือชื่อ 3-4 ระดับ */}
-        <div className="pt-8 border-t border-line/60 mt-8">
+        <div className="print-keep-together pt-8 border-t border-line/60 mt-8">
           <div className="grid grid-cols-2 gap-6 text-center text-[13px]">
             {doc.signatures.map((sig) => (
               <div key={sig.id} className="p-2">
@@ -224,6 +234,8 @@ export default function DocumentTemplatePreviewPage() {
             ))}
           </div>
         </div>
+      </div>
+        ))}
       </div>
     </div>
   );

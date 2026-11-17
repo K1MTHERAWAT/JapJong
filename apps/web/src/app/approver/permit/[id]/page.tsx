@@ -17,6 +17,7 @@ import { useAuth } from '@/components/auth-context';
 import { AppShell, roleHomePath } from '@/components/shell';
 import { OfficialGovFormDocument } from '@/components/ui';
 import { api } from '@/lib/api';
+import { triggerDocumentPrint } from '@/lib/print';
 
 export default function PermitPdfPage() {
   // รับค่า id คำขอจาก URL parameters
@@ -47,27 +48,9 @@ export default function PermitPdfPage() {
       .catch(() => {});
   }, [params.id]);
 
-  // ฟังก์ชันสั่งพิมพ์เอกสารผ่านหน้าต่าง Print ของเบราว์เซอร์
+  // ฟังก์ชันสั่งพิมพ์เอกสารผ่านหน้าต่าง Print มาตรฐานกลาง
   const handlePrint = () => {
-    if (typeof window === 'undefined') return;
-    const originalTitle = document.title;
-    // ล้าง document.title ชั่วคราวเพื่อป้องกันไม่ให้เบราว์เซอร์พิมพ์ชื่อเว็บและวันที่บนหัวกระดาษ
-    document.title = '';
-
-    // ฟังก์ชันคืนค่า document.title เดิมหลังพิมพ์เสร็จ
-    const restore = () => {
-      document.title = originalTitle;
-      window.removeEventListener('afterprint', restore);
-    };
-    window.addEventListener('afterprint', restore);
-
-    // เปิดหน้าต่างสั่งพิมพ์ของระบบ
-    window.print();
-
-    // Fallback ในกรณีที่ afterprint ไม่ทำงานบนบางเบราว์เซอร์
-    setTimeout(() => {
-      document.title = originalTitle;
-    }, 1000);
+    triggerDocumentPrint();
   };
 
   return (
