@@ -628,9 +628,9 @@ function diffDaysYmd(targetYmd: string, baseYmd: string): number {
 
 /**
  * Checks whether a borrower can confirm equipment receipt on `now` given `pickupDate`.
- * Rule: Borrower must confirm receipt AT LEAST 1 day before `pickupDate` (i.e. todayBkk <= pickupDate - 1 day).
- * Example: If pickupDate is 2026-11-15, lastAllowedReceiveDate is 2026-11-14.
- * Confirming on 2026-11-14 or earlier is allowed; confirming on 2026-11-15 or later is rejected.
+ * Rule: Borrower can confirm receipt starting from 1 day before `pickupDate` onwards (i.e. todayBkk >= pickupDate - 1 day).
+ * Example: If pickupDate is 2026-11-18, earliestAllowedReceiveDate is 2026-11-17.
+ * Confirming on 2026-11-16 or earlier is rejected; confirming on 2026-11-17 or later is allowed.
  */
 export function checkBorrowReceiveEligibility(
   pickupDate: string,
@@ -653,27 +653,23 @@ export function checkBorrowReceiveEligibility(
     };
   }
 
-  const lastAllowedReceiveDate = addDaysYmd(pickupYmd, -1);
+  const earliestAllowedReceiveDate = addDaysYmd(pickupYmd, -1);
   const daysUntilPickup = diffDaysYmd(pickupYmd, todayBkk);
   const isOnPickupDate = todayBkk === pickupYmd;
   const isAfterPickupDate = todayBkk > pickupYmd;
-  const isPastDeadline = todayBkk >= pickupYmd;
-  const allowed = todayBkk <= lastAllowedReceiveDate;
+  const isPastDeadline = false;
+  const allowed = todayBkk >= earliestAllowedReceiveDate;
 
   let reason: string | undefined;
   if (!allowed) {
-    if (isOnPickupDate) {
-      reason = `เลยกำหนดยืนยันรับมอบครุภัณฑ์ (ต้องกดยืนยันล่วงหน้าอย่างน้อย 1 วันก่อนวันรับครุภัณฑ์ ${pickupYmd} คือภายในวันที่ ${lastAllowedReceiveDate}) กรุณาติดต่อเจ้าหน้าที่หรือเลื่อนวันรับครุภัณฑ์`;
-    } else {
-      reason = `เลยกำหนดวันรับครุภัณฑ์ (${pickupYmd}) แล้ว (ต้องกดยืนยันรับมอบภายในวันที่ ${lastAllowedReceiveDate}) กรุณาติดต่อเจ้าหน้าที่เพื่อดำเนินการหรือกำหนดวันรับใหม่`;
-    }
+    reason = `ยังไม่ถึงกำหนดยืนยันรับมอบครุภัณฑ์ สามารถกดยืนยันรับมอบได้ตั้งแต่วันที่ ${earliestAllowedReceiveDate} เป็นต้นไป (รับมอบล่วงหน้าได้ไม่เกิน 1 วันก่อนวันรับครุภัณฑ์ ${pickupYmd}) กรุณารอถึงวันดังกล่าวหรือเลื่อนวันรับครุภัณฑ์`;
   }
 
   return {
     allowed,
     todayBkk,
     pickupDate: pickupYmd,
-    lastAllowedReceiveDate,
+    lastAllowedReceiveDate: earliestAllowedReceiveDate,
     daysUntilPickup,
     isOnPickupDate,
     isAfterPickupDate,

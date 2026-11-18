@@ -539,38 +539,38 @@ describe('Logic & Permissions Unit Tests', () => {
   });
 
   describe('checkBorrowReceiveEligibility() — 1-day advance pickup rule', () => {
-    it('allows confirming receipt when current date is before pickupDate - 1 day', () => {
-      const res = checkBorrowReceiveEligibility('2026-11-15', '2026-11-10');
-      expect(res.allowed).toBe(true);
-      expect(res.lastAllowedReceiveDate).toBe('2026-11-14');
-    });
-
-    it('allows confirming receipt on the exact last allowed day (pickupDate - 1 day)', () => {
-      const res = checkBorrowReceiveEligibility('2026-11-15', '2026-11-14');
-      expect(res.allowed).toBe(true);
-      expect(res.lastAllowedReceiveDate).toBe('2026-11-14');
-    });
-
-    it('blocks confirming receipt on the pickupDate itself', () => {
-      const res = checkBorrowReceiveEligibility('2026-11-15', '2026-11-15');
+    it('blocks confirming receipt when current date is more than 1 day before pickupDate', () => {
+      const res = checkBorrowReceiveEligibility('2026-11-18', '2026-11-16');
       expect(res.allowed).toBe(false);
-      expect(res.lastAllowedReceiveDate).toBe('2026-11-14');
-      expect(res.reason).toContain('อย่างน้อย 1 วันก่อนวันรับครุภัณฑ์');
+      expect(res.lastAllowedReceiveDate).toBe('2026-11-17');
+      expect(res.reason).toContain('2026-11-17');
     });
 
-    it('blocks confirming receipt after the pickupDate has passed', () => {
-      const res = checkBorrowReceiveEligibility('2026-11-15', '2026-11-16');
-      expect(res.allowed).toBe(false);
-      expect(res.reason).toContain('เลยกำหนดวันรับครุภัณฑ์');
+    it('allows confirming receipt starting from 1 day before pickupDate (pickupDate - 1 day)', () => {
+      const res = checkBorrowReceiveEligibility('2026-11-18', '2026-11-17');
+      expect(res.allowed).toBe(true);
+      expect(res.lastAllowedReceiveDate).toBe('2026-11-17');
     });
 
-    it('dynamically recalculates eligibility when pickupDate is rescheduled to a future date', () => {
-      const beforeReschedule = checkBorrowReceiveEligibility('2026-11-15', '2026-11-15');
+    it('allows confirming receipt on the pickupDate itself', () => {
+      const res = checkBorrowReceiveEligibility('2026-11-18', '2026-11-18');
+      expect(res.allowed).toBe(true);
+      expect(res.isOnPickupDate).toBe(true);
+    });
+
+    it('allows confirming receipt after the pickupDate', () => {
+      const res = checkBorrowReceiveEligibility('2026-11-18', '2026-11-19');
+      expect(res.allowed).toBe(true);
+      expect(res.isAfterPickupDate).toBe(true);
+    });
+
+    it('dynamically recalculates eligibility when pickupDate is rescheduled closer', () => {
+      const beforeReschedule = checkBorrowReceiveEligibility('2026-11-20', '2026-11-16');
       expect(beforeReschedule.allowed).toBe(false);
 
-      const afterReschedule = checkBorrowReceiveEligibility('2026-11-18', '2026-11-15');
+      const afterReschedule = checkBorrowReceiveEligibility('2026-11-17', '2026-11-16');
       expect(afterReschedule.allowed).toBe(true);
-      expect(afterReschedule.lastAllowedReceiveDate).toBe('2026-11-17');
+      expect(afterReschedule.lastAllowedReceiveDate).toBe('2026-11-16');
     });
   });
 

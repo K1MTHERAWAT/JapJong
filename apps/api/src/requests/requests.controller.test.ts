@@ -658,6 +658,8 @@ describe('RequestsController Unit Tests', () => {
   describe('Equipment Receive, Return and Inspection Lifecycle', () => {
     it('confirms receipt of equipment and transitions status to borrowing', async () => {
       const now = new Date().toISOString();
+      const todayBkk = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
+      const returnDayBkk = new Date(Date.now() + 7 * 3600000 + 3 * 86400000).toISOString().slice(0, 10);
       const borrowReq = {
         id: 'r-br-receive',
         code: 'BR-2569-0090',
@@ -666,8 +668,8 @@ describe('RequestsController Unit Tests', () => {
         requesterId: citizen.id,
         requesterName: citizen.name,
         items: [{ equipmentId: 'e-01', qty: 2 }],
-        pickupDate: '2026-11-20',
-        returnDate: '2026-11-25',
+        pickupDate: todayBkk,
+        returnDate: returnDayBkk,
         purpose: 'จัดงานอบรม',
         attachments: [],
         signatures: [],
@@ -694,8 +696,10 @@ describe('RequestsController Unit Tests', () => {
       );
     });
 
-    it('blocks receiveEquipment when current date is on or after pickupDate, and allows after rescheduling pickupDate', async () => {
+    it('blocks receiveEquipment when current date is more than 1 day before pickupDate, and allows after rescheduling closer', async () => {
       const now = new Date().toISOString();
+      const todayBkk = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
+      const returnDayBkk = new Date(Date.now() + 7 * 3600000 + 3 * 86400000).toISOString().slice(0, 10);
       const borrowReq = {
         id: 'r-br-late',
         code: 'BR-2569-0095',
@@ -704,8 +708,8 @@ describe('RequestsController Unit Tests', () => {
         requesterId: citizen.id,
         requesterName: citizen.name,
         items: [{ equipmentId: 'e-01', qty: 1 }],
-        pickupDate: '2020-01-01', // Past pickup date
-        returnDate: '2020-01-05',
+        pickupDate: '2029-12-20', // More than 1 day in the future
+        returnDate: '2029-12-25',
         purpose: 'ทดสอบเงื่อนไขวันรับครุภัณฑ์',
         attachments: [],
         signatures: [],
@@ -720,10 +724,10 @@ describe('RequestsController Unit Tests', () => {
         }),
       ).rejects.toThrow(BadRequestException);
 
-      // Reschedule pickupDate to a future date (2029-12-20)
+      // Reschedule pickupDate to today (within allowed window: pickupDate - 1 day onwards)
       await controller.reschedule(citizen, 'r-br-late', {
-        pickupDate: '2029-12-20',
-        returnDate: '2029-12-25',
+        pickupDate: todayBkk,
+        returnDate: returnDayBkk,
       });
 
       const received = await controller.receiveEquipment(citizen, 'r-br-late', {
@@ -819,6 +823,35 @@ describe('RequestsController Unit Tests', () => {
         expect.stringContaining('สภาพปกติ'),
         '/borrow/my',
       );
+    });
+
+    it('blocks staff/admin from inspecting their own borrow return (Separation of Duties)', async () => {
+      const now = new Date().toISOString();
+      const selfBorrow: any = {
+        id: 'r-br-self-inspect',
+        code: 'BR-SELF-INSP',
+        type: 'borrow',
+        status: 'return_inspect',
+        requesterId: staff.id,
+        requesterName: staff.name,
+        returnSubmittedById: staff.id,
+        items: [{ equipmentId: 'e-01', qty: 1 }],
+        pickupDate: '2026-11-20',
+        returnDate: '2026-11-25',
+        purpose: 'ยืมใช้งานเอง',
+        attachments: [],
+        signatures: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+      mockDb.requests.push(selfBorrow);
+
+      await expect(
+        controller.inspectReturn(staff, 'r-br-self-inspect', {
+          result: 'normal',
+          photos: ['data:image/jpeg;base64,self-inspect'],
+        }),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('validates 10-digit phone number and 3-level Thai address hierarchy on createBorrow', async () => {

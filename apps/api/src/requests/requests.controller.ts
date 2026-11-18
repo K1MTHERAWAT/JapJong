@@ -1057,12 +1057,12 @@ export class RequestsController {
       throw new BadRequestException('คำขอยืมต้องผ่านการอนุมัติครบและอยู่ในสถานะอนุมัติแล้ว (รอรับมอบ) เท่านั้นจึงจะรับมอบได้');
     }
 
-    // ตรวจสอบเงื่อนไขวันรับมอบครุภัณฑ์: ต้องกดยืนยันรับมอบล่วงหน้าอย่างน้อย 1 วันก่อนถึงวันรับครุภัณฑ์ (pickupDate)
+    // ตรวจสอบเงื่อนไขวันรับมอบครุภัณฑ์: สามารถกดยืนยันรับมอบได้ตั้งแต่วันที่ (pickupDate - 1 วัน) เป็นต้นไป
     const eligibility = checkBorrowReceiveEligibility(req.pickupDate);
     if (!eligibility.allowed) {
       throw new BadRequestException(
         eligibility.reason ||
-          `ไม่สามารถยืนยันรับมอบได้ เนื่องจากต้องยืนยันล่วงหน้าอย่างน้อย 1 วันก่อนวันรับครุภัณฑ์ (${req.pickupDate}) กรุณาติดต่อเจ้าหน้าที่`,
+          `ยังไม่ถึงกำหนดยืนยันรับมอบครุภัณฑ์ (สามารถรับมอบได้ตั้งแต่วันก่อนวันรับครุภัณฑ์ 1 วันเป็นต้นไป สำหรับกำหนดรับ ${req.pickupDate})`,
       );
     }
 
@@ -1159,6 +1159,10 @@ export class RequestsController {
     if (!req) throw new NotFoundException('ไม่พบรายการยืม');
     if (!hasPermission(user, 'review') && !hasPermission(user, 'handover') && user.role !== 'STAFF' && user.role !== 'ADMIN') {
       throw new ForbiddenException('เฉพาะเจ้าหน้าที่ผู้มีสิทธิ์ตรวจสอบเท่านั้นที่สามารถตรวจรับคืนอุปกรณ์ได้');
+    }
+    // Separation of Duties (SoD): ผู้ยืม/ผู้แจ้งส่งคืนไม่สามารถตรวจรับคืนคำขอของตนเองได้ (คนรับคืนต้องเป็นคนละคน)
+    if (req.requesterId === user.id || req.returnSubmittedById === user.id) {
+      throw new ForbiddenException('ผู้ยืมหรือผู้แจ้งส่งคืนไม่สามารถตรวจรับคืนอุปกรณ์ของตนเองได้ (คนรับคืนต้องเป็นคนละคน)');
     }
     if (req.status !== 'return_inspect') {
       throw new BadRequestException('คำขอนี้ไม่ได้อยู่ในสถานะรอตรวจสภาพ');

@@ -1157,7 +1157,7 @@ export default function MyBorrowsPage() {
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div className="flex flex-col gap-1">
                               <div className="text-sm font-semibold text-rose-600 dark:text-rose-400">
-                                ไม่สามารถกดยืนยันรับมอบได้ (ต้องรับมอบก่อนวันเริ่มยืมอย่างน้อย 1 วัน)
+                                ยังไม่ถึงกำหนดยืนยันรับมอบได้ (รับมอบได้ตั้งแต่วันก่อนวันเริ่มยืม 1 วันเป็นต้นไป)
                               </div>
                               <div className="text-xs sm:text-sm text-rose-700/80 dark:text-rose-300/80">
                                 {eligibility.reason}
@@ -1248,7 +1248,9 @@ export default function MyBorrowsPage() {
                             </div>
                           </div>
 
-                          {isStaffOrAdmin && (
+                          {isStaffOrAdmin &&
+                          selectedRequest.requesterId !== account?.id &&
+                          selectedRequest.returnSubmittedById !== account?.id ? (
                             <button
                               type="button"
                               onClick={() => {
@@ -1263,7 +1265,11 @@ export default function MyBorrowsPage() {
                               <Icon name="check" className="w-4 h-4" />
                               <span>ตรวจสอบและยืนยันรับคืน</span>
                             </button>
-                          )}
+                          ) : isStaffOrAdmin ? (
+                            <span className="text-xs text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-1.5 shrink-0">
+                              ต้องให้เจ้าหน้าที่ท่านอื่นเป็นผู้ตรวจรับคืน
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     )}
