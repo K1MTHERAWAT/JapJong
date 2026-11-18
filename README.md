@@ -190,15 +190,15 @@ pnpm dev
 
 | ชื่อผู้ใช้ (`username`) | ชื่อ-นามสกุล | บทบาท (`role`) | อีเมลรับ OTP | ตำแหน่งแสดงผล | รหัสผ่าน | PIN ลงนาม | หน้าเริ่มต้น |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `somchai` | สมชาย ใจดี | ผู้ใช้งานทั่วไป (`USER`) | `somchai@namcham.go.th` | ประชาชน | `Demo1234` | `123456` | `/` |
-| `manee` | มานี มีนา | ผู้ใช้งานทั่วไป (`USER`) | `manee@namcham.go.th` | ประชาชน | `Demo1234` | `123456` | `/` |
-| `suda` | สุดา มีสุข | เจ้าหน้าที่ผู้ตรวจสอบ (`STAFF`) | `suda@namcham.go.th` | เจ้าหน้าที่ธุรการ | `Demo1234` | `123456` | `/staff` |
-| `wichai` | วิชัย รักถิ่น | ปลัดองค์การบริหารส่วนตำบล (`APPROVER_L2`) | `wichai@namcham.go.th` | ปลัดองค์การบริหารส่วนตำบล | `Demo1234` | `123456` | `/approver` |
-| `prasert` | ประเสริฐ ศรีสุข | นายกองค์การบริหารส่วนตำบล (`APPROVER_L1`) | `prasert@namcham.go.th` | นายกองค์การบริหารส่วนตำบล | `Demo1234` | `123456` | `/approver` |
-| `admin` | ผู้ดูแลระบบ | แอดมิน (`ADMIN`) | `admin@namcham.go.th` | ผู้ดูแลระบบ | `Demo1234` | `123456` | `/admin` |
+| `somchai` | สมชาย ใจดี | ผู้ใช้งานทั่วไป (`USER`) | `somchai@namcham.go.th` | ประชาชน | `P@ssw0rd` | `123456` | `/` |
+| `manee` | มานี มีนา | ผู้ใช้งานทั่วไป (`USER`) | `manee@namcham.go.th` | ประชาชน | `P@ssw0rd` | `123456` | `/` |
+| `suda` | สุดา มีสุข | เจ้าหน้าที่ผู้ตรวจสอบ (`STAFF`) | `suda@namcham.go.th` | เจ้าหน้าที่ธุรการ | `P@ssw0rd` | `123456` | `/staff` |
+| `wichai` | วิชัย รักถิ่น | ปลัดองค์การบริหารส่วนตำบล (`APPROVER_L2`) | `wichai@namcham.go.th` | ปลัดองค์การบริหารส่วนตำบล | `P@ssw0rd` | `123456` | `/approver` |
+| `prasert` | ประเสริฐ ศรีสุข | นายกองค์การบริหารส่วนตำบล (`APPROVER_L1`) | `prasert@namcham.go.th` | นายกองค์การบริหารส่วนตำบล | `P@ssw0rd` | `123456` | `/approver` |
+| `admin` | ผู้ดูแลระบบ | แอดมิน (`ADMIN`) | `admin@namcham.go.th` | ผู้ดูแลระบบ | `P@ssw0rd` | `123456` | `/admin` |
 
 ### บัญชีทดสอบทีมงาน (Team Test Accounts)
-รหัสผ่านทุกบัญชี: `Demo1234` · PIN ลงนาม: `123456` · อีเมล: `<username>@namcham.go.th`
+รหัสผ่านทุกบัญชี: `P@ssw0rd` · PIN ลงนาม: `123456` · อีเมล: `<username>@namcham.go.th`
 
 | คน | ประชาชน (`USER`) | เจ้าหน้าที่ (`STAFF`) | ลงนาม 1 (`APPROVER_L1`) | ลงนาม 2 (`APPROVER_L2`) |
 | :--- | :--- | :--- | :--- | :--- |
