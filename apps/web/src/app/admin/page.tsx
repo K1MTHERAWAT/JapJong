@@ -116,7 +116,7 @@ export default function AdminHomePage() {
               </div>
             </Link>
 
-            {/* เมนูจัดการแม่แบบเอกสารราชการ */}
+            {/* เมนูจัดการแม่แบบเอกสารราชการ (ซ่อนไว้ชั่วคราว)
             <Link
               href="/admin/document-templates"
               className="jw-card p-4 flex items-center gap-3 hover:ring-1 hover:ring-brand transition"
@@ -129,6 +129,7 @@ export default function AdminHomePage() {
                 <span className="text-[12px] text-ink-mute">ออกแบบ & จัดการแบบฟอร์มราชการ</span>
               </div>
             </Link>
+            */}
 
             {/* เมนูจัดการสิทธิ์ผู้ใช้งานและบทบาท */}
             <Link

@@ -82,6 +82,7 @@ export default function AccountPage() {
   // --- Profile state: เก็บข้อมูลฟอร์มโปรไฟล์และที่อยู่ ---
   const [name, setName] = useState('');
   const [nickname, setNickname] = useState('');
+  const [position, setPosition] = useState('');
   const [department, setDepartment] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -190,6 +191,7 @@ export default function AccountPage() {
     if (account) {
       setName(account.name || '');
       setNickname(account.nickname || '');
+      setPosition(account.position || '');
       setDepartment(account.department || '');
       setPhone(sanitizePhoneInput(account.phone || ''));
       setEmail(account.email || '');
@@ -257,6 +259,7 @@ export default function AccountPage() {
       await api.updateProfile({
         name: name.trim(),
         nickname: nickname.trim(),
+        position: position.trim() || undefined,
         department: department.trim(),
         phone: phoneCheck.normalized,
         email: email.trim(),
@@ -286,6 +289,7 @@ export default function AccountPage() {
     if (!account) return;
     setName(account.name || '');
     setNickname(account.nickname || '');
+    setPosition(account.position || '');
     setDepartment(account.department || '');
     setPhone(sanitizePhoneInput(account.phone || ''));
     setAddressHouseNo(account.addressHouseNo || '');
@@ -495,8 +499,15 @@ export default function AccountPage() {
                   />
                 </div>
 
-                {/* หน่วยงาน, เบอร์โทรศัพท์ และอีเมล */}
+                {/* ตำแหน่ง, หน่วยงาน, เบอร์โทรศัพท์ และอีเมล */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+                  <Input
+                    label="ตำแหน่ง"
+                    value={position}
+                    maxLength={NAME_MAX_LENGTH.POSITION}
+                    onChange={(e) => setPosition(clampNameInput(e.target.value, NAME_MAX_LENGTH.POSITION))}
+                    placeholder="เช่น เจ้าหน้าที่ธุรการ / ประชาชน"
+                  />
                   <Input
                     label="หน่วยงาน / ชุมชน / สังกัด"
                     value={department}
@@ -511,15 +522,13 @@ export default function AccountPage() {
                     value={phone}
                     onChange={setPhone}
                   />
-                  <div className="sm:col-span-2">
-                    <Input
-                      label="อีเมล (สำหรับรับรหัส OTP ยืนยันการลงนาม)"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="เช่น user@namcham.go.th"
-                    />
-                  </div>
+                  <Input
+                    label="อีเมล (สำหรับรับรหัส OTP ยืนยันการลงนาม)"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="เช่น user@namcham.go.th"
+                  />
                 </div>
 
                 {/* ส่วนที่อยู่สำหรับดึงไปกรอกแบบคำขอราชการอัตโนมัติ */}

@@ -140,8 +140,9 @@ function ManageResourcesContent() {
           options={[
             { value: 'venues', label: 'สถานที่' },
             { value: 'equipment', label: 'อุปกรณ์' },
-            { value: 'vehicles', label: 'ยานพาหนะ' },
-            { value: 'forms', label: 'แบบฟอร์ม' },
+            // ซ่อนแท็บยานพาหนะและแบบฟอร์มไว้ชั่วคราว
+            // { value: 'vehicles', label: 'ยานพาหนะ' },
+            // { value: 'forms', label: 'แบบฟอร์ม' },
           ]}
         />
 

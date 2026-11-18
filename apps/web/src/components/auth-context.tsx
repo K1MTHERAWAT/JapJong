@@ -280,6 +280,13 @@ export function useAuth() {
 }
 
 /**
+ * Custom Hook สำหรับดึง AuthContext แบบไม่ throw error หากอยู่นอก AuthProvider (เช่น หน้าสาธารณะ)
+ */
+export function useOptionalAuth() {
+  return useContext(AuthContext);
+}
+
+/**
  * กำหนดเส้นทางหน้าหลัก (Default Home Path) ตามบทบาทของผู้ใช้ (RBAC)
  */
 export function roleHomePath(role?: PublicAccount['role']): string {

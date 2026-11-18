@@ -17,6 +17,7 @@ import {
   VenueType,
 } from '@japjong/shared';
 import { Icon, IconName } from './icons';
+import { useOptionalAuth } from './auth-context';
 import { api, formatMonthTitle, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
 import { chunkDocumentItems } from '@/lib/print';
 
@@ -1147,6 +1148,22 @@ export function OfficialGovFormDocument({
   const sigL2 = !blankMode && req && req.type !== 'repair' ? req.signatures.find((s) => s.level === 'l2') : undefined;
   const sigL1 = !blankMode && req && req.type !== 'repair' ? req.signatures.find((s) => s.level === 'l1') : undefined;
 
+  const auth = useOptionalAuth();
+  const currentAcc = auth?.account;
+
+  const staffFallback =
+    !blankMode && !sampleDocMode && currentAcc?.role === 'STAFF' && currentAcc.position?.trim()
+      ? currentAcc.position.trim()
+      : SIGN_LEVEL_TITLE.staff;
+  const l2Fallback =
+    !blankMode && !sampleDocMode && currentAcc?.role === 'APPROVER_L2' && currentAcc.position?.trim()
+      ? currentAcc.position.trim()
+      : SIGN_LEVEL_TITLE.l2;
+  const l1Fallback =
+    !blankMode && !sampleDocMode && currentAcc?.role === 'APPROVER_L1' && currentAcc.position?.trim()
+      ? currentAcc.position.trim()
+      : SIGN_LEVEL_TITLE.l1;
+
   const resolveRoleTitle = (sig: { title?: string } | undefined, fallback: string) => {
     const raw = sig?.title?.trim();
     if (!raw || raw === 'เจ้าหน้าที่ผู้ตรวจสอบ' || raw === 'ผู้พิจารณา' || raw === 'ผู้มีอำนาจอนุมัติ') {
@@ -1155,9 +1172,9 @@ export function OfficialGovFormDocument({
     return raw;
   };
 
-  const staffRoleTitle = resolveRoleTitle(sigStaff, SIGN_LEVEL_TITLE.staff);
-  const l2RoleTitle = resolveRoleTitle(sigL2, SIGN_LEVEL_TITLE.l2);
-  const l1RoleTitle = resolveRoleTitle(sigL1, SIGN_LEVEL_TITLE.l1);
+  const staffRoleTitle = resolveRoleTitle(sigStaff, staffFallback);
+  const l2RoleTitle = resolveRoleTitle(sigL2, l2Fallback);
+  const l1RoleTitle = resolveRoleTitle(sigL1, l1Fallback);
 
   const DottedSpan = ({
     children,

@@ -2749,17 +2749,20 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       const currentRound = r.approvalRound ?? 1;
       const signatures = (r.signatures || [])
         .filter((s: any) => s.round === currentRound)
-        .map((s: any) => ({
-          level: s.level,
-          round: s.round,
-          signerId: s.signerId,
-          signerName: s.signerName,
-          title: s.title,
-          at: s.signedAt.toISOString(),
-          decision: s.decision,
-          signature: s.signature ?? undefined,
-          note: s.note ?? undefined,
-        }));
+        .map((s: any) => {
+          const signerAcc = this.accounts.find((a) => a.id === s.signerId);
+          return {
+            level: s.level,
+            round: s.round,
+            signerId: s.signerId,
+            signerName: s.signerName,
+            title: signerAcc?.position?.trim() || s.title,
+            at: s.signedAt.toISOString(),
+            decision: s.decision,
+            signature: s.signature ?? undefined,
+            note: s.note ?? undefined,
+          };
+        });
 
       if (r.type === 'booking') {
         const currentPeriods = (r.periods || [])
