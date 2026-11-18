@@ -331,6 +331,29 @@ describe('AuthController Unit Tests', () => {
       expect(res.demoOtp).toBeUndefined();
     });
 
+    it('requests email OTP for real user when OTP_MOCK_MODE=true (returns demoOtp)', async () => {
+      const prev = process.env.OTP_MOCK_MODE;
+      process.env.OTP_MOCK_MODE = 'true';
+      try {
+        const realUser = {
+          ...testUser,
+          id: 'u-real-123',
+          isDemo: false,
+          email: 'real.citizen@gmail.com',
+        };
+        const res = await controller.requestSignOtp(realUser, {}, { ip: '127.0.0.1', headers: {} });
+        expect(res.ok).toBe(true);
+        expect(res.maskedEmail).toBeDefined();
+        expect(res.demoOtp).toMatch(/^\d{6}$/);
+      } finally {
+        if (prev === undefined) {
+          delete process.env.OTP_MOCK_MODE;
+        } else {
+          process.env.OTP_MOCK_MODE = prev;
+        }
+      }
+    });
+
     it('checks signing session status', async () => {
       const res = await controller.getSignSessionStatus(testUser, { token: 'test-session-token' });
       expect(res.isVerified).toBe(true);

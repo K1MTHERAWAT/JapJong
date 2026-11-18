@@ -655,17 +655,19 @@ export class AuthController {
     // บันทึกรายการ OTP (เฉพาะ Hash, อีเมลปลายทาง, เวลาหมดอายุ) ลงในฐานข้อมูล
     await this.db.createSignOtp(user.id, targetEmail, codeHash, expiresAt);
 
-    // ตรวจสอบว่าปลายทางเป็นอีเมลจำลองของระบบเดโมหรือไม่ (@namcham.go.th, @example.com, @test.com)
+    // ตรวจสอบว่าเปิดโหมดจำลอง OTP ชั่วคราว (OTP_MOCK_MODE=true) หรือปลายทางเป็นอีเมลจำลองของระบบเดโมหรือไม่
+    const isOtpMockMode = process.env.OTP_MOCK_MODE?.trim().toLowerCase() === 'true';
     const isMockEmail = isDemoEmail(targetEmail);
+    const shouldMockOtp = isMockEmail || isOtpMockMode;
 
     // ส่งรหัส OTP ผ่าน EmailService:
-    // - หากเป็นอีเมลจำลอง (isMockEmail = true): จะข้าม Resend จริงและใช้วิธีจำลองเดิมเพื่อไม่ให้ติด Error
-    // - หากเป็นอีเมลจริง (isMockEmail = false): จะส่งผ่าน Resend จริงเข้ากล่องจดหมายผู้รับเสมอ
+    // - หากเป็นโหมดจำลอง (shouldMockOtp = true): จะข้าม Resend จริงและใช้วิธีจำลองเพื่อไม่ให้ติด Error
+    // - หากเป็นอีเมลจริง (shouldMockOtp = false): จะส่งผ่าน Resend จริงเข้ากล่องจดหมายผู้รับเสมอ
     const sendResult = await this.emailService.sendSignOtpEmail(
       targetEmail,
       otp,
       user.name,
-      { isDemo: isMockEmail },
+      { isDemo: shouldMockOtp },
     );
     // หาก Resend เกิดข้อผิดพลาดในการส่งจริง ให้แจ้ง Error ทันที
     if (!sendResult.success) {
@@ -679,7 +681,7 @@ export class AuthController {
     await this.db.log(
       'user',
       'ขอรหัส OTP สำหรับยืนยันการลงนาม',
-      `ส่งรหัส OTP 6 หลักไปยัง ${masked} (${isMockEmail ? 'โหมดเดโม (Mock)' : 'Resend จริง'})`,
+      `ส่งรหัส OTP 6 หลักไปยัง ${masked} (${shouldMockOtp ? 'โหมดเดโม (Mock)' : 'Resend จริง'})`,
       {
         id: user.id,
         name: user.name,
@@ -695,8 +697,8 @@ export class AuthController {
       maskedEmail: masked,
       expiresInSeconds: 300,        // รหัสหมดอายุใน 300 วินาที (5 นาที)
       resendCooldownSeconds: 60,   // เว้นระยะขอใหม่ได้ใน 60 วินาที
-      // หากเป็นบัญชีทดสอบหรืออีเมลจำลอง จะแนบ demoOtp ไปให้เพื่อให้มีปุ่มกรอกสะดวกในการทดสอบ
-      ...(user.isDemo || isMockEmail ? { demoOtp: otp } : {}),
+      // หากเป็นบัญชีทดสอบ, อีเมลจำลอง, หรือเปิด OTP_MOCK_MODE=true จะแนบ demoOtp ไปให้กรอกบนหน้าเว็บ
+      ...(user.isDemo || shouldMockOtp ? { demoOtp: otp } : {}),
     };
   }
 
