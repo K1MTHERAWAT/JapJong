@@ -2,9 +2,9 @@ import { Account, DEFAULT_PERMISSIONS } from '@japjong/shared';
 
 /**
  * Demo data accounts — ใช้สำหรับทดสอบทุกบทบาทในโหมดเดโม
- * รหัสผ่านทุกบัญชี: 1234   ·   PIN ลงนาม: 123456
+ * รหัสผ่านทุกบัญชี: Demo1234   ·   PIN ลงนาม: 123456
  */
-export const MOCK_PASSWORD = '1234';
+export const MOCK_PASSWORD = 'Demo1234';
 export const MOCK_PIN = '123456';
 
 function strokeSvgDataUrl(paths: string[]): string {

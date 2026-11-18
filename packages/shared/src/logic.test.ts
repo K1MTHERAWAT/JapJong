@@ -3,13 +3,18 @@ import {
   canAccessRoute,
   canSignRequest,
   checkBorrowReceiveEligibility,
+  classifyLoginIdentifier,
   computeTimeline,
   describeRequest,
+  getPasswordRuleChecks,
   hasPermission,
   overlaps,
   periodDurationText,
   sanitizePhoneInput,
+  validateEmail,
+  validatePassword,
   validateThaiPhone,
+  validateUsername,
   withTimeline,
 } from './logic';
 import {
@@ -663,6 +668,57 @@ describe('Logic & Permissions Unit Tests', () => {
         subdistrictId: otherSub.id,
       });
       expect(badSub.valid).toBe(false);
+    });
+  });
+
+  describe('Auth & Password Policy Validation', () => {
+    it('validates usernames (>= 4 chars, English letters/numbers/_/-)', () => {
+      expect(validateUsername('supa').valid).toBe(true);
+      expect(validateUsername('  Supa_01-x  ')).toEqual({ valid: true, value: 'supa_01-x' });
+      expect(validateUsername('abc').valid).toBe(false);
+      expect(validateUsername('สมชาย').valid).toBe(false);
+      expect(validateUsername('user@gmail.com').valid).toBe(false);
+    });
+
+    it('validates email / Gmail format', () => {
+      expect(validateEmail('Somchai@Gmail.com')).toEqual({ valid: true, value: 'somchai@gmail.com' });
+      expect(validateEmail('not-an-email').valid).toBe(false);
+      expect(validateEmail('abc@').valid).toBe(false);
+    });
+
+    it('validates passwords (>= 8 chars, >= 1 English letter, >= 1 digit)', () => {
+      expect(validatePassword('supa1234').valid).toBe(true);
+      expect(validatePassword('Demo1234').valid).toBe(true);
+      expect(validatePassword('1234').valid).toBe(false);
+      expect(validatePassword('12345678').valid).toBe(false);
+      expect(validatePassword('abcdefgh').valid).toBe(false);
+      expect(validatePassword('abc1234').valid).toBe(false);
+
+      expect(getPasswordRuleChecks('supa1234')).toEqual({
+        minLength: true,
+        hasLetter: true,
+        hasNumber: true,
+        valid: true,
+      });
+    });
+
+    it('classifies login identifier automatically as email or username', () => {
+      expect(classifyLoginIdentifier('Somchai@Gmail.com')).toEqual({
+        kind: 'email',
+        value: 'somchai@gmail.com',
+        validEmail: true,
+      });
+      expect(classifyLoginIdentifier('bad@email')).toEqual({
+        kind: 'email',
+        value: 'bad@email',
+        validEmail: false,
+      });
+      expect(classifyLoginIdentifier('Supa')).toEqual({
+        kind: 'username',
+        value: 'supa',
+        validEmail: false,
+      });
+      expect(classifyLoginIdentifier('   ').kind).toBe('empty');
     });
   });
 });

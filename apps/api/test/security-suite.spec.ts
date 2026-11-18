@@ -58,21 +58,21 @@ describe('Security & Penetration Testing Suite (PHASE 7)', () => {
     // Citizen login
     const cRes = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ username: 'somchai', password: '1234' });
+      .send({ username: 'somchai', password: 'Demo1234' });
     citizenToken = cRes.body.token;
     citizenId = cRes.body.account.id;
 
     // Staff login
     const sRes = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ username: 'suda', password: '1234' });
+      .send({ username: 'suda', password: 'Demo1234' });
     staffToken = sRes.body.token;
     staffId = sRes.body.account.id;
 
     // Admin login
     const aRes = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ username: 'admin', password: '1234' });
+      .send({ username: 'admin', password: 'Demo1234' });
     adminToken = aRes.body.token;
   });
 
@@ -101,7 +101,7 @@ describe('Security & Penetration Testing Suite (PHASE 7)', () => {
       // Login temporary user 'manee'
       const maneeLogin = await request(app.getHttpServer())
         .post('/auth/login')
-        .send({ username: 'manee', password: '1234' });
+        .send({ username: 'manee', password: 'Demo1234' });
       expect(maneeLogin.status).toBe(201);
       const maneeToken = maneeLogin.body.token;
       const maneeAccount = db.accounts.find((a) => a.username === 'manee');
@@ -125,7 +125,7 @@ describe('Security & Penetration Testing Suite (PHASE 7)', () => {
       // Create temporary session for testing logout
       const tempLogin = await request(app.getHttpServer())
         .post('/auth/login')
-        .send({ username: 'manee', password: '1234' });
+        .send({ username: 'manee', password: 'Demo1234' });
       const tempToken = tempLogin.body.token;
 
       // Access before logout

@@ -20,8 +20,12 @@ import {
   DemoAccountSummary,
   NAME_MAX_LENGTH,
   clampNameInput,
+  classifyLoginIdentifier,
+  validateEmail,
+  validatePassword,
   validateThaiAddressHierarchy,
   validateThaiPhone,
+  validateUsername,
 } from '@japjong/shared';
 import { DbService } from '../db/db.service';
 import { EmailService, isDemoEmail } from './email.service';
@@ -133,32 +137,47 @@ export class AuthController {
   }
 
   /**
-   * เข้าสู่ระบบด้วยชื่อผู้ใช้ / อีเมล / เบอร์โทรศัพท์ และรหัสผ่าน
+   * เข้าสู่ระบบด้วยชื่อผู้ใช้ (Username) หรืออีเมล (Gmail) และรหัสผ่าน
    */
   @Throttle({ auth: { limit: 10, ttl: 60000 } })
   @Public()
   @Post('login')
   async login(@Body() body: LoginDto) {
-    const username = String(body.username ?? '').trim().toLowerCase();
+    const identifier = classifyLoginIdentifier(body.username);
     const password = String(body.password ?? '');
-    if (!username || !password) throw new UnauthorizedException('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+    if (identifier.kind === 'empty' || !password) {
+      throw new UnauthorizedException('ชื่อผู้ใช้ อีเมล หรือรหัสผ่านไม่ถูกต้อง');
+    }
+    if (identifier.kind === 'email' && !identifier.validEmail) {
+      throw new BadRequestException('รูปแบบอีเมลไม่ถูกต้อง');
+    }
+
+    const username = identifier.value;
 
     // ตรวจสอบสถานะการระงับชั่วคราว (Brute-force Lockout)
     const lockKey = `login:${username}`;
     assertNotLocked(lockKey);
 
-    // ดึงเฉพาะตัวเลขเพื่อรองรับการค้นหาด้วยเบอร์โทรศัพท์
-    const digits = username.replace(/\D/g, '');
-    const user = this.db.accounts.find(
-      (a) =>
-        a.username.toLowerCase() === username ||
-        (a.email && a.email.toLowerCase() === username) ||
-        (digits.length >= 9 && a.phone.replace(/\D/g, '') === digits),
-    );
-    // ตรวจสอบรหัสผ่านด้วย Argon2
+    let user: Account | undefined;
+    if (identifier.kind === 'email') {
+      user = this.db.accounts.find(
+        (a) =>
+          (a.email && a.email.toLowerCase() === username) ||
+          a.username.toLowerCase() === username,
+      );
+    } else {
+      // ดึงเฉพาะตัวเลขเพื่อรองรับการค้นหาด้วยเบอร์โทรศัพท์ (Backward Compatibility)
+      const digits = username.replace(/\D/g, '');
+      user = this.db.accounts.find(
+        (a) =>
+          a.username.toLowerCase() === username ||
+          (digits.length >= 9 && a.phone.replace(/\D/g, '') === digits),
+      );
+    }
+    // ตรวจสอบรหัสผ่านด้วย Argon2 (ไม่เปิดเผยว่ามีบัญชีอยู่ในระบบหรือไม่)
     if (!user || !(await verifySecret(user.password, password))) {
       recordFailure(lockKey);
-      throw new UnauthorizedException('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+      throw new UnauthorizedException('ชื่อผู้ใช้ อีเมล หรือรหัสผ่านไม่ถูกต้อง');
     }
     // ตรวจสอบว่าบัญชีถูกระงับการใช้งานหรือไม่
     if (user.active === false) {
@@ -239,6 +258,7 @@ export class AuthController {
     }
 
     const name = clampNameInput(body.name, NAME_MAX_LENGTH.PERSON_NAME).trim();
+    const rawUsername = typeof body.username === 'string' ? body.username.trim() : '';
     const email = String(body.email ?? '').trim().toLowerCase();
     const phone = String(body.phone ?? '').trim();
     const password = String(body.password ?? '');
@@ -247,10 +267,30 @@ export class AuthController {
     if (!name) throw new BadRequestException('กรุณากรอกชื่อ-นามสกุล');
     if (!password) throw new BadRequestException('กรุณากรอกรหัสผ่าน');
 
+    // ตรวจสอบมาตรฐานและไม่ซ้ำซ้อนของชื่อผู้ใช้ (Username) เมื่อมีการระบุ
+    let validatedUsername = '';
+    if (rawUsername) {
+      const usernameCheck = validateUsername(rawUsername);
+      if (!usernameCheck.valid) {
+        throw new BadRequestException(usernameCheck.error);
+      }
+      validatedUsername = usernameCheck.value;
+      if (
+        this.db.accounts.some(
+          (a) =>
+            a.username.toLowerCase() === validatedUsername ||
+            (a.email && a.email.toLowerCase() === validatedUsername),
+        )
+      ) {
+        throw new ConflictException('ชื่อผู้ใช้ (Username) นี้ถูกใช้งานในระบบแล้ว');
+      }
+    }
+
     // ตรวจสอบความถูกต้องและไม่ซ้ำซ้อนของอีเมล
     if (email) {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        throw new BadRequestException('รูปแบบอีเมลไม่ถูกต้อง');
+      const emailCheck = validateEmail(email);
+      if (!emailCheck.valid) {
+        throw new BadRequestException(emailCheck.error || 'รูปแบบอีเมลไม่ถูกต้อง');
       }
       if (this.db.accounts.some((a) => (a.email && a.email.toLowerCase() === email) || a.username.toLowerCase() === email)) {
         throw new ConflictException('อีเมลนี้ถูกใช้งานในระบบแล้ว');
@@ -265,9 +305,10 @@ export class AuthController {
       }
     }
 
-    // ตรวจสอบความแข็งแกร่งของรหัสผ่าน
-    if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-      throw new BadRequestException('รหัสผ่านต้องยาวอย่างน้อย 8 ตัว และมีทั้งตัวอักษรและตัวเลข');
+    // ตรวจสอบความแข็งแกร่งของรหัสผ่านตามมาตรฐานใหม่ (อย่างน้อย 8 ตัวอักษร + ตัวอักษรภาษาอังกฤษ + ตัวเลข)
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.valid) {
+      throw new BadRequestException(passwordCheck.error);
     }
 
     // ตรวจสอบ OTP เฉพาะกรณีที่มีการส่ง OTP มา (Backward Compatibility)
@@ -311,7 +352,7 @@ export class AuthController {
     // Hash รหัสผ่านก่อนบันทึก
     const hashedPassword = await hashSecret(password);
     const id = await this.db.nextId('u');
-    const username = email || (digits ? digits : (body.username ? body.username.trim().toLowerCase() : `user_${id}`));
+    const username = validatedUsername || email || (digits ? digits : `user_${id}`);
 
     // สร้างข้อมูลโครงสร้างบัญชีผู้ใช้งานใหม่
     const account: Account = {
@@ -449,8 +490,19 @@ export class AuthController {
     }
     if (body.email !== undefined) {
       const emailStr = String(body.email).trim().toLowerCase();
-      if (emailStr && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr)) {
-        throw new BadRequestException('รูปแบบอีเมลไม่ถูกต้อง');
+      if (emailStr) {
+        const emailCheck = validateEmail(emailStr);
+        if (!emailCheck.valid) {
+          throw new BadRequestException(emailCheck.error || 'รูปแบบอีเมลไม่ถูกต้อง');
+        }
+        const duplicateEmail = this.db.accounts.some(
+          (a) =>
+            a.id !== user.id &&
+            ((a.email && a.email.toLowerCase() === emailStr) || a.username.toLowerCase() === emailStr),
+        );
+        if (duplicateEmail) {
+          throw new ConflictException('อีเมลนี้ถูกใช้งานโดยบัญชีอื่นแล้ว');
+        }
       }
       user.email = emailStr || undefined;
       user.emailVerified = true;
@@ -488,12 +540,14 @@ export class AuthController {
     }
     clearFailures(lockKey);
 
-    if (newPassword.length < 4) {
-      throw new BadRequestException('รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 4 ตัวอักษร');
+    const passwordCheck = validatePassword(newPassword);
+    if (!passwordCheck.valid) {
+      throw new BadRequestException(passwordCheck.error);
     }
 
     // เข้ารหัสรหัสผ่านใหม่และบันทึก
     user.password = await hashSecret(newPassword);
+    user.mustChangePassword = false;
     await this.db.persistAccount(user);
     await this.db.log('user', 'เปลี่ยนรหัสผ่านบัญชี', user.name, {
       id: user.id,

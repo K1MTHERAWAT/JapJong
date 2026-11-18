@@ -38,6 +38,7 @@ interface AuthContextValue {
   /** ฟังก์ชันลงทะเบียนบัญชีใหม่ */
   registerAccount: (payload: {
     name: string;
+    username?: string;
     password: string;
     email?: string;
     phone?: string;
@@ -191,6 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const registerAccount = useCallback(
     async (payload: {
       name: string;
+      username?: string;
       password: string;
       email?: string;
       phone?: string;

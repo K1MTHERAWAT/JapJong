@@ -10,7 +10,15 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth-context';
 // นำเข้า Icon แสดงรูปไอคอน SVG
 import { Icon } from '@/components/icons';
-import { NAME_MAX_LENGTH, clampNameInput } from '@japjong/shared';
+import { Eye, EyeOff } from 'lucide-react';
+import {
+  NAME_MAX_LENGTH,
+  clampNameInput,
+  getPasswordRuleChecks,
+  validateEmail,
+  validatePassword,
+  validateUsername,
+} from '@japjong/shared';
 import { NameLengthBadge, NameLimitWarning } from '@/components/ui';
 
 /**
@@ -24,12 +32,16 @@ export default function RegisterPage() {
 
   // State ฟอร์มลงทะเบียน
   const [name, setName] = useState(''); // ชื่อ-นามสกุล
+  const [username, setUsername] = useState(''); // ชื่อผู้ใช้ (Username)
   const [department, setDepartment] = useState(''); // หน่วยงาน / ชุมชน / สังกัด
-  const [email, setEmail] = useState(''); // อีเมล
+  const [email, setEmail] = useState(''); // อีเมล / Gmail
   const [password, setPassword] = useState(''); // รหัสผ่าน
+  const [showPassword, setShowPassword] = useState(false); // แสดง/ซ่อนรหัสผ่าน
   const [pdpa, setPdpa] = useState(true); // ยินยอมเงื่อนไข PDPA (ค่าเริ่มต้น: ยินยอม)
   const [error, setError] = useState(''); // ข้อความแจ้งเตือนข้อผิดพลาด
   const [submitting, setSubmitting] = useState(false); // สถานะกำลังส่งข้อมูลสมัครสมาชิก
+
+  const passwordChecks = getPasswordRuleChecks(password);
 
   // ตรวจสอบตัวแปรสภาพแวดล้อมว่าเปิดให้ประชาชนลงทะเบียนด้วยตนเองหรือไม่
   const isRegistrationOpen = process.env.NEXT_PUBLIC_REGISTRATION_OPEN !== 'false';
@@ -49,17 +61,25 @@ export default function RegisterPage() {
       setError('กรุณากรอกชื่อ-นามสกุล');
       return;
     }
-    // 3. ตรวจสอบรูปแบบอีเมล
-    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setError('กรุณากรอกอีเมลให้ถูกต้อง');
+    // 3. ตรวจสอบมาตรฐานชื่อผู้ใช้ (Username)
+    const usernameCheck = validateUsername(username);
+    if (!usernameCheck.valid) {
+      setError(usernameCheck.error || 'ชื่อผู้ใช้ (Username) ไม่ถูกต้อง');
       return;
     }
-    // 4. ตรวจสอบความปลอดภัยของรหัสผ่าน (อย่างน้อย 8 ตัวอักษร มีตัวอักษรและตัวเลข)
-    if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-      setError('รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร และประกอบด้วยตัวอักษรและตัวเลข');
+    // 4. ตรวจสอบรูปแบบอีเมล / Gmail
+    const emailCheck = validateEmail(email);
+    if (!emailCheck.valid) {
+      setError(emailCheck.error || 'กรุณากรอกอีเมลให้ถูกต้อง');
       return;
     }
-    // 5. ตรวจสอบการยินยอมนโยบาย PDPA
+    // 5. ตรวจสอบความปลอดภัยของรหัสผ่าน (อย่างน้อย 8 ตัวอักษร มีตัวอักษรภาษาอังกฤษและตัวเลข)
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.valid) {
+      setError(passwordCheck.error || 'รหัสผ่านไม่ผ่านเงื่อนไขที่กำหนด');
+      return;
+    }
+    // 6. ตรวจสอบการยินยอมนโยบาย PDPA
     if (!pdpa) {
       setError('กรุณายินยอมนโยบาย PDPA ก่อนลงทะเบียน');
       return;
@@ -71,8 +91,9 @@ export default function RegisterPage() {
       // เรียกฟังก์ชันลงทะเบียนผ่าน Auth Context
       await registerAccount({
         name: name.trim(),
+        username: usernameCheck.value,
         department: department.trim() || 'ประชาชนทั่วไป',
-        email: email.trim().toLowerCase(),
+        email: emailCheck.value,
         password,
       });
       // ลงทะเบียนสำเร็จ นำทางไปยังหน้าหลักของระบบ
@@ -159,17 +180,41 @@ export default function RegisterPage() {
             <NameLimitWarning value={department} maxLength={NAME_MAX_LENGTH.ORGANIZATION} />
           </div>
 
-          {/* ช่องกรอกอีเมล */}
+          {/* ช่องกรอกชื่อผู้ใช้ (Username) */}
+          <div>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <label className="jw-lbl mb-0">
+                ชื่อผู้ใช้ (Username) <span className="text-status-crit">*</span>
+              </label>
+              <NameLengthBadge value={username} maxLength={NAME_MAX_LENGTH.USERNAME} />
+            </div>
+            <input
+              type="text"
+              value={username}
+              maxLength={NAME_MAX_LENGTH.USERNAME}
+              onChange={(e) => setUsername(clampNameInput(e.target.value, NAME_MAX_LENGTH.USERNAME))}
+              placeholder="เช่น somchai, supa1234 (อย่างน้อย 4 ตัวอักษร)"
+              className="jw-in"
+              autoComplete="username"
+              required
+            />
+            <div className="text-[12px] text-ink-mute mt-1">
+              อย่างน้อย 4 ตัวอักษร ใช้ตัวอักษรภาษาอังกฤษ (A-Z, a-z), ตัวเลข (0-9), _ หรือ -
+            </div>
+          </div>
+
+          {/* ช่องกรอกอีเมล / Gmail */}
           <div>
             <label className="jw-lbl">
-              อีเมล <span className="text-status-crit">*</span>
+              อีเมล / Gmail <span className="text-status-crit">*</span>
             </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="เช่น somchai@example.com"
+              placeholder="เช่น somchai@gmail.com"
               className="jw-in"
+              autoComplete="email"
               required
             />
           </div>
@@ -181,19 +226,33 @@ export default function RegisterPage() {
             </label>
             <div className="relative">
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="กรอกรหัสผ่าน"
-                className="jw-in pr-10"
+                placeholder="อย่างน้อย 8 ตัวอักษร เช่น supa1234"
+                className="jw-in pr-11"
+                autoComplete="new-password"
                 required
               />
-              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-ink-mute">
-                <Icon name="lock" className="w-4 h-4" />
-              </span>
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-full text-ink-mute hover:text-brand transition cursor-pointer"
+                aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
-            <div className="text-[12px] text-ink-mute mt-1">
-              อย่างน้อย 8 ตัวอักษร ประกอบด้วยตัวอักษรและตัวเลข
+            <div className="text-[12px] mt-1.5 flex flex-col gap-0.5">
+              <span className={passwordChecks.minLength ? 'text-status-ok font-medium' : 'text-ink-mute'}>
+                {passwordChecks.minLength ? '✓' : '•'} ความยาวอย่างน้อย 8 ตัวอักษร
+              </span>
+              <span className={passwordChecks.hasLetter ? 'text-status-ok font-medium' : 'text-ink-mute'}>
+                {passwordChecks.hasLetter ? '✓' : '•'} มีตัวอักษรภาษาอังกฤษอย่างน้อย 1 ตัว
+              </span>
+              <span className={passwordChecks.hasNumber ? 'text-status-ok font-medium' : 'text-ink-mute'}>
+                {passwordChecks.hasNumber ? '✓' : '•'} มีตัวเลขอย่างน้อย 1 ตัว
+              </span>
             </div>
           </div>
 
@@ -230,7 +289,7 @@ export default function RegisterPage() {
           </Link>
           <button
             type="submit"
-            disabled={submitting || !name.trim() || !email.trim() || !password.trim()}
+            disabled={submitting || !name.trim() || !username.trim() || !email.trim() || !password.trim()}
             className="jw-btn flex-[1.5] disabled:opacity-50"
           >
             {submitting ? 'กำลังลงทะเบียน...' : 'ลงทะเบียน'}

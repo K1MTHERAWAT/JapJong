@@ -43,13 +43,13 @@ describe('Regression & Concurrency Performance Testing (PHASE 8)', () => {
     // Login citizen 1 (somchai)
     const c1 = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ username: 'somchai', password: '1234' });
+      .send({ username: 'somchai', password: 'Demo1234' });
     citizen1Token = c1.body.token;
 
     // Login citizen 2 (manee)
     const c2 = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ username: 'manee', password: '1234' });
+      .send({ username: 'manee', password: 'Demo1234' });
     citizen2Token = c2.body.token;
   });
 

@@ -42,6 +42,8 @@ export interface Account {
   isDemo?: boolean;
   /** สถานะเปิด/ปิดการใช้งานบัญชี (ค่าเริ่มต้น = true) */
   active?: boolean;
+  /** บังคับให้ผู้ใช้เปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งถัดไป (เช่น บัญชีเดิมที่ไม่ผ่านนโยบายรหัสผ่านใหม่) */
+  mustChangePassword?: boolean;
   registrationCompletedAt?: string;
   accountStatus?: 'ACTIVE' | 'SUSPENDED';
   createdAt: string;

@@ -1,4 +1,5 @@
-import React, { useId } from 'react';
+import React, { useId, useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { clampNameInput, formatNameCounter, isNameAtLimit } from '@japjong/shared';
 
 /**
@@ -73,6 +74,8 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   helperText?: string;
   /** แสดงตัวนับจำนวนตัวอักษร (เช่น 25/100) เมื่อระบุ maxLength (ค่าเริ่มต้น: true เมื่อมี maxLength) */
   showCount?: boolean;
+  /** แสดงปุ่มสลับการแสดง/ซ่อนรหัสผ่านเมื่อ type="password" */
+  showPasswordToggle?: boolean;
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
@@ -85,6 +88,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       required,
       maxLength,
       showCount,
+      showPasswordToggle,
+      type,
       value,
       onChange,
       className = '',
@@ -97,6 +102,9 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     const errorId = `${id}-error`;
     const helperId = `${id}-helper`;
     const limitId = `${id}-limit`;
+    const [passwordVisible, setPasswordVisible] = useState(false);
+    const canTogglePassword = type === 'password' && Boolean(showPasswordToggle);
+    const resolvedType = canTogglePassword && passwordVisible ? 'text' : type;
 
     const hasMaxLength = typeof maxLength === 'number' && maxLength > 0;
     const shouldShowCount = showCount ?? hasMaxLength;
@@ -135,28 +143,42 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             )}
           </div>
         )}
-        <input
-          ref={ref}
-          id={id}
-          required={required}
-          maxLength={maxLength}
-          value={value}
-          onChange={handleChange}
-          aria-invalid={Boolean(error)}
-          aria-describedby={describedBy}
-          className={[
-            'h-11 min-h-[44px] w-full min-w-0 rounded-control border bg-surface px-3.5 text-body text-ink placeholder:text-ink-ph',
-            'transition-colors focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20',
-            error
-              ? 'border-danger-fg focus:border-danger-fg focus:ring-danger-fg/20'
-              : atLimit
-                ? 'border-warn-fg focus:border-warn-fg focus:ring-warn-fg/20'
-                : 'border-line-input hover:border-ink-mute',
-            'disabled:bg-disabled-bg disabled:text-disabled-fg disabled:border-disabled-border disabled:cursor-not-allowed',
-            className,
-          ].join(' ')}
-          {...props}
-        />
+        <div className="relative w-full min-w-0">
+          <input
+            ref={ref}
+            id={id}
+            type={resolvedType}
+            required={required}
+            maxLength={maxLength}
+            value={value}
+            onChange={handleChange}
+            aria-invalid={Boolean(error)}
+            aria-describedby={describedBy}
+            className={[
+              'h-11 min-h-[44px] w-full min-w-0 rounded-control border bg-surface px-3.5 text-body text-ink placeholder:text-ink-ph',
+              canTogglePassword ? 'pr-11' : '',
+              'transition-colors focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20',
+              error
+                ? 'border-danger-fg focus:border-danger-fg focus:ring-danger-fg/20'
+                : atLimit
+                  ? 'border-warn-fg focus:border-warn-fg focus:ring-warn-fg/20'
+                  : 'border-line-input hover:border-ink-mute',
+              'disabled:bg-disabled-bg disabled:text-disabled-fg disabled:border-disabled-border disabled:cursor-not-allowed',
+              className,
+            ].join(' ')}
+            {...props}
+          />
+          {canTogglePassword && (
+            <button
+              type="button"
+              onClick={() => setPasswordVisible((v) => !v)}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-full text-ink-mute hover:text-brand transition cursor-pointer"
+              aria-label={passwordVisible ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+            >
+              {passwordVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          )}
+        </div>
         {error && (
           <span id={errorId} className="text-caption font-medium text-danger-fg break-words">
             {error}

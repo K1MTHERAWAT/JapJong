@@ -27,6 +27,7 @@ import {
   RoleItem,
   UpdateRoleDto,
   clampNameInput,
+  validatePassword,
 } from '@japjong/shared';
 import { CurrentUser, Permissions, Roles } from '../auth/auth.guard';
 import { hashSecret } from '../auth/secret';
@@ -183,10 +184,12 @@ export class AdminController {
     // 2. รีเซ็ตรหัสผ่านใหม่โดยผู้ดูแลระบบ (Admin Password Reset)
     if (typeof body.newPassword === 'string' && body.newPassword.trim()) {
       const pwd = body.newPassword.trim();
-      if (pwd.length < 4) {
-        throw new BadRequestException('รหัสผ่านใหม่ต้องยาวอย่างน้อย 4 ตัวอักษร');
+      const pwdCheck = validatePassword(pwd);
+      if (!pwdCheck.valid) {
+        throw new BadRequestException(pwdCheck.error);
       }
       target.password = await hashSecret(pwd);
+      target.mustChangePassword = false;
       await this.db.log('user', 'รีเซ็ตรหัสผ่านบัญชีผู้ใช้', target.name, {
         id: actor.id,
         name: actor.name,

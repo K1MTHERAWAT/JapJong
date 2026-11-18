@@ -122,6 +122,18 @@ describe('AuthController Unit Tests', () => {
       expect(res.token).toBe('test-session-token');
     });
 
+    it('authenticates with valid Gmail/email and password', async () => {
+      const res = await controller.login({ username: 'SOMCHAI@namcham.go.th', password: 'password123' });
+      expect(res.token).toBe('test-session-token');
+      expect(res.account.email).toBe('somchai@namcham.go.th');
+    });
+
+    it('rejects malformed email format on login', async () => {
+      await expect(controller.login({ username: 'bad-email@', password: 'password123' })).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
     it('throws UnauthorizedException with wrong password', async () => {
       await expect(controller.login({ username: 'somchai_test', password: 'wrong' })).rejects.toThrow(UnauthorizedException);
     });
@@ -170,6 +182,40 @@ describe('AuthController Unit Tests', () => {
       expect(res.token).toBeDefined();
       expect(res.account.phone).toBe('0891112233');
       expect(res.account.username).toBe('0891112233');
+    });
+
+    it('registers new user with valid username, Gmail, and compliant password', async () => {
+      const res = await controller.register({
+        name: 'สุภา ใจดี',
+        username: 'Supa',
+        email: 'supa@gmail.com',
+        password: 'supa1234',
+      });
+      expect(res.token).toBeDefined();
+      expect(res.account.username).toBe('supa');
+      expect(res.account.email).toBe('supa@gmail.com');
+    });
+
+    it('rejects registration with short, invalid, or duplicate username', async () => {
+      await expect(
+        controller.register({ name: 'ทดสอบ', username: 'abc', email: 'a@gmail.com', password: 'supa1234' }),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        controller.register({ name: 'ทดสอบ', username: 'สมชาย', email: 'b@gmail.com', password: 'supa1234' }),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        controller.register({ name: 'ทดสอบ', username: 'somchai_test', email: 'c@gmail.com', password: 'supa1234' }),
+      ).rejects.toThrow(/ถูกใช้งานในระบบแล้ว/);
+    });
+
+    it('rejects registration with weak password', async () => {
+      for (const weak of ['1234', '12345678', 'abcdefgh', 'abc1234']) {
+        await expect(
+          controller.register({ name: 'ทดสอบ', username: 'validuser', email: 'd@gmail.com', password: weak }),
+        ).rejects.toThrow(BadRequestException);
+      }
     });
 
     it('rejects registration when REGISTRATION_OPEN is explicitly false', async () => {
@@ -234,6 +280,17 @@ describe('AuthController Unit Tests', () => {
           newPassword: 'newPassword456',
         }),
       ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('rejects weak new password on changePassword', async () => {
+      for (const weak of ['1234', '12345678', 'abcdefgh']) {
+        await expect(
+          controller.changePassword(testUser, {
+            currentPassword: 'password123',
+            newPassword: weak,
+          }),
+        ).rejects.toThrow(BadRequestException);
+      }
     });
 
     it('saves drawn signature', async () => {

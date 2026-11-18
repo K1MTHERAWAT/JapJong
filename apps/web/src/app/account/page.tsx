@@ -25,7 +25,9 @@ import {
   ROLE_LABEL,
   ROLE_TONE,
   clampNameInput,
+  getPasswordRuleChecks,
   sanitizePhoneInput,
+  validatePassword,
   validateThaiAddressHierarchy,
   validateThaiPhone,
 } from '@japjong/shared';
@@ -129,9 +131,17 @@ export default function AccountPage() {
         // กรณีเกิดข้อผิดพลาดในการเชื่อมต่อ LINE
         setProfileErr(decodeURIComponent(sp.get('line_error') || 'เชื่อมต่อ LINE ไม่สำเร็จ'));
         window.history.replaceState({}, '', '/account');
+      } else if (sp.get('tab') === 'password') {
+        setActiveTab('password');
       }
     }
   }, [refreshMe]);
+
+  useEffect(() => {
+    if (account?.mustChangePassword) {
+      setActiveTab('password');
+    }
+  }, [account?.mustChangePassword]);
 
   /**
    * ฟังก์ชันขอ URL เพื่อเปลี่ยนเส้นทางไปหน้าขออนุญาตสิทธิ์ของ LINE Login (OAuth)
@@ -305,8 +315,9 @@ export default function AccountPage() {
       setPwdErr('กรุณากรอกรหัสผ่านใหม่');
       return;
     }
-    if (newPassword.length < 4) {
-      setPwdErr('รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 4 ตัวอักษร');
+    const pwdCheck = validatePassword(newPassword);
+    if (!pwdCheck.valid) {
+      setPwdErr(pwdCheck.error || 'รหัสผ่านใหม่ไม่ผ่านเงื่อนไขที่กำหนด');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -320,6 +331,7 @@ export default function AccountPage() {
         currentPassword,
         newPassword,
       });
+      await refreshMe();
       // ล้างข้อมูลรหัสผ่านในฟอร์มเมื่อเปลี่ยนสำเร็จ
       setCurrentPassword('');
       setNewPassword('');
@@ -704,6 +716,18 @@ export default function AccountPage() {
                   </div>
                 </div>
 
+                {account?.mustChangePassword && (
+                  <div className="rounded-control bg-warn-bg border border-warn-fg/30 px-4 py-3 text-body text-warn-fg flex items-start gap-2.5">
+                    <AlertCircle className="size-5 shrink-0 mt-0.5" />
+                    <div>
+                      <b className="block">กรุณาอัปเดตรหัสผ่านของคุณให้เป็นไปตามมาตรฐานความปลอดภัยใหม่</b>
+                      <span className="text-caption">
+                        รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 8 ตัวอักษร และประกอบด้วยตัวอักษรภาษาอังกฤษและตัวเลข
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {/* ช่องกรอกรหัสผ่านปัจจุบัน */}
                 <Input
                   type="password"
@@ -711,19 +735,39 @@ export default function AccountPage() {
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="กรอกรหัสผ่านปัจจุบันของคุณ"
+                  showPasswordToggle
                   required
                 />
 
                 {/* ช่องกรอกรหัสผ่านใหม่ */}
-                <Input
-                  type="password"
-                  label="รหัสผ่านใหม่"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="ตั้งรหัสผ่านใหม่อย่างน้อย 4 ตัวอักษร"
-                  helperText="แนะนำให้ตั้งรหัสผ่านอย่างน้อย 8 ตัวอักษร ประกอบด้วยตัวอักษรและตัวเลข"
-                  required
-                />
+                <div className="flex flex-col gap-1.5">
+                  <Input
+                    type="password"
+                    label="รหัสผ่านใหม่"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="ตั้งรหัสผ่านใหม่อย่างน้อย 8 ตัวอักษร เช่น supa1234"
+                    helperText="อย่างน้อย 8 ตัวอักษร ประกอบด้วยตัวอักษรภาษาอังกฤษและตัวเลขอย่างน้อยอย่างละ 1 ตัว"
+                    showPasswordToggle
+                    required
+                  />
+                  {newPassword.length > 0 && (() => {
+                    const checks = getPasswordRuleChecks(newPassword);
+                    return (
+                      <div className="text-caption flex flex-wrap gap-x-4 gap-y-0.5 pl-1">
+                        <span className={checks.minLength ? 'text-status-ok font-medium' : 'text-muted'}>
+                          {checks.minLength ? '✓' : '•'} อย่างน้อย 8 ตัวอักษร
+                        </span>
+                        <span className={checks.hasLetter ? 'text-status-ok font-medium' : 'text-muted'}>
+                          {checks.hasLetter ? '✓' : '•'} ตัวอักษรภาษาอังกฤษ (A-Z, a-z)
+                        </span>
+                        <span className={checks.hasNumber ? 'text-status-ok font-medium' : 'text-muted'}>
+                          {checks.hasNumber ? '✓' : '•'} ตัวเลข (0-9)
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
 
                 {/* ช่องยืนยันรหัสผ่านใหม่ */}
                 <Input
@@ -732,6 +776,7 @@ export default function AccountPage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="กรอกรหัสผ่านใหม่อีกครั้ง"
+                  showPasswordToggle
                   required
                 />
 

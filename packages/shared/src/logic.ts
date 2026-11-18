@@ -682,4 +682,157 @@ export function checkBorrowReceiveEligibility(
   };
 }
 
+// ===== Authentication & Password Policy Validation =====
+
+export const USERNAME_MIN_LENGTH = 4;
+export const USERNAME_MAX_LENGTH = 30;
+export const USERNAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
+export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const PASSWORD_MIN_LENGTH = 8;
+
+export interface UsernameValidationResult {
+  valid: boolean;
+  value: string;
+  error?: string;
+}
+
+export interface EmailValidationResult {
+  valid: boolean;
+  value: string;
+  error?: string;
+}
+
+export interface PasswordRuleChecks {
+  minLength: boolean;
+  hasLetter: boolean;
+  hasNumber: boolean;
+  valid: boolean;
+}
+
+export interface PasswordValidationResult {
+  valid: boolean;
+  checks: PasswordRuleChecks;
+  error?: string;
+}
+
+export interface LoginIdentifierClassification {
+  kind: 'empty' | 'email' | 'username';
+  value: string;
+  validEmail: boolean;
+}
+
+/**
+ * ตรวจสอบมาตรฐาน Username:
+ * - ความยาวอย่างน้อย 4 ตัวอักษร (และไม่เกิน 30 ตัวอักษร)
+ * - รองรับเฉพาะตัวอักษรภาษาอังกฤษ (A-Z, a-z), ตัวเลข (0-9), _ และ -
+ */
+export function validateUsername(raw: unknown): UsernameValidationResult {
+  if (typeof raw !== 'string') {
+    return { valid: false, value: '', error: 'กรุณากรอกชื่อผู้ใช้ (Username)' };
+  }
+  const normalized = raw.trim().toLowerCase();
+  if (!normalized) {
+    return { valid: false, value: '', error: 'กรุณากรอกชื่อผู้ใช้ (Username)' };
+  }
+  if (normalized.length < USERNAME_MIN_LENGTH) {
+    return {
+      valid: false,
+      value: normalized,
+      error: `ชื่อผู้ใช้ (Username) ต้องมีความยาวอย่างน้อย ${USERNAME_MIN_LENGTH} ตัวอักษร`,
+    };
+  }
+  if (normalized.length > USERNAME_MAX_LENGTH) {
+    return {
+      valid: false,
+      value: normalized,
+      error: `ชื่อผู้ใช้ (Username) ต้องไม่เกิน ${USERNAME_MAX_LENGTH} ตัวอักษร`,
+    };
+  }
+  if (!USERNAME_PATTERN.test(normalized)) {
+    return {
+      valid: false,
+      value: normalized,
+      error: 'ชื่อผู้ใช้ (Username) รองรับเฉพาะตัวอักษรภาษาอังกฤษ (A-Z, a-z), ตัวเลข (0-9), _ และ - เท่านั้น',
+    };
+  }
+  return { valid: true, value: normalized };
+}
+
+/**
+ * ตรวจสอบรูปแบบอีเมล / Gmail ให้ถูกต้อง
+ */
+export function validateEmail(raw: unknown): EmailValidationResult {
+  if (typeof raw !== 'string') {
+    return { valid: false, value: '', error: 'กรุณากรอกอีเมล' };
+  }
+  const normalized = raw.trim().toLowerCase();
+  if (!normalized) {
+    return { valid: false, value: '', error: 'กรุณากรอกอีเมล' };
+  }
+  if (!EMAIL_PATTERN.test(normalized)) {
+    return { valid: false, value: normalized, error: 'รูปแบบอีเมลไม่ถูกต้อง' };
+  }
+  return { valid: true, value: normalized };
+}
+
+/**
+ * ตรวจสอบรายละเอียดเงื่อนไขความปลอดภัยของรหัสผ่านแต่ละข้อ
+ */
+export function getPasswordRuleChecks(password: string): PasswordRuleChecks {
+  const minLength = password.length >= PASSWORD_MIN_LENGTH;
+  const hasLetter = /[A-Za-z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  return {
+    minLength,
+    hasLetter,
+    hasNumber,
+    valid: minLength && hasLetter && hasNumber,
+  };
+}
+
+/**
+ * ตรวจสอบมาตรฐานรหัสผ่านใหม่:
+ * - ความยาวขั้นต่ำ 8 ตัวอักษร
+ * - ประกอบด้วยตัวอักษรภาษาอังกฤษอย่างน้อย 1 ตัว
+ * - ประกอบด้วยตัวเลขอย่างน้อย 1 ตัว
+ */
+export function validatePassword(raw: unknown): PasswordValidationResult {
+  const password = typeof raw === 'string' ? raw : '';
+  const checks = getPasswordRuleChecks(password);
+  if (!password) {
+    return { valid: false, checks, error: 'กรุณากรอกรหัสผ่าน' };
+  }
+  if (!checks.valid) {
+    return {
+      valid: false,
+      checks,
+      error: `รหัสผ่านต้องมีความยาวอย่างน้อย ${PASSWORD_MIN_LENGTH} ตัวอักษร และประกอบด้วยตัวอักษรภาษาอังกฤษและตัวเลขอย่างน้อยอย่างละ 1 ตัว`,
+    };
+  }
+  return { valid: true, checks };
+}
+
+/**
+ * จำแนกประเภทข้อมูลที่ใช้เข้าสู่ระบบ (Gmail/Email หรือ Username) โดยอัตโนมัติ
+ */
+export function classifyLoginIdentifier(raw: unknown): LoginIdentifierClassification {
+  const value = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+  if (!value) {
+    return { kind: 'empty', value: '', validEmail: false };
+  }
+  if (value.includes('@')) {
+    return {
+      kind: 'email',
+      value,
+      validEmail: EMAIL_PATTERN.test(value),
+    };
+  }
+  return {
+    kind: 'username',
+    value,
+    validEmail: false,
+  };
+}
+
+
 

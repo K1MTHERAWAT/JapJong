@@ -910,6 +910,11 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
             "email_verified" = ${a.emailVerified ?? false}
         WHERE "id" = ${a.id}
       `;
+      await this.prisma.$executeRaw`
+        UPDATE "accounts"
+        SET "must_change_password" = ${a.mustChangePassword ?? false}
+        WHERE "id" = ${a.id}
+      `.catch(() => {});
     } catch (err) {
       this.logger.error('Failed to persistAccount in DB', err);
     }
@@ -2563,7 +2568,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   }
 
   async loadFromDatabase() {
-    const [dbAccounts, accountAddresses, dbVenues, dbEquipment, dbRequests, dbNotifications, dbActivities, dbHandovers] =
+    const [dbAccounts, accountAddresses, mustChangeRows, dbVenues, dbEquipment, dbRequests, dbNotifications, dbActivities, dbHandovers] =
       await Promise.all([
         this.prisma.account.findMany({ orderBy: { createdAt: 'asc' } }),
         (this.prisma.$queryRaw`SELECT "id", "address_house_no", "address_moo", "address_subdistrict", "address_district", "address_province", "address_subdistrict_id", "address_district_id", "address_province_id", "email", "email_verified" FROM "accounts"` as Promise<
@@ -2581,6 +2586,9 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
             email_verified: boolean | null;
           }[]
         >),
+        (this.prisma.$queryRaw`SELECT "id", "must_change_password" FROM "accounts"` as Promise<
+          { id: string; must_change_password: boolean | null }[]
+        >).catch(() => [] as { id: string; must_change_password: boolean | null }[]),
         this.prisma.venue.findMany({ orderBy: { createdAt: 'asc' } }),
         this.prisma.equipment.findMany({ orderBy: { createdAt: 'asc' } }),
         this.prisma.request.findMany({
@@ -2598,6 +2606,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       ]);
 
     const addrMap = new Map((accountAddresses as any[]).map((r: any) => [r.id, r]));
+    const mustChangeMap = new Map((mustChangeRows as any[]).map((r: any) => [r.id, Boolean(r.must_change_password)]));
 
     this.accounts = (dbAccounts || []).map((a: any) => {
       const addr = addrMap.get(a.id) as any;
@@ -2632,6 +2641,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         pin: a.pin,
         isDemo: a.isDemo,
         active: a.active,
+        mustChangePassword: mustChangeMap.get(a.id) ?? false,
         createdAt: a.createdAt.toISOString(),
       };
     });

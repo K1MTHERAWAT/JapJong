@@ -5,9 +5,9 @@ import { NAME_MAX_LENGTH } from '@japjong/shared';
  * Data Transfer Object (DTO) สำหรับการเข้าสู่ระบบแบบปกติ (Username & Password)
  */
 export class LoginDto {
-  // บัญชีชื่อผู้ใช้งาน (ห้ามว่าง)
+  // บัญชีชื่อผู้ใช้งาน หรืออีเมล (ห้ามว่าง)
   @IsString()
-  @IsNotEmpty({ message: 'กรุณากรอกชื่อผู้ใช้' })
+  @IsNotEmpty({ message: 'กรุณากรอกชื่อผู้ใช้หรืออีเมล' })
   username!: string;
 
   // รหัสผ่านเข้าใช้งานระบบ (ห้ามว่าง)

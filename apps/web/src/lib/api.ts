@@ -214,6 +214,7 @@ export const api = {
   /** ลงทะเบียนบัญชีผู้ใช้ใหม่ทั่วไป */
   register: (payload: {
     name: string;
+    username?: string;
     password: string;
     email?: string;
     phone?: string;

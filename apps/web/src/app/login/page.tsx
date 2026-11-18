@@ -16,7 +16,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 // ข้อมูลจำลองและคอนฟิกประเภทผู้ใช้/สีโทนประจำบทบาท (RBAC)
-import { DemoAccountSummary, ROLE_LABEL, ROLE_TONE } from '@japjong/shared';
+import { DemoAccountSummary, ROLE_LABEL, ROLE_TONE, classifyLoginIdentifier } from '@japjong/shared';
 // Context จัดการสถานะการเข้าสู่ระบบและผู้ใช้ปัจจุบัน
 import { useAuth } from '@/components/auth-context';
 // Context จัดการสลับธีม สว่าง/มืด (Light / Dark mode)
@@ -179,9 +179,14 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedUser = username.trim();
+    const identifier = classifyLoginIdentifier(trimmedUser);
     // ตรวจสอบความถูกต้องเบื้องต้น (Validation)
-    if (!trimmedUser || !password.trim()) {
-      setError('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน');
+    if (identifier.kind === 'empty' || !password.trim()) {
+      setError('กรุณากรอกชื่อผู้ใช้หรืออีเมล และรหัสผ่าน');
+      return;
+    }
+    if (identifier.kind === 'email' && !identifier.validEmail) {
+      setError('รูปแบบอีเมลไม่ถูกต้อง');
       return;
     }
     // ต้องยินยอมนโยบาย PDPA
@@ -194,7 +199,11 @@ export default function LoginPage() {
     try {
       // ลองเข้าสู่ระบบผ่านระบบจัดการบัญชีภายใน (Local Auth)
       const acc = await loginWithCredentials(trimmedUser, password);
-      router.push(roleHomePath(acc.role));
+      if (acc.mustChangePassword) {
+        router.push('/account?tab=password&force=1');
+      } else {
+        router.push(roleHomePath(acc.role));
+      }
     } catch (localErr) {
       // หากกรอกเป็นรูปแบบอีเมล ให้ลองตรวจสอบกับ Gov Center SSO อัตโนมัติ (Fallback)
       if (trimmedUser.includes('@')) {
@@ -504,17 +513,17 @@ export default function LoginPage() {
             {/* ฟอร์มกรอกข้อมูลชื่อผู้ใช้และรหัสผ่าน */}
             <form onSubmit={handleLogin} className="flex flex-col gap-4">
               
-              {/* ช่องกรอกชื่อผู้ใช้ / อีเมล / เบอร์โทร */}
+              {/* ช่องกรอกชื่อผู้ใช้ (Username) หรือ Gmail / อีเมล */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[13.5px] font-semibold text-[#1e302a] dark:text-ink">
-                  ชื่อผู้ใช้, อีเมล หรือ เบอร์โทรศัพท์
+                  ชื่อผู้ใช้ (Username) หรือ Gmail / อีเมล
                 </label>
                 <input
                   id="login-username-input"
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="เช่น somchai หรืออีเมล"
+                  placeholder="เช่น somchai หรือ name@gmail.com"
                   className="w-full h-[50px] px-5 lg:px-4 rounded-full lg:rounded-[12px] border-[1.5px] border-[#87928d] dark:border-line bg-white dark:bg-surface text-[#14231f] dark:text-ink text-[15px] focus:outline-none focus:border-[#0b6b5c] dark:focus:border-brand focus:ring-2 focus:ring-[#0b6b5c]/20 transition placeholder:text-ink-mute/50"
                   autoComplete="username"
                 />

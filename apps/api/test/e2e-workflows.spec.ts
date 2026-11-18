@@ -63,7 +63,7 @@ describe('End-to-End System Workflows (E2E)', () => {
     // Login Citizen
     const citizenRes = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ username: 'somchai', password: '1234' });
+      .send({ username: 'somchai', password: 'Demo1234' });
     expect(citizenRes.status).toBe(201);
     citizenToken = citizenRes.body.token;
     citizenId = citizenRes.body.account.id;
@@ -71,7 +71,7 @@ describe('End-to-End System Workflows (E2E)', () => {
     // Login Staff
     const staffRes = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ username: 'suda', password: '1234' });
+      .send({ username: 'suda', password: 'Demo1234' });
     expect(staffRes.status).toBe(201);
     staffToken = staffRes.body.token;
     staffId = staffRes.body.account.id;
@@ -79,7 +79,7 @@ describe('End-to-End System Workflows (E2E)', () => {
     // Login Palad L2
     const paladRes = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ username: 'wichai', password: '1234' });
+      .send({ username: 'wichai', password: 'Demo1234' });
     expect(paladRes.status).toBe(201);
     paladToken = paladRes.body.token;
     paladId = paladRes.body.account.id;
@@ -87,7 +87,7 @@ describe('End-to-End System Workflows (E2E)', () => {
     // Login Nayok L1
     const nayokRes = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ username: 'prasert', password: '1234' });
+      .send({ username: 'prasert', password: 'Demo1234' });
     expect(nayokRes.status).toBe(201);
     nayokToken = nayokRes.body.token;
     nayokId = nayokRes.body.account.id;
@@ -95,7 +95,7 @@ describe('End-to-End System Workflows (E2E)', () => {
     // Login Admin
     const adminRes = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ username: 'admin', password: '1234' });
+      .send({ username: 'admin', password: 'Demo1234' });
     expect(adminRes.status).toBe(201);
     adminToken = adminRes.body.token;
   });
