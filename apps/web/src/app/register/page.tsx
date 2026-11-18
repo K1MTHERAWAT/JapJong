@@ -67,11 +67,15 @@ export default function RegisterPage() {
       setError(usernameCheck.error || 'ชื่อผู้ใช้ (Username) ไม่ถูกต้อง');
       return;
     }
-    // 4. ตรวจสอบรูปแบบอีเมล / Gmail
-    const emailCheck = validateEmail(email);
-    if (!emailCheck.valid) {
-      setError(emailCheck.error || 'กรุณากรอกอีเมลให้ถูกต้อง');
-      return;
+    // 4. ตรวจสอบรูปแบบอีเมล / Gmail (ไม่บังคับกรอก แต่ถ้ากรอกต้องถูกต้อง)
+    let normalizedEmail: string | undefined;
+    if (email.trim()) {
+      const emailCheck = validateEmail(email);
+      if (!emailCheck.valid) {
+        setError(emailCheck.error || 'กรุณากรอกอีเมลให้ถูกต้อง');
+        return;
+      }
+      normalizedEmail = emailCheck.value;
     }
     // 5. ตรวจสอบความปลอดภัยของรหัสผ่าน (อย่างน้อย 8 ตัวอักษร มีตัวอักษรภาษาอังกฤษและตัวเลข)
     const passwordCheck = validatePassword(password);
@@ -93,7 +97,7 @@ export default function RegisterPage() {
         name: name.trim(),
         username: usernameCheck.value,
         department: department.trim() || 'ประชาชนทั่วไป',
-        email: emailCheck.value,
+        email: normalizedEmail,
         password,
       });
       // ลงทะเบียนสำเร็จ นำทางไปยังหน้าหลักของระบบ
@@ -203,11 +207,9 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* ช่องกรอกอีเมล / Gmail */}
+          {/* ช่องกรอกอีเมล / Gmail (ไม่บังคับ) */}
           <div>
-            <label className="jw-lbl">
-              อีเมล / Gmail <span className="text-status-crit">*</span>
-            </label>
+            <label className="jw-lbl">อีเมล / Gmail</label>
             <input
               type="email"
               value={email}
@@ -215,7 +217,6 @@ export default function RegisterPage() {
               placeholder="เช่น somchai@gmail.com"
               className="jw-in"
               autoComplete="email"
-              required
             />
           </div>
 
@@ -289,7 +290,7 @@ export default function RegisterPage() {
           </Link>
           <button
             type="submit"
-            disabled={submitting || !name.trim() || !username.trim() || !email.trim() || !password.trim()}
+            disabled={submitting || !name.trim() || !username.trim() || !password.trim()}
             className="jw-btn flex-[1.5] disabled:opacity-50"
           >
             {submitting ? 'กำลังลงทะเบียน...' : 'ลงทะเบียน'}
