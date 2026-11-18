@@ -667,26 +667,19 @@ export class AuthController {
       user.name,
       { isDemo: isMockEmail },
     );
-    // หากส่งอีเมลไม่สำเร็จ ให้แจ้ง Error ทันที
+    // หาก Resend เกิดข้อผิดพลาดในการส่งจริง ให้แจ้ง Error ทันที
     if (!sendResult.success) {
-      throw new BadRequestException(`ไม่สามารถส่งรหัส OTP ทางอีเมลได้: ${sendResult.error}`);
+      throw new BadRequestException(`ไม่สามารถส่งรหัส OTP ผ่าน Resend ได้: ${sendResult.error}`);
     }
 
     // ซ่อนตัวอักษรบางส่วนของอีเมล เช่น ki***@gmail.com สำหรับแสดงบนหน้าจอและ Audit Log
     const masked = maskEmail(targetEmail);
-    const channelLabel = isMockEmail
-      ? 'โหมดเดโม (Mock)'
-      : sendResult.provider === 'smtp'
-        ? 'Gmail SMTP'
-        : sendResult.provider === 'resend'
-          ? 'Resend จริง'
-          : 'โหมดเดโม (Log)';
 
     // บันทึกประวัติการทำงาน (Audit Log) ทางราชการเพื่อความโปร่งใสและตรวจสอบย้อนหลังได้
     await this.db.log(
       'user',
       'ขอรหัส OTP สำหรับยืนยันการลงนาม',
-      `ส่งรหัส OTP 6 หลักไปยัง ${masked} (${channelLabel})`,
+      `ส่งรหัส OTP 6 หลักไปยัง ${masked} (${isMockEmail ? 'โหมดเดโม (Mock)' : 'Resend จริง'})`,
       {
         id: user.id,
         name: user.name,

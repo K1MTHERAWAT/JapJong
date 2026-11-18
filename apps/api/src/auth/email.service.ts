@@ -1,14 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as nodemailer from 'nodemailer';
-import type { Transporter } from 'nodemailer';
 import { Resend } from 'resend';
 
 // โครงสร้างผลลัพธ์การส่งรหัส OTP
 export interface SendOtpResult {
-  success: boolean;                       // สำเร็จหรือไม่ (true/false)
-  id?: string;                            // รหัสอ้างอิงอีเมลจากผู้ให้บริการ (ถ้าส่งสำเร็จ)
-  provider?: 'smtp' | 'resend' | 'mock';  // ช่องทางที่ใช้ส่งอีเมลจริงหรือจำลอง
-  error?: string;                         // ข้อความแจ้งเตือนข้อผิดพลาด (ถ้าส่งไม่สำเร็จ)
+  success: boolean;  // สำเร็จหรือไม่ (true/false)
+  id?: string;       // รหัสอ้างอิงอีเมลจาก Resend (ถ้าส่งสำเร็จ)
+  error?: string;    // ข้อความแจ้งเตือนข้อผิดพลาด (ถ้าส่งไม่สำเร็จ)
 }
 
 // ตัวเลือกเสริมสำหรับการส่งรหัส OTP ยืนยันการลงนาม
@@ -43,83 +40,17 @@ export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   // ตัวแปรเก็บ Resend SDK Client instance (ค่าเริ่มต้นเป็น null)
   private resend: Resend | null = null;
-  // ตัวแปรเก็บ Nodemailer SMTP Transporter instance (ค่าเริ่มต้นเป็น null)
-  private smtpTransporter: Transporter | null = null;
 
   constructor() {
-    // กำหนดค่าเริ่มต้นของ Provider ที่พร้อมใช้งานทันทีที่ Service ถูกสร้าง
-    const provider = this.resolveProvider();
-    if (provider === 'smtp') {
-      this.ensureSmtpTransporter();
-    } else if (provider === 'resend') {
-      this.ensureResendClient();
-    } else {
-      this.logger.warn(
-        'Neither SMTP_USER/SMTP_PASS nor RESEND_API_KEY is configured. OTP emails will be logged to console.',
-      );
-    }
-  }
-
-  /**
-   * ระบุผู้ให้บริการส่งอีเมลที่จะใช้งาน โดยดูจาก EMAIL_PROVIDER (smtp | resend)
-   * หากไม่ได้กำหนด (หรือเป็น auto) จะเลือก SMTP ก่อนถ้าตั้งค่าไว้ มิฉะนั้นจะใช้ Resend
-   */
-  private resolveProvider(): 'smtp' | 'resend' | 'none' {
-    const explicit = process.env.EMAIL_PROVIDER?.trim().toLowerCase();
-    if (explicit === 'smtp') return 'smtp';
-    if (explicit === 'resend') return 'resend';
-
-    if (process.env.SMTP_USER?.trim() && process.env.SMTP_PASS?.trim()) {
-      return 'smtp';
-    }
-    if (process.env.RESEND_API_KEY?.trim()) {
-      return 'resend';
-    }
-    return 'none';
-  }
-
-  /**
-   * ฟังก์ชันสร้างและเตรียมความพร้อมของ Nodemailer SMTP Transporter (รองรับ Gmail App Password)
-   */
-  private ensureSmtpTransporter(): Transporter | null {
-    if (this.smtpTransporter) return this.smtpTransporter;
-
-    const user = process.env.SMTP_USER?.trim();
-    const pass = process.env.SMTP_PASS?.replace(/\s+/g, '').trim();
-
-    if (!user || !pass) {
-      this.logger.warn('SMTP_USER or SMTP_PASS is not set. Cannot initialize SMTP transporter.');
-      return null;
-    }
-
-    const host = process.env.SMTP_HOST?.trim() || 'smtp.gmail.com';
-    const parsedPort = Number(process.env.SMTP_PORT || 465);
-    const port = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 465;
-    const secure =
-      process.env.SMTP_SECURE !== undefined
-        ? process.env.SMTP_SECURE.trim().toLowerCase() === 'true'
-        : port === 465;
-
-    try {
-      this.smtpTransporter = nodemailer.createTransport({
-        host,
-        port,
-        secure,
-        auth: { user, pass },
-      });
-      this.logger.log(`SMTP transporter initialized (${host}:${port}, user: ${user}).`);
-    } catch (err) {
-      this.logger.error('Failed to initialize SMTP transporter:', err);
-    }
-
-    return this.smtpTransporter;
+    // กำหนดค่าเริ่มต้นและเชื่อมต่อ Resend Client ทันทีที่ Service ถูกสร้าง
+    this.ensureClient();
   }
 
   /**
    * ฟังก์ชันสร้างและเตรียมความพร้อมของ Resend Client แบบ Singleton
    * หากสร้างไว้แล้วจะคืนค่าเดิมทันที หรือโหลดจาก RESEND_API_KEY ใน Environment
    */
-  private ensureResendClient(): Resend | null {
+  private ensureClient(): Resend | null {
     // ถ้าเคย Initialize Client ไว้แล้ว ให้คืนค่าตัวเดิมทันที (ไม่ต้องสร้างใหม่)
     if (this.resend) return this.resend;
 
@@ -177,13 +108,17 @@ export class EmailService {
         `========================================\n`,
       );
       // คืนค่าสำเร็จพร้อมระบุ id เป็น demo-mock-dispatch
-      return { success: true, id: 'demo-mock-dispatch', provider: 'mock' };
+      return { success: true, id: 'demo-mock-dispatch' };
     }
 
     // สภาพแวดล้อม Unit Test (Vitest): ข้ามการยิง Network ออกภายนอกเพื่อความรวดเร็วและไม่ใช้โควต้า
     if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
-      return { success: true, id: 'mock-local-dispatch', provider: 'mock' };
+      return { success: true, id: 'mock-local-dispatch' };
     }
+
+    // กำหนดชื่อและอีเมลผู้ส่ง (ดึงจาก RESEND_FROM หรือใช้ค่ามาตรฐาน onboarding@resend.dev)
+    const fromAddress =
+      process.env.RESEND_FROM?.trim() || 'Jongwen อบต.[บิซ่า] <onboarding@resend.dev>';
 
     // เทมเพลตเนื้อหาอีเมล HTML แบบทางการ สวยงาม อ่านง่ายบนมือถือและคอมพิวเตอร์
     const htmlContent = `
@@ -249,20 +184,39 @@ export class EmailService {
 </html>
     `.trim();
 
-    const provider = this.resolveProvider();
+    // ดึง instance ของ Resend Client
+    const client = this.ensureClient();
+    if (client) {
+      try {
+        // ยิงคำขอส่งอีเมลผ่าน Resend API ไปยังเซิร์ฟเวอร์จริง
+        const { data, error } = await client.emails.send({
+          from: fromAddress,
+          to: [toEmail],
+          subject,
+          html: htmlContent,
+        });
 
-    if (provider === 'smtp') {
-      return this.sendViaSmtp(toEmail, subject, htmlContent);
+        // หากทาง Resend API ตอบกลับ Error กลับมา
+        if (error) {
+          this.logger.error(`Resend API Error sending to ${toEmail}:`, error);
+          return { success: false, error: error.message };
+        }
+
+        // หากส่งสำเร็จ บันทึก log หมายเลขอ้างอิง และคืนค่าสำเร็จ
+        this.logger.log(`Resend email delivered successfully to ${toEmail} (ID: ${data?.id})`);
+        return { success: true, id: data?.id };
+      } catch (err: unknown) {
+        // จัดการกรณีเกิด Network Exception ในระหว่างเรียก API
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.error(`Failed to dispatch email via Resend to ${toEmail}:`, err);
+        return { success: false, error: msg };
+      }
     }
 
-    if (provider === 'resend') {
-      return this.sendViaResend(toEmail, subject, htmlContent);
-    }
-
-    // กรณีไม่มีการตั้งค่า SMTP หรือ RESEND_API_KEY ให้แสดง OTP ลงใน Console Log แทน
+    // กรณีไม่มีการตั้งค่า RESEND_API_KEY ให้แสดง OTP ลงใน Console Log แทน
     this.logger.log(
       `\n========================================\n` +
-      `📨 [DEMO / DEV EMAIL DISPATCH (NO PROVIDER CONFIGURED)]\n` +
+      `📨 [DEMO / DEV RESEND EMAIL DISPATCH (NO API KEY)]\n` +
       `To: ${toEmail} (${recipientName || 'User'})\n` +
       `Subject: ${subject}\n` +
       `OTP CODE: >>> ${otpCode} <<<\n` +
@@ -270,87 +224,7 @@ export class EmailService {
       `========================================\n`,
     );
 
-    return { success: true, id: 'mock-local-dispatch', provider: 'mock' };
-  }
-
-  /**
-   * ส่งอีเมลผ่าน Nodemailer + SMTP (ค่าเริ่มต้นรองรับ Gmail App Password)
-   */
-  private async sendViaSmtp(
-    toEmail: string,
-    subject: string,
-    htmlContent: string,
-  ): Promise<SendOtpResult> {
-    const transporter = this.ensureSmtpTransporter();
-    if (!transporter) {
-      return {
-        success: false,
-        provider: 'smtp',
-        error: 'ยังไม่ได้ตั้งค่า SMTP_USER หรือ SMTP_PASS สำหรับส่งอีเมลผ่าน Gmail SMTP',
-      };
-    }
-
-    const smtpUser = process.env.SMTP_USER?.trim() || '';
-    const fromAddress =
-      process.env.SMTP_FROM?.trim() || `Jongwen อบต.[บิซ่า] <${smtpUser}>`;
-
-    try {
-      const info = await transporter.sendMail({
-        from: fromAddress,
-        to: toEmail,
-        subject,
-        html: htmlContent,
-      });
-
-      this.logger.log(`SMTP email delivered successfully to ${toEmail} (ID: ${info.messageId})`);
-      return { success: true, id: info.messageId, provider: 'smtp' };
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.error(`Failed to dispatch email via SMTP to ${toEmail}:`, err);
-      return { success: false, provider: 'smtp', error: msg };
-    }
-  }
-
-  /**
-   * ส่งอีเมลผ่าน Resend API (ใช้สำหรับ Demo หรือ Production ที่ยืนยันโดเมนแล้ว)
-   */
-  private async sendViaResend(
-    toEmail: string,
-    subject: string,
-    htmlContent: string,
-  ): Promise<SendOtpResult> {
-    const fromAddress =
-      process.env.RESEND_FROM?.trim() || 'Jongwen อบต.[บิซ่า] <onboarding@resend.dev>';
-
-    const client = this.ensureResendClient();
-    if (!client) {
-      return {
-        success: false,
-        provider: 'resend',
-        error: 'ยังไม่ได้ตั้งค่า RESEND_API_KEY',
-      };
-    }
-
-    try {
-      const { data, error } = await client.emails.send({
-        from: fromAddress,
-        to: [toEmail],
-        subject,
-        html: htmlContent,
-      });
-
-      if (error) {
-        this.logger.error(`Resend API Error sending to ${toEmail}:`, error);
-        return { success: false, provider: 'resend', error: error.message };
-      }
-
-      this.logger.log(`Resend email delivered successfully to ${toEmail} (ID: ${data?.id})`);
-      return { success: true, id: data?.id, provider: 'resend' };
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.error(`Failed to dispatch email via Resend to ${toEmail}:`, err);
-      return { success: false, provider: 'resend', error: msg };
-    }
+    return { success: true, id: 'mock-local-dispatch' };
   }
 }
 
