@@ -467,7 +467,7 @@ export default function AccountPage() {
                 {/* ชื่อและชื่อเล่น */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
                   <Input
-                    label="ชื่อ-นามสกุล *"
+                    label="ชื่อ-นามสกุล"
                     value={name}
                     maxLength={NAME_MAX_LENGTH.PERSON_NAME}
                     onChange={(e) => setName(clampNameInput(e.target.value, NAME_MAX_LENGTH.PERSON_NAME))}
@@ -486,7 +486,7 @@ export default function AccountPage() {
                 {/* หน่วยงาน, เบอร์โทรศัพท์ และอีเมล */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
                   <Input
-                    label="หน่วยงาน / ชุมชน / สังกัด *"
+                    label="หน่วยงาน / ชุมชน / สังกัด"
                     value={department}
                     maxLength={NAME_MAX_LENGTH.ORGANIZATION}
                     onChange={(e) => setDepartment(clampNameInput(e.target.value, NAME_MAX_LENGTH.ORGANIZATION))}
@@ -707,7 +707,7 @@ export default function AccountPage() {
                 {/* ช่องกรอกรหัสผ่านปัจจุบัน */}
                 <Input
                   type="password"
-                  label="รหัสผ่านปัจจุบัน *"
+                  label="รหัสผ่านปัจจุบัน"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="กรอกรหัสผ่านปัจจุบันของคุณ"
@@ -717,7 +717,7 @@ export default function AccountPage() {
                 {/* ช่องกรอกรหัสผ่านใหม่ */}
                 <Input
                   type="password"
-                  label="รหัสผ่านใหม่ *"
+                  label="รหัสผ่านใหม่"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="ตั้งรหัสผ่านใหม่อย่างน้อย 4 ตัวอักษร"
@@ -728,7 +728,7 @@ export default function AccountPage() {
                 {/* ช่องยืนยันรหัสผ่านใหม่ */}
                 <Input
                   type="password"
-                  label="ยืนยันรหัสผ่านใหม่ *"
+                  label="ยืนยันรหัสผ่านใหม่"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="กรอกรหัสผ่านใหม่อีกครั้ง"

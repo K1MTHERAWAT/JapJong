@@ -520,7 +520,7 @@ export default function BorrowWizardPage() {
                 <button
                   type="button"
                   onClick={() => setQuantities({})}
-                  className="hidden sm:inline-flex h-10 px-3.5 rounded-xl border border-line bg-surface text-[12.5px] font-semibold text-ink-mute hover:text-status-crit hover:bg-soft transition"
+                  className="hidden sm:inline-flex items-center justify-center h-10 px-3.5 rounded-xl border border-line bg-surface text-[12.5px] font-semibold text-ink-mute hover:text-status-crit hover:bg-soft transition"
                 >
                   ล้างทั้งหมด
                 </button>
