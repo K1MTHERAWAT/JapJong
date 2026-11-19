@@ -16,6 +16,7 @@
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
+  DocumentTemplateItem,
   EquipmentCategory,
   FACILITIES,
   NAME_MAX_LENGTH,
@@ -26,16 +27,8 @@ import {
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
 import { Chip, NameLengthBadge, NameLimitWarning, Stepper, Toggle } from '@/components/ui';
-import { OfficialDocumentEditor } from '@/components/official-document-editor';
+import { FreeformTemplateEditorModal } from '@/components/freeform-a4-editor';
 import { api, readAndCompressImages } from '@/lib/api';
-import {
-  FormTemplateItem,
-  getFormTemplates,
-  getFormTemplate,
-  saveNewFormTemplate,
-  fetchFormTemplatesFromApi,
-  saveTemplateToDatabase,
-} from '@/lib/forms-store';
 
 type Kind = 'venue' | 'equipment';
 const DAYS_TH = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
@@ -71,17 +64,17 @@ function EditResourceContent() {
   const [openDays, setOpenDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [advanceDays, setAdvanceDays] = useState(3);
   const [formName, setFormName] = useState('แบบคำขอใช้สถานที่');
-  const [availableForms, setAvailableForms] = useState<FormTemplateItem[]>([]);
-  const [showDocEditor, setShowDocEditor] = useState(false);
-  const [isCreatingNewForm, setIsCreatingNewForm] = useState(false);
+  const [availableForms, setAvailableForms] = useState<DocumentTemplateItem[]>([]);
+  const [editingTemplate, setEditingTemplate] = useState<DocumentTemplateItem | null>(null);
   const [enabled, setEnabled] = useState(true);
+
+  const loadForms = () => {
+    api.listDocumentTemplates().then(setAvailableForms).catch(() => {});
+  };
 
   // โหลดรายการแบบฟอร์มที่มีในระบบ
   useEffect(() => {
-    setAvailableForms(getFormTemplates());
-    fetchFormTemplatesFromApi().then((templates) => {
-      setAvailableForms(templates);
-    });
+    loadForms();
   }, []);
 
   const [approvalOrder, setApprovalOrder] = useState<string[]>([
@@ -708,9 +701,35 @@ function EditResourceContent() {
               <label className="jw-lbl mb-0">แบบฟอร์มที่ใช้</label>
               <button
                 type="button"
-                onClick={() => {
-                  setIsCreatingNewForm(true);
-                  setShowDocEditor(true);
+                onClick={async () => {
+                  const title = window.prompt('ตั้งชื่อแบบฟอร์มเอกสารใหม่:', 'แบบขอใช้สถานที่ราชการ (แบบใหม่)');
+                  if (!title || !title.trim()) return;
+                  try {
+                    const created = await api.createDocumentTemplate({
+                      name: title.trim(),
+                      category: kind,
+                      structure: {
+                        editorMode: 'freeform',
+                        freeformElements: [],
+                        title: title.trim(),
+                        writtenAt: '',
+                        writtenDate: '',
+                        subject: '',
+                        recipient: '',
+                        requesterClause: '',
+                        requesterSlots: [],
+                        purposeText: '',
+                        purposeItems: [],
+                        closingText: '',
+                        signatures: [],
+                      },
+                    });
+                    loadForms();
+                    setFormName(created.name);
+                    setEditingTemplate(created);
+                  } catch (err) {
+                    alert((err as Error).message || 'สร้างแบบฟอร์มไม่สำเร็จ');
+                  }
                 }}
                 className="text-[12px] font-semibold text-brand flex items-center gap-1 hover:underline"
               >
@@ -720,19 +739,23 @@ function EditResourceContent() {
             </div>
             <div className="flex gap-2">
               <select value={formName} onChange={(e) => setFormName(e.target.value)} className="jw-in flex-1">
+                {availableForms.length === 0 && (
+                  <option value={formName}>{formName}</option>
+                )}
                 {availableForms.map((f) => (
-                  <option key={f.id} value={f.title}>
-                    {f.title}
+                  <option key={f.id} value={f.name}>
+                    {f.name}
                   </option>
                 ))}
               </select>
               <button
                 type="button"
                 onClick={() => {
-                  setIsCreatingNewForm(false);
-                  setShowDocEditor(true);
+                  const found = availableForms.find((f) => f.name === formName) || availableForms[0];
+                  if (found) setEditingTemplate(found);
                 }}
-                className="px-3.5 py-2 rounded-xl border border-brand bg-brand-mint text-brand text-[13px] font-semibold hover:bg-brand hover:text-white transition flex items-center gap-1.5 shrink-0"
+                disabled={availableForms.length === 0}
+                className="px-3.5 py-2 rounded-xl border border-brand bg-brand-mint text-brand text-[13px] font-semibold hover:bg-brand hover:text-white disabled:opacity-40 transition flex items-center gap-1.5 shrink-0"
                 title="เปิดตัวจัดการและแก้ไขแบบฟอร์ม"
               >
                 <Icon name="file-text" className="w-4 h-4" />
@@ -780,29 +803,17 @@ function EditResourceContent() {
         </div>
       )}
 
-      {/* Modal ตัวจัดการและแก้ไขแบบฟอร์มกระดาษราชการ */}
-      {showDocEditor && (
-        <OfficialDocumentEditor
-          isModal={true}
-          initialFormTitle={
-            isCreatingNewForm
-              ? 'แบบขอใช้สถานที่ราชการ (แบบใหม่)'
-              : formName
-          }
-          initialConfig={getFormTemplate(formName)?.config}
-          isBorrowMode={formName.includes('ครุภัณฑ์') || formName.includes('อุปกรณ์')}
-          onClose={() => setShowDocEditor(false)}
-          onSave={async ({ formTitle, config }) => {
-            const trimmed = formTitle.trim();
-            if (config) {
-              await saveTemplateToDatabase(trimmed, config, kind);
-            } else if (isCreatingNewForm && trimmed) {
-              saveNewFormTemplate(trimmed);
-            }
-            const updated = await fetchFormTemplatesFromApi();
-            setAvailableForms(updated);
-            setFormName(trimmed);
-            setShowDocEditor(false);
+      {/* Modal ตัวแก้ไขแม่แบบเอกสารแบบอิสระบนกระดาษ A4 */}
+      {editingTemplate && (
+        <FreeformTemplateEditorModal
+          template={editingTemplate}
+          onClose={() => {
+            setEditingTemplate(null);
+            loadForms();
+          }}
+          onSaved={(updated) => {
+            setAvailableForms((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+            setFormName(updated.name);
           }}
         />
       )}

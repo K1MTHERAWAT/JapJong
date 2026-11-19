@@ -767,6 +767,9 @@ export const api = {
     const qs = q.toString();
     return request<DocumentTemplateItem[]>(`/document-templates${qs ? `?${qs}` : ''}`);
   },
+  /** ดึงตำแหน่งผู้ลงนามในระบบ (STAFF, APPROVER_L2, APPROVER_L1) */
+  signerPositions: () =>
+    request<{ staff: string; l2: string; l1: string }>('/document-templates/signer-positions'),
   /** ดึงรายละเอียดแม่แบบเอกสารเดี่ยว */
   getDocumentTemplate: (id: string) =>
     request<DocumentTemplateItem>(`/document-templates/${id}`),

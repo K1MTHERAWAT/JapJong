@@ -112,11 +112,26 @@ export default function DocumentTemplatesPage() {
     if (!newTemplateName.trim()) return;
     setCreating(true); // เปิดสถานะกำลังสร้าง
     try {
-      // เรียก API สร้างแม่แบบเอกสารใหม่
+      // เรียก API สร้างแม่แบบเอกสารใหม่ (Freeform A4)
       const created = await api.createDocumentTemplate({
         name: newTemplateName.trim(),
         category: newTemplateCat,
         description: newTemplateDesc.trim(),
+        structure: {
+          editorMode: 'freeform',
+          freeformElements: [],
+          title: newTemplateName.trim(),
+          writtenAt: '',
+          writtenDate: '',
+          subject: '',
+          recipient: '',
+          requesterClause: '',
+          requesterSlots: [],
+          purposeText: '',
+          purposeItems: [],
+          closingText: '',
+          signatures: [],
+        },
       });
       // ปิด Modal และเคลียร์ค่าในฟอร์ม
       setShowCreateModal(false);

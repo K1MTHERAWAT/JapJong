@@ -38,6 +38,26 @@ export class DocumentTemplatesController {
   }
 
   /**
+   * ดึงตำแหน่งผู้ลงนามในระบบ (STAFF, APPROVER_L2, APPROVER_L1) สำหรับแบบฟอร์มราชการ
+   * GET /document-templates/signer-positions
+   */
+  @Get('signer-positions')
+  @Roles('USER', 'ADMIN', 'STAFF', 'APPROVER_L2', 'APPROVER_L1')
+  getSignerPositions() {
+    const findPos = (role: string, fallback: string) => {
+      const acc = this.db.accounts.find(
+        (a) => a.role === role && a.accountStatus !== 'SUSPENDED' && a.position?.trim(),
+      );
+      return acc?.position?.trim() || fallback;
+    };
+    return {
+      staff: findPos('STAFF', 'เจ้าหน้าที่'),
+      l2: findPos('APPROVER_L2', 'ปลัดองค์การบริหารส่วนตำบล'),
+      l1: findPos('APPROVER_L1', 'นายกองค์การบริหารส่วนตำบล'),
+    };
+  }
+
+  /**
    * ดึงข้อมูลเทมเพลตเอกสารรายฉบับตาม ID
    * GET /document-templates/:id
    */
@@ -48,11 +68,11 @@ export class DocumentTemplatesController {
   }
 
   /**
-   * สร้างเทมเพลตเอกสารราชการใหม่ (เฉพาะ ADMIN)
+   * สร้างเทมเพลตเอกสารราชการใหม่ (ADMIN, STAFF)
    * POST /document-templates
    */
   @Post()
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'STAFF')
   createTemplate(
     @Body() body: { name: string; category?: DocumentTemplateCategory; description?: string; structure?: any; settings?: any },
     @CurrentUser() user: Account,
@@ -61,11 +81,11 @@ export class DocumentTemplatesController {
   }
 
   /**
-   * แก้ไขโครงสร้างหรือการตั้งค่าเทมเพลตเอกสาร (เฉพาะ ADMIN)
+   * แก้ไขโครงสร้างหรือการตั้งค่าเทมเพลตเอกสาร (ADMIN, STAFF)
    * PATCH /document-templates/:id
    */
   @Patch(':id')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'STAFF')
   updateTemplate(
     @Param('id') id: string,
     @Body() body: any,
@@ -75,31 +95,31 @@ export class DocumentTemplatesController {
   }
 
   /**
-   * ลบเทมเพลตเอกสารออกจากระบบ (เฉพาะ ADMIN)
+   * ลบเทมเพลตเอกสารออกจากระบบ (ADMIN, STAFF)
    * DELETE /document-templates/:id
    */
   @Delete(':id')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'STAFF')
   deleteTemplate(@Param('id') id: string, @CurrentUser() user: Account) {
     return this.db.deleteDocumentTemplate(id, user);
   }
 
   /**
-   * ทำสำเนา (Duplicate) เทมเพลตเอกสาร (เฉพาะ ADMIN)
+   * ทำสำเนา (Duplicate) เทมเพลตเอกสาร (ADMIN, STAFF)
    * POST /document-templates/:id/duplicate
    */
   @Post(':id/duplicate')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'STAFF')
   duplicateTemplate(@Param('id') id: string, @CurrentUser() user: Account) {
     return this.db.duplicateDocumentTemplate(id, user);
   }
 
   /**
-   * เผยแพร่ (Publish) เทมเพลตเอกสารเพื่อเปิดให้ใช้งานจริง (เฉพาะ ADMIN)
+   * เผยแพร่ (Publish) เทมเพลตเอกสารเพื่อเปิดให้ใช้งานจริง (ADMIN, STAFF)
    * POST /document-templates/:id/publish
    */
   @Post(':id/publish')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'STAFF')
   publishTemplate(
     @Param('id') id: string,
     @Body('note') note: string | undefined,
@@ -109,11 +129,11 @@ export class DocumentTemplatesController {
   }
 
   /**
-   * จัดเก็บเทมเพลตเข้าคลังเอกสารประวัติ (Archive) เมื่อยกเลิกใช้งาน (เฉพาะ ADMIN)
+   * จัดเก็บเทมเพลตเข้าคลังเอกสารประวัติ (Archive) เมื่อยกเลิกใช้งาน (ADMIN, STAFF)
    * POST /document-templates/:id/archive
    */
   @Post(':id/archive')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'STAFF')
   archiveTemplate(@Param('id') id: string, @CurrentUser() user: Account) {
     return this.db.archiveDocumentTemplate(id, user);
   }
@@ -139,11 +159,11 @@ export class DocumentTemplatesController {
   }
 
   /**
-   * ย้อนกลับเทมเพลตไปยังเวอร์ชันก่อนหน้า (Rollback Version) (เฉพาะ ADMIN)
+   * ย้อนกลับเทมเพลตไปยังเวอร์ชันก่อนหน้า (Rollback Version) (ADMIN, STAFF)
    * POST /document-templates/:id/versions/:version/rollback
    */
   @Post(':id/versions/:version/rollback')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'STAFF')
   rollbackVersion(
     @Param('id') id: string,
     @Param('version') version: string,

@@ -3695,7 +3695,7 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   // ===================== Document Templates Management =====================
 
   private initDefaultDocumentTemplates() {
-    if (this.documentTemplates.length > 0) return;
+    const isInitialEmpty = this.documentTemplates.length === 0;
     const defaultTemplates: DocumentTemplateItem[] = [
       {
         id: 'tpl-venue',
@@ -3861,19 +3861,25 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       },
     ];
 
-    this.documentTemplates = defaultTemplates;
     for (const t of defaultTemplates) {
-      if (t.status === 'published') {
-        this.documentTemplateVersions.push({
-          id: `ver-${t.id}-1`,
-          templateId: t.id,
-          version: 1,
-          structure: clone(t.structure),
-          settings: clone(t.settings),
-          note: 'เวอร์ชันแรกเริ่มต้นระบบ',
-          publishedAt: t.createdAt,
-          publishedBy: 'ADMIN',
-        });
+      const exists = this.documentTemplates.some((x) => x.id === t.id);
+      if (!exists && (isInitialEmpty || t.id === 'tpl-venue' || t.id === 'tpl-equipment')) {
+        this.documentTemplates.push(t);
+        if (!isInitialEmpty) {
+          this.persistDocumentTemplate(t).catch(() => {});
+        }
+        if (t.status === 'published' && !this.documentTemplateVersions.some((v) => v.templateId === t.id && v.version === 1)) {
+          this.documentTemplateVersions.push({
+            id: `ver-${t.id}-1`,
+            templateId: t.id,
+            version: 1,
+            structure: clone(t.structure),
+            settings: clone(t.settings),
+            note: 'เวอร์ชันแรกเริ่มต้นระบบ',
+            publishedAt: t.createdAt,
+            publishedBy: 'ADMIN',
+          });
+        }
       }
     }
   }
@@ -4045,6 +4051,9 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   }
 
   deleteDocumentTemplate(id: string, actor: Account): { success: boolean; id: string } {
+    if (id === 'tpl-venue' || id === 'tpl-equipment') {
+      throw new BadRequestException('ไม่สามารถลบแบบฟอร์มค่าเริ่มต้นของระบบ (แบบขอใช้สถานที่ราชการ / แบบคำขอยืมครุภัณฑ์ราชการ) ได้');
+    }
     const idx = this.documentTemplates.findIndex((x) => x.id === id);
     if (idx === -1) {
       throw new NotFoundException(`ไม่พบแม่แบบเอกสารรหัส ${id}`);
@@ -4209,6 +4218,69 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
           else if (s.fieldKey === 'requester_phone') val = request.requesterPhone || '';
           else if (s.fieldKey === 'purpose') val = (request as any).purpose || '';
           return { ...s, value: val };
+        });
+      }
+
+      // Hydrate freeform canvas elements with real values
+      if (Array.isArray(snapshot.freeformElements)) {
+        const sigs = Array.isArray((request as any).signatures) ? (request as any).signatures : [];
+        const findSig = (level: 'staff' | 'l2' | 'l1') =>
+          [...sigs].reverse().find((x: any) => x.level === level);
+        const staffSig = findSig('staff');
+        const l2Sig = findSig('l2');
+        const l1Sig = findSig('l1');
+        const reqDate = new Date((request as any).createdAt || now);
+        const thaiMonths = [
+          'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+          'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
+        ];
+        const fullAddress = [
+          request.addressHouseNo ? `บ้านเลขที่ ${request.addressHouseNo}` : '',
+          request.addressMoo ? `หมู่ ${request.addressMoo}` : '',
+          request.addressSubdistrict ? `ต.${request.addressSubdistrict}` : '',
+          request.addressDistrict ? `อ.${request.addressDistrict}` : '',
+          request.addressProvince ? `จ.${request.addressProvince}` : '',
+        ].filter(Boolean).join(' ');
+
+        snapshot.freeformElements = snapshot.freeformElements.map((el: any) => {
+          if (el.type !== 'slot') return el;
+          let val = '';
+          if (el.binding === 'requester.name') val = request.requesterName;
+          else if (el.binding === 'requester.position') val = request.requesterPosition || '';
+          else if (el.binding === 'requester.organization') val = request.organization || '';
+          else if (el.binding === 'requester.phone') val = request.requesterPhone || '';
+          else if (el.binding === 'requester.addressHouseNo') val = request.addressHouseNo || '';
+          else if (el.binding === 'requester.addressMoo') val = request.addressMoo || '';
+          else if (el.binding === 'requester.addressSubdistrict') val = request.addressSubdistrict || '';
+          else if (el.binding === 'requester.addressDistrict') val = request.addressDistrict || '';
+          else if (el.binding === 'requester.addressProvince') val = request.addressProvince || '';
+          else if (el.binding === 'requester.address') val = fullAddress;
+          else if (el.binding === 'document.number') val = docNum;
+          else if (el.binding === 'document.writtenAt') val = request.writtenAt || '';
+          else if (el.binding === 'document.day') val = String(reqDate.getDate());
+          else if (el.binding === 'document.month') val = thaiMonths[reqDate.getMonth()] || '';
+          else if (el.binding === 'document.year') val = String(reqDate.getFullYear() + 543);
+          else if (el.binding === 'booking.startDate') val = (request as any).startDate || '';
+          else if (el.binding === 'booking.endDate') val = (request as any).endDate || '';
+          else if (el.binding === 'booking.location') val = (request as any).venueName || (request as any).resourceName || '';
+          else if (el.binding === 'booking.purpose') val = (request as any).purpose || '';
+          else if (el.binding === 'signature.requester.image') val = (request as any).requesterSignature || '';
+          else if (el.binding === 'signature.staff.image') val = staffSig?.signature || '';
+          else if (el.binding === 'signature.staff.name') val = staffSig?.signerName || '';
+          else if (el.binding === 'signature.staff.title') val = staffSig?.title || '';
+          else if (el.binding === 'signature.staff.date') val = staffSig?.at || '';
+          else if (el.binding === 'signature.staff.note') val = staffSig?.note || '';
+          else if (el.binding === 'signature.l2.image') val = l2Sig?.signature || '';
+          else if (el.binding === 'signature.l2.name') val = l2Sig?.signerName || '';
+          else if (el.binding === 'signature.l2.title') val = l2Sig?.title || '';
+          else if (el.binding === 'signature.l2.date') val = l2Sig?.at || '';
+          else if (el.binding === 'signature.l2.note') val = l2Sig?.note || '';
+          else if (el.binding === 'signature.l1.image') val = l1Sig?.signature || '';
+          else if (el.binding === 'signature.l1.name') val = l1Sig?.signerName || '';
+          else if (el.binding === 'signature.l1.title') val = l1Sig?.title || '';
+          else if (el.binding === 'signature.l1.date') val = l1Sig?.at || '';
+          else if (el.binding === 'signature.l1.note') val = l1Sig?.note || '';
+          return { ...el, value: val };
         });
       }
     }

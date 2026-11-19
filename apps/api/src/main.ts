@@ -90,16 +90,16 @@ async function bootstrap() {
     }),
   );
 
-  // ตั้ง body limit เป็น 8MB รองรับภาพลายเซ็นและรูปภาพประกอบ พร้อมเก็บ rawBody สำหรับตรวจ X-Line-Signature
+  // ตั้ง body limit เป็น 20MB รองรับกระดาษ A4 (รูปภาพ/PDF) และภาพลายเซ็น พร้อมเก็บ rawBody สำหรับตรวจ X-Line-Signature
   app.use(
     express.json({
-      limit: '8mb',
+      limit: '20mb',
       verify: (req: any, _res, buf) => {
         req.rawBody = buf;
       },
     }),
   );
-  app.use(express.urlencoded({ limit: '8mb', extended: true }));
+  app.use(express.urlencoded({ limit: '20mb', extended: true }));
 
   // จัดการ Cross-Origin Resource Sharing (CORS) ตามรายการโดเมนที่ได้รับอนุญาต
   const allowedOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:3000,http://127.0.0.1:3000')

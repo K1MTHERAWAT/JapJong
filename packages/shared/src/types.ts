@@ -713,7 +713,32 @@ export interface DocumentDataSlot {
   fallback?: string;
 }
 
+export type FreeformElementType = 'text' | 'slot' | 'logo' | 'signature' | 'divider';
+
+export interface FreeformDocumentElement {
+  id: string;
+  type: FreeformElementType;
+  x: number; // in pixels on A4 794x1123 canvas
+  y: number;
+  width: number;
+  height: number;
+  fontSize?: number;
+  fontWeight?: 'normal' | 'bold';
+  textAlign?: 'left' | 'center' | 'right';
+  color?: string;
+  text?: string;
+  binding?: string;
+  label?: string;
+  showBorderBottom?: boolean;
+  imageUrl?: string;
+  signatureRole?: string;
+}
+
 export interface DocumentStructure {
+  editorMode?: 'structured' | 'freeform';
+  backgroundImageUrl?: string;
+  backgroundOpacity?: number;
+  freeformElements?: FreeformDocumentElement[];
   title: string;
   writtenAt: string;
   writtenDate: string;

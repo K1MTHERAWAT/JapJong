@@ -17,7 +17,9 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { DocumentTemplateItem } from '@japjong/shared';
 import { Icon } from '@/components/icons';
+import { A4BackgroundLayer, A4_HEIGHT_PX, A4_WIDTH_PX } from '@/components/freeform-a4-editor';
 import { api } from '@/lib/api';
+import { getSampleBindingValue } from '@/lib/document-bindings';
 import { chunkDocumentItems, triggerDocumentPrint } from '@/lib/print';
 
 export default function DocumentTemplatePreviewPage() {
@@ -101,7 +103,89 @@ export default function DocumentTemplatePreviewPage() {
         </div>
       </div>
 
-      {/* หน้ากระดาษมาตรฐาน A4 จำลอง (1-3 ข้อต่อหน้า ถ้ามีข้อ 4 เริ่มนับ 1 ใหม่หน้า 2) */}
+      {/* หน้ากระดาษมาตรฐาน A4 จำลอง */}
+      {doc.editorMode === 'freeform' ? (
+        <div
+          id="official-doc-print-area"
+          className="print-doc relative bg-white shadow-xl overflow-hidden print:shadow-none"
+          style={{
+            width: A4_WIDTH_PX,
+            height: A4_HEIGHT_PX,
+            fontFamily: "'TH Sarabun New', 'Sarabun', sans-serif",
+          }}
+        >
+          <A4BackgroundLayer url={doc.backgroundImageUrl} opacity={doc.backgroundOpacity ?? 1} />
+          {(doc.freeformElements || []).map((el) => {
+            const fontSize = el.fontSize ?? 16;
+            return (
+              <div
+                key={el.id}
+                style={{
+                  position: 'absolute',
+                  left: el.x,
+                  top: el.y,
+                  width: el.width,
+                  height: el.height,
+                  fontSize: `${fontSize}px`,
+                  fontWeight: el.fontWeight || 'normal',
+                  textAlign: el.textAlign || 'left',
+                  color: el.color || '#0f172a',
+                  lineHeight: 1.35,
+                }}
+              >
+                {el.type === 'text' && (
+                  <div
+                    className="w-full h-full overflow-hidden whitespace-pre-wrap break-words px-1 flex items-center"
+                    style={{
+                      justifyContent:
+                        el.textAlign === 'center'
+                          ? 'center'
+                          : el.textAlign === 'right'
+                            ? 'flex-end'
+                            : 'flex-start',
+                    }}
+                  >
+                    {el.text || ''}
+                  </div>
+                )}
+                {el.type === 'slot' && (
+                  <div
+                    className={`w-full h-full px-1.5 flex items-center overflow-hidden ${
+                      el.showBorderBottom !== false ? 'border-b border-dotted border-slate-700' : ''
+                    }`}
+                    style={{
+                      justifyContent:
+                        el.textAlign === 'center'
+                          ? 'center'
+                          : el.textAlign === 'right'
+                            ? 'flex-end'
+                            : 'flex-start',
+                    }}
+                  >
+                    <span className="truncate">{getSampleBindingValue(el.binding) || '\u00A0'}</span>
+                  </div>
+                )}
+                {el.type === 'logo' && el.imageUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={el.imageUrl} alt="Logo" className="w-full h-full object-contain" />
+                )}
+                {el.type === 'signature' && (
+                  <div className="w-full h-full flex flex-col items-center justify-end pb-1 text-center">
+                    <div className="w-4/5 border-b border-dotted border-slate-700 mb-1" />
+                    <div className="text-slate-700">(................................................)</div>
+                    <div className="font-medium mt-0.5">{el.text || 'ผู้ลงนาม'}</div>
+                  </div>
+                )}
+                {el.type === 'divider' && (
+                  <div className="w-full h-full flex items-center">
+                    <div className="w-full border-t-2" style={{ borderColor: el.color || '#334155' }} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
       <div className="flex flex-col gap-6 items-center w-full print:block print:gap-0">
         {itemPages.map((pageItems, pageIdx) => (
           <div
@@ -237,6 +321,7 @@ export default function DocumentTemplatePreviewPage() {
       </div>
         ))}
       </div>
+      )}
     </div>
   );
 }

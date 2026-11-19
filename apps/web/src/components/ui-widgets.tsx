@@ -1150,19 +1150,40 @@ export function OfficialGovFormDocument({
 
   const auth = useOptionalAuth();
   const currentAcc = auth?.account;
+  const [sysPositions, setSysPositions] = useState<{ staff: string; l2: string; l1: string } | null>(null);
+
+  useEffect(() => {
+    if (blankMode || !currentAcc) return;
+    let cancelled = false;
+    api
+      .signerPositions()
+      .then((pos) => {
+        if (!cancelled) setSysPositions(pos);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [blankMode, currentAcc]);
 
   const staffFallback =
-    !blankMode && !sampleDocMode && currentAcc?.role === 'STAFF' && currentAcc.position?.trim()
+    !blankMode && currentAcc?.role === 'STAFF' && currentAcc.position?.trim()
       ? currentAcc.position.trim()
-      : SIGN_LEVEL_TITLE.staff;
+      : !blankMode && sysPositions?.staff
+        ? sysPositions.staff
+        : SIGN_LEVEL_TITLE.staff;
   const l2Fallback =
-    !blankMode && !sampleDocMode && currentAcc?.role === 'APPROVER_L2' && currentAcc.position?.trim()
+    !blankMode && currentAcc?.role === 'APPROVER_L2' && currentAcc.position?.trim()
       ? currentAcc.position.trim()
-      : SIGN_LEVEL_TITLE.l2;
+      : !blankMode && sysPositions?.l2
+        ? sysPositions.l2
+        : SIGN_LEVEL_TITLE.l2;
   const l1Fallback =
-    !blankMode && !sampleDocMode && currentAcc?.role === 'APPROVER_L1' && currentAcc.position?.trim()
+    !blankMode && currentAcc?.role === 'APPROVER_L1' && currentAcc.position?.trim()
       ? currentAcc.position.trim()
-      : SIGN_LEVEL_TITLE.l1;
+      : !blankMode && sysPositions?.l1
+        ? sysPositions.l1
+        : SIGN_LEVEL_TITLE.l1;
 
   const resolveRoleTitle = (sig: { title?: string } | undefined, fallback: string) => {
     const raw = sig?.title?.trim();

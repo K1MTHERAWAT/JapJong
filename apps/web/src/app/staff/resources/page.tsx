@@ -9,14 +9,15 @@
  * 2. ครุภัณฑ์/อุปกรณ์ (Equipment): สต็อกคงเหลือ, เปิด/ปิดให้ยืม
  * 3. ยานพาหนะ (Vehicles): ระบบบริหารการขอใช้รถส่วนกลาง
  * 4. แบบฟอร์มราชการ (Forms):
- *    - แสดงตัวอย่างเอกสารราชการจริง (OfficialGovFormDocument)
- *    - ปรับแต่งหัวกระดาษ ข้อความ และช่องลงนามแบบ WYSIWYG (OfficialDocumentEditor)
+ *    - จัดการแม่แบบเอกสารราชการแบบอิสระบนกระดาษ A4 (FreeformA4Editor)
+ *    - อัปโหลดกระดาษ A4, อัปโหลดโลโก้, ลากวางและปรับขนาดฟิลด์/ขนาดตัวอักษรได้อิสระ
  */
 
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
+  DocumentTemplateItem,
   EQUIPMENT_CATEGORY_LABEL,
   Equipment,
   VENUE_TYPE_LABEL,
@@ -26,17 +27,14 @@ import { roleHomePath, useAuth } from '@/components/auth-context';
 import { Icon } from '@/components/icons';
 import { AppShell } from '@/components/shell';
 import { OfficialGovFormDocument, Tabs, Toggle } from '@/components/ui';
-import { OfficialDocumentEditor } from '@/components/official-document-editor';
-import { api } from '@/lib/api';
 import {
-  FormTemplateItem,
-  deleteCustomFormTemplate,
-  getFormTemplates,
-  getFormTemplate,
-  saveNewFormTemplate,
-  saveTemplateToDatabase,
-  fetchFormTemplatesFromApi,
-} from '@/lib/forms-store';
+  A4BackgroundLayer,
+  A4_HEIGHT_PX,
+  A4_WIDTH_PX,
+  FreeformTemplateEditorModal,
+} from '@/components/freeform-a4-editor';
+import { api } from '@/lib/api';
+import { getSampleBindingValue } from '@/lib/document-bindings';
 
 // ชนิดแท็บหมวดหมู่ทรัพยากร
 type ResourceTab = 'venues' | 'equipment' | 'vehicles' | 'forms';
@@ -54,20 +52,21 @@ function ManageResourcesContent() {
   // State รายการอุปกรณ์
   const [equipment, setEquipment] = useState<Equipment[]>([]);
 
-  // State การจัดการแบบฟอร์มราชการ
-  const [formsList, setFormsList] = useState<FormTemplateItem[]>([]);
-  const [selectedFormKey, setSelectedFormKey] = useState<string>('venue');
-  const [formPreviewMode, setFormPreviewMode] = useState<'sample' | 'blank'>('sample');
-  const [showDocEditor, setShowDocEditor] = useState(false);
-  const [isCreatingNewForm, setIsCreatingNewForm] = useState(false);
+  // State การจัดการแบบฟอร์มราชการ (Freeform A4)
+  const [formsList, setFormsList] = useState<DocumentTemplateItem[]>([]);
+  const [selectedFormId, setSelectedFormId] = useState<string>('');
+  const [editingTemplate, setEditingTemplate] = useState<DocumentTemplateItem | null>(null);
   const [previewImg, setPreviewImg] = useState<string | null>(null);
 
-  // โหลดรายการแม่แบบฟอร์มทั้งจากแคชและ API
+  // โหลดรายการแม่แบบฟอร์มจาก API
   const loadForms = useCallback(() => {
-    setFormsList(getFormTemplates());
-    fetchFormTemplatesFromApi().then((list) => {
-      setFormsList(list);
-    });
+    api
+      .listDocumentTemplates()
+      .then((list) => {
+        setFormsList(list);
+        setSelectedFormId((prev) => (prev && list.some((x) => x.id === prev) ? prev : list[0]?.id || ''));
+      })
+      .catch(() => {});
   }, []);
 
   // โหลดข้อมูลสถานที่ อุปกรณ์ และแบบฟอร์ม
@@ -93,19 +92,52 @@ function ManageResourcesContent() {
     load();
   };
 
-  // ฟังก์ชันลบแบบฟอร์มที่สร้างขึ้นเอง
-  const handleDeleteForm = (id: string, title: string) => {
-    if (window.confirm(`คุณต้องการลบแบบฟอร์ม "${title}" ออกจากระบบใช่หรือไม่?`)) {
-      deleteCustomFormTemplate(id);
+  // สร้างแบบฟอร์มกระดาษ A4 อิสระใหม่
+  const handleCreateNewForm = async () => {
+    const name = window.prompt('ตั้งชื่อแบบฟอร์มเอกสารใหม่:', 'แบบขอใช้สถานที่ราชการ (แบบใหม่)');
+    if (!name || !name.trim()) return;
+    try {
+      const created = await api.createDocumentTemplate({
+        name: name.trim(),
+        category: 'venue',
+        description: 'แม่แบบกระดาษ A4 แบบอิสระ',
+        structure: {
+          editorMode: 'freeform',
+          freeformElements: [],
+          title: name.trim(),
+          writtenAt: '',
+          writtenDate: '',
+          subject: '',
+          recipient: '',
+          requesterClause: '',
+          requesterSlots: [],
+          purposeText: '',
+          purposeItems: [],
+          closingText: '',
+          signatures: [],
+        },
+      });
+      await loadForms();
+      setSelectedFormId(created.id);
+      setEditingTemplate(created);
+    } catch (err) {
+      alert((err as Error).message || 'สร้างแบบฟอร์มไม่สำเร็จ');
+    }
+  };
+
+  // ฟังก์ชันลบแบบฟอร์ม
+  const handleDeleteForm = async (id: string, title: string) => {
+    if (!window.confirm(`คุณต้องการลบแบบฟอร์ม "${title}" ออกจากระบบใช่หรือไม่?`)) return;
+    try {
+      await api.deleteDocumentTemplate(id);
       loadForms();
-      if (selectedFormKey === id) {
-        setSelectedFormKey('venue');
-      }
+    } catch (err) {
+      alert((err as Error).message || 'ลบแบบฟอร์มไม่สำเร็จ');
     }
   };
 
   // ค้นหาแบบฟอร์มที่กำลังเลือกดูตัวอย่าง
-  const currentSelectedForm = formsList.find((f) => f.id === selectedFormKey) || formsList[0];
+  const currentSelectedForm = formsList.find((f) => f.id === selectedFormId) || formsList[0];
 
   return (
     <AppShell
@@ -117,10 +149,7 @@ function ManageResourcesContent() {
         tab === 'forms' ? (
           <button
             type="button"
-            onClick={() => {
-              setIsCreatingNewForm(true);
-              setShowDocEditor(true);
-            }}
+            onClick={handleCreateNewForm}
             className="jw-btn w-full sm:w-56 shadow-sm"
           >
             + เพิ่มแบบฟอร์มใหม่
@@ -140,9 +169,9 @@ function ManageResourcesContent() {
           options={[
             { value: 'venues', label: 'สถานที่' },
             { value: 'equipment', label: 'อุปกรณ์' },
-            // ซ่อนแท็บยานพาหนะและแบบฟอร์มไว้ชั่วคราว
+            { value: 'forms', label: 'แบบฟอร์ม' },
+            // ซ่อนแท็บยานพาหนะไว้ชั่วคราว
             // { value: 'vehicles', label: 'ยานพาหนะ' },
-            // { value: 'forms', label: 'แบบฟอร์ม' },
           ]}
         />
 
@@ -254,10 +283,7 @@ function ManageResourcesContent() {
             </p>
             <button
               type="button"
-              onClick={() => {
-                setIsCreatingNewForm(true);
-                setShowDocEditor(true);
-              }}
+              onClick={handleCreateNewForm}
               className="mt-2 jw-btn px-4 py-2 text-xs"
             >
               + สร้างแบบฟอร์มขอใช้ยานพาหนะ
@@ -277,10 +303,7 @@ function ManageResourcesContent() {
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setIsCreatingNewForm(true);
-                  setShowDocEditor(true);
-                }}
+                onClick={handleCreateNewForm}
                 className="px-3.5 py-1.5 rounded-xl border border-brand bg-brand-mint text-brand text-[12.5px] font-semibold hover:bg-brand hover:text-white transition flex items-center gap-1.5 shadow-xs"
               >
                 <Icon name="plus" className="w-3.5 h-3.5" />
@@ -289,118 +312,200 @@ function ManageResourcesContent() {
             </div>
 
             {/* รายชื่อแบบฟอร์มทั้งหมด */}
-            <div className="flex flex-col gap-2.5">
-              {formsList.map((f) => {
-                const active = selectedFormKey === f.id;
-                return (
-                  <div
-                    key={f.id}
-                    onClick={() => setSelectedFormKey(f.id)}
-                    className={`p-4 rounded-2xl border text-left transition flex items-center justify-between cursor-pointer ${
-                      active
-                        ? 'border-brand ring-2 ring-brand bg-brand-mint/40'
-                        : 'border-line bg-white hover:bg-soft/40'
-                    }`}
-                  >
-                    <div className="min-w-0 flex-1 pr-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <b className="text-[15px] text-ink break-words leading-snug">{f.title}</b>
-                        {f.isCustom && (
-                          <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-brand text-white shrink-0">
-                            สร้างขึ้นใหม่
+            {formsList.length === 0 ? (
+              <div className="jw-card p-8 text-center text-ink-mute space-y-2">
+                <p className="text-[14px] font-semibold text-ink">ยังไม่มีแม่แบบเอกสาร</p>
+                <p className="text-[12px]">กดปุ่ม &quot;+ เพิ่มแบบฟอร์มใหม่&quot; เพื่ออัปโหลดกระดาษ A4 และออกแบบฟอร์ม</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {formsList.map((f) => {
+                  const active = currentSelectedForm?.id === f.id;
+                  const isSystemDefault = f.id === 'tpl-venue' || f.id === 'tpl-equipment';
+                  const isFreeform = f.structure?.editorMode === 'freeform';
+                  return (
+                    <div
+                      key={f.id}
+                      onClick={() => setSelectedFormId(f.id)}
+                      className={`p-4 rounded-2xl border text-left transition flex items-center justify-between cursor-pointer ${
+                        active
+                          ? 'border-brand ring-2 ring-brand bg-brand-mint/40'
+                          : 'border-line bg-white hover:bg-soft/40'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1 pr-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <b className="text-[15px] text-ink break-words leading-snug">{f.name}</b>
+                          {isSystemDefault && (
+                            <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-100 text-emerald-800 shrink-0">
+                              ค่าเริ่มต้น
+                            </span>
+                          )}
+                          {isFreeform && (
+                            <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-indigo-100 text-indigo-800 shrink-0">
+                              Freeform A4
+                            </span>
+                          )}
+                          <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-slate-100 text-slate-700 shrink-0">
+                            v{f.currentVersion}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-slate-100 text-slate-700 shrink-0">
+                            {f.status === 'published' ? 'เผยแพร่แล้ว' : 'ฉบับร่าง'}
+                          </span>
+                        </div>
+                        <span className="text-[12px] text-ink-mute block break-words">
+                          {f.description || 'แม่แบบเอกสารกระดาษ A4'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isFreeform ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingTemplate(f);
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-brand text-white text-[12px] font-semibold hover:bg-brand/90 transition"
+                          >
+                            แก้ไข
+                          </button>
+                        ) : (
+                          <span className="text-[12px] font-semibold text-brand">
+                            {active ? 'กำลังแสดงตัวอย่าง' : 'แตะเพื่อดู'}
                           </span>
                         )}
+                        {!isSystemDefault && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteForm(f.id, f.name);
+                            }}
+                            className="w-7 h-7 rounded-lg hover:bg-red-50 text-red-500 flex items-center justify-center transition"
+                            title="ลบแบบฟอร์มนี้"
+                          >
+                            <Icon name="trash" className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
-                      <span className="text-[12px] text-ink-mute block break-words">{f.sub}</span>
                     </div>
+                  );
+                })}
+              </div>
+            )}
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[12px] font-semibold text-brand">
-                        {active ? 'กำลังแสดงตัวอย่าง' : 'แตะเพื่อดู'}
-                      </span>
-                      {f.isCustom && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteForm(f.id, f.title);
-                          }}
-                          className="w-7 h-7 rounded-lg hover:bg-red-50 text-red-500 flex items-center justify-center transition"
-                          title="ลบแบบฟอร์มนี้"
-                        >
-                          <Icon name="trash" className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* แสดงตัวอย่างหน้ากระดาษราชการและการเปิดโปรแกรมแก้ไข WYSIWYG */}
-            {selectedFormKey !== 'repair' && (
+            {/* แสดงตัวอย่างหน้ากระดาษ A4 */}
+            {currentSelectedForm && (
               <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <b className="text-[15px] text-ink">
-                      ตัวอย่างหน้ากระดาษราชการ ({currentSelectedForm?.title || 'แบบฟอร์มราชการ'})
-                    </b>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setShowDocEditor(true)}
-                      className="px-3.5 py-1.5 rounded-full text-[12px] font-semibold bg-brand text-white hover:bg-brand/90 transition flex items-center gap-1.5 shadow-sm"
-                      title="เปิดตัวแก้ไขแบบฟอร์มเชิงโต้ตอบ (WYSIWYG Interactive Editor)"
-                    >
-                      <Icon name="edit" className="w-3.5 h-3.5" />
-                      <span>ปรับแต่ง / แก้ไขแบบฟอร์มนี้</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormPreviewMode('sample')}
-                      className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition ${
-                        formPreviewMode === 'sample'
-                          ? 'bg-ink text-white'
-                          : 'bg-soft text-ink hover:bg-ink hover:text-white'
-                      }`}
-                    >
-                      -ตัวอย่าง-
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormPreviewMode('blank')}
-                      className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition ${
-                        formPreviewMode === 'blank'
-                          ? 'bg-ink text-white'
-                          : 'bg-soft text-ink hover:bg-ink hover:text-white'
-                      }`}
-                    >
-                      แบบฟอร์มเปล่า
-                    </button>
-                  </div>
+                  <b className="text-[15px] text-ink">
+                    ตัวอย่างหน้ากระดาษ ({currentSelectedForm.name})
+                  </b>
+                  {currentSelectedForm.structure?.editorMode === 'freeform' && (
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/admin/document-templates/${currentSelectedForm.id}/preview`}
+                        className="px-3 py-1.5 rounded-full text-[12px] font-semibold bg-soft text-ink hover:bg-ink hover:text-white transition"
+                      >
+                        พิมพ์ / PDF
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => setEditingTemplate(currentSelectedForm)}
+                        className="px-3.5 py-1.5 rounded-full text-[12px] font-semibold bg-brand text-white hover:bg-brand/90 transition flex items-center gap-1.5 shadow-sm"
+                      >
+                        <Icon name="edit" className="w-3.5 h-3.5" />
+                        <span>เปิดตัวแก้ไขกระดาษ A4</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
-                <OfficialGovFormDocument
-                  blankMode={formPreviewMode === 'blank'}
-                  sampleDocMode={formPreviewMode === 'sample'}
-                  customFields={{
-                    formTitle: currentSelectedForm?.config?.formTitle || currentSelectedForm?.title || 'แบบขอใช้สถานที่ราชการ',
-                    subject: currentSelectedForm?.config?.subjectText || currentSelectedForm?.sub?.replace(/^เรื่อง\s*/, '') || 'ขออนุญาตใช้สถานที่ราชการ',
-                    toWhom: currentSelectedForm?.config?.recipientText || 'ผู้มีอำนาจอนุมัติ',
-                    writtenAt: currentSelectedForm?.config?.writtenAtSlot?.label,
-                    desireLabel: currentSelectedForm?.title?.includes('ครุภัณฑ์')
-                      ? 'มีความประสงค์ขอยืมครุภัณฑ์ราชการ ดังนี้'
-                      : 'มีความประสงค์ขอใช้สถานที่ราชการ ดังนี้',
-                    requesterRoleCaption: currentSelectedForm?.title?.includes('ครุภัณฑ์')
-                      ? 'ผู้ขออนุญาตยืมครุภัณฑ์ราชการ'
-                      : 'ผู้ขออนุญาตใช้สถานที่ราชการ',
-                    logoUrl: currentSelectedForm?.config?.logoUrl,
-                    customSlots: currentSelectedForm?.config?.customSlots,
-                    closingText: currentSelectedForm?.config?.closingText,
-                    slotsConfig: currentSelectedForm?.config,
-                  }}
-                />
+                {currentSelectedForm.structure?.editorMode === 'freeform' ? (
+                  <div className="overflow-auto bg-slate-100 p-4 rounded-2xl border border-line flex justify-center">
+                  <div
+                    className="relative bg-white shadow-md border border-slate-300 overflow-hidden shrink-0"
+                    style={{
+                      width: A4_WIDTH_PX,
+                      height: A4_HEIGHT_PX,
+                      fontFamily: "'TH Sarabun New', 'Sarabun', sans-serif",
+                    }}
+                  >
+                    <A4BackgroundLayer
+                      url={currentSelectedForm.structure?.backgroundImageUrl}
+                      opacity={currentSelectedForm.structure?.backgroundOpacity ?? 1}
+                    />
+                    {(currentSelectedForm.structure?.freeformElements || []).map((el) => (
+                      <div
+                        key={el.id}
+                        style={{
+                          position: 'absolute',
+                          left: el.x,
+                          top: el.y,
+                          width: el.width,
+                          height: el.height,
+                          fontSize: `${el.fontSize ?? 16}px`,
+                          fontWeight: el.fontWeight || 'normal',
+                          textAlign: el.textAlign || 'left',
+                          color: el.color || '#0f172a',
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        {el.type === 'text' && (
+                          <div className="w-full h-full overflow-hidden whitespace-pre-wrap break-words px-1 flex items-center">
+                            {el.text || ''}
+                          </div>
+                        )}
+                        {el.type === 'slot' && (
+                          <div
+                            className={`w-full h-full px-1.5 flex items-center overflow-hidden ${
+                              el.showBorderBottom !== false ? 'border-b border-dotted border-slate-700' : ''
+                            }`}
+                          >
+                            <span className="truncate">{getSampleBindingValue(el.binding) || '\u00A0'}</span>
+                          </div>
+                        )}
+                        {el.type === 'logo' && el.imageUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={el.imageUrl} alt="Logo" className="w-full h-full object-contain" />
+                        )}
+                        {el.type === 'signature' && (
+                          <div className="w-full h-full flex flex-col items-center justify-end pb-1 text-center">
+                            <div className="w-4/5 border-b border-dotted border-slate-700 mb-1" />
+                            <div className="text-slate-700">(................................................)</div>
+                            <div className="font-medium mt-0.5">{el.text || 'ผู้ลงนาม'}</div>
+                          </div>
+                        )}
+                        {el.type === 'divider' && (
+                          <div className="w-full h-full flex items-center">
+                            <div className="w-full border-t-2" style={{ borderColor: el.color || '#334155' }} />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                ) : (
+                  <OfficialGovFormDocument
+                    sampleDocMode={true}
+                    customFields={{
+                      formTitle: currentSelectedForm.structure?.title || currentSelectedForm.name,
+                      subject: currentSelectedForm.structure?.subject || 'ขออนุญาตใช้สถานที่ราชการ',
+                      toWhom: currentSelectedForm.structure?.recipient || 'ผู้มีอำนาจอนุมัติ',
+                      writtenAt: currentSelectedForm.structure?.writtenAt,
+                      desireLabel:
+                        currentSelectedForm.category === 'equipment' || currentSelectedForm.name.includes('ครุภัณฑ์')
+                          ? 'มีความประสงค์ขอยืมครุภัณฑ์ราชการ ดังนี้'
+                          : 'มีความประสงค์ขอใช้สถานที่ราชการ ดังนี้',
+                      requesterRoleCaption:
+                        currentSelectedForm.category === 'equipment' || currentSelectedForm.name.includes('ครุภัณฑ์')
+                          ? 'ผู้ขออนุญาตยืมครุภัณฑ์ราชการ'
+                          : 'ผู้ขออนุญาตใช้สถานที่ราชการ',
+                      closingText: currentSelectedForm.structure?.closingText,
+                    }}
+                  />
+                )}
               </div>
             )}
           </div>
@@ -431,38 +536,16 @@ function ManageResourcesContent() {
         </div>
       )}
 
-      {/* Modal ตัวจัดการและแก้ไขแบบฟอร์มกระดาษราชการ WYSIWYG */}
-      {showDocEditor && (
-        <OfficialDocumentEditor
-          isModal={true}
-          initialFormTitle={
-            isCreatingNewForm
-              ? 'แบบขอใช้สถานที่ราชการ (แบบใหม่)'
-              : currentSelectedForm?.title || 'แบบขอใช้สถานที่ราชการ'
-          }
-          initialConfig={currentSelectedForm?.config || getFormTemplate(currentSelectedForm?.title || '')?.config}
-          isBorrowMode={currentSelectedForm?.title?.includes('ครุภัณฑ์') || currentSelectedForm?.title?.includes('อุปกรณ์')}
+      {/* Modal ตัวแก้ไขแม่แบบเอกสารแบบอิสระบนกระดาษ A4 */}
+      {editingTemplate && (
+        <FreeformTemplateEditorModal
+          template={editingTemplate}
           onClose={() => {
-            setShowDocEditor(false);
-            setIsCreatingNewForm(false);
+            setEditingTemplate(null);
+            loadForms();
           }}
-          onSave={async ({ formTitle, config }) => {
-            const trimmed = formTitle.trim();
-            if (config) {
-              await saveTemplateToDatabase(
-                trimmed,
-                config,
-                currentSelectedForm?.title?.includes('ครุภัณฑ์') ? 'equipment' : 'venue'
-              );
-            } else if (isCreatingNewForm && trimmed) {
-              saveNewFormTemplate(trimmed);
-            }
-            const updated = await fetchFormTemplatesFromApi();
-            setFormsList(updated);
-            const found = updated.find((f) => f.title === trimmed || f.id === trimmed);
-            if (found) setSelectedFormKey(found.id);
-            setShowDocEditor(false);
-            setIsCreatingNewForm(false);
+          onSaved={(updated) => {
+            setFormsList((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
           }}
         />
       )}
