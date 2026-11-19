@@ -42,12 +42,12 @@ import { HealthController } from './health/health.controller';
       {
         name: 'default',
         ttl: 60000,
-        limit: 100,
+        limit: 600,
       },
       {
         name: 'auth',
         ttl: 60000,
-        limit: 10,
+        limit: 600, // เส้นทาง Auth จะ override ด้วย @Throttle({ auth: { limit: 3..20 } })
       },
     ]),
   ],
