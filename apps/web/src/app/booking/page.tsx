@@ -206,12 +206,7 @@ export default function BookingWizardPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
   const [availability, setAvailability] = useState<DayAvailability[]>([]);
-  const [periods, setPeriods] = useState<Period[]>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 3);
-    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    return [{ start: `${dateStr}T09:00:00+07:00`, end: `${dateStr}T16:00:00+07:00` }];
-  });
+  const [periods, setPeriods] = useState<Period[]>([]);
   const [activePeriodIdx, setActivePeriodIdx] = useState(0);
   const [conflicts, setConflicts] = useState<ConflictInfo[]>([]);
 
@@ -1173,12 +1168,13 @@ export default function BookingWizardPage() {
                 {/* ตัวกรองประเภทสถานที่ (Dropdown List) */}
                 <div className="flex items-center gap-1.5 bg-soft border border-line rounded-xl px-3 h-10">
                   <Icon name="filter" className="w-3.5 h-3.5 text-brand shrink-0" />
-                  <span className="text-[12.5px] font-bold text-ink shrink-0">ประเภท:</span>
-                  <select
-                    value={catFilter}
-                    onChange={(e) => setCatFilter(e.target.value as 'all' | VenueType)}
-                    className="bg-transparent text-[12.5px] font-semibold text-ink focus:outline-none cursor-pointer pr-1"
-                  >
+                  <span className="text-[12.5px] font-bold text-ink leading-none shrink-0">ประเภท:</span>
+                  <div className="relative flex items-center h-full">
+                    <select
+                      value={catFilter}
+                      onChange={(e) => setCatFilter(e.target.value as 'all' | VenueType)}
+                      className="h-full appearance-none bg-transparent text-[12.5px] font-semibold text-ink leading-normal focus:outline-none cursor-pointer pr-5 py-0"
+                    >
                     {(
                       [
                         ['all', 'ทั้งหมด'],
@@ -1197,7 +1193,9 @@ export default function BookingWizardPage() {
                         </option>
                       );
                     })}
-                  </select>
+                    </select>
+                    <Icon name="chevron-down" className="w-3.5 h-3.5 text-ink-mute pointer-events-none absolute right-0 top-1/2 -translate-y-1/2" />
+                  </div>
                 </div>
 
                 <button

@@ -210,23 +210,11 @@ export function HourlyBookingSection({
     return { disabled, reason, isPast, isAdvanceRestricted, isClosed, isFull };
   };
 
-  // เมื่อผู้ใช้เลือกวันในปฏิทิน
+  // เมื่อผู้ใช้เลือกวันในปฏิทิน (ไม่เลือกรอบเวลาให้อัตโนมัติ ให้ผู้ใช้กดเลือกช่วงเวลาเอง)
   const handleSelectDate = (dateStr: string) => {
     const status = getDateStatus(dateStr);
     if (status.disabled) return;
     setInternalDate(dateStr);
-
-    // หากยังไม่มีช่วงเวลาที่เลือกเลย ให้เลือกช่วงเวลาเริ่มต้นที่เปิดทำการ
-    if (effectivePeriods.length === 0) {
-      const defaultStart = effectiveOpenTime;
-      const defaultEnd = minutesToTime(timeToMinutes(defaultStart) + 60);
-      updatePeriods([
-        {
-          start: `${dateStr}T${defaultStart}:00+07:00`,
-          end: `${dateStr}T${defaultEnd}:00+07:00`,
-        },
-      ]);
-    }
   };
 
   // เมื่อผู้ใช้คลิกเลือก Slot 1 ชั่วโมง (รองรับการเลือกข้ามช่วง และหลายช่วงเวลาได้อย่างอิสระ)

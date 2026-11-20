@@ -186,34 +186,36 @@ export default function StaffHomePage() {
           </div>
         </div>
 
-        {/* 2. การ์ดสถิติสรุปงานหลัก 4 ด้าน (KPI Cards) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {/* 2. การ์ดสถิติสรุปงานหลัก 4 ด้าน (สีและสไตล์เดิม + มือถือเป็น 2×2 Grid) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
           {/* การ์ด 1: รอตรวจคำขอสถานที่/อุปกรณ์ */}
           <Link
             href="/staff/review"
-            className={`jw-card p-5 flex flex-col justify-between gap-4 border-l-4 border-l-brand hover:border-brand hover:shadow-md transition group ${
+            className={`jw-card p-3 sm:p-5 flex flex-col justify-between gap-2.5 sm:gap-4 border-l-4 border-l-brand hover:border-brand hover:shadow-md transition group ${
               !hasPermission(account, 'review') ? 'opacity-60' : ''
             }`}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <span className="text-[12.5px] font-semibold text-ink-mute block">
+            <div className="flex items-start justify-between gap-2 sm:gap-3">
+              <div className="min-w-0">
+                <span className="text-[11.5px] sm:text-[12.5px] font-semibold text-ink-mute block truncate">
                   รอตรวจคำขอ (สถานที่/อุปกรณ์)
                 </span>
-                <b className="text-[32px] font-bold text-ink leading-tight mt-1 block tabular-nums">
+                <b className="text-[24px] sm:text-[32px] font-bold text-ink leading-tight mt-0.5 sm:mt-1 block tabular-nums">
                   {reviewItems.length}
                 </b>
               </div>
-              <div className="size-11 rounded-2xl bg-brand-tint text-brand flex items-center justify-center shrink-0 group-hover:bg-brand group-hover:text-white transition">
-                <ClipboardCheck className="size-5" />
+              <div className="size-8 sm:size-11 rounded-xl sm:rounded-2xl bg-brand-tint text-brand flex items-center justify-center shrink-0 group-hover:bg-brand group-hover:text-white transition">
+                <ClipboardCheck className="size-4 sm:size-5" />
               </div>
             </div>
-            <div className="flex items-center justify-between pt-3 border-t border-line text-[12.5px]">
-              <span className={reviewItems.length > 0 ? 'text-status-crit font-semibold' : 'text-ink-mute'}>
+            <div className="flex items-center justify-between gap-1 pt-2 sm:pt-3 border-t border-line text-[11px] sm:text-[12.5px]">
+              <span className={`truncate ${reviewItems.length > 0 ? 'text-status-crit font-semibold' : 'text-ink-mute'}`}>
                 {reviewItems.length > 0 ? `รอดำเนินการ ${reviewItems.length} รายการ` : 'ไม่มีงานค้าง'}
               </span>
-              <span className="font-semibold text-brand inline-flex items-center gap-1 group-hover:translate-x-0.5 transition">
-                ไปหน้าตรวจคำขอ <ArrowRight className="size-3.5" />
+              <span className="font-semibold text-brand inline-flex items-center gap-0.5 sm:gap-1 shrink-0 group-hover:translate-x-0.5 transition">
+                <span className="hidden sm:inline">ไปหน้าตรวจคำขอ</span>
+                <span className="sm:hidden">ตรวจคำขอ</span>
+                <ArrowRight className="size-3 sm:size-3.5" />
               </span>
             </div>
           </Link>
@@ -221,29 +223,31 @@ export default function StaffHomePage() {
           {/* การ์ด 2: งานแจ้งซ่อมรอจัดการ */}
           <Link
             href="/staff/repairs"
-            className={`jw-card p-5 flex flex-col justify-between gap-4 border-l-4 border-l-amber-500 hover:border-amber-500 hover:shadow-md transition group ${
+            className={`jw-card p-3 sm:p-5 flex flex-col justify-between gap-2.5 sm:gap-4 border-l-4 border-l-amber-500 hover:border-amber-500 hover:shadow-md transition group ${
               !hasPermission(account, 'review') ? 'opacity-60' : ''
             }`}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <span className="text-[12.5px] font-semibold text-ink-mute block">
+            <div className="flex items-start justify-between gap-2 sm:gap-3">
+              <div className="min-w-0">
+                <span className="text-[11.5px] sm:text-[12.5px] font-semibold text-ink-mute block truncate">
                   งานแจ้งซ่อมรอจัดการ
                 </span>
-                <b className="text-[32px] font-bold text-ink leading-tight mt-1 block tabular-nums">
+                <b className="text-[24px] sm:text-[32px] font-bold text-ink leading-tight mt-0.5 sm:mt-1 block tabular-nums">
                   {repairItems.length}
                 </b>
               </div>
-              <div className="size-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:bg-amber-500 group-hover:text-white transition">
-                <Wrench className="size-5" />
+              <div className="size-8 sm:size-11 rounded-xl sm:rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:bg-amber-500 group-hover:text-white transition">
+                <Wrench className="size-4 sm:size-5" />
               </div>
             </div>
-            <div className="flex items-center justify-between pt-3 border-t border-line text-[12.5px]">
-              <span className={repairItems.length > 0 ? 'text-amber-700 font-semibold' : 'text-ink-mute'}>
+            <div className="flex items-center justify-between gap-1 pt-2 sm:pt-3 border-t border-line text-[11px] sm:text-[12.5px]">
+              <span className={`truncate ${repairItems.length > 0 ? 'text-amber-700 font-semibold' : 'text-ink-mute'}`}>
                 {repairItems.length > 0 ? `รอรับงาน/ซ่อม ${repairItems.length} รายการ` : 'ไม่มีรายการแจ้งซ่อมค้าง'}
               </span>
-              <span className="font-semibold text-amber-700 inline-flex items-center gap-1 group-hover:translate-x-0.5 transition">
-                จัดการงานซ่อม <ArrowRight className="size-3.5" />
+              <span className="font-semibold text-amber-700 inline-flex items-center gap-0.5 sm:gap-1 shrink-0 group-hover:translate-x-0.5 transition">
+                <span className="hidden sm:inline">จัดการงานซ่อม</span>
+                <span className="sm:hidden">จัดการ</span>
+                <ArrowRight className="size-3 sm:size-3.5" />
               </span>
             </div>
           </Link>
@@ -251,27 +255,27 @@ export default function StaffHomePage() {
           {/* การ์ด 3: รอตรวจรับคืนอุปกรณ์ */}
           <Link
             href="/borrow/my?tab=inspect"
-            className="jw-card p-5 flex flex-col justify-between gap-4 border-l-4 border-l-blue-600 hover:border-blue-600 hover:shadow-md transition group"
+            className="jw-card p-3 sm:p-5 flex flex-col justify-between gap-2.5 sm:gap-4 border-l-4 border-l-blue-600 hover:border-blue-600 hover:shadow-md transition group"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <span className="text-[12.5px] font-semibold text-ink-mute block">
+            <div className="flex items-start justify-between gap-2 sm:gap-3">
+              <div className="min-w-0">
+                <span className="text-[11.5px] sm:text-[12.5px] font-semibold text-ink-mute block truncate">
                   รอตรวจสภาพรับคืนอุปกรณ์
                 </span>
-                <b className="text-[32px] font-bold text-ink leading-tight mt-1 block tabular-nums">
+                <b className="text-[24px] sm:text-[32px] font-bold text-ink leading-tight mt-0.5 sm:mt-1 block tabular-nums">
                   {inspectQueue.length}
                 </b>
               </div>
-              <div className="size-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-600 group-hover:text-white transition">
-                <PackageCheck className="size-5" />
+              <div className="size-8 sm:size-11 rounded-xl sm:rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-600 group-hover:text-white transition">
+                <PackageCheck className="size-4 sm:size-5" />
               </div>
             </div>
-            <div className="flex items-center justify-between pt-3 border-t border-line text-[12.5px]">
-              <span className={inspectQueue.length > 0 ? 'text-blue-700 font-semibold' : 'text-ink-mute'}>
+            <div className="flex items-center justify-between gap-1 pt-2 sm:pt-3 border-t border-line text-[11px] sm:text-[12.5px]">
+              <span className={`truncate ${inspectQueue.length > 0 ? 'text-blue-700 font-semibold' : 'text-ink-mute'}`}>
                 {inspectQueue.length > 0 ? `รอตรวจรับคืน ${inspectQueue.length} รายการ` : 'ตรวจรับคืนครบแล้ว'}
               </span>
-              <span className="font-semibold text-blue-700 inline-flex items-center gap-1 group-hover:translate-x-0.5 transition">
-                ตรวจรับคืน <ArrowRight className="size-3.5" />
+              <span className="font-semibold text-blue-700 inline-flex items-center gap-0.5 sm:gap-1 shrink-0 group-hover:translate-x-0.5 transition">
+                ตรวจรับคืน <ArrowRight className="size-3 sm:size-3.5" />
               </span>
             </div>
           </Link>
@@ -279,29 +283,31 @@ export default function StaffHomePage() {
           {/* การ์ด 4: จัดการทรัพยากรสถานที่ & อุปกรณ์ */}
           <Link
             href="/staff/resources"
-            className={`jw-card p-5 flex flex-col justify-between gap-4 border-l-4 border-l-emerald-600 hover:border-brand hover:shadow-md transition group ${
+            className={`jw-card p-3 sm:p-5 flex flex-col justify-between gap-2.5 sm:gap-4 border-l-4 border-l-emerald-600 hover:border-brand hover:shadow-md transition group ${
               !hasPermission(account, 'manageResources') ? 'opacity-60' : ''
             }`}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <span className="text-[12.5px] font-semibold text-ink-mute block">
-                  สถานที่ & อุปกรณ์ในระบบ
+            <div className="flex items-start justify-between gap-2 sm:gap-3">
+              <div className="min-w-0">
+                <span className="text-[11.5px] sm:text-[12.5px] font-semibold text-ink-mute block truncate">
+                  สถานที่ &amp; อุปกรณ์ในระบบ
                 </span>
-                <b className="text-[32px] font-bold text-ink leading-tight mt-1 block tabular-nums">
+                <b className="text-[24px] sm:text-[32px] font-bold text-ink leading-tight mt-0.5 sm:mt-1 block tabular-nums">
                   {venues.length + equipment.length}
                 </b>
               </div>
-              <div className="size-11 rounded-2xl bg-brand-tint text-brand flex items-center justify-center shrink-0 group-hover:bg-brand group-hover:text-white transition">
-                <Building2 className="size-5" />
+              <div className="size-8 sm:size-11 rounded-xl sm:rounded-2xl bg-brand-tint text-brand flex items-center justify-center shrink-0 group-hover:bg-brand group-hover:text-white transition">
+                <Building2 className="size-4 sm:size-5" />
               </div>
             </div>
-            <div className="flex items-center justify-between pt-3 border-t border-line text-[12.5px]">
-              <span className="text-ink-mute">
+            <div className="flex items-center justify-between gap-1 pt-2 sm:pt-3 border-t border-line text-[11px] sm:text-[12.5px]">
+              <span className="text-ink-mute truncate">
                 สถานที่ {enabledVenuesCount} แห่ง · อุปกรณ์ {enabledEquipmentCount} รายการ
               </span>
-              <span className="font-semibold text-brand inline-flex items-center gap-1 group-hover:translate-x-0.5 transition">
-                ตั้งค่าทรัพยากร <ArrowRight className="size-3.5" />
+              <span className="font-semibold text-brand inline-flex items-center gap-0.5 sm:gap-1 shrink-0 group-hover:translate-x-0.5 transition">
+                <span className="hidden sm:inline">ตั้งค่าทรัพยากร</span>
+                <span className="sm:hidden">ตั้งค่า</span>
+                <ArrowRight className="size-3 sm:size-3.5" />
               </span>
             </div>
           </Link>
