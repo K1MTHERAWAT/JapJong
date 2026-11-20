@@ -395,7 +395,7 @@
   }
   select.jw-in,
   .jw-select {
-    @apply min-h-[44px] h-11 w-full rounded-control px-3.5 text-body focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/25 transition;
+    @apply min-h-[44px] h-11 w-full rounded-control px-3.5 py-0 text-body leading-[42px] focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/25 transition;
     background-color: var(--color-surface);
     border: 1px solid var(--color-line-input);
     color: var(--color-ink);
@@ -941,4 +941,13 @@
 
 .gov-brand-shell .sidebar-toggle-btn {
   display: none !important;
+}
+
+.gov-brand-shell header [style*="overflow-y: auto"] {
+  overflow-x: hidden !important;
+}
+
+.gov-brand-shell header [style*="overflow-y: auto"] * {
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
