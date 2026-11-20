@@ -415,7 +415,6 @@ export default function StaffHomePage() {
                           <th className="py-3 px-2.5 lg:px-3">ผู้ยื่นคำขอ</th>
                           <th className="py-3 px-2.5 lg:px-3">กำหนดการใช้ / วันที่</th>
                           <th className="py-3 px-2.5 lg:px-3">สถานะ</th>
-                          <th className="py-3 px-2.5 lg:px-3 text-right">การดำเนินการ</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-line text-[13.5px]">
@@ -459,31 +458,6 @@ export default function StaffHomePage() {
                               </td>
                               <td className="py-3.5 px-2.5 lg:px-3 whitespace-nowrap">
                                 <StatusChip status={r.status} />
-                              </td>
-                              <td className="py-3.5 px-2.5 lg:px-3 text-right whitespace-nowrap">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRowNavigate(r);
-                                  }}
-                                  className={`px-3 py-1.5 rounded-lg text-white text-[12px] font-semibold transition inline-flex items-center gap-1 cursor-pointer ${
-                                    r.type === 'repair'
-                                      ? 'bg-amber-600 hover:bg-amber-700'
-                                      : r.status === 'return_inspect'
-                                        ? 'bg-blue-600 hover:bg-blue-700'
-                                        : 'bg-brand hover:bg-brand-ink'
-                                  }`}
-                                >
-                                  <span>
-                                    {r.type === 'repair'
-                                      ? 'จัดการงานซ่อม'
-                                      : r.status === 'return_inspect'
-                                        ? 'ตรวจรับคืน'
-                                        : 'ตรวจคำขอ'}
-                                  </span>
-                                  <ArrowRight className="size-3.5" />
-                                </button>
                               </td>
                             </tr>
                           );
