@@ -461,7 +461,13 @@ export default function StaffHomePage() {
                                     e.stopPropagation();
                                     handleRowNavigate(r);
                                   }}
-                                  className="px-3 py-1.5 rounded-lg bg-brand text-white text-[12px] font-semibold hover:bg-brand-ink transition inline-flex items-center gap-1"
+                                  className={`px-3 py-1.5 rounded-lg text-white text-[12px] font-semibold transition inline-flex items-center gap-1 cursor-pointer ${
+                                    r.type === 'repair'
+                                      ? 'bg-amber-600 hover:bg-amber-700'
+                                      : r.status === 'return_inspect'
+                                        ? 'bg-blue-600 hover:bg-blue-700'
+                                        : 'bg-brand hover:bg-brand-ink'
+                                  }`}
                                 >
                                   <span>
                                     {r.type === 'repair'

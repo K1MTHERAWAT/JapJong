@@ -529,7 +529,7 @@ export default function StaffVerifyPage() {
                 <div
                   onClick={handleManualRefocus}
                   title="แตะที่ภาพเพื่อปรับโฟกัสอัตโนมัติใหม่"
-                  className="relative w-full max-w-[420px] aspect-square rounded-2xl overflow-hidden bg-black/95 border-2 border-brand/60 shadow-md flex items-center justify-center cursor-pointer"
+                  className="relative w-full aspect-[4/3] sm:aspect-[16/10] min-h-[340px] sm:min-h-[440px] max-h-[620px] rounded-2xl overflow-hidden bg-black/95 border-2 border-brand/60 shadow-md flex items-center justify-center cursor-pointer"
                 >
                   <div
                     id="qr-reader"
@@ -575,113 +575,6 @@ export default function StaffVerifyPage() {
                       </span>
                     )}
                   </div>
-                </div>
-
-                {/* แถบควบคุมการซูม (Zoom Slider & Quick Presets) + ไฟฉาย + โฟกัส */}
-                <div className="w-full max-w-[420px] rounded-2xl border border-line bg-canvas p-3.5 flex flex-col gap-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[12.5px] font-semibold text-ink">
-                      ระดับการซูมกล้อง (สำหรับ QR ขนาดเล็กหรืออยู่ไกล):
-                    </span>
-                    <div className="flex items-center gap-1">
-                      {[1, 1.5, 2, 3].map((preset) => (
-                        <button
-                          key={preset}
-                          type="button"
-                          onClick={() => handleZoomChange(preset)}
-                          className={`px-2 py-0.5 rounded-lg text-[11.5px] font-bold border transition ${
-                            Math.abs(zoomLevel - preset) < 0.08
-                              ? 'bg-brand text-white border-brand'
-                              : 'bg-white text-ink border-line hover:border-brand'
-                          }`}
-                        >
-                          {preset}x
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => handleZoomChange(zoomLevel - 0.2)}
-                      className="w-8 h-8 rounded-lg border border-line bg-white text-ink font-bold hover:border-brand"
-                      aria-label="ลดการซูม"
-                    >
-                      -
-                    </button>
-                    <input
-                      type="range"
-                      min={1}
-                      max={3}
-                      step={0.1}
-                      value={zoomLevel}
-                      onChange={(e) => handleZoomChange(parseFloat(e.target.value))}
-                      className="flex-1 accent-brand cursor-pointer"
-                      aria-label="แถบเลื่อนซูมกล้อง"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleZoomChange(zoomLevel + 0.2)}
-                      className="w-8 h-8 rounded-lg border border-line bg-white text-ink font-bold hover:border-brand"
-                      aria-label="เพิ่มการซูม"
-                    >
-                      +
-                    </button>
-                  </div>
-
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-line/60">
-                    <button
-                      type="button"
-                      onClick={handleManualRefocus}
-                      className="px-3 py-1.5 rounded-xl border border-line bg-white hover:bg-soft text-[12px] font-semibold text-ink flex items-center gap-1.5"
-                    >
-                      <Icon name="search" className="w-3.5 h-3.5 text-brand" />
-                      แตะเพื่อปรับโฟกัสใหม่
-                    </button>
-
-                    {availableCameras.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={handleSwitchCamera}
-                        className="px-3 py-1.5 rounded-xl border border-line bg-white hover:bg-soft text-[12px] font-semibold text-ink flex items-center gap-1.5 cursor-pointer"
-                        title="สลับกล้องหน้า/หลัง"
-                      >
-                        <Icon name="rotate-cw" className="w-3.5 h-3.5 text-brand" />
-                        สลับกล้อง ({availableCameras.length})
-                      </button>
-                    )}
-
-                    {capabilities.supportsTorch && (
-                      <button
-                        type="button"
-                        onClick={handleToggleTorch}
-                        className={`px-3 py-1.5 rounded-xl border text-[12px] font-semibold flex items-center gap-1.5 transition ${
-                          torchOn
-                            ? 'bg-amber-500 text-white border-amber-500'
-                            : 'bg-white text-ink border-line hover:bg-soft'
-                        }`}
-                      >
-                        <Icon name="eye" className="w-3.5 h-3.5" />
-                        {torchOn ? 'ปิดไฟฉาย' : 'เปิดไฟฉาย (แสงน้อย)'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* ข้อความแนะนำอัจฉริยะแบบเรียลไทม์ */}
-                <div
-                  className={`w-full max-w-[420px] rounded-xl px-3.5 py-2.5 text-[12.5px] flex items-start gap-2 border ${
-                    scanElapsedSec >= 4
-                      ? 'bg-amber-50/80 border-amber-200 text-amber-900'
-                      : 'bg-brand-mint/30 border-brand/20 text-ink'
-                  }`}
-                >
-                  <Icon
-                    name="shield-check"
-                    className="w-4 h-4 text-brand shrink-0 mt-0.5"
-                  />
-                  <span>{guidanceText}</span>
                 </div>
 
                 {lastScannedBanner && (

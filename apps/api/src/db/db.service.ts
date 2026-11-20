@@ -189,7 +189,8 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
            ADD COLUMN IF NOT EXISTS "address_district_id" TEXT,
            ADD COLUMN IF NOT EXISTS "address_province_id" TEXT,
            ADD COLUMN IF NOT EXISTS "email" TEXT,
-           ADD COLUMN IF NOT EXISTS "email_verified" BOOLEAN NOT NULL DEFAULT false`,
+           ADD COLUMN IF NOT EXISTS "email_verified" BOOLEAN NOT NULL DEFAULT false,
+           ADD COLUMN IF NOT EXISTS "avatar" TEXT`,
         `ALTER TABLE "venues"
            ADD COLUMN IF NOT EXISTS "images" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]`,
         `ALTER TABLE "equipments"

@@ -122,6 +122,8 @@ model Account {
   permissions Json
   /// ภาพลายเซ็น (data URL)
   signature   String?
+  /// รูปโปรไฟล์ (data URL หรือ URL)
+  avatar      String?
   /// PIN 6 หลักเข้ารหัสด้วย argon2id สำหรับยืนยันการลงนาม
   pin         String?
   /// บัญชีสำหรับโหมดเดโม (เฉพาะโหมดเดโมเท่านั้นที่ล็อกอิน one-click ได้)

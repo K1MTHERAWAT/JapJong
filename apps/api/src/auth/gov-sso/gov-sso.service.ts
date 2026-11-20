@@ -392,6 +392,9 @@ export class GovSsoService {
           where: { username: ssoUsername },
         });
         if (dbAcc) {
+          const avatarRows = (await this.db.prisma
+            .$queryRaw`SELECT "avatar" FROM "accounts" WHERE "id" = ${dbAcc.id}`
+            .catch(() => [])) as { avatar: string | null }[];
           account = {
             id: dbAcc.id,
             username: dbAcc.username,
@@ -410,6 +413,7 @@ export class GovSsoService {
                 ? (dbAcc.permissions as any)
                 : { ...DEFAULT_PERMISSIONS[(dbAcc.role as Role) || 'USER'] },
             signature: dbAcc.signature,
+            avatar: avatarRows[0]?.avatar ?? null,
             pin: dbAcc.pin,
             isDemo: dbAcc.isDemo,
             active: dbAcc.active,

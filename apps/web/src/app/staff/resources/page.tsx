@@ -16,6 +16,7 @@
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { Building2, FileText, Package } from 'lucide-react';
 import {
   DocumentTemplateItem,
   EQUIPMENT_CATEGORY_LABEL,
@@ -26,7 +27,7 @@ import {
 import { roleHomePath, useAuth } from '@/components/auth-context';
 import { Icon } from '@/components/icons';
 import { AppShell } from '@/components/shell';
-import { OfficialGovFormDocument, Tabs, Toggle } from '@/components/ui';
+import { OfficialGovFormDocument, Toggle } from '@/components/ui';
 import {
   A4BackgroundLayer,
   A4_HEIGHT_PX,
@@ -162,18 +163,73 @@ function ManageResourcesContent() {
       }
     >
       <div className="flex flex-col gap-3.5">
-        {/* แถบแท็บสลับหมวดหมู่ทรัพยากร */}
-        <Tabs<ResourceTab>
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: 'venues', label: 'สถานที่' },
-            { value: 'equipment', label: 'อุปกรณ์' },
-            { value: 'forms', label: 'แบบฟอร์ม' },
-            // ซ่อนแท็บยานพาหนะไว้ชั่วคราว
-            // { value: 'vehicles', label: 'ยานพาหนะ' },
-          ]}
-        />
+        {/* แถบแท็บสลับหมวดหมู่ทรัพยากร (Soft Tint Icon Cards - แนวนอนทุกขนาดจอ) */}
+        <div
+          role="tablist"
+          aria-label="หมวดหมู่ทรัพยากรและแบบฟอร์ม"
+          className="grid grid-cols-3 gap-1.5 sm:gap-2.5"
+        >
+          {(
+            [
+              {
+                value: 'venues' as const,
+                label: 'สถานที่',
+                desc: `ห้องประชุม สนาม · ${venues.length} รายการ`,
+                Icon: Building2,
+              },
+              {
+                value: 'equipment' as const,
+                label: 'อุปกรณ์',
+                desc: `ครุภัณฑ์และสต็อก · ${equipment.length} รายการ`,
+                Icon: Package,
+              },
+              {
+                value: 'forms' as const,
+                label: 'แบบฟอร์ม',
+                desc: `แม่แบบเอกสาร A4 · ${formsList.length} แบบฟอร์ม`,
+                Icon: FileText,
+              },
+            ]
+          ).map(({ value, label, desc, Icon: TabIcon }) => {
+            const active = tab === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setTab(value)}
+                className={`flex flex-col sm:flex-row items-center text-center sm:text-left gap-1.5 sm:gap-3 p-2 sm:p-3.5 rounded-card transition cursor-pointer min-w-0 ${
+                  active
+                    ? 'border-2 border-brand bg-brand-tint/60 shadow-xs'
+                    : 'border border-line bg-surface hover:border-brand/40 hover:bg-hover/50'
+                }`}
+              >
+                <div
+                  className={`size-8 sm:size-10 rounded-control flex items-center justify-center shrink-0 transition ${
+                    active
+                      ? 'bg-brand text-white'
+                      : 'bg-surface-muted border border-line text-ink-mute'
+                  }`}
+                >
+                  <TabIcon className="size-4 sm:size-5" />
+                </div>
+                <div className="min-w-0 w-full sm:flex-1">
+                  <div
+                    className={`text-[11.5px] sm:text-[13.5px] font-bold leading-tight truncate ${
+                      active ? 'text-brand-ink' : 'text-ink'
+                    }`}
+                  >
+                    {label}
+                  </div>
+                  <div className="hidden sm:block text-[12px] text-ink-mute truncate mt-0.5">
+                    {desc}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
 
         {/* แท็บที่ 1: สถานที่ */}
         {tab === 'venues' && (
