@@ -555,7 +555,10 @@ export class RequestsController {
         attendees: Math.max(1, Math.min(10000, Math.floor(Number(body.attendees ?? 30)) || 30)),
         activity: clampNameInput(body.activity, NAME_MAX_LENGTH.ACTIVITY_NAME).trim() || 'ขอใช้สถานที่',
         purpose: String(body.purpose ?? '').trim().slice(0, 1000),
-        attachments: (body.attachments ?? []).slice(0, 10).map((a) => String(a).slice(0, 200)),
+        attachments: (body.attachments ?? [])
+          .slice(0, 10)
+          .map((a) => String(a).trim().slice(0, 2_500_000))
+          .filter(Boolean),
         extraItems,
         signatures: [],
         writtenAt: body.writtenAt ? clampNameInput(body.writtenAt, NAME_MAX_LENGTH.WRITTEN_AT).trim() : '',
@@ -664,7 +667,10 @@ export class RequestsController {
           pickupDate: String(body.pickupDate).slice(0, 10),
           returnDate: String(body.returnDate).slice(0, 10),
           purpose: String(body.purpose ?? '').trim().slice(0, 1000),
-          attachments: (body.attachments ?? []).slice(0, 10).map((a) => String(a).slice(0, 200)),
+          attachments: (body.attachments ?? [])
+            .slice(0, 10)
+            .map((a) => String(a).trim().slice(0, 2_500_000))
+            .filter(Boolean),
           signatures: [],
           writtenAt: body.writtenAt ? clampNameInput(body.writtenAt, NAME_MAX_LENGTH.WRITTEN_AT).trim() : '',
           requesterPosition: body.requesterPosition

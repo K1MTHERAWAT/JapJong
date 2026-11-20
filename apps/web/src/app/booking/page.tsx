@@ -52,7 +52,7 @@ import {
   venueIconName,
 } from '@/components/ui';
 // นำเข้า API client และฟังก์ชันแปลงวันที่/เวลาภาษาไทย
-import { api, formatMonthTitle, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
+import { api, formatMonthTitle, formatPeriodRange, formatThaiDate, formatThaiDateTime, serializeAttachmentFiles } from '@/lib/api';
 // นำเข้า HourlyBookingSection คอมโพเนนต์จองสถานที่แบบรายชั่วโมงพร้อมเช็กตารางว่าง
 import { HourlyBookingSection } from '@/components/hourly-booking-section';
 
@@ -658,6 +658,7 @@ export default function BookingWizardPage() {
     setSubmitting(true);
     setSubmitError(null);
     try {
+      const serializedAttachments = await serializeAttachmentFiles(attachmentFiles);
       const created = await api.createBooking({
         venueIds: selectedIds,
         periods,
@@ -665,7 +666,7 @@ export default function BookingWizardPage() {
         activity: purposeItems[0]?.forWhat || activity,
         purpose,
         organization,
-        attachments: attachmentFiles.map((file) => file.name),
+        attachments: serializedAttachments,
         extraItems: selectedExtraItems.map((s) => ({ equipmentId: s.eq.id, qty: s.qty })),
         requesterId: isWalkIn && foundUser ? foundUser.id : undefined,
         requesterName: fullRequesterName || requesterName,

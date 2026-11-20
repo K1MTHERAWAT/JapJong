@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { DocumentTemplateItem } from '@japjong/shared';
 import { Icon } from '@/components/icons';
+import { AppShell } from '@/components/shell';
 import { A4BackgroundLayer, A4_HEIGHT_PX, A4_WIDTH_PX } from '@/components/freeform-a4-editor';
 import { api } from '@/lib/api';
 import { getSampleBindingValue } from '@/lib/document-bindings';
@@ -78,7 +79,8 @@ export default function DocumentTemplatePreviewPage() {
   const itemPages = chunkDocumentItems(doc.purposeItems || [], 3);
 
   return (
-    <div className="min-h-screen bg-slate-200 py-6 px-4 flex flex-col items-center">
+    <AppShell noPadding>
+      <div className="flex-1 bg-slate-200 py-6 px-4 flex flex-col items-center">
       {/* แถบเครื่องมือควบคุมการพิมพ์ (ซ่อนอัตโนมัติเวลาสั่งพิมพ์) */}
       <div className="w-[210mm] max-w-full flex items-center justify-between mb-4 print:hidden">
         <Link
@@ -322,6 +324,7 @@ export default function DocumentTemplatePreviewPage() {
         ))}
       </div>
       )}
-    </div>
+      </div>
+    </AppShell>
   );
 }

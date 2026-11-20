@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap');
+@import 'gov-token-css/tokens';
 @import '../styles/print-standard.css';
 
 @tailwind base;
@@ -906,5 +907,38 @@
   border-radius: 1rem !important;
 }
 #qr-reader img[alt="Info icon"] {
+  display: none !important;
+}
+
+/* =====================================================================
+   Gov Layout Color Overrides (ใช้ชุดสีของระบบจับจอง)
+   ===================================================================== */
+:root,
+.dark {
+  --color-alias-color-brand-primary: rgb(var(--rgb-brand));
+  --color-alias-color-brand-text-dark: rgb(var(--rgb-brand-ink));
+  --color-alias-text-colors-primary: rgb(var(--rgb-ink));
+  --color-alias-text-colors-tertiary: rgb(var(--rgb-ink-soft));
+  --color-alias-semantic-critical: rgb(var(--rgb-danger-fg));
+  --color-alias-semantic-warning: rgb(var(--rgb-warn-fg));
+  --color-border-colors-neutral: rgb(var(--rgb-line));
+}
+
+.gov-brand-shell header,
+.gov-brand-shell [style*="linear-gradient"] {
+  background-color: rgb(var(--rgb-brand)) !important;
+  background-image: linear-gradient(
+    to bottom left,
+    rgb(var(--rgb-brand)),
+    rgb(var(--rgb-brand-ink))
+  ) !important;
+}
+
+.gov-brand-shell aside {
+  background: rgb(var(--rgb-surface)) !important;
+  border-color: rgb(var(--rgb-line)) !important;
+}
+
+.gov-brand-shell .sidebar-toggle-btn {
   display: none !important;
 }

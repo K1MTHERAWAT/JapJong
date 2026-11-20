@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { DocumentStructure, DocumentTemplateItem } from '@japjong/shared';
 import { FreeformA4Editor } from '@/components/freeform-a4-editor';
+import { AppShell } from '@/components/shell';
 import { api } from '@/lib/api';
 
 export default function DocumentEditorWorkspacePage() {
@@ -133,36 +134,42 @@ export default function DocumentEditorWorkspacePage() {
 
   if (loading) {
     return (
-      <div className="w-screen h-screen flex items-center justify-center bg-slate-100 text-ink-mute">
-        กำลังโหลด Document Editor Workspace...
-      </div>
+      <AppShell noPadding>
+        <div className="flex-1 flex items-center justify-center bg-slate-100 text-ink-mute py-16">
+          กำลังโหลด Document Editor Workspace...
+        </div>
+      </AppShell>
     );
   }
 
   if (error || !template) {
     return (
-      <div className="w-screen h-screen flex flex-col items-center justify-center bg-slate-100 gap-4">
-        <p className="text-red-600 font-semibold">{error || 'ไม่พบแม่แบบเอกสาร'}</p>
-        <Link href="/admin/document-templates" className="jw-btn text-sm">
-          กลับไปหน้ารายการแม่แบบ
-        </Link>
-      </div>
+      <AppShell noPadding>
+        <div className="flex-1 flex flex-col items-center justify-center bg-slate-100 gap-4 py-16">
+          <p className="text-red-600 font-semibold">{error || 'ไม่พบแม่แบบเอกสาร'}</p>
+          <Link href="/admin/document-templates" className="jw-btn text-sm">
+            กลับไปหน้ารายการแม่แบบ
+          </Link>
+        </div>
+      </AppShell>
     );
   }
 
   return (
-    <FreeformA4Editor
-      template={template}
-      doc={doc}
-      saveStatus={saveStatus}
-      isPublishing={isPublishing}
-      canUndo={historyIdx > 0}
-      canRedo={historyIdx < history.length - 1}
-      onUpdateDoc={updateDoc}
-      onUndo={handleUndo}
-      onRedo={handleRedo}
-      onSaveNow={handleSaveManual}
-      onPublish={handlePublish}
-    />
+    <AppShell noPadding>
+      <FreeformA4Editor
+        template={template}
+        doc={doc}
+        saveStatus={saveStatus}
+        isPublishing={isPublishing}
+        canUndo={historyIdx > 0}
+        canRedo={historyIdx < history.length - 1}
+        onUpdateDoc={updateDoc}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        onSaveNow={handleSaveManual}
+        onPublish={handlePublish}
+      />
+    </AppShell>
   );
 }

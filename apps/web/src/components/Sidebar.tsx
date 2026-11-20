@@ -242,8 +242,13 @@ export function Sidebar({
                   className="flex items-center gap-2.5 min-w-0 flex-1 rounded-lg hover:opacity-85 transition-opacity"
                 >
                   {/* รูปย่อหรือตัวอักษรแรกของชื่อ */}
-                  <div className="w-8 h-8 size-8 rounded-full bg-brand-tint text-brand-ink font-bold flex items-center justify-center text-caption shrink-0">
-                    {account.initial || account.name.charAt(0) || 'ผ'}
+                  <div className="w-8 h-8 size-8 rounded-full bg-brand-tint text-brand-ink font-bold flex items-center justify-center text-caption shrink-0 overflow-hidden">
+                    {account.avatar ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={account.avatar} alt={account.name} className="size-full object-cover" />
+                    ) : (
+                      account.initial || account.name.charAt(0) || 'ผ'
+                    )}
                   </div>
                   <div className={['min-w-0 flex-1 leading-tight', open ? '' : 'lg:sr-only'].join(' ')}>
                     <div className="text-caption font-semibold text-ink truncate">{account.name}</div>

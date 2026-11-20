@@ -15,6 +15,7 @@ export * from './ListRow';
 export * from './Feedback';
 export * from './Modal';
 export * from './Table';
+export * from './AttachmentViewer';
 
 // วิดเจ็ตเฉพาะทางที่นำเข้าจาก ui-widgets
 export {

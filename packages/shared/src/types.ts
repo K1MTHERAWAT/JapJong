@@ -37,6 +37,8 @@ export interface Account {
   permissions: Record<PermissionKey, boolean>;
   /** ข้อความ/ภาพลายเซ็น (data URL) — null = ยังไม่ตั้งค่า */
   signature: string | null;
+  /** รูปโปรไฟล์ (data URL หรือ URL) — null = ยังไม่ตั้งค่า */
+  avatar?: string | null;
   pin: string | null;
   /** บัญชีสำหรับโหมดเดโม (เฉพาะโหมดเดโมเท่านั้นที่ล็อกอิน one-click ได้) */
   isDemo?: boolean;

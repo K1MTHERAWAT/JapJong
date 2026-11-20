@@ -18,6 +18,7 @@ import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
 import {
+  AttachmentViewer,
   Chip,
   OfficialGovFormDocument,
   PinKeypad,
@@ -488,6 +489,14 @@ export default function StaffReviewPage() {
             <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
               {/* แบบฟอร์มราชการฉบับเต็ม */}
               {showOfficialForm && <OfficialGovFormDocument req={current} />}
+
+              {/* รูปภาพและเอกสารแนบประกอบคำขอ (แสดงใต้เอกสาร) */}
+              {Array.isArray(current.attachments) && current.attachments.length > 0 && (
+                <div className="jw-card p-4 flex flex-col gap-2.5">
+                  <b className="text-[14px] text-ink">รูปภาพ / เอกสารแนบประกอบคำขอ</b>
+                  <AttachmentViewer attachments={current.attachments} emptyText="" />
+                </div>
+              )}
 
               {/* สถานะลายมือชื่อทั้ง 4 ฝ่าย */}
               <div className="jw-card p-4 flex flex-col gap-2.5">

@@ -241,6 +241,7 @@ export const api = {
     addressSubdistrict?: string;
     addressDistrict?: string;
     addressProvince?: string;
+    avatar?: string | null;
   }) => request<PublicAccount>('/auth/profile', { method: 'PATCH', body: JSON.stringify(payload) }),
   /** เปลี่ยนรหัสผ่าน */
   changePassword: (payload: { currentPassword: string; newPassword: string }) =>
@@ -916,6 +917,7 @@ export function formatMonthTitle(ym: string): string {
 export async function readAndCompressImages(
   fileList: FileList | File[] | null,
   maxCount = 3,
+  maxDim = 1000,
 ): Promise<string[]> {
   if (!fileList) return [];
   const files = Array.from(fileList)
@@ -932,7 +934,6 @@ export async function readAndCompressImages(
         img.onerror = () => resolve(rawDataUrl);
         img.onload = () => {
           try {
-            const maxDim = 1000;
             let { width, height } = img;
             // คำนวณสัดส่วนใหม่หากด้านใดด้านหนึ่งเกิน 1000px
             if (width > maxDim || height > maxDim) {
@@ -965,4 +966,31 @@ export async function readAndCompressImages(
     });
 
   return Promise.all(files.map(readSingle));
+}
+
+/**
+ * แปลงไฟล์แนบ (รูปภาพ / PDF) เป็น Data URL สำหรับอัปโหลดไปเก็บกับคำขอ
+ * - รูปภาพจะถูกบีบอัดไม่เกิน 1200px (JPEG 82%)
+ * - PDF ขนาดไม่เกิน 2MB จะถูกแปลงเป็น data:application/pdf;base64,...
+ */
+export async function serializeAttachmentFiles(files: File[]): Promise<string[]> {
+  if (!files || files.length === 0) return [];
+  const results = await Promise.all(
+    files.slice(0, 5).map(async (file) => {
+      if (file.type.startsWith('image/')) {
+        const [compressed] = await readAndCompressImages([file], 1, 1200);
+        return compressed || file.name;
+      }
+      if (file.type === 'application/pdf' && file.size <= 2_000_000) {
+        return new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || file.name));
+          reader.onerror = () => resolve(file.name);
+          reader.readAsDataURL(file);
+        });
+      }
+      return file.name;
+    }),
+  );
+  return results.filter(Boolean);
 }

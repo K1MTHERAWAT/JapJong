@@ -207,6 +207,10 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   email?: string;
+
+  // รูปโปรไฟล์ (data URL หรือ URL, ส่ง null หรือค่าว่างเพื่อลบรูป)
+  @IsOptional()
+  avatar?: string | null;
 }
 
 /**

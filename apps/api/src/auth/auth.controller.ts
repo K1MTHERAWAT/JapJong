@@ -440,6 +440,25 @@ export class AuthController {
     if (body.lineName !== undefined) {
       user.lineName = String(body.lineName).trim().slice(0, 50) || undefined;
     }
+    if (body.avatar !== undefined) {
+      if (body.avatar === null || body.avatar === '') {
+        user.avatar = null;
+      } else {
+        const trimmed = String(body.avatar).trim();
+        if (
+          !trimmed.startsWith('data:image/') &&
+          !trimmed.startsWith('http://') &&
+          !trimmed.startsWith('https://') &&
+          !trimmed.startsWith('/')
+        ) {
+          throw new BadRequestException('รูปแบบรูปโปรไฟล์ไม่ถูกต้อง');
+        }
+        if (trimmed.length > 600_000) {
+          throw new BadRequestException('ไฟล์รูปโปรไฟล์มีขนาดใหญ่เกินไป');
+        }
+        user.avatar = trimmed;
+      }
+    }
     if (body.addressHouseNo !== undefined) {
       user.addressHouseNo = String(body.addressHouseNo).trim().slice(0, 50) || undefined;
     }

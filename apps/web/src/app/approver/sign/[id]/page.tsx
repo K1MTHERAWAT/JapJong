@@ -23,7 +23,7 @@ import { ROLE_LABEL, RequestWithTimeline, SIGN_LEVEL_TITLE, canSignRequest } fro
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
-import { Chip, OfficialGovFormDocument, PinKeypad, SignatureBox, SignaturePreviewCard, SignOtpVerifier } from '@/components/ui';
+import { AttachmentViewer, Chip, OfficialGovFormDocument, PinKeypad, SignatureBox, SignaturePreviewCard, SignOtpVerifier } from '@/components/ui';
 import { api, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
 
 export default function ApproverSignDocumentPage() {
@@ -279,6 +279,14 @@ export default function ApproverSignDocumentPage() {
 
           {/* เอกสารแบบฟอร์มราชการขนาด A4 จำลอง */}
           {req.type !== 'repair' && showOfficialForm && <OfficialGovFormDocument req={req} />}
+
+          {/* รูปภาพและเอกสารแนบประกอบคำขอ (แสดงใต้เอกสาร) */}
+          {'attachments' in req && Array.isArray(req.attachments) && req.attachments.length > 0 && (
+            <div className="jw-card p-4 flex flex-col gap-2.5">
+              <b className="text-[14px] text-ink">รูปภาพ / เอกสารแนบประกอบคำขอ</b>
+              <AttachmentViewer attachments={req.attachments} emptyText="" />
+            </div>
+          )}
 
           {/* การ์ดแสดงลายเซ็น 4 ฝ่าย */}
           <div className="jw-card p-4 flex flex-col gap-2.5">

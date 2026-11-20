@@ -13,7 +13,7 @@ import { useAuth } from '@/components/auth-context';
 // นำเข้า AppShell และฟังก์ชันหาเส้นทางหน้าแรกตามบทบาท
 import { AppShell, roleHomePath } from '@/components/shell';
 // นำเข้า UI Components: เอกสารราชการ A4, ป้ายประเภทคำขอ, การ์ดแสดงลายเซ็น, ป้ายสถานะ, แถบไทม์ไลน์
-import { OfficialGovFormDocument, RequestTypeChip, SignaturePreviewCard, StatusChip, Timeline } from '@/components/ui';
+import { AttachmentViewer, OfficialGovFormDocument, RequestTypeChip, SignaturePreviewCard, StatusChip, Timeline } from '@/components/ui';
 // นำเข้า API client และฟังก์ชันจัดรูปแบบวันที่เวลาภาษาไทย
 import { api, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
 import { triggerDocumentPrint } from '@/lib/print';
@@ -296,6 +296,14 @@ export default function RequestDetailPage() {
             </div>
             {/* คอมโพเนนต์แสดงแบบฟอร์ม A4 ตามระเบียบงานสารบรรณ พร้อมพิมพ์ */}
             {showOfficialForm && <OfficialGovFormDocument req={req} />}
+          </div>
+        )}
+
+        {/* รูปภาพและเอกสารแนบประกอบคำขอ (แสดงใต้เอกสาร) */}
+        {'attachments' in req && Array.isArray(req.attachments) && req.attachments.length > 0 && (
+          <div className="jw-card p-5 flex flex-col gap-2.5 print:hidden">
+            <b className="text-[15px] text-ink">รูปภาพ / เอกสารแนบประกอบคำขอ</b>
+            <AttachmentViewer attachments={req.attachments} emptyText="" />
           </div>
         )}
 

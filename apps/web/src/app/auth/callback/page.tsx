@@ -3,7 +3,7 @@
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { setStoredAuth } from '@/lib/api';
-import { roleHomePath } from '@/components/shell';
+import { AppShell, roleHomePath } from '@/components/shell';
 import { useAuth } from '@/components/auth-context';
 import {
   exchangeGovSsoCallback,
@@ -160,17 +160,19 @@ function CallbackContent() {
 
 export default function SsoCallbackPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-bg text-ink">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-3 border-[#0F766E] border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-ink-mute">กำลังโหลดหน้ายืนยันตัวตน Gov Center...</p>
+    <AppShell allowPublic noPadding>
+      <Suspense
+        fallback={
+          <div className="flex-1 flex items-center justify-center bg-bg text-ink py-16">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-3 border-[#0F766E] border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-ink-mute">กำลังโหลดหน้ายืนยันตัวตน Gov Center...</p>
+            </div>
           </div>
-        </div>
-      }
-    >
-      <CallbackContent />
-    </Suspense>
+        }
+      >
+        <CallbackContent />
+      </Suspense>
+    </AppShell>
   );
 }

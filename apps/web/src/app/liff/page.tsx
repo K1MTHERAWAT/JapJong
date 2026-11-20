@@ -10,6 +10,7 @@ import { api, getStoredToken, setStoredAuth } from '../../lib/api';
 import { getLiffIdToken, initLiff, loginWithLiff, resolveLiffTarget } from '../../lib/liff';
 // นำเข้าไอคอนแสดงสถานะจาก lucide-react
 import { AlertCircle, ArrowRight, CheckCircle2, Loader2, LogIn } from 'lucide-react';
+import { AppShell } from '@/components/shell';
 
 /**
  * คอมโพเนนต์หลักสำหรับการยืนยันตัวตนอัตโนมัติผ่าน LINE Front-end Framework (LIFF SSO)
@@ -250,14 +251,16 @@ function LiffAuthContent() {
  */
 export default function LiffPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
-        </div>
-      }
-    >
-      <LiffAuthContent />
-    </Suspense>
+    <AppShell allowPublic noPadding>
+      <Suspense
+        fallback={
+          <div className="flex-1 bg-slate-50 flex items-center justify-center py-16">
+            <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+          </div>
+        }
+      >
+        <LiffAuthContent />
+      </Suspense>
+    </AppShell>
   );
 }

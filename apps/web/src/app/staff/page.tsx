@@ -403,13 +403,13 @@ export default function StaffHomePage() {
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-surface-muted/70 border-b border-line text-[12px] font-semibold text-ink-mute">
-                          <th className="py-3 px-4">เลขที่คำขอ</th>
-                          <th className="py-3 px-4">ประเภท</th>
-                          <th className="py-3 px-4">รายการ / เรื่อง</th>
-                          <th className="py-3 px-4">ผู้ยื่นคำขอ</th>
-                          <th className="py-3 px-4">กำหนดการใช้ / วันที่</th>
-                          <th className="py-3 px-4">สถานะ</th>
-                          <th className="py-3 px-4 text-right">การดำเนินการ</th>
+                          <th className="py-3 px-2.5 lg:px-3">เลขที่คำขอ</th>
+                          <th className="py-3 px-2.5 lg:px-3">ประเภท</th>
+                          <th className="py-3 px-2.5 lg:px-3">รายการ / เรื่อง</th>
+                          <th className="py-3 px-2.5 lg:px-3">ผู้ยื่นคำขอ</th>
+                          <th className="py-3 px-2.5 lg:px-3">กำหนดการใช้ / วันที่</th>
+                          <th className="py-3 px-2.5 lg:px-3">สถานะ</th>
+                          <th className="py-3 px-2.5 lg:px-3 text-right">การดำเนินการ</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-line text-[13.5px]">
@@ -428,13 +428,13 @@ export default function StaffHomePage() {
                               onClick={() => handleRowNavigate(r)}
                               className="hover:bg-brand-tint/20 cursor-pointer transition"
                             >
-                              <td className="py-3.5 px-4 font-bold text-brand whitespace-nowrap">
+                              <td className="py-3.5 px-2.5 lg:px-3 font-bold text-brand whitespace-nowrap">
                                 {r.code}
                               </td>
-                              <td className="py-3.5 px-4 whitespace-nowrap">
+                              <td className="py-3.5 px-2.5 lg:px-3 whitespace-nowrap">
                                 <RequestTypeChip type={r.type} />
                               </td>
-                              <td className="py-3.5 px-4 max-w-[240px]">
+                              <td className="py-3.5 px-2.5 lg:px-3 max-w-[180px] xl:max-w-[240px]">
                                 <b className="text-ink font-semibold block truncate">{r.title}</b>
                                 {r.subtitle && (
                                   <span className="text-[12px] text-ink-mute block truncate">
@@ -442,19 +442,19 @@ export default function StaffHomePage() {
                                   </span>
                                 )}
                               </td>
-                              <td className="py-3.5 px-4 whitespace-nowrap">
-                                <span className="font-medium text-ink block">{r.requesterName}</span>
-                                <span className="text-[11.5px] text-ink-mute block">
+                              <td className="py-3.5 px-2.5 lg:px-3 max-w-[155px]">
+                                <span className="font-medium text-ink block truncate">{r.requesterName}</span>
+                                <span className="text-[11.5px] text-ink-mute block truncate">
                                   {r.organization || 'ประชาชน/หน่วยงาน'}
                                 </span>
                               </td>
-                              <td className="py-3.5 px-4 text-[12.5px] text-ink-mute whitespace-nowrap">
+                              <td className="py-3.5 px-2.5 lg:px-3 text-[12.5px] text-ink-mute">
                                 {scheduleText}
                               </td>
-                              <td className="py-3.5 px-4 whitespace-nowrap">
+                              <td className="py-3.5 px-2.5 lg:px-3 whitespace-nowrap">
                                 <StatusChip status={r.status} />
                               </td>
-                              <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                              <td className="py-3.5 px-2.5 lg:px-3 text-right whitespace-nowrap">
                                 <button
                                   type="button"
                                   onClick={(e) => {

@@ -1,12 +1,13 @@
 'use client'; // กำหนดให้คอมโพเนนต์นี้ทำงานในฝั่ง Client (React Client Component)
 
 // นำเข้า React Hooks พื้นฐานสำหรับจัดการ State และ Side Effects
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 // นำเข้า Link สำหรับการเปลี่ยนหน้าแบบ Client-side Navigation
 import Link from 'next/link';
 // นำเข้าไอคอนจากไลบรารี lucide-react
 import {
   Building2,
+  Camera,
   Check,
   CheckCircle2,
   ExternalLink,
@@ -15,6 +16,7 @@ import {
   PenTool,
   Phone,
   Sun,
+  Trash2,
   UserCircle,
   AlertCircle,
 } from 'lucide-react';
@@ -49,10 +51,9 @@ import {
   Input,
   PinKeypad,
   SignatureBox,
-  Tabs,
 } from '@/components/ui';
 // นำเข้า API client และฟังก์ชันแปลงวันที่เป็น พ.ศ.
-import { api, formatThaiDate } from '@/lib/api';
+import { api, formatThaiDate, readAndCompressImages } from '@/lib/api';
 
 // กำหนดประเภทชื่อแท็บในหน้าจัดการบัญชี
 type AccountTab = 'profile' | 'password' | 'signature';
@@ -95,6 +96,8 @@ export default function AccountPage() {
   const [addressDistrict, setAddressDistrict] = useState('');
   const [addressProvince, setAddressProvince] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
+  const [savingAvatar, setSavingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const [profileMsg, setProfileMsg] = useState('');
   const [profileErr, setProfileErr] = useState('');
 
@@ -391,6 +394,43 @@ export default function AccountPage() {
     }
   };
 
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setProfileMsg('');
+    setProfileErr('');
+    setSavingAvatar(true);
+    try {
+      const [compressed] = await readAndCompressImages(files, 1, 320);
+      if (!compressed) throw new Error('กรุณาเลือกไฟล์รูปภาพ');
+      await api.updateProfile({ avatar: compressed });
+      await refreshMe();
+      setProfileMsg('อัปเดตรูปโปรไฟล์เรียบร้อยแล้ว');
+      setTimeout(() => setProfileMsg(''), 3500);
+    } catch (err) {
+      setProfileErr((err as Error).message || 'อัปเดตรูปโปรไฟล์ไม่สำเร็จ');
+    } finally {
+      setSavingAvatar(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    setProfileMsg('');
+    setProfileErr('');
+    setSavingAvatar(true);
+    try {
+      await api.updateProfile({ avatar: null });
+      await refreshMe();
+      setProfileMsg('ลบรูปโปรไฟล์เรียบร้อยแล้ว');
+      setTimeout(() => setProfileMsg(''), 3500);
+    } catch (err) {
+      setProfileErr((err as Error).message || 'ลบรูปโปรไฟล์ไม่สำเร็จ');
+    } finally {
+      setSavingAvatar(false);
+    }
+  };
+
   return (
     // โครงเลย์เอาต์หลักของหน้าบัญชีผู้ใช้
     <AppShell title="จัดการบัญชีผู้ใช้งาน" maxWidth="max-w-[1160px]">
@@ -399,9 +439,58 @@ export default function AccountPage() {
           {/* การ์ดสรุปข้อมูลโปรไฟล์ส่วนหัว (Header Card Summary) */}
           <Card className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:p-6">
             <div className="flex items-center gap-4 min-w-0">
-              {/* อวาตาร์แสดงอักษรย่อ */}
-              <div className="size-14 rounded-full bg-brand-tint text-brand-ink font-bold text-title flex items-center justify-center shrink-0 border border-brand/20 sm:size-16">
-                {account.initial || account.name.charAt(0) || 'ผ'}
+              {/* อวาตาร์พร้อมปุ่มเปลี่ยนรูปโปรไฟล์ */}
+              <div className="relative shrink-0">
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={savingAvatar}
+                  title="เปลี่ยนรูปโปรไฟล์"
+                  className="group relative size-14 sm:size-16 rounded-full bg-brand-tint text-brand-ink font-bold text-title flex items-center justify-center overflow-hidden border border-brand/20 hover:ring-2 hover:ring-brand/40 transition cursor-pointer disabled:opacity-60"
+                >
+                  {account.avatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={account.avatar}
+                      alt={account.name}
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    <span>{account.initial || account.name.charAt(0) || 'ผ'}</span>
+                  )}
+                  <span className="absolute inset-0 bg-black/40 text-white opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                    <Camera className="size-5" />
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={savingAvatar}
+                  aria-label="เปลี่ยนรูปโปรไฟล์"
+                  title="เปลี่ยนรูปโปรไฟล์"
+                  className="absolute -bottom-1 -right-1 size-6 rounded-full bg-surface border border-line shadow-sm flex items-center justify-center text-ink hover:bg-hover transition cursor-pointer disabled:opacity-60"
+                >
+                  <Camera className="size-3.5 text-brand" />
+                </button>
+                {account.avatar && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveAvatar}
+                    disabled={savingAvatar}
+                    aria-label="ลบรูปโปรไฟล์"
+                    title="ลบรูปโปรไฟล์"
+                    className="absolute -top-1 -right-1 size-5 rounded-full bg-surface border border-line shadow-sm flex items-center justify-center text-danger-fg hover:bg-danger-bg transition cursor-pointer disabled:opacity-60"
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2 min-w-0">
@@ -452,17 +541,73 @@ export default function AccountPage() {
             </div>
           </Card>
 
-          {/* แถบสลับแท็บเมนูจัดการบัญชี (Navigation Tabs) */}
-          <Tabs<AccountTab>
-            className="flex-wrap sm:flex-nowrap"
-            value={activeTab}
-            onChange={setActiveTab}
-            options={[
-              { value: 'profile', label: 'ข้อมูลโปรไฟล์ & หน่วยงาน' },
-              { value: 'password', label: 'เปลี่ยนรหัสผ่าน (Password)' },
-              { value: 'signature', label: 'ลายมือชื่อ & รหัส PIN' },
-            ]}
-          />
+          {/* แถบสลับแท็บเมนูจัดการบัญชี (Soft Tint Icon Cards - แนวนอนทุกขนาดจอ) */}
+          <div
+            role="tablist"
+            aria-label="หมวดหมู่การจัดการบัญชี"
+            className="grid grid-cols-3 gap-1.5 sm:gap-2.5"
+          >
+            {(
+              [
+                {
+                  value: 'profile' as const,
+                  label: 'ข้อมูลโปรไฟล์ & หน่วยงาน',
+                  desc: 'ชื่อ เบอร์โทร ที่อยู่ LINE',
+                  Icon: UserCircle,
+                },
+                {
+                  value: 'password' as const,
+                  label: 'เปลี่ยนรหัสผ่าน (Password)',
+                  desc: 'ความปลอดภัยการเข้าสู่ระบบ',
+                  Icon: KeyRound,
+                },
+                {
+                  value: 'signature' as const,
+                  label: 'ลายมือชื่อ & รหัส PIN',
+                  desc: 'ลายเซ็นเอกสาร & PIN 6 หลัก',
+                  Icon: PenTool,
+                },
+              ]
+            ).map(({ value, label, desc, Icon: TabIcon }) => {
+              const active = activeTab === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setActiveTab(value)}
+                  className={`flex flex-col sm:flex-row items-center text-center sm:text-left gap-1.5 sm:gap-3 p-2 sm:p-3.5 rounded-card transition cursor-pointer min-w-0 ${
+                    active
+                      ? 'border-2 border-brand bg-brand-tint/60 shadow-xs'
+                      : 'border border-line bg-surface hover:border-brand/40 hover:bg-hover/50'
+                  }`}
+                >
+                  <div
+                    className={`size-8 sm:size-10 rounded-control flex items-center justify-center shrink-0 transition ${
+                      active
+                        ? 'bg-brand text-white'
+                        : 'bg-surface-muted border border-line text-ink-mute'
+                    }`}
+                  >
+                    <TabIcon className="size-4 sm:size-5" />
+                  </div>
+                  <div className="min-w-0 w-full sm:flex-1">
+                    <div
+                      className={`text-[11.5px] sm:text-[13.5px] font-bold leading-tight truncate ${
+                        active ? 'text-brand-ink' : 'text-ink'
+                      }`}
+                    >
+                      {label}
+                    </div>
+                    <div className="hidden sm:block text-[12px] text-ink-mute truncate mt-0.5">
+                      {desc}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
 
           {/* แท็บที่ 1: ข้อมูลโปรไฟล์ ที่อยู่ และการผูกบัญชี LINE */}
           {activeTab === 'profile' && (

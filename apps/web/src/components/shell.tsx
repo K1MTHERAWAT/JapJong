@@ -4,86 +4,104 @@
  * =====================================================================
  * โครงสร้างหลักของหน้าจอ (AppShell - Core Layout Container)
  * =====================================================================
- * หน้าที่หลัก:
- * 1. รวมโครงสร้าง Layout ร่วม (Sidebar, Unified Mobile Header, Main Container, Sticky Footer)
- * 2. ตรวจสอบสิทธิ์การเข้าถึงหน้า (RBAC & Permissions Guard) ป้องกันผู้ใช้เข้าถึงหน้าที่ไม่ได้รับอนุญาต
- * 3. รองรับแถบนำทางไดนามิก (Dynamic Service Navigation) ดึงจากฐานข้อมูลและรีเฟรชผ่าน Custom Event
- * 4. จัดการปุ่มย้อนกลับ (onBack / backHref) และแถบความคืบหน้าของฟอร์มแบบหลายขั้นตอน (Progress Bar)
- * 5. รองรับธีม มืด/สว่าง และ Safe-Area Insets สำหรับสมาร์ทโฟนทุกรุ่น
+ * ใช้คอมโพเนนต์จาก `gov-layout` (StaffSidebar, UserHeader, UserSidebar)
+ * โดยปรับสีผ่าน CSS Tokens ของระบบจับจอง (.gov-brand-shell)
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-// ไอคอนสัญลักษณ์สำหรับส่วนหัว เมนู การแจ้งเตือน และกล่องแจ้งเตือนสิทธิ์
 import {
   Bell,
   ChevronLeft,
-  Menu,
-  Moon,
   ShieldAlert,
-  Sun,
+  UserCircle,
 } from 'lucide-react';
-// โมเดลสิทธิ์ บทบาท และฟังก์ชันตรวจสอบการเข้าถึงหน้าของระบบ
+import {
+  StaffSidebar,
+  UserHeader,
+  UserSidebar,
+  type MenuItem as GovMenuItem,
+  type NotificationItem as GovNotificationItem,
+  type User as GovUser,
+} from 'gov-layout';
 import {
   PERMISSION_LABEL,
   ROLE_LABEL,
-  ROLE_META,
   Role,
   SidebarServiceItem,
-  canAccessRoute,
   canAccessServiceRoute,
 } from '@japjong/shared';
-// Context ระบบยืนยันตัวตน และ Context จัดการธีม
 import { useAuth } from './auth-context';
-import { useTheme } from './theme-provider';
-// แถบเมนูด้านข้าง
-import { Sidebar } from './Sidebar';
-import { getVisibleNav } from './nav';
+import { getVisibleNav, type NavItem } from './nav';
 import { Button, Card } from './ui';
 import { api } from '@/lib/api';
 
-/**
- * ฟังก์ชันหาเส้นทางหน้าหลัก (Default Home Route) ตามบทบาทของผู้ใช้งาน
- */
 export function roleHomePath(role?: Role): string {
   switch (role) {
     case 'STAFF':
-      return '/staff'; // เจ้าหน้าที่ อบต.
+      return '/staff';
     case 'APPROVER_L2':
     case 'APPROVER_L1':
-      return '/approver'; // ปลัด อบต. หรือ นายก อบต.
+      return '/approver';
     case 'ADMIN':
-      return '/admin'; // ผู้ดูแลระบบ
+      return '/admin';
     default:
-      return '/'; // ประชาชนทั่วไป
+      return '/';
   }
 }
 
-/**
- * Interface กำหนดคุณสมบัติของ AppShell Props
- */
 export interface AppShellProps {
-  /** หัวข้อหน้าเว็บ (Title) แสดงบนส่วนหัว */
   title?: string;
-  /** ป้ายข้อความเสริมฝั่งขวา */
   rightLabel?: string;
-  /** ความกว้างสูงสุดของพื้นที่เนื้อหา (เช่น max-w-5xl, max-w-none) */
   maxWidth?: string;
-  /** คอมโพเนนต์แถบด้านล่าง (Footer) ตรึงไว้ที่ขอบล่างของจอ */
   footer?: React.ReactNode;
-  /** ฟังก์ชันย้อนกลับเมื่อกดปุ่มลูกศรย้อนกลับ */
   onBack?: () => void;
-  /** URL ปลายทางเมื่อกดปุ่มย้อนกลับ */
   backHref?: string;
-  /** ส่วนเนื้อหาภายในหน้า */
   children: React.ReactNode;
-  /** หมายเลขขั้นตอนปัจจุบัน (สำหรับฟอร์มหลายขั้นตอน) */
   step?: number;
-  /** จำนวนขั้นตอนทั้งหมด */
   totalSteps?: number;
-  /** คำอธิบายขั้นตอนย่อย (Subtitle) */
   stepSubtitle?: string;
+  allowPublic?: boolean;
+  noPadding?: boolean;
+}
+
+function toGovMenuItems(items: NavItem[], unreadCount: number): GovMenuItem[] {
+  const sections: string[] = [];
+  const grouped = new Map<string, NavItem[]>();
+
+  for (const item of items) {
+    const sec = item.section || 'ทั่วไป';
+    if (!grouped.has(sec)) {
+      sections.push(sec);
+      grouped.set(sec, []);
+    }
+    grouped.get(sec)!.push(item);
+  }
+
+  const result: GovMenuItem[] = [];
+  sections.forEach((sec, secIdx) => {
+    const group = grouped.get(sec)!;
+    const isLastSection = secIdx === sections.length - 1;
+    group.forEach((item, idx) => {
+      const IconComp = item.icon;
+      const isLastInGroup = idx === group.length - 1;
+      const title =
+        item.href === '/notifications' && unreadCount > 0
+          ? `${item.label} (${unreadCount > 99 ? '99+' : unreadCount})`
+          : item.label;
+
+      result.push({
+        id: item.id || item.href,
+        title,
+        path: item.href,
+        icon: <IconComp className="size-5" />,
+        dividerAfter: !isLastSection && isLastInGroup,
+      });
+    });
+  });
+
+  return result;
 }
 
 export function AppShell({
@@ -97,31 +115,26 @@ export function AppShell({
   step,
   totalSteps,
   stepSubtitle,
+  allowPublic = false,
+  noPadding = false,
 }: AppShellProps) {
-  // เส้นทาง URL ปัจจุบัน
   const pathname = usePathname();
-  // ตัวจัดการการนำทางหน้า
   const router = useRouter();
 
-  // ดึงข้อมูลบัญชีผู้ใช้ สถานะการโหลด และจำนวนแจ้งเตือนจาก AuthContext
   const {
     account,
     loading,
     logout,
+    notifications,
     unreadCount,
+    markNotificationRead,
+    markAllNotificationsRead,
   } = useAuth();
 
-  // จัดการโหมดสีสว่าง/มืด
-  const { actualTheme, toggleTheme } = useTheme();
-
-  // สถานะการเปิด/ปิด Drawer บนมือถือ
-  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  // รายการบริการแบบไดนามิกที่ดึงมาจากฐานข้อมูล
+  const [userSidebarOpen, setUserSidebarOpen] = useState(false);
+  const [staffSidebarOpen, setStaffSidebarOpen] = useState(false);
   const [dbServices, setDbServices] = useState<SidebarServiceItem[]>([]);
 
-  /**
-   * ดึงรายการเมนูบริการแบบไดนามิกจาก Backend API
-   */
   const fetchNav = useCallback(() => {
     api
       .getNavigation()
@@ -133,9 +146,6 @@ export function AppShell({
       .catch(() => {});
   }, []);
 
-  /**
-   * Effect ดักฟังการอัปเดตเมนูนำทางผ่าน Custom DOM Event
-   */
   useEffect(() => {
     fetchNav();
     window.addEventListener('japjong-navigation-refresh', fetchNav);
@@ -144,29 +154,39 @@ export function AppShell({
     };
   }, [account?.id, account?.role, fetchNav]);
 
-  /**
-   * คำนวณเมนูที่ผู้ใช้มีสิทธิ์มองเห็นตาม Role และ Service Config
-   */
+  useEffect(() => {
+    setUserSidebarOpen(false);
+  }, [pathname]);
+
   const visibleNav = useMemo(() => {
     return getVisibleNav(account, dbServices.length > 0 ? dbServices : undefined);
   }, [account, dbServices]);
 
-  /**
-   * ตรวจสอบสิทธิ์การเข้าใช้งานหน้านี้ (Route Authorization Guard)
-   */
   const access = useMemo(() => {
     return canAccessServiceRoute(account, pathname, dbServices.length > 0 ? dbServices : undefined);
   }, [account, pathname, dbServices]);
 
-  /**
-   * ฟังก์ชันออกจากระบบแล้วนำทางกลับไปยังหน้าล็อกอิน
-   */
-  const handleLogoutAndLogin = () => {
+  const handleLogoutAndLogin = useCallback(() => {
     logout();
     router.push('/login');
-  };
+  }, [logout, router]);
 
-  const isPublicRoute = pathname === '/verify' || pathname.startsWith('/verify/');
+  const handleNavigate = useCallback(
+    (path: string) => {
+      setUserSidebarOpen(false);
+      router.push(path);
+    },
+    [router],
+  );
+
+  const isPublicRoute =
+    allowPublic ||
+    pathname === '/register' ||
+    pathname.startsWith('/register/') ||
+    pathname === '/auth/callback' ||
+    pathname === '/liff' ||
+    pathname === '/verify' ||
+    pathname.startsWith('/verify/');
 
   useEffect(() => {
     if (!loading && !account && !isPublicRoute) {
@@ -174,8 +194,84 @@ export function AppShell({
     }
   }, [loading, account, isPublicRoute, router]);
 
-  // ตรวจสอบว่าหน้านี้มีการกำหนดปุ่มย้อนกลับหรือไม่
+  const isStaffLayout = Boolean(account && account.role !== 'USER');
   const hasBackAction = Boolean(onBack || backHref);
+  const hasSubHeader = Boolean(hasBackAction || title || rightLabel || (step && totalSteps));
+
+  const govUser: GovUser | null = useMemo(() => {
+    if (!account) return null;
+    const parts = (account.name || '').trim().split(/\s+/);
+    return {
+      id: account.id,
+      firstName: parts[0] || account.nickname || account.username,
+      lastName: parts.slice(1).join(' '),
+      pictureUrl: account.avatar || undefined,
+      role: account.role,
+    };
+  }, [account]);
+
+  const roleLabel = account ? ROLE_LABEL[account.role] : 'ผู้เยี่ยมชม';
+
+  const staffMenuItems = useMemo(() => {
+    const mainItems = visibleNav.filter(
+      (item) => item.href !== '/account' && item.href !== '/notifications',
+    );
+    return toGovMenuItems(mainItems, unreadCount);
+  }, [visibleNav, unreadCount]);
+
+  const staffBottomMenuItems = useMemo<GovMenuItem[]>(() => {
+    const notifTitle =
+      unreadCount > 0
+        ? `ศูนย์แจ้งเตือน (${unreadCount > 99 ? '99+' : unreadCount})`
+        : 'ศูนย์แจ้งเตือน';
+    return [
+      {
+        id: '/notifications',
+        title: notifTitle,
+        path: '/notifications',
+        icon: <Bell className="size-5" />,
+      },
+      {
+        id: '/account',
+        title: 'จัดการบัญชีส่วนตัว',
+        path: '/account',
+        icon: <UserCircle className="size-5" />,
+      },
+    ];
+  }, [unreadCount]);
+
+  const userMenuItems = useMemo(() => {
+    return toGovMenuItems(visibleNav, unreadCount);
+  }, [visibleNav, unreadCount]);
+
+  const govNotifications = useMemo<GovNotificationItem[]>(() => {
+    return notifications.map((n) => ({
+      id: n.id,
+      title: n.title,
+      description: n.body || n.message || '',
+      date: n.at || n.createdAt || '',
+      type: 'info',
+      isRead: Boolean(n.read ?? n.isRead),
+      category:
+        n.referenceType === 'approval' || n.referenceType === 'borrow'
+          ? 'action'
+          : 'general',
+    }));
+  }, [notifications]);
+
+  const handleNotificationClick = useCallback(
+    (item: GovNotificationItem) => {
+      const id = String(item.id);
+      markNotificationRead(id).catch(() => {});
+      const matched = notifications.find((n) => n.id === id);
+      if (matched?.link) {
+        router.push(matched.link);
+      } else {
+        router.push('/notifications');
+      }
+    },
+    [markNotificationRead, notifications, router],
+  );
 
   if (!loading && !account && !isPublicRoute) {
     return (
@@ -187,167 +283,177 @@ export function AppShell({
   }
 
   return (
-    <div className="flex min-h-dvh bg-ground text-ink font-sans selection:bg-brand-tint selection:text-brand-ink print:bg-white print:block transition-colors duration-200">
-      {/* แถบเมนูด้านข้างแบบตอบสนองทุกขนาดหน้าจอ (แถบข้างลอยบนเดสก์ท็อป และลิ้นชักเมนูบนมือถือ) */}
-      <Sidebar
-        items={visibleNav}
-        mobileDrawerOpen={mobileDrawerOpen}
-        onMobileDrawerChange={setMobileDrawerOpen}
-        hideDefaultMobileTrigger={true}
-      />
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* ========================================================
-            แถบส่วนหัวรวมบนมือถือ (Unified Mobile Header ขนาดหน้าจอ < lg)
-            - ตรึงไว้ด้านบน (Sticky), ความสูงกะทัดรัด
-            - รองรับรอยบากหน้าจอและรูกล้องหน้า (pt-safe)
-            - ปุ่มย้อนกลับ/เปิดเมนู, หัวข้อหน้าและชื่อขั้นตอนย่อย, ปุ่มสลับธีม และการแจ้งเตือน
-            - รวมแถบความคืบหน้า (Multi-Segment Progress Bar) ไว้ที่ขอบล่างอัตโนมัติเมื่อระบุขั้นตอน
-            ======================================================== */}
-        <header className="lg:hidden sticky top-0 z-30 w-full bg-surface/95 backdrop-blur-md border-b border-line shadow-xs pt-[env(safe-area-inset-top,0px)] print:hidden transition-colors">
-          <div className="h-12 px-2.5 flex items-center justify-between gap-2">
-            
-            {/* ปุ่มควบคุมฝั่งซ้าย (ย้อนกลับ หรือ เปิดเมนูหลัก) */}
-            <div className="flex items-center gap-1 shrink-0 w-[76px]">
-              {onBack ? (
-                <button
-                  type="button"
-                  onClick={onBack}
-                  aria-label="ย้อนกลับ"
-                  className="size-9 rounded-xl flex items-center justify-center text-ink hover:bg-hover active:scale-95 transition cursor-pointer"
-                >
-                  <ChevronLeft className="size-5" />
-                </button>
-              ) : backHref ? (
-                <Link
-                  href={backHref}
-                  aria-label="ย้อนกลับ"
-                  className="size-9 rounded-xl flex items-center justify-center text-ink hover:bg-hover active:scale-95 transition"
-                >
-                  <ChevronLeft className="size-5" />
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setMobileDrawerOpen(true)}
-                  aria-label="เปิดเมนูหลัก"
-                  className="size-9 rounded-xl flex items-center justify-center text-ink hover:bg-hover active:scale-95 transition cursor-pointer"
-                >
-                  <Menu className="size-5" />
-                </button>
-              )}
-            </div>
-
-            {/* ตรงกลาง: หัวข้อหน้า / โลโก้ / ข้อมูลขั้นตอน */}
-            <div className="min-w-0 flex-1 flex flex-col items-center justify-center text-center px-1 overflow-hidden">
-              {step && totalSteps ? (
-                <>
-                  <span className="text-[11px] font-semibold text-brand tracking-wide leading-tight">
-                    {stepSubtitle || `ขั้นตอนที่ ${step} จาก ${totalSteps}`}
-                  </span>
-                  <h1 className="text-[14.5px] font-bold text-ink truncate leading-tight tracking-tight max-w-full">
-                    {title}
-                  </h1>
-                </>
-              ) : title ? (
-                <h1 className="text-[15px] font-bold text-ink truncate leading-tight tracking-tight max-w-full">
-                  {title}
-                </h1>
-              ) : (
-                <Link href="/" className="inline-flex items-center justify-center gap-2 max-w-full">
-                  <div className="size-7 rounded-lg overflow-hidden shrink-0 flex items-center justify-center bg-surface-muted border border-line-soft p-0.5">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/logo.png" alt="จับจอง" className="size-full object-contain" />
-                  </div>
-                  <span className="text-[15px] font-bold text-ink tracking-tight truncate">จับจอง</span>
-                </Link>
-              )}
-            </div>
-
-            {/* ปุ่มควบคุมฝั่งขวา (สลับธีม สว่าง/มืด, เมนูหลัก, แจ้งเตือน) */}
-            <div className="flex items-center justify-end gap-1 shrink-0 w-[76px]">
-              {/* ปุ่มสลับธีม โหมดสว่าง / โหมดมืด (ดวงอาทิตย์ / ดวงจันทร์) */}
-              <button
-                type="button"
-                onClick={toggleTheme}
-                aria-label={actualTheme === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด'}
-                title={actualTheme === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด'}
-                className="size-9 rounded-xl flex items-center justify-center text-ink hover:bg-hover active:scale-95 transition cursor-pointer"
-              >
-                {actualTheme === 'dark' ? (
-                  <Sun className="size-4.5 text-amber-400" />
-                ) : (
-                  <Moon className="size-4.5 text-ink-mute" />
-                )}
-              </button>
-
-              {hasBackAction ? (
-                /* เมื่ออยู่ในหน้าย่อยที่มีปุ่มย้อนกลับ ให้แสดงปุ่มเมนูหลักไว้ทางขวามือ */
-                <button
-                  type="button"
-                  onClick={() => setMobileDrawerOpen(true)}
-                  aria-label="เปิดเมนูหลัก"
-                  className="size-9 rounded-xl flex items-center justify-center text-ink hover:bg-hover active:scale-95 transition cursor-pointer"
-                >
-                  <Menu className="size-5" />
-                </button>
-              ) : rightLabel ? (
-                <span className="text-[12px] font-semibold text-brand truncate max-w-[100px] px-2 py-0.5 rounded-full bg-brand-mint border border-brand/20">
-                  {rightLabel}
-                </span>
-              ) : (
-                <Link
-                  href="/notifications"
-                  aria-label="การแจ้งเตือน"
-                  className="relative size-9 rounded-xl flex items-center justify-center text-ink hover:bg-hover active:scale-95 transition"
-                >
-                  <Bell className="size-4.5" />
-                  {unreadCount > 0 && (
-                    <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-status-crit ring-2 ring-surface" />
-                  )}
-                </Link>
-              )}
-            </div>
+    <div className="gov-brand-shell min-h-dvh bg-ground text-ink font-sans selection:bg-brand-tint selection:text-brand-ink print:bg-white print:block transition-colors duration-200 flex flex-col">
+      {/* ========================================================
+          1. Navigation Shell ตามบทบาท (gov-layout)
+          ======================================================== */}
+      <div className="print:hidden">
+        {isStaffLayout ? (
+          <div
+            onMouseEnter={() => setStaffSidebarOpen(true)}
+            onMouseLeave={() => setStaffSidebarOpen(false)}
+          >
+            <StaffSidebar
+              orgLogo="/logo.png"
+              orgName="จับจอง"
+              orgSubtitle={account?.department || 'ระบบบริการภาครัฐ'}
+              menuItems={staffMenuItems}
+              bottomMenuItems={staffBottomMenuItems}
+              user={govUser}
+              roleLabel={roleLabel}
+              onNavigate={handleNavigate}
+              onLogout={handleLogoutAndLogin}
+              onProfile={() => handleNavigate('/account')}
+              currentPath={pathname}
+              collapsible={true}
+              isOpen={staffSidebarOpen}
+              onToggle={() => setStaffSidebarOpen((prev) => !prev)}
+            />
           </div>
+        ) : (
+          <>
+            <UserHeader
+              user={{
+                firstName: govUser?.firstName || 'ผู้เยี่ยมชม',
+                lastName: govUser?.lastName || '',
+                pictureUrl: govUser?.pictureUrl,
+                subtitle: account?.position || roleLabel,
+              }}
+              notifications={account ? govNotifications : []}
+              onToggleSidebar={() => setUserSidebarOpen(true)}
+              onMarkAllRead={() => {
+                markAllNotificationsRead().catch(() => {});
+              }}
+              onNotificationClick={handleNotificationClick}
+              onProfile={() => handleNavigate(account ? '/account' : '/login')}
+            />
+            <UserSidebar
+              isOpen={userSidebarOpen}
+              onClose={() => setUserSidebarOpen(false)}
+              user={govUser}
+              roleLabel={roleLabel}
+              menuItems={userMenuItems}
+              onNavigate={handleNavigate}
+              onLogout={handleLogoutAndLogin}
+              onProfile={() => handleNavigate(account ? '/account' : '/login')}
+            />
+          </>
+        )}
+      </div>
 
-          {/* แถบขีดความคืบหน้าแบบหลายท่อนในตัว (Integrated Progress Bar) */}
-          {Boolean(step && totalSteps) && (
+      {/* ========================================================
+          2. Content Wrapper (ชดเชยความกว้าง StaffSidebar บน Desktop)
+          ======================================================== */}
+      <div
+        className={`flex-1 flex flex-col min-w-0 transition-[padding] duration-300 print:pl-0 ${
+          isStaffLayout ? 'md:pl-[64px]' : ''
+        }`}
+      >
+        {isStaffLayout && (
+          <div className="hidden md:block print:hidden">
+            <UserHeader
+              user={{
+                firstName: govUser?.firstName || 'เจ้าหน้าที่',
+                lastName: govUser?.lastName || '',
+                pictureUrl: govUser?.pictureUrl,
+                subtitle: account?.position || roleLabel,
+              }}
+              notifications={account ? govNotifications : []}
+              onToggleSidebar={() => setStaffSidebarOpen((prev) => !prev)}
+              onMarkAllRead={() => {
+                markAllNotificationsRead().catch(() => {});
+              }}
+              onNotificationClick={handleNotificationClick}
+              onProfile={() => handleNavigate('/account')}
+            />
+          </div>
+        )}
+
+        <main
+          className={`flex-1 w-full max-w-none min-w-0 print:p-0 print:max-w-none flex flex-col ${
+            noPadding
+              ? ''
+              : `p-3.5 sm:p-5 lg:px-6 lg:py-6 ${
+                  footer ? 'pb-24 sm:pb-28 lg:pb-28' : ''
+                } pl-[max(0.875rem,env(safe-area-inset-left,0px))] pr-[max(0.875rem,env(safe-area-inset-right,0px))]`
+          }`}
+        >
+          {hasSubHeader && (
             <div
-              className="flex items-center gap-1 px-3 pb-2 pt-0.5 w-full"
-              role="progressbar"
-              aria-valuenow={step}
-              aria-valuemin={1}
-              aria-valuemax={totalSteps}
-              aria-label={`ความคืบหน้าขั้นตอนที่ ${step} จาก ${totalSteps}`}
+              className={`print:hidden mb-4 w-full ${
+                noPadding ? 'px-3.5 pt-3.5 sm:px-5 sm:pt-5 lg:px-6 lg:pt-6' : ''
+              } ${maxWidth && maxWidth !== 'max-w-none' ? `${maxWidth} mx-auto` : ''}`}
             >
-              {Array.from({ length: totalSteps || 0 }).map((_, idx) => (
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {onBack ? (
+                    <button
+                      type="button"
+                      onClick={onBack}
+                      aria-label="ย้อนกลับ"
+                      className="size-9 rounded-xl bg-surface border border-line flex items-center justify-center text-ink hover:bg-hover active:scale-95 transition cursor-pointer shrink-0"
+                    >
+                      <ChevronLeft className="size-5" />
+                    </button>
+                  ) : backHref ? (
+                    <Link
+                      href={backHref}
+                      aria-label="ย้อนกลับ"
+                      className="size-9 rounded-xl bg-surface border border-line flex items-center justify-center text-ink hover:bg-hover active:scale-95 transition shrink-0"
+                    >
+                      <ChevronLeft className="size-5" />
+                    </Link>
+                  ) : null}
+
+                  <div className="min-w-0">
+                    {Boolean(step && totalSteps) && (
+                      <p className="text-[11px] font-semibold text-brand tracking-wide leading-tight">
+                        {stepSubtitle || `ขั้นตอนที่ ${step} จาก ${totalSteps}`}
+                      </p>
+                    )}
+                    {title && (
+                      <h1 className="text-[17px] sm:text-[19px] font-bold text-ink truncate leading-tight tracking-tight">
+                        {title}
+                      </h1>
+                    )}
+                  </div>
+                </div>
+
+                {rightLabel && (
+                  <span className="text-[12px] font-semibold text-brand truncate max-w-[140px] px-2.5 py-1 rounded-full bg-brand-mint border border-brand/20 shrink-0">
+                    {rightLabel}
+                  </span>
+                )}
+              </div>
+
+              {Boolean(step && totalSteps) && (
                 <div
-                  key={idx}
-                  className={`h-1 flex-1 rounded-full transition-colors duration-200 ${
-                    idx + 1 <= (step || 1) ? 'bg-brand' : 'bg-line'
-                  }`}
-                />
-              ))}
+                  className="flex items-center gap-1.5 mt-2.5 w-full"
+                  role="progressbar"
+                  aria-valuenow={step}
+                  aria-valuemin={1}
+                  aria-valuemax={totalSteps}
+                  aria-label={`ความคืบหน้าขั้นตอนที่ ${step} จาก ${totalSteps}`}
+                >
+                  {Array.from({ length: totalSteps || 0 }).map((_, idx) => (
+                    <div
+                      key={idx}
+                      className={`h-1.5 flex-1 rounded-full transition-colors duration-200 ${
+                        idx + 1 <= (step || 1) ? 'bg-brand' : 'bg-line'
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
-        </header>
 
-        {/* ========================================================
-            พื้นที่เนื้อหาหลัก (Main Content Area)
-            - จัดระยะขอบสะอาดตารองรับทุกขนาดหน้าจอ
-            - รองรับรอยบากหน้าจอและการหมุนแนวนอน (Safe-area Inset)
-            ======================================================== */}
-        <main
-          className={`flex-1 w-full max-w-none p-3.5 sm:p-5 lg:px-6 lg:py-6 ${footer ? 'pb-24 sm:pb-28 lg:pb-28' : ''} min-w-0 print:p-0 print:max-w-none flex flex-col pl-[max(0.875rem,env(safe-area-inset-left,0px))] pr-[max(0.875rem,env(safe-area-inset-right,0px))]`}
-        >
-          {/* สถานะที่ 1: กำลังตรวจสอบสถานะการล็อกอิน */}
-          {loading ? (
+          {loading && !isPublicRoute ? (
             <Card className="p-8 max-w-[480px] mx-auto my-8 text-center text-body text-muted flex flex-col items-center justify-center gap-3">
               <div className="size-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
               <span>กำลังตรวจสอบสถานะการเข้าสู่ระบบ...</span>
             </Card>
-          ) : account && !access.allowed ? (
-            /* สถานะที่ 3: ไม่มีสิทธิ์เข้าถึงหน้านี้ (Permission & Role Guard) */
+          ) : account && !access.allowed && !allowPublic ? (
             <Card className="p-6 max-w-[620px] mx-auto my-6 border-danger-fg/30 flex flex-col gap-4">
               <div className="flex items-start gap-4">
                 <div className="size-11 rounded-[12px] bg-danger-bg text-danger-fg flex items-center justify-center shrink-0">
@@ -363,7 +469,6 @@ export function AppShell({
                 </div>
               </div>
 
-              {/* รายละเอียดสิทธิ์ที่ต้องการเพื่อเข้าใช้งาน */}
               <div className="rounded-control bg-surface-muted border border-line p-4 flex flex-col gap-2 text-caption">
                 <div className="flex justify-between gap-2">
                   <span className="text-muted">บัญชีของคุณขณะนี้:</span>
@@ -392,7 +497,6 @@ export function AppShell({
                 )}
               </div>
 
-              {/* ปุ่มทางเลือกสำหรับผู้ใช้ที่ไม่มีสิทธิ์ */}
               <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
                 <Button
                   variant="primary"
@@ -409,21 +513,23 @@ export function AppShell({
               </div>
             </Card>
           ) : (
-            /* สถานะที่ 4: ผ่านการตรวจสอบสิทธิ์แล้ว แสดงเนื้อหาของหน้า */
-            <div className={`flex-1 flex flex-col justify-between gap-5 w-full ${maxWidth && maxWidth !== 'max-w-none' ? `${maxWidth} mx-auto` : ''}`}>
-              <div className="w-full">{children}</div>
+            <div
+              className={`flex-1 flex flex-col justify-between gap-5 w-full ${
+                maxWidth && maxWidth !== 'max-w-none' ? `${maxWidth} mx-auto` : ''
+              }`}
+            >
+              <div className="w-full flex-1 flex flex-col">{children}</div>
             </div>
           )}
         </main>
 
-        {/* ========================================================
-            แถบท้ายหน้าเว็บรวมศูนย์ (Unified Footer - ตรึงแถบล่างไว้เสมอ)
-            - มือถือ (< lg): ตรึงแนบสนิทที่ขอบล่าง พร้อมเว้นระยะปลอดภัยสำหรับ Home Bar
-            - เดสก์ท็อป (>= lg): การ์ดลอยเหนือขอบล่างอย่างสวยงาม
-            ======================================================== */}
         {footer && (
           <div className="print:hidden w-full sticky bottom-0 z-30 bg-surface/98 backdrop-blur-md border-t border-line shadow-[0_-4px_16px_rgba(20,35,31,0.06)] px-3.5 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom,0px))] lg:bg-transparent lg:backdrop-blur-none lg:border-none lg:shadow-none lg:px-6 lg:pb-3 lg:pt-0 lg:pointer-events-none transition-colors">
-            <div className={`w-full ${maxWidth && maxWidth !== 'max-w-none' ? `${maxWidth} mx-auto` : ''} lg:pointer-events-auto lg:rounded-card lg:bg-surface/95 lg:backdrop-blur-md lg:border lg:border-line lg:shadow-float lg:px-4 lg:py-3 lg:flex lg:items-center lg:justify-end`}>
+            <div
+              className={`w-full ${
+                maxWidth && maxWidth !== 'max-w-none' ? `${maxWidth} mx-auto` : ''
+              } lg:pointer-events-auto lg:rounded-card lg:bg-surface/95 lg:backdrop-blur-md lg:border lg:border-line lg:shadow-float lg:px-4 lg:py-3 lg:flex lg:items-center lg:justify-end`}
+            >
               {footer}
             </div>
           </div>

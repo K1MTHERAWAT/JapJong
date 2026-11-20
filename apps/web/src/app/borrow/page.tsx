@@ -41,7 +41,7 @@ import {
   equipmentIconName,
 } from '@/components/ui';
 // นำเข้า API client และฟังก์ชันจัดรูปแบบวันที่ภาษาไทย
-import { api, formatThaiDate } from '@/lib/api';
+import { api, formatThaiDate, serializeAttachmentFiles } from '@/lib/api';
 
 // ขั้นตอนทั้ง 4 ของการขอยืม–คืนอุปกรณ์ราชการ (4-Step Borrow Wizard)
 const STEPS = ['เลือกอุปกรณ์', 'วันยืม-คืน', 'กรอกคำขอ', 'ลงนามและส่ง'];
@@ -404,6 +404,7 @@ export default function BorrowWizardPage() {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
+      const serializedAttachments = await serializeAttachmentFiles(attachmentFiles);
       const created = await api.createBorrow({
         items: selectedItems.map((s) => ({ equipmentId: s.eq.id, qty: s.qty })),
         pickupDate,
@@ -426,7 +427,7 @@ export default function BorrowWizardPage() {
         addressDistrictId: addressDistrictId || undefined,
         addressProvinceId: addressProvinceId || undefined,
         purposeItems: purposeItems.filter((pi) => pi.item.trim() || pi.forWhat.trim()),
-        attachments: attachmentFiles.map((file) => file.name),
+        attachments: serializedAttachments,
       } as any);
       router.push(`/requests/${created.id}`);
     } catch (err: any) {
@@ -834,7 +835,22 @@ export default function BorrowWizardPage() {
                         : 'border-line'
                     }`}
                   >
-                    <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                    <div
+                      role="button"
+                      tabIndex={outOfStock ? -1 : 0}
+                      onClick={() => {
+                        if (!outOfStock) setQty(eq.id, eq.stock, isSelected ? 0 : 1);
+                      }}
+                      onKeyDown={(e) => {
+                        if (!outOfStock && (e.key === 'Enter' || e.key === ' ')) {
+                          e.preventDefault();
+                          setQty(eq.id, eq.stock, isSelected ? 0 : 1);
+                        }
+                      }}
+                      className={`flex items-start sm:items-center gap-3.5 min-w-0 flex-1 ${
+                        outOfStock ? 'cursor-not-allowed' : 'cursor-pointer'
+                      }`}
+                    >
                       <div className="w-16 h-16 rounded-xl bg-brand-mint text-brand flex items-center justify-center shrink-0 relative overflow-hidden">
                         <ThumbnailImage
                           src={eq.images?.[0]}
@@ -939,7 +955,20 @@ export default function BorrowWizardPage() {
                         : 'border-line'
                     }`}
                   >
-                    <div>
+                    <div
+                      role="button"
+                      tabIndex={outOfStock ? -1 : 0}
+                      onClick={() => {
+                        if (!outOfStock) setQty(eq.id, eq.stock, isSelected ? 0 : 1);
+                      }}
+                      onKeyDown={(e) => {
+                        if (!outOfStock && (e.key === 'Enter' || e.key === ' ')) {
+                          e.preventDefault();
+                          setQty(eq.id, eq.stock, isSelected ? 0 : 1);
+                        }
+                      }}
+                      className={outOfStock ? 'cursor-not-allowed' : 'cursor-pointer'}
+                    >
                       {/* ส่วนหัวการ์ดและรูปภาพ (แบบที่ 2: ภาพเต็มตา h-56 พร้อม Overlay ชื่อและข้อมูลอุปกรณ์ด้านล่างภาพ) */}
                       <div className="h-56 bg-brand-mint relative flex items-center justify-center text-brand overflow-hidden">
                         <ThumbnailImage
