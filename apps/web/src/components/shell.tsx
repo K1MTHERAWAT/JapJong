@@ -4,7 +4,7 @@
  * =====================================================================
  * โครงสร้างหลักของหน้าจอ (AppShell - Core Layout Container)
  * =====================================================================
- * ใช้คอมโพเนนต์จาก `gov-layout` (StaffSidebar, UserHeader, UserSidebar)
+ * ใช้คอมโพเนนต์จาก `gov-layout` (StaffSidebar)
  * โดยปรับสีผ่าน CSS Tokens ของระบบจับจอง (.gov-brand-shell)
  */
 
@@ -20,9 +20,7 @@ import {
 } from 'lucide-react';
 import {
   StaffSidebar,
-  UserHeader,
   type MenuItem as GovMenuItem,
-  type NotificationItem as GovNotificationItem,
   type User as GovUser,
 } from 'gov-layout';
 import {
@@ -125,10 +123,7 @@ export function AppShell({
     account,
     loading,
     logout,
-    notifications,
     unreadCount,
-    markNotificationRead,
-    markAllNotificationsRead,
   } = useAuth();
 
   const [staffSidebarOpen, setStaffSidebarOpen] = useState(false);
@@ -246,35 +241,6 @@ export function AppShell({
     ];
   }, [unreadCount, account]);
 
-  const govNotifications = useMemo<GovNotificationItem[]>(() => {
-    return notifications.map((n) => ({
-      id: n.id,
-      title: n.title,
-      description: n.body || n.message || '',
-      date: n.at || n.createdAt || '',
-      type: 'info',
-      isRead: Boolean(n.read ?? n.isRead),
-      category:
-        n.referenceType === 'approval' || n.referenceType === 'borrow'
-          ? 'action'
-          : 'general',
-    }));
-  }, [notifications]);
-
-  const handleNotificationClick = useCallback(
-    (item: GovNotificationItem) => {
-      const id = String(item.id);
-      markNotificationRead(id).catch(() => {});
-      const matched = notifications.find((n) => n.id === id);
-      if (matched?.link) {
-        router.push(matched.link);
-      } else {
-        router.push('/notifications');
-      }
-    },
-    [markNotificationRead, notifications, router],
-  );
-
   if (!loading && !account && !isPublicRoute) {
     return (
       <div className="min-h-dvh bg-bg flex flex-col items-center justify-center gap-3 text-body text-ink-mute">
@@ -321,26 +287,6 @@ export function AppShell({
           hasLeftSidebar ? 'md:pl-[64px]' : ''
         }`}
       >
-        {hasLeftSidebar && (
-          <div className="hidden md:block sticky top-0 z-30 print:hidden">
-            <UserHeader
-              user={{
-                firstName: govUser?.firstName || (account?.nickname || account?.name || 'ผู้ใช้งาน'),
-                lastName: govUser?.lastName || '',
-                pictureUrl: govUser?.pictureUrl,
-                subtitle: account?.position || roleLabel,
-              }}
-              notifications={account ? govNotifications : []}
-              onToggleSidebar={() => setStaffSidebarOpen((prev) => !prev)}
-              onMarkAllRead={() => {
-                markAllNotificationsRead().catch(() => {});
-              }}
-              onNotificationClick={handleNotificationClick}
-              onProfile={() => handleNavigate(account ? '/account' : '/login')}
-            />
-          </div>
-        )}
-
         <main
           className={`flex-1 w-full max-w-none min-w-0 print:p-0 print:max-w-none flex flex-col ${
             noPadding
