@@ -948,6 +948,21 @@
   display: none !important;
 }
 
+/* บังคับให้ Sidebar ทุกประเภท (รวมถึง UserSidebar จาก gov-layout) อยู่ฝั่งซ้ายเสมอ */
+.gov-brand-shell aside[aria-label="เมนูผู้ใช้"] {
+  left: 0 !important;
+  right: auto !important;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15) !important;
+}
+
+.gov-brand-shell aside[aria-label="เมนูผู้ใช้"][aria-hidden="true"] {
+  transform: translateX(-100%) !important;
+}
+
+.gov-brand-shell aside[aria-label="เมนูผู้ใช้"][aria-hidden="false"] {
+  transform: translateX(0) !important;
+}
+
 .gov-brand-shell header [style*="overflow-y: auto"] {
   overflow-x: hidden !important;
 }

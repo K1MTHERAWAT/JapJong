@@ -12,6 +12,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
+  ArrowUp,
   Bell,
   ChevronLeft,
   ShieldAlert,
@@ -20,7 +21,6 @@ import {
 import {
   StaffSidebar,
   UserHeader,
-  UserSidebar,
   type MenuItem as GovMenuItem,
   type NotificationItem as GovNotificationItem,
   type User as GovUser,
@@ -131,9 +131,18 @@ export function AppShell({
     markAllNotificationsRead,
   } = useAuth();
 
-  const [userSidebarOpen, setUserSidebarOpen] = useState(false);
   const [staffSidebarOpen, setStaffSidebarOpen] = useState(false);
   const [dbServices, setDbServices] = useState<SidebarServiceItem[]>([]);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      setShowBackToTop(window.scrollY > 280);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const fetchNav = useCallback(() => {
     api
@@ -154,10 +163,6 @@ export function AppShell({
     };
   }, [account?.id, account?.role, fetchNav]);
 
-  useEffect(() => {
-    setUserSidebarOpen(false);
-  }, [pathname]);
-
   const visibleNav = useMemo(() => {
     return getVisibleNav(account, dbServices.length > 0 ? dbServices : undefined);
   }, [account, dbServices]);
@@ -173,7 +178,7 @@ export function AppShell({
 
   const handleNavigate = useCallback(
     (path: string) => {
-      setUserSidebarOpen(false);
+      setStaffSidebarOpen(false);
       router.push(path);
     },
     [router],
@@ -194,7 +199,8 @@ export function AppShell({
     }
   }, [loading, account, isPublicRoute, router]);
 
-  const isStaffLayout = Boolean(account && account.role !== 'USER');
+  // ทุกบทบาท (รวมถึงประชาชน USER) มีแถบเมนู Sidebar อยู่ฝั่งซ้ายเสมอ
+  const hasLeftSidebar = true;
   const hasBackAction = Boolean(onBack || backHref);
   const hasSubHeader = Boolean(hasBackAction || title || rightLabel || (step && totalSteps));
 
@@ -233,16 +239,12 @@ export function AppShell({
       },
       {
         id: '/account',
-        title: 'จัดการบัญชีส่วนตัว',
-        path: '/account',
+        title: account ? 'จัดการบัญชีส่วนตัว' : 'เข้าสู่ระบบ',
+        path: account ? '/account' : '/login',
         icon: <UserCircle className="size-5" />,
       },
     ];
-  }, [unreadCount]);
-
-  const userMenuItems = useMemo(() => {
-    return toGovMenuItems(visibleNav, unreadCount);
-  }, [visibleNav, unreadCount]);
+  }, [unreadCount, account]);
 
   const govNotifications = useMemo<GovNotificationItem[]>(() => {
     return notifications.map((n) => ({
@@ -285,60 +287,30 @@ export function AppShell({
   return (
     <div className="gov-brand-shell min-h-dvh bg-ground text-ink font-sans selection:bg-brand-tint selection:text-brand-ink print:bg-white print:block transition-colors duration-200 flex flex-col">
       {/* ========================================================
-          1. Navigation Shell ตามบทบาท (gov-layout)
+          1. Navigation Shell ฝั่งซ้ายเสมอทุกบทบาท (StaffSidebar จาก gov-layout)
           ======================================================== */}
       <div className="print:hidden">
-        {isStaffLayout ? (
-          <div
-            onMouseEnter={() => setStaffSidebarOpen(true)}
-            onMouseLeave={() => setStaffSidebarOpen(false)}
-          >
-            <StaffSidebar
-              orgLogo="/logo.png"
-              orgName="จับจอง"
-              orgSubtitle={account?.department || 'ระบบบริการภาครัฐ'}
-              menuItems={staffMenuItems}
-              bottomMenuItems={staffBottomMenuItems}
-              user={govUser}
-              roleLabel={roleLabel}
-              onNavigate={handleNavigate}
-              onLogout={handleLogoutAndLogin}
-              onProfile={() => handleNavigate('/account')}
-              currentPath={pathname}
-              collapsible={true}
-              isOpen={staffSidebarOpen}
-              onToggle={() => setStaffSidebarOpen((prev) => !prev)}
-            />
-          </div>
-        ) : (
-          <>
-            <UserHeader
-              user={{
-                firstName: govUser?.firstName || 'ผู้เยี่ยมชม',
-                lastName: govUser?.lastName || '',
-                pictureUrl: govUser?.pictureUrl,
-                subtitle: account?.position || roleLabel,
-              }}
-              notifications={account ? govNotifications : []}
-              onToggleSidebar={() => setUserSidebarOpen(true)}
-              onMarkAllRead={() => {
-                markAllNotificationsRead().catch(() => {});
-              }}
-              onNotificationClick={handleNotificationClick}
-              onProfile={() => handleNavigate(account ? '/account' : '/login')}
-            />
-            <UserSidebar
-              isOpen={userSidebarOpen}
-              onClose={() => setUserSidebarOpen(false)}
-              user={govUser}
-              roleLabel={roleLabel}
-              menuItems={userMenuItems}
-              onNavigate={handleNavigate}
-              onLogout={handleLogoutAndLogin}
-              onProfile={() => handleNavigate(account ? '/account' : '/login')}
-            />
-          </>
-        )}
+        <div
+          onMouseEnter={() => setStaffSidebarOpen(true)}
+          onMouseLeave={() => setStaffSidebarOpen(false)}
+        >
+          <StaffSidebar
+            orgLogo="/logo.png"
+            orgName="จับจอง"
+            orgSubtitle={account?.department || 'ระบบบริการภาครัฐ'}
+            menuItems={staffMenuItems}
+            bottomMenuItems={staffBottomMenuItems}
+            user={govUser}
+            roleLabel={roleLabel}
+            onNavigate={handleNavigate}
+            onLogout={handleLogoutAndLogin}
+            onProfile={() => handleNavigate(account ? '/account' : '/login')}
+            currentPath={pathname}
+            collapsible={true}
+            isOpen={staffSidebarOpen}
+            onToggle={() => setStaffSidebarOpen((prev) => !prev)}
+          />
+        </div>
       </div>
 
       {/* ========================================================
@@ -346,14 +318,14 @@ export function AppShell({
           ======================================================== */}
       <div
         className={`flex-1 flex flex-col min-w-0 transition-[padding] duration-300 print:pl-0 ${
-          isStaffLayout ? 'md:pl-[64px]' : ''
+          hasLeftSidebar ? 'md:pl-[64px]' : ''
         }`}
       >
-        {isStaffLayout && (
-          <div className="hidden md:block print:hidden">
+        {hasLeftSidebar && (
+          <div className="hidden md:block sticky top-0 z-30 print:hidden">
             <UserHeader
               user={{
-                firstName: govUser?.firstName || 'เจ้าหน้าที่',
+                firstName: govUser?.firstName || (account?.nickname || account?.name || 'ผู้ใช้งาน'),
                 lastName: govUser?.lastName || '',
                 pictureUrl: govUser?.pictureUrl,
                 subtitle: account?.position || roleLabel,
@@ -364,7 +336,7 @@ export function AppShell({
                 markAllNotificationsRead().catch(() => {});
               }}
               onNotificationClick={handleNotificationClick}
-              onProfile={() => handleNavigate('/account')}
+              onProfile={() => handleNavigate(account ? '/account' : '/login')}
             />
           </div>
         )}
@@ -533,6 +505,20 @@ export function AppShell({
               {footer}
             </div>
           </div>
+        )}
+
+        {showBackToTop && (
+          <button
+            type="button"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            aria-label="กลับขึ้นด้านบน"
+            title="กลับขึ้นด้านบน"
+            className={`print:hidden fixed right-4 sm:right-6 z-30 size-11 rounded-full bg-surface/95 backdrop-blur-md border border-line text-ink hover:border-brand hover:text-brand shadow-float flex items-center justify-center transition-all duration-200 cursor-pointer active:scale-95 ${
+              footer ? 'bottom-24 sm:bottom-28' : 'bottom-5 sm:bottom-6'
+            }`}
+          >
+            <ArrowUp className="size-5" />
+          </button>
         )}
       </div>
     </div>

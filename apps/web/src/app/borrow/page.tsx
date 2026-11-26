@@ -100,23 +100,17 @@ export default function BorrowWizardPage() {
     return `${y}-${m}`;
   });
 
-  // วันที่รับอุปกรณ์ (ค่าเริ่มต้น: วันพรุ่งนี้)
-  const [pickupDate, setPickupDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return d.toISOString().slice(0, 10);
-  });
+  // วันที่รับอุปกรณ์ (ไม่เลือกไว้ล่วงหน้า ให้ผู้ใช้เลือกเอง)
+  const [pickupDate, setPickupDate] = useState('');
 
-  // วันที่กำหนดส่งคืนอุปกรณ์ (ค่าเริ่มต้น: 3 วันถัดไป)
-  const [returnDate, setReturnDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 3);
-    return d.toISOString().slice(0, 10);
-  });
+  // วันที่กำหนดส่งคืนอุปกรณ์ (ไม่เลือกไว้ล่วงหน้า ให้ผู้ใช้เลือกเอง)
+  const [returnDate, setReturnDate] = useState('');
+
+  const hasSelectedDates = Boolean(pickupDate && returnDate);
 
   // คำนวณจำนวนวันยืมรวม
   const borrowDays = useMemo(() => {
-    if (!pickupDate || !returnDate) return 1;
+    if (!pickupDate || !returnDate) return 0;
     const s = new Date(pickupDate).getTime();
     const e = new Date(returnDate).getTime();
     const diff = Math.round((e - s) / 86400000);
@@ -145,7 +139,7 @@ export default function BorrowWizardPage() {
   );
 
   useEffect(() => {
-    if (selectedItems.length === 0 || !pickupDate || !returnDate) {
+    if (selectedItems.length === 0) {
       setEquipmentAvailability((prev) => (prev.length === 0 ? prev : []));
       setEquipmentSummary((prev) => (prev.length === 0 ? prev : []));
       setIsEquipmentAvailable(true);
@@ -153,19 +147,28 @@ export default function BorrowWizardPage() {
     }
 
     let active = true;
-    setCheckingAvailability(true);
+    const hasDates = Boolean(pickupDate && returnDate);
+    if (hasDates) {
+      setCheckingAvailability(true);
+    } else {
+      setEquipmentSummary((prev) => (prev.length === 0 ? prev : []));
+      setIsEquipmentAvailable(true);
+    }
+
     api
       .checkEquipmentAvailability({
         items: selectedItems.map((s) => ({ equipmentId: s.eq.id, qty: s.qty })),
-        pickupDate,
-        returnDate,
+        pickupDate: pickupDate || undefined,
+        returnDate: returnDate || undefined,
         month,
       })
       .then((res) => {
         if (!active) return;
         setEquipmentAvailability(res.dayAvailability);
-        setEquipmentSummary(res.summary);
-        setIsEquipmentAvailable(res.isAvailable);
+        if (hasDates) {
+          setEquipmentSummary(res.summary);
+          setIsEquipmentAvailable(res.isAvailable);
+        }
       })
       .catch(() => {
         if (active) {
@@ -175,7 +178,7 @@ export default function BorrowWizardPage() {
         }
       })
       .finally(() => {
-        if (active) setCheckingAvailability(false);
+        if (active && hasDates) setCheckingAvailability(false);
       });
 
     return () => {
@@ -351,7 +354,10 @@ export default function BorrowWizardPage() {
     const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
     if (dateStr < todayStr) return;
 
-    if (pickupDate === returnDate && dateStr > pickupDate) {
+    if (!pickupDate || !returnDate) {
+      setPickupDate(dateStr);
+      setReturnDate(dateStr);
+    } else if (pickupDate === returnDate && dateStr > pickupDate) {
       setReturnDate(dateStr);
     } else if (dateStr < pickupDate) {
       setPickupDate(dateStr);
@@ -362,7 +368,12 @@ export default function BorrowWizardPage() {
   };
 
   const setPresetDays = (days: number) => {
-    const s = new Date(pickupDate);
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' }).format(new Date());
+    const baseStr = pickupDate || todayStr;
+    if (!pickupDate) {
+      setPickupDate(baseStr);
+    }
+    const s = new Date(baseStr);
     const e = new Date(s);
     e.setDate(s.getDate() + (days - 1));
     setReturnDate(e.toISOString().slice(0, 10));
@@ -555,15 +566,23 @@ export default function BorrowWizardPage() {
             </button>
             <button
               type="button"
-              disabled={!isEquipmentAvailable || checkingAvailability}
+              disabled={!hasSelectedDates || !isEquipmentAvailable || checkingAvailability}
               onClick={() => {
                 syncFormPurposeItems();
                 setStep(3);
               }}
               className="jw-btn flex-[1.5] sm:w-56"
-              title={!isEquipmentAvailable ? 'อุปกรณ์บางรายการไม่เพียงพอในวันที่เลือก' : undefined}
+              title={
+                !hasSelectedDates
+                  ? 'กรุณาเลือกวันรับและวันคืนอุปกรณ์'
+                  : !isEquipmentAvailable
+                  ? 'อุปกรณ์บางรายการไม่เพียงพอในวันที่เลือก'
+                  : undefined
+              }
             >
-              {checkingAvailability
+              {!hasSelectedDates
+                ? 'กรุณาเลือกวันยืม-คืน'
+                : checkingAvailability
                 ? 'กำลังตรวจสอบสต็อก...'
                 : !isEquipmentAvailable
                 ? 'อุปกรณ์ไม่ว่างในวันที่เลือก'
@@ -1263,7 +1282,11 @@ export default function BorrowWizardPage() {
                 month={month}
                 onMonthChange={setMonth}
                 availability={equipmentAvailability}
-                periods={[{ start: `${pickupDate}T09:00:00+07:00`, end: `${returnDate}T16:00:00+07:00` }]}
+                periods={
+                  hasSelectedDates
+                    ? [{ start: `${pickupDate}T09:00:00+07:00`, end: `${returnDate}T16:00:00+07:00` }]
+                    : []
+                }
                 onPickDate={handlePickCalendarDate}
               />
 
@@ -1293,21 +1316,23 @@ export default function BorrowWizardPage() {
               <div className="jw-card p-4 sm:p-5 flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                   <b className="text-[16px]">ช่วงวันที่ขอยืมอุปกรณ์</b>
-                  <Chip tone="green">{borrowDays} วัน</Chip>
+                  {hasSelectedDates ? <Chip tone="green">{borrowDays} วัน</Chip> : <Chip tone="gray">ยังไม่ได้เลือก</Chip>}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-center gap-2.5">
                   <div className="border border-line rounded-xl p-2.5 bg-white flex flex-col gap-1.5">
                     <div className="flex items-center justify-between">
                       <span className="text-[12px] text-ink-mute">วันที่รับอุปกรณ์</span>
-                      <span className="text-[12px] text-brand font-semibold">{formatThaiDate(pickupDate, false)}</span>
+                      <span className="text-[12px] text-brand font-semibold">
+                        {pickupDate ? formatThaiDate(pickupDate, false) : 'ยังไม่เลือก'}
+                      </span>
                     </div>
                     <DatePickerField
                       value={pickupDate}
                       label="วันที่รับอุปกรณ์"
                       onChange={(value) => {
                         setPickupDate(value);
-                        if (value > returnDate) {
+                        if (returnDate && value > returnDate) {
                           setReturnDate(value);
                         }
                       }}
@@ -1321,14 +1346,16 @@ export default function BorrowWizardPage() {
                   <div className="border border-line rounded-xl p-2.5 bg-white flex flex-col gap-1.5">
                     <div className="flex items-center justify-between">
                       <span className="text-[12px] text-ink-mute">กำหนดคืนอุปกรณ์</span>
-                      <span className="text-[12px] text-brand font-semibold">{formatThaiDate(returnDate, false)}</span>
+                      <span className="text-[12px] text-brand font-semibold">
+                        {returnDate ? formatThaiDate(returnDate, false) : 'ยังไม่เลือก'}
+                      </span>
                     </div>
                     <DatePickerField
                       value={returnDate}
                       label="กำหนดคืนอุปกรณ์"
                       onChange={(value) => {
                         setReturnDate(value);
-                        if (value < pickupDate) {
+                        if (pickupDate && value < pickupDate) {
                           setPickupDate(value);
                         }
                       }}
@@ -1346,7 +1373,7 @@ export default function BorrowWizardPage() {
                         type="button"
                         onClick={() => setPresetDays(d)}
                         className={`px-3 py-1.5 rounded-full text-[12px] font-semibold border transition ${
-                          borrowDays === d
+                          hasSelectedDates && borrowDays === d
                             ? 'bg-brand border-brand text-white'
                             : 'bg-white border-line text-ink hover:border-brand'
                         }`}
@@ -1365,7 +1392,9 @@ export default function BorrowWizardPage() {
                     <Icon name="package" className="w-4 h-4 text-brand" />
                     <span>สถานะความว่างของอุปกรณ์</span>
                   </b>
-                  {checkingAvailability ? (
+                  {!hasSelectedDates ? (
+                    <Chip tone="gray">รอเลือกวันที่</Chip>
+                  ) : checkingAvailability ? (
                     <span className="text-[12px] text-ink-mute animate-pulse">กำลังตรวจสอบ...</span>
                   ) : isEquipmentAvailable ? (
                     <Chip tone="green">พร้อมให้ยืมทั้งหมด</Chip>
@@ -1375,7 +1404,13 @@ export default function BorrowWizardPage() {
                 </div>
 
                 <div className="text-[12.5px] text-ink-mute">
-                  ช่วงวันที่เลือก: <b className="text-ink">{formatThaiDate(pickupDate, false)} – {formatThaiDate(returnDate, true)}</b> ({borrowDays} วัน)
+                  {hasSelectedDates ? (
+                    <>
+                      ช่วงวันที่เลือก: <b className="text-ink">{formatThaiDate(pickupDate, false)} – {formatThaiDate(returnDate, true)}</b> ({borrowDays} วัน)
+                    </>
+                  ) : (
+                    <span>กรุณาเลือกวันที่รับและกำหนดคืนอุปกรณ์จากปฏิทินหรือช่องเลือกวันที่</span>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-2">
@@ -1436,7 +1471,16 @@ export default function BorrowWizardPage() {
                 <b className="text-[15px] text-ink">สรุปรายการคำขอ</b>
                 <div className="text-[13.5px] text-ink-soft space-y-1">
                   <p>• อุปกรณ์ที่เลือก: <b className="text-ink">{selectedItems.length} รายการ ({totalSelectedUnits} ชิ้น)</b></p>
-                  <p>• ระยะเวลาที่ยืม: <b className="text-ink">{borrowDays} วัน</b> ({formatThaiDate(pickupDate, false)} ถึง {formatThaiDate(returnDate, true)})</p>
+                  <p>
+                    • ระยะเวลาที่ยืม:{' '}
+                    {hasSelectedDates ? (
+                      <>
+                        <b className="text-ink">{borrowDays} วัน</b> ({formatThaiDate(pickupDate, false)} ถึง {formatThaiDate(returnDate, true)})
+                      </>
+                    ) : (
+                      <span className="text-ink-mute">ยังไม่ได้เลือกวันที่</span>
+                    )}
+                  </p>
                 </div>
                 <div className="p-3 bg-brand-mint/40 border border-brand/20 rounded-xl flex items-center gap-2 text-[12.5px] text-brand-dark">
                   <Icon name="info" className="w-4 h-4 text-brand shrink-0" />
