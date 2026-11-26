@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Download,
   Eye,
+  EyeOff,
   FileText,
   Image as ImageIcon,
   Layers,
@@ -61,14 +62,17 @@ export function AttachmentViewer({
   attachments,
   emptyText = 'ไม่มีไฟล์แนบเพิ่มเติม',
   variant = 'full',
+  title,
 }: {
   attachments?: string[];
   emptyText?: string;
   variant?: 'full' | 'thumbnail';
+  title?: string;
 }) {
   const [previewIdx, setPreviewIdx] = useState<number | null>(null);
   const [singleMode, setSingleMode] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
+  const [hidden, setHidden] = useState(false);
 
   const list = (attachments || []).filter((item) => typeof item === 'string' && item.trim().length > 0);
   const safeActiveIdx = Math.min(activeIdx, Math.max(0, list.length - 1));
@@ -203,8 +207,23 @@ export function AttachmentViewer({
     <>
       {variant === 'full' ? (
         <div className="flex flex-col gap-3">
-          {/* แถบควบคุมกรณีมีมากกว่า 1 ไฟล์ */}
-          {list.length > 1 && (
+          {/* หัวข้อและปุ่มซ่อน/แสดงรูปภาพและเอกสารแนบ */}
+          <div className={`flex flex-wrap items-center gap-2 ${title ? 'justify-between' : 'justify-end'}`}>
+            {title && <b className="text-[14px] sm:text-[15px] text-ink">{title}</b>}
+            <button
+              type="button"
+              onClick={() => setHidden((v) => !v)}
+              className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-brand hover:underline cursor-pointer"
+            >
+              {hidden ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
+              <span>{hidden ? `แสดงรูป / เอกสารแนบ (${list.length})` : 'ซ่อนรูป / เอกสารแนบ'}</span>
+            </button>
+          </div>
+
+          {!hidden && (
+            <>
+              {/* แถบควบคุมกรณีมีมากกว่า 1 ไฟล์ */}
+              {list.length > 1 && (
             <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-[12px] font-semibold text-ink-mute mr-1">
@@ -277,6 +296,8 @@ export function AttachmentViewer({
             <div className="flex flex-col gap-4">
               {list.map((src, idx) => renderFullItem(src, idx))}
             </div>
+          )}
+            </>
           )}
         </div>
       ) : (

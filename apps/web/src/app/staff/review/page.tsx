@@ -13,7 +13,14 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { BookingRequest, BorrowRequest, RequestWithTimeline, canSignRequest } from '@japjong/shared';
+import { ArrowRight, ChevronLeft, FileText, PenLine } from 'lucide-react';
+import {
+  BookingRequest,
+  BorrowRequest,
+  RequestWithTimeline,
+  SIGN_LEVEL_TITLE,
+  canSignRequest,
+} from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
@@ -22,15 +29,27 @@ import {
   Chip,
   OfficialGovFormDocument,
   PinKeypad,
+  RequestTypeChip,
   SignatureBox,
-  SignaturePreviewCard,
+  SigningProgressSpotlight,
+  SigningStepStatus,
   SignOtpVerifier,
   StatusChip,
 } from '@/components/ui';
-import { api, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
+import { api, formatPeriodRange, formatThaiDate } from '@/lib/api';
+import { triggerDocumentPrint } from '@/lib/print';
 
 // ชนิดคำขอที่เจ้าหน้าที่ต้องตรวจ (คำขอจองสถานที่ หรือ ขอยืมอุปกรณ์)
 type ReviewRequest = (BookingRequest | BorrowRequest) & RequestWithTimeline;
+
+function formatSignedAt(iso?: string): string | undefined {
+  if (!iso) return undefined;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return undefined;
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${formatThaiDate(iso, true)} เวลา ${hh}:${mm} น.`;
+}
 
 export default function StaffReviewPage() {
   // ดึงข้อมูลบัญชีเจ้าหน้าที่ปัจจุบัน
@@ -46,6 +65,8 @@ export default function StaffReviewPage() {
   const [showOfficialForm, setShowOfficialForm] = useState(true);
   // State บันทึกความเห็น/เหตุผล (กรณีไม่ผ่านหรือเสนอแนะ)
   const [note, setNote] = useState('');
+  // State เปิด/ปิดถาดกรอกเหตุผลกรณีไม่ผ่าน
+  const [rejectDrawerOpen, setRejectDrawerOpen] = useState(false);
   // State ข้อมูลลายเซ็นเจ้าหน้าที่ (Base64)
   const [staffSignature, setStaffSignature] = useState('');
   // State ติ๊กถูกรับรองการตรวจสอบ
@@ -120,12 +141,14 @@ export default function StaffReviewPage() {
   useEffect(() => {
     setStaffSignature(account?.signature || '');
     setOtpStep(false);
+    setRejectDrawerOpen(false);
     setErrorMsg('');
   }, [account?.id, account?.signature, current?.id]);
 
   // ฟังก์ชันกดย้อนกลับไปหน้ารายการคิวงาน
   const handleBackToList = () => {
     setOtpStep(false);
+    setRejectDrawerOpen(false);
     setErrorMsg('');
     setSelectedId(null);
     if (typeof window !== 'undefined' && window.location.search) {
@@ -195,69 +218,15 @@ export default function StaffReviewPage() {
     }
   };
 
+  const isDetailView = Boolean(current && !otpStep);
+
   return (
     <AppShell
-      title={otpStep ? 'ยืนยัน OTP ก่อนลงนาม' : 'ตรวจคำขอ (สถานที่/อุปกรณ์)'}
-      backHref="/staff"
-      onBack={otpStep ? () => setOtpStep(false) : current ? handleBackToList : undefined}
-      rightLabel={account?.nickname || 'สุดา'}
-      maxWidth={current ? 'max-w-[1440px]' : 'max-w-[1100px]'}
-      footer={
-        current && !otpStep ? (
-          <div className="flex w-full sm:w-auto gap-2.5">
-            {(() => {
-              // ตรวจสอบสิทธิ์การลงนามในคำขอนี้
-              const signCheck = canSignRequest(account, current);
-              if (!signCheck.allowed) {
-                return (
-                  <div className="w-full flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-[13px]">
-                    <div className="flex items-center gap-2">
-                      <Icon name="info" className="w-4 h-4 shrink-0 text-amber-600" />
-                      <span>{signCheck.reason || 'คำขอนี้ไม่ได้อยู่ในสถานะที่เจ้าหน้าที่ตรวจสอบสามารถลงนามได้'}</span>
-                    </div>
-                    {current.status === 'pending_l2' && (
-                      <Link href={`/approver/sign/${current.id}`} className="text-brand font-semibold underline shrink-0">
-                        ไปหน้าลงนามระดับปลัด →
-                      </Link>
-                    )}
-                    {current.status === 'pending_l1' && (
-                      <Link href={`/approver/sign/${current.id}`} className="text-brand font-semibold underline shrink-0">
-                        ไปหน้าลงนามระดับนายก →
-                      </Link>
-                    )}
-                  </div>
-                );
-              }
-              return (
-                <>
-                  {/* ปุ่มลงนามไม่ผ่าน */}
-                  <button
-                    type="button"
-                    disabled={submitting || !staffSignature.trim()}
-                    onClick={() => handleStartDecision('reject')}
-                    className="jw-btn-sec border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10 flex-1 sm:min-w-[160px]"
-                  >
-                    ลงนามไม่ผ่าน
-                  </button>
-                  {/* ปุ่มลงนามเห็นชอบและส่งต่อปลัด */}
-                  <button
-                    type="button"
-                    disabled={submitting || !confirmed || !staffSignature.trim()}
-                    onClick={() => handleStartDecision('approve')}
-                    className="jw-btn flex-[1.5] sm:min-w-[220px]"
-                  >
-                    {submitting
-                      ? 'กำลังบันทึก...'
-                      : isSessionVerified
-                        ? 'ลงนามส่งต่อปลัด (มีผลทันที)'
-                        : 'ลงนามและยืนยัน OTP'}
-                  </button>
-                </>
-              );
-            })()}
-          </div>
-        ) : undefined
-      }
+      title={isDetailView ? undefined : otpStep ? 'ยืนยัน OTP ก่อนลงนาม' : 'ตรวจคำขอ (สถานที่/อุปกรณ์)'}
+      backHref={isDetailView ? undefined : '/staff'}
+      onBack={otpStep ? () => setOtpStep(false) : undefined}
+      rightLabel={isDetailView ? undefined : account?.nickname || 'สุดา'}
+      maxWidth={current ? 'max-w-[1280px]' : 'max-w-[1100px]'}
     >
       {/* แบนเนอร์แจ้งผลการดำเนินการล่าสุด */}
       {lastCompleted && (
@@ -272,7 +241,7 @@ export default function StaffReviewPage() {
                   : 'อัปเดตสถานะแล้ว'}
               )
             </b>
-            <span className="text-[12px] text-ink-mute">
+            <span className="text-[12px] text-ink-soft">
               {lastCompleted.status === 'pending_l2'
                 ? 'ลงนามระดับที่ 1 (เจ้าหน้าที่) สำเร็จ เอกสารถูกส่งต่อไปยังคิวของปลัด อบต. (ระดับ 2) แล้ว'
                 : 'บันทึกผลการพิจารณาคำขอเรียบร้อยแล้ว'}
@@ -282,7 +251,7 @@ export default function StaffReviewPage() {
             <button
               type="button"
               onClick={() => setLastCompleted(null)}
-              className="jw-btn-sec jw-btn-sm"
+              className="jw-btn-sec min-h-[44px] px-4 text-[13px]"
             >
               ปิด
             </button>
@@ -292,15 +261,15 @@ export default function StaffReviewPage() {
 
       {/* Alert ข้อความแจ้งเตือนข้อผิดพลาด (ถ้ามี) */}
       {errorMsg && !otpStep && (
-        <div className="mb-4 jw-card bg-red-50 border border-red-200 p-4 flex items-center justify-between gap-3 text-red-700 text-[13px] rounded-2xl animate-fade-in">
+        <div className="mb-4 jw-card bg-danger-bg border border-danger-border p-4 flex items-center justify-between gap-3 text-danger-fg text-[13px]">
           <div className="flex items-center gap-2.5">
-            <Icon name="alert-triangle" className="w-5 h-5 text-red-600 shrink-0" />
+            <Icon name="alert-triangle" className="w-5 h-5 text-danger-fg shrink-0" />
             <span>{errorMsg}</span>
           </div>
           <button
             type="button"
             onClick={() => setErrorMsg('')}
-            className="text-red-500 hover:text-red-800 text-caption font-semibold"
+            className="min-h-[44px] px-2 text-danger-fg hover:underline text-caption font-semibold"
           >
             ปิด
           </button>
@@ -310,15 +279,15 @@ export default function StaffReviewPage() {
       {/* เมื่ออยู่ในขั้นตอนยืนยัน Email OTP */}
       {otpStep && current ? (
         <div className="flex flex-col gap-4 max-w-xl mx-auto">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <button
               type="button"
               onClick={() => setOtpStep(false)}
-              className="text-[13px] font-semibold text-brand hover:underline"
+              className="min-h-[44px] inline-flex items-center text-[13px] font-semibold text-brand hover:underline"
             >
               ← ย้อนกลับไปแก้ไขลายเซ็น
             </button>
-            <span className="text-[12px] text-ink-mute">
+            <span className="text-[12px] text-ink-soft">
               ลงนามฝ่ายที่ 2 จาก 4 · เจ้าหน้าที่ตรวจสอบ (ระดับ 1) · เอกสาร {current.code}
             </span>
           </div>
@@ -336,7 +305,7 @@ export default function StaffReviewPage() {
           />
 
           {errorMsg && (
-            <div className="rounded-2xl bg-[#FDE8E8] border border-[#F9B4B4] px-3.5 py-2 text-[13px] text-[#7A1010]">
+            <div className="rounded-control bg-danger-bg border border-danger-border px-3.5 py-2.5 text-[13px] text-danger-fg">
               {errorMsg}
             </div>
           )}
@@ -351,7 +320,7 @@ export default function StaffReviewPage() {
             </div>
             <Link
               href="/history"
-              className="text-[13px] font-semibold text-ink inline-flex items-center gap-1 hover:underline"
+              className="min-h-[44px] text-[13px] font-semibold text-ink inline-flex items-center gap-1 hover:underline"
             >
               ดูประวัติทั้งหมด <Icon name="chevron-right" className="w-4 h-4" />
             </Link>
@@ -379,23 +348,22 @@ export default function StaffReviewPage() {
                     ? r.periods.map((p) => formatPeriodRange(p)).join(', ')
                     : `${formatThaiDate(r.pickupDate, false)}–${formatThaiDate(r.returnDate, true)}`;
                 return (
-                  <div
+                  <button
                     key={r.id}
+                    type="button"
                     onClick={() => handleSelectRequest(r.id)}
-                    className="jw-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:ring-1 hover:ring-brand transition"
+                    className="jw-card p-4 sm:p-5 w-full text-left flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:ring-1 hover:ring-brand transition"
                   >
                     <div className="min-w-0 flex flex-col gap-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <b className="text-[16px] text-ink">{r.code}</b>
-                        <Chip tone={r.type === 'booking' ? 'blue' : 'teal'}>
-                          {r.type === 'booking' ? 'ขอใช้สถานที่' : 'ยืมอุปกรณ์'}
-                        </Chip>
+                        <RequestTypeChip type={r.type} />
                         <StatusChip status={r.status} />
                       </div>
                       <span className="text-[14px] font-semibold text-ink truncate">
                         {r.title} {r.subtitle ? `(${r.subtitle})` : ''}
                       </span>
-                      <span className="text-[12.5px] text-ink-mute">
+                      <span className="text-[12.5px] text-ink-soft">
                         ผู้ขอ: {r.requesterName} · {r.organization} · วัน-เวลา: {dateInfo}
                       </span>
                     </div>
@@ -403,213 +371,462 @@ export default function StaffReviewPage() {
                       <span>ตรวจคำขอ</span>
                       <Icon name="chevron-right" className="w-4 h-4" />
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
           )}
         </div>
       ) : (
-        /* ===================== หน้ารายละเอียดคำขอ (Detail View) ===================== */
-        <div className="flex flex-col gap-4 sm:gap-5">
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={handleBackToList}
-              className="text-[13px] font-semibold text-brand hover:underline inline-flex items-center gap-1"
-            >
-              ← กลับไปหน้ารายการคำขอ ({queue.length})
-            </button>
-          </div>
+        /* ===================== หน้ารายละเอียดคำขอสำหรับเจ้าหน้าที่ (Detail View) ===================== */
+        (() => {
+          const sigStaff = current.signatures.find((s) => s.level === 'staff');
+          const sigL2 = current.signatures.find((s) => s.level === 'l2');
+          const sigL1 = current.signatures.find((s) => s.level === 'l1');
+          const isFullyApproved =
+            current.status === 'approved' ||
+            current.status === 'borrowing' ||
+            current.status === 'returned';
+          const signCheck = canSignRequest(account, current);
 
-          <div className="flex items-center justify-between">
-            <h1 className="text-[22px] font-bold text-ink">{current.code}</h1>
-            <StatusChip status={current.status} />
-          </div>
+          const resolveStepStatus = (
+            sig: typeof sigStaff,
+            targetPendingStatus: 'pending_staff' | 'pending_l2' | 'pending_l1',
+          ): SigningStepStatus => {
+            if (sig) return sig.decision === 'approve' ? 'signed' : 'rejected';
+            if (current.status === 'cancelled') return 'cancelled';
+            if (current.status === 'rejected') return 'upcoming';
+            if (current.status === targetPendingStatus) return 'current';
+            return 'upcoming';
+          };
 
-          {/* รายละเอียดข้อมูลคำขอ */}
-          <div className="jw-card p-4 sm:p-5 flex flex-col gap-3 text-[14px]">
-            <div className="flex items-start gap-2">
-              <b className="w-24 shrink-0 text-ink">ผู้ยืม/ผู้ขอ</b>
-              <span>
-                {current.requesterName} · {current.organization}
-                {current.requesterPhone ? ` · โทร. ${current.requesterPhone}` : ''}
-              </span>
-            </div>
-            <div className="flex items-start gap-2">
-              <b className="w-24 shrink-0 text-ink">วัตถุประสงค์</b>
-              <span>
-                {current.type === 'booking'
-                  ? `${current.activity || current.purposeItems?.[0]?.forWhat || 'ขอใช้สถานที่'} · ${current.attendees} คน`
-                  : current.purposeItems?.[0]?.forWhat || current.purpose || 'ขอใช้อุปกรณ์'}
-              </span>
-            </div>
-            {current.type === 'borrow' && current.purpose ? (
-              <div className="flex items-start gap-2 bg-amber-50/80 border border-amber-200/80 rounded-xl p-2.5 text-[13.5px] text-amber-950">
-                <b className="w-24 shrink-0 font-semibold text-amber-900">ข้อความถึง จนท.</b>
-                <span className="whitespace-pre-wrap">{current.purpose}</span>
-              </div>
-            ) : null}
-            <div className="flex items-start gap-2">
-              <b className="w-24 shrink-0 text-ink">รายการ</b>
-              <span>
-                {current.title} {current.subtitle ? `(${current.subtitle})` : ''}
-              </span>
-            </div>
-            <div className="flex items-start gap-2">
-              <b className="w-24 shrink-0 text-ink">วัน-เวลา</b>
-              <span>
-                {current.type === 'booking'
-                  ? current.periods.map((p) => formatPeriodRange(p)).join(', ')
-                  : `${formatThaiDate(current.pickupDate, false)}–${formatThaiDate(current.returnDate, true)}`}
-              </span>
-            </div>
-            <div className="flex items-start gap-2">
-              <b className="w-24 shrink-0 text-ink">ไฟล์และเอกสาร</b>
-              <span className="flex flex-wrap items-center gap-2">
-                <span>แบบขอใช้สถานที่ราชการ.pdf</span>
+          const signedCount =
+            1 +
+            (sigStaff?.decision === 'approve' ? 1 : 0) +
+            (sigL2?.decision === 'approve' ? 1 : 0) +
+            (sigL1?.decision === 'approve' ? 1 : 0);
+
+          const waitingStageText =
+            current.status === 'pending_staff'
+              ? 'ขณะนี้รอเจ้าหน้าที่'
+              : current.status === 'pending_l2'
+                ? `ขณะนี้รอ${SIGN_LEVEL_TITLE.l2}`
+                : current.status === 'pending_l1'
+                  ? `ขณะนี้รอ${SIGN_LEVEL_TITLE.l1}`
+                  : current.status === 'cancelled'
+                    ? 'คำขอถูกยกเลิกแล้ว'
+                    : current.status === 'rejected'
+                      ? 'คำขอไม่ได้รับการอนุมัติ'
+                      : 'ลงนามครบถ้วนแล้ว';
+
+          return (
+            <div className="flex flex-col gap-5 min-w-0">
+              {/* ส่วนหัวหน้า: ปุ่มลูกศรกลับ + รหัสคำขอ + ชิปประเภท + ชิปสถานะ อยู่ในแถวเดียวกัน */}
+              <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+                <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+                  <button
+                    type="button"
+                    onClick={handleBackToList}
+                    aria-label="กลับไปหน้ารายการคำขอ"
+                    className="min-w-[44px] min-h-[44px] rounded-control bg-surface border border-line flex items-center justify-center text-ink hover:bg-hover active:scale-95 transition cursor-pointer shrink-0"
+                  >
+                    <ChevronLeft className="size-5" />
+                  </button>
+                  <h1 className="text-[18px] sm:text-[20px] font-bold text-ink leading-tight tracking-tight">
+                    คำขอ {current.code}
+                  </h1>
+                  <RequestTypeChip type={current.type} />
+                  <StatusChip status={current.status} />
+                </div>
                 <button
                   type="button"
-                  onClick={() => setShowOfficialForm((v) => !v)}
-                  className="text-brand font-semibold underline text-[13px]"
+                  onClick={handleBackToList}
+                  className="jw-btn-ter min-h-[44px] px-3 text-[13px] text-brand"
                 >
-                  {showOfficialForm ? 'ซ่อนแบบฟอร์มราชการ' : 'ดูแบบขอใช้สถานที่ราชการ'}
+                  ← กลับไปหน้ารายการคำขอ ({queue.length})
                 </button>
-                <Link
-                  href={`/requests/${current.id}`}
-                  className="text-brand font-semibold underline text-[13px]"
-                >
-                  เปิดดูรายละเอียด / เอกสาร PDF ใบอนุญาต
-                </Link>
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1.15fr)_minmax(420px,0.85fr)] gap-4 sm:gap-5 items-start">
-            <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
-              {/* แบบฟอร์มราชการฉบับเต็ม */}
-              {showOfficialForm && <OfficialGovFormDocument req={current} />}
-
-              {/* รูปภาพและเอกสารแนบประกอบคำขอ (แสดงใต้เอกสาร) */}
-              {Array.isArray(current.attachments) && current.attachments.length > 0 && (
-                <div className="jw-card p-4 flex flex-col gap-2.5">
-                  <b className="text-[14px] text-ink">รูปภาพ / เอกสารแนบประกอบคำขอ</b>
-                  <AttachmentViewer attachments={current.attachments} emptyText="" />
-                </div>
-              )}
-
-              {/* สถานะลายมือชื่อทั้ง 4 ฝ่าย */}
-              <div className="jw-card p-4 flex flex-col gap-2.5">
-                <b className="text-[14px] text-ink">สถานะลายมือชื่อบนเอกสารนี้</b>
-                <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5">
-                  <SignaturePreviewCard
-                    roleLabel="1. ผู้ยื่นคำขอ"
-                    signerName={current.requesterName}
-                    signature={current.requesterSignature}
-                    signedAt={formatThaiDateTime(current.createdAt)}
-                    status="signed"
-                  />
-                  <SignaturePreviewCard
-                    roleLabel="2. เจ้าหน้าที่ (ระดับ 1)"
-                    signerName={account?.name || 'สุดา มีสุข'}
-                    signature={undefined}
-                    status="pending"
-                  />
-                  <SignaturePreviewCard
-                    roleLabel="3. ปลัด อบต. (ระดับ 2)"
-                    signerName="วิชัย รักถิ่น"
-                    signature={undefined}
-                    status="pending"
-                  />
-                  <SignaturePreviewCard
-                    roleLabel="4. นายก อบต. (ระดับ 3)"
-                    signerName="ประเสริฐ ศรีสุข"
-                    signature={undefined}
-                    status="pending"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* แถบขั้นตอนและการลงนามของเจ้าหน้าที่ */}
-            <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
-              <div className="flex flex-col gap-1.5">
-                <div className="flex gap-1.5">
-                  {[1, 2, 3].map((n) => (
-                    <i
-                      key={n}
-                      className={`flex-1 h-1.5 rounded-full block ${
-                        n === 1 ? 'bg-brand-hover' : 'bg-line'
-                      }`}
-                    />
-                  ))}
-                </div>
-                <span className="text-[13px] text-ink-mute">
-                  ลงนามฝ่ายที่ 2 จาก 4 · เจ้าหน้าที่ตรวจสอบ (ระดับ 1)
-                </span>
               </div>
 
-              <div>
-                <label className="jw-lbl">เหตุผล / วันที่เสนอแทน (กรณีไม่ผ่าน)</label>
-                <textarea
-                  rows={2}
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="พิมพ์ข้อความที่จะส่งให้ผู้จองทาง LINE"
-                  className="jw-in h-20 py-2.5"
-                />
-              </div>
-
-              {/* กล่องลายเซ็นของเจ้าหน้าที่ */}
-              <div className="jw-card p-4 flex flex-col gap-3">
-                <label className="jw-lbl">
-                  ลายเซ็นของคุณ ({account?.name || 'สุดา มีสุข'} · {account?.position || 'เจ้าหน้าที่ธุรการ'})
-                </label>
-                <SignatureBox
-                  value={staffSignature}
-                  onChange={setStaffSignature}
-                  savedSignature={account?.signature}
-                  signerLabel={`${account?.name || 'สุดา มีสุข'} · ${account?.position || 'เจ้าหน้าที่ธุรการ'}`}
-                  height={155}
-                  skipPinPrompt
-                />
-
-                <div
-                  onClick={() => setConfirmed((v) => !v)}
-                  className="flex items-start gap-2.5 cursor-pointer select-none pt-1"
-                >
-                  <div
-                    className={`w-[22px] h-[22px] rounded-[6px] border-[1.5px] flex items-center justify-center shrink-0 mt-0.5 ${
-                      confirmed ? 'bg-brand border-brand text-white' : 'bg-white border-[#7A7A7A]'
-                    }`}
-                  >
-                    {confirmed && <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} />}
+              {/* 1) การ์ด "ความคืบหน้าการลงนาม" ไว้บนสุด */}
+              <section className="jw-card p-4 sm:p-5 flex flex-col gap-4 print:hidden">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <h2 className="text-[16px] font-bold text-ink">ความคืบหน้าการลงนาม</h2>
+                    <p className="text-[12.5px] text-ink-soft mt-0.5">
+                      คลิกแต่ละลำดับด้านขวาเพื่อดูหลักฐานลายมือชื่อ หรือดูขั้นตอนที่กำลังรอดำเนินการ
+                    </p>
                   </div>
-                  <span className="text-[13px] text-ink-mute leading-relaxed">
-                    ข้าพเจ้ายืนยันว่าได้ตรวจเอกสารแล้วและลงลายมือชื่อด้วยตนเอง
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12.5px] font-medium bg-surface-muted text-ink-soft border border-line">
+                    <b className="font-bold text-brand">ลงนามแล้ว {signedCount} จาก 4 ฝ่าย</b>
+                    <span className="text-ink-mute">·</span>
+                    <span>{waitingStageText}</span>
                   </span>
                 </div>
+
+                <SigningProgressSpotlight
+                  requestKey={current.id}
+                  steps={[
+                    {
+                      stepNumber: 1,
+                      roleTitle: 'ผู้ยื่นคำขอ',
+                      shortRoleTitle: 'ผู้ยื่นคำขอ',
+                      status: 'signed',
+                      signerName: current.requesterName,
+                      signature: current.requesterSignature,
+                      signedAtText: formatSignedAt(current.createdAt),
+                    },
+                    {
+                      stepNumber: 2,
+                      roleTitle: sigStaff?.title || SIGN_LEVEL_TITLE.staff,
+                      shortRoleTitle: 'เจ้าหน้าที่',
+                      status: resolveStepStatus(sigStaff, 'pending_staff'),
+                      signerName: sigStaff?.signerName || (sigStaff ? account?.name : undefined),
+                      signature: sigStaff?.signature,
+                      signedAtText: formatSignedAt(sigStaff?.at),
+                      hint: 'ตรวจสอบความถูกต้องของข้อมูลคำขอและคิวว่าง',
+                      note: sigStaff?.note,
+                    },
+                    {
+                      stepNumber: 3,
+                      roleTitle: sigL2?.title || SIGN_LEVEL_TITLE.l2,
+                      shortRoleTitle: 'ปลัด อบต.',
+                      status: resolveStepStatus(sigL2, 'pending_l2'),
+                      signerName: sigL2?.signerName,
+                      signature: sigL2?.signature,
+                      signedAtText: formatSignedAt(sigL2?.at),
+                      hint: 'กลั่นกรองและเสนอความเห็นชอบตามระเบียบราชการ',
+                      note: sigL2?.note,
+                    },
+                    {
+                      stepNumber: 4,
+                      roleTitle: sigL1?.title || SIGN_LEVEL_TITLE.l1,
+                      shortRoleTitle: 'นายก อบต.',
+                      status: resolveStepStatus(sigL1, 'pending_l1'),
+                      signerName: sigL1?.signerName,
+                      signature: sigL1?.signature,
+                      signedAtText: formatSignedAt(sigL1?.at),
+                      hint: 'พิจารณาอนุมัติคำขอขั้นสุดท้าย',
+                      note: sigL1?.note,
+                    },
+                    {
+                      stepNumber: 5,
+                      roleTitle: 'ออกเอกสาร PDF และแจ้งผล',
+                      shortRoleTitle: 'ออกใบอนุญาต PDF',
+                      status: isFullyApproved ? 'system_ready' : 'system_pending',
+                      systemNote: 'ออกโดยระบบเมื่อลงนามครบทั้ง 4 ฝ่าย',
+                      actionHref: isFullyApproved ? `/approver/permit/${current.id}` : undefined,
+                      actionLabel: isFullyApproved ? 'เปิดดูใบอนุญาต (PDF)' : undefined,
+                    },
+                  ]}
+                />
+              </section>
+
+              {/* 2) เนื้อหาหลัก 2 คอลัมน์ (มือถือ: ขวาขึ้นก่อนซ้าย) */}
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px] gap-5 items-start min-w-0">
+                {/* คอลัมน์ซ้าย: เอกสารราชการ + รูปภาพ/เอกสารแนบ + ตรวจสอบและลงนาม */}
+                <div className="order-2 lg:order-1 min-w-0 flex flex-col gap-5">
+                  <section className="flex flex-col gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 px-1 print:hidden">
+                      <h2 className="text-[16px] font-bold text-ink">
+                        {current.type === 'booking'
+                          ? 'เอกสารราชการ: แบบขอใช้สถานที่ราชการ'
+                          : 'เอกสารราชการ: แบบคำขอใช้อุปกรณ์ราชการ'}
+                      </h2>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {showOfficialForm && (
+                          <button
+                            type="button"
+                            onClick={() => triggerDocumentPrint()}
+                            className="jw-btn-sec min-h-[44px] px-3.5 text-[13px]"
+                          >
+                            พิมพ์แบบฟอร์ม / PDF
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setShowOfficialForm((v) => !v)}
+                          className="jw-btn-ter min-h-[44px] px-3 text-[13px] text-brand"
+                        >
+                          {showOfficialForm ? 'ซ่อนแบบฟอร์มราชการ' : 'แสดงแบบฟอร์มราชการเต็มใบ'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {showOfficialForm && (
+                      <div className="w-full text-[17px] leading-[1.7]">
+                        <OfficialGovFormDocument req={current} />
+                      </div>
+                    )}
+                  </section>
+
+                  {/* รูปภาพและเอกสารแนบประกอบคำขอ */}
+                  {Array.isArray(current.attachments) && current.attachments.length > 0 && (
+                    <section className="jw-card p-4 sm:p-5 flex flex-col gap-2.5 print:hidden">
+                      <AttachmentViewer
+                        attachments={current.attachments}
+                        emptyText=""
+                        title="รูปภาพ / เอกสารแนบประกอบคำขอ"
+                      />
+                    </section>
+                  )}
+
+                  {/* การ์ดตรวจสอบและลงนามของเจ้าหน้าที่ (ต่อท้ายรูปภาพ/เอกสารแนบ) */}
+                  {!signCheck.allowed ? (
+                    <section className="jw-card p-4 sm:p-5 flex flex-col gap-3 print:hidden">
+                      <div className="flex items-start gap-2 p-3 bg-warn-bg/60 border border-warn-border rounded-control text-warn-fg text-[13px]">
+                        <Icon name="info" className="w-4 h-4 shrink-0 mt-0.5" />
+                        <span>{signCheck.reason || 'คำขอนี้ไม่ได้อยู่ในสถานะที่เจ้าหน้าที่ตรวจสอบสามารถลงนามได้'}</span>
+                      </div>
+                      {current.status === 'pending_l2' && (
+                        <Link href={`/approver/sign/${current.id}`} className="jw-btn-sec w-full">
+                          ไปหน้าลงนามระดับปลัด →
+                        </Link>
+                      )}
+                      {current.status === 'pending_l1' && (
+                        <Link href={`/approver/sign/${current.id}`} className="jw-btn-sec w-full">
+                          ไปหน้าลงนามระดับนายก →
+                        </Link>
+                      )}
+                      <button type="button" onClick={handleBackToList} className="jw-btn w-full">
+                        กลับ
+                      </button>
+                    </section>
+                  ) : (
+                    <section className="jw-card overflow-hidden flex flex-col print:hidden">
+                      {/* แถบหัวเรื่องสีเขียวอ่อน (Top Accent Header) */}
+                      <div className="px-4 sm:px-5 py-3.5 bg-brand-tint/65 border-b border-brand/20 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <PenLine className="size-4 text-brand shrink-0" />
+                          <b className="text-[14.5px] sm:text-[15.5px] text-ink truncate">
+                            กระดานลงลายมือชื่ออิเล็กทรอนิกส์ · {account?.name || 'สุดา มีสุข'} (
+                            {account?.position || 'เจ้าหน้าที่ธุรการ'})
+                          </b>
+                        </div>
+                        <span className="text-[12px] font-semibold text-brand shrink-0">
+                          ฝ่ายที่ 2 จาก 4 · ระดับ 1
+                        </span>
+                      </div>
+
+                      <div className="p-4 sm:p-5 flex flex-col gap-4">
+                        {/* Extra-Tall 280px Touchscreen Signature Stage */}
+                        <SignatureBox
+                          value={staffSignature}
+                          onChange={setStaffSignature}
+                          savedSignature={account?.signature}
+                          signerLabel={`${account?.name || 'สุดา มีสุข'} · ${account?.position || 'เจ้าหน้าที่ธุรการ'}`}
+                          height={280}
+                          skipPinPrompt
+                          floatingToolbar
+                          hideTopLabel
+                        />
+
+                        {/* เช็คบ็อกซ์ยืนยันความรับผิดชอบ */}
+                        <button
+                          type="button"
+                          onClick={() => setConfirmed((v) => !v)}
+                          className="flex items-start gap-2.5 text-left cursor-pointer select-none"
+                        >
+                          <span
+                            className={`w-[22px] h-[22px] rounded-[6px] border-[1.5px] flex items-center justify-center shrink-0 mt-0.5 ${
+                              confirmed ? 'bg-brand border-brand text-white' : 'bg-surface border-line-input'
+                            }`}
+                          >
+                            {confirmed && <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} />}
+                          </span>
+                          <span className="text-[13.5px] text-ink-soft leading-relaxed">
+                            ข้าพเจ้ายืนยันว่าได้ตรวจเอกสารแล้วและลงลายมือชื่อด้วยตนเอง
+                          </span>
+                        </button>
+
+                        {/* ถาดกรอกเหตุผลกรณีไม่ผ่าน (แสดงเฉพาะเมื่อกดปุ่ม "ลงนามไม่ผ่าน...") */}
+                        {rejectDrawerOpen && (
+                          <div className="rounded-control border border-danger-border bg-danger-bg/35 p-4 flex flex-col gap-2.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <label className="text-[13px] font-bold text-danger-fg">
+                                ระบุเหตุผลที่ไม่ผ่าน / วันที่เสนอแทน (ส่งแจ้งผู้ขอทาง LINE)
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => setRejectDrawerOpen(false)}
+                                className="text-[12px] font-medium text-ink-soft hover:text-ink cursor-pointer"
+                              >
+                                ยกเลิก ✕
+                              </button>
+                            </div>
+                            <textarea
+                              rows={2}
+                              value={note}
+                              onChange={(e) => setNote(e.target.value)}
+                              placeholder="พิมพ์เหตุผลหรือข้อเสนอแนะที่จะส่งให้ผู้จอง..."
+                              className="jw-in h-20 py-2.5 bg-surface"
+                            />
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setRejectDrawerOpen(false)}
+                                className="jw-btn-sec !min-h-[38px] px-3.5 text-[12.5px]"
+                              >
+                                ปิดถาดนี้
+                              </button>
+                              <button
+                                type="button"
+                                disabled={submitting || !staffSignature.trim()}
+                                onClick={() => handleStartDecision('reject')}
+                                className="min-h-[38px] px-4 rounded-control bg-danger-solid text-white text-[12.5px] font-semibold hover:opacity-95 disabled:opacity-40 transition cursor-pointer"
+                              >
+                                ยืนยันลงนามไม่ผ่าน
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* แถบปุ่มกดขนาดใหญ่สัดส่วน 3 : 3 : 6 */}
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 pt-1">
+                          <button
+                            type="button"
+                            onClick={handleBackToList}
+                            className="sm:col-span-3 jw-btn-sec w-full text-[13.5px]"
+                          >
+                            ← กลับหน้ารายการ
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setRejectDrawerOpen((v) => !v)}
+                            className={`sm:col-span-3 min-h-[44px] px-4 rounded-control border text-[13.5px] font-semibold transition cursor-pointer ${
+                              rejectDrawerOpen
+                                ? 'border-danger-border bg-danger-bg text-danger-fg'
+                                : 'border-danger-border/70 bg-surface text-danger-fg hover:bg-danger-bg/40'
+                            }`}
+                          >
+                            ลงนามไม่ผ่าน...
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={submitting || !confirmed || !staffSignature.trim()}
+                            onClick={() => handleStartDecision('approve')}
+                            className="sm:col-span-6 jw-btn w-full text-[14px] font-bold inline-flex items-center justify-center gap-2"
+                          >
+                            <span>
+                              {submitting
+                                ? 'กำลังบันทึก...'
+                                : isSessionVerified
+                                  ? 'ลงนามส่งต่อปลัด (มีผลทันที)'
+                                  : 'ลงนามและยืนยัน OTP'}
+                            </span>
+                            <ArrowRight className="size-4 shrink-0" />
+                          </button>
+                        </div>
+                      </div>
+                    </section>
+                  )}
+                </div>
+
+                {/* คอลัมน์ขวา (กว้างสุด 400px): สรุปคำขอ */}
+                <div className="order-1 lg:order-2 min-w-0 flex flex-col gap-4 lg:sticky lg:top-6 print:hidden">
+                  {/* การ์ดสรุปคำขอ */}
+                  <section className="jw-card p-4 sm:p-5 flex flex-col gap-3.5">
+                    <h2 className="text-[16px] font-bold text-ink">สรุปคำขอ</h2>
+
+                    <dl className="grid grid-cols-[96px_minmax(0,1fr)] gap-y-2.5 gap-x-3 text-[14px] items-baseline">
+                      <dt className="font-semibold text-ink-soft">เลขคำขอ</dt>
+                      <dd className="font-semibold text-ink break-words">{current.code}</dd>
+
+                      <dt className="font-semibold text-ink-soft">ประเภท</dt>
+                      <dd>
+                        <RequestTypeChip type={current.type} />
+                      </dd>
+
+                      <dt className="font-semibold text-ink-soft">รายการ</dt>
+                      <dd className="font-semibold text-ink break-words">
+                        {current.title} {current.subtitle ? `(${current.subtitle})` : ''}
+                      </dd>
+
+                      <dt className="font-semibold text-ink-soft">
+                        {current.type === 'booking' ? 'วัน-เวลา' : 'ช่วงขอใช้'}
+                      </dt>
+                      <dd className="text-ink">
+                        {current.type === 'booking'
+                          ? current.periods.map((p) => formatPeriodRange(p)).join(', ')
+                          : `${formatThaiDate(current.pickupDate, false)}–${formatThaiDate(current.returnDate, true)}`}
+                      </dd>
+
+                      <dt className="font-semibold text-ink-soft">วัตถุประสงค์</dt>
+                      <dd className="text-ink break-words">
+                        {current.type === 'booking'
+                          ? `${current.activity || current.purposeItems?.[0]?.forWhat || 'ขอใช้สถานที่'} · ${current.attendees} คน`
+                          : current.purposeItems?.[0]?.forWhat || current.purpose || 'ขอใช้อุปกรณ์'}
+                      </dd>
+
+                      <dt className="font-semibold text-ink-soft">ผู้ยืม/ผู้ขอ</dt>
+                      <dd className="text-ink break-words">{current.requesterName}</dd>
+
+                      <dt className="font-semibold text-ink-soft">หน่วยงาน</dt>
+                      <dd className="text-ink break-words">{current.organization || '-'}</dd>
+
+                      {current.requesterPhone && (
+                        <>
+                          <dt className="font-semibold text-ink-soft">โทรศัพท์</dt>
+                          <dd>
+                            <a
+                              href={`tel:${current.requesterPhone}`}
+                              className="inline-flex items-center min-h-[44px] -my-2 text-brand font-semibold hover:underline"
+                            >
+                              {current.requesterPhone}
+                            </a>
+                          </dd>
+                        </>
+                      )}
+                    </dl>
+
+                    {current.purpose ? (
+                      <div className="flex flex-col gap-1 bg-warn-bg/60 border border-warn-border rounded-control p-3 text-[13px] text-warn-fg">
+                        <b className="font-semibold">ข้อความถึง จนท.</b>
+                        <span className="whitespace-pre-wrap leading-relaxed">{current.purpose}</span>
+                      </div>
+                    ) : null}
+
+                    <div className="flex items-start gap-2.5 pt-2 border-t border-line text-[13px]">
+                      <FileText className="size-4 text-ink-soft shrink-0 mt-0.5" />
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="font-semibold text-ink break-all">คำขอ_{current.code}.pdf</span>
+                        {isFullyApproved ? (
+                          <Link
+                            href={`/approver/permit/${current.id}`}
+                            className="inline-flex items-center min-h-[44px] -my-1 underline text-brand font-semibold"
+                          >
+                            เปิดดูใบอนุญาต (PDF)
+                          </Link>
+                        ) : (
+                          <span className="text-ink-soft text-[12px]">(ออกใบอนุญาตเมื่อลงนามครบทั้ง 4 ฝ่าย)</span>
+                        )}
+                      </div>
+                    </div>
+                  </section>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
+          );
+        })()
       )}
 
       {/* Modal ยืนยันรหัส PIN 6 หลักเพื่อลงนาม */}
       {showPinModal && current && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-[420px] bg-white rounded-hard p-6 flex flex-col items-center gap-4 shadow-md">
+        <div className="fixed inset-0 bg-ink/50 flex items-center justify-center p-4 z-50">
+          <div className="w-full max-w-[420px] bg-surface rounded-card border border-line p-6 flex flex-col items-center gap-4 shadow-pop">
             <div className="w-full flex items-center justify-between">
               <div>
                 <b className="text-[16px] text-ink block">ยืนยันรหัส PIN 6 หลักเพื่อลงนาม</b>
-                <span className="text-[12px] text-ink-mute">
+                <span className="text-[12px] text-ink-soft">
                   คำขอ {current.code} · {pendingDecision === 'approve' ? 'ลงนามเห็นชอบ (ส่งต่อปลัด อบต.)' : 'ลงนามไม่เห็นชอบ/ไม่ผ่าน'}
                 </span>
               </div>
               <button
                 type="button"
+                aria-label="ปิดหน้าต่าง PIN"
                 onClick={() => setShowPinModal(false)}
-                className="text-ink-mute hover:text-ink"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center text-ink-soft hover:text-ink"
               >
                 <Icon name="x" className="w-5 h-5" />
               </button>
@@ -623,7 +840,7 @@ export default function StaffReviewPage() {
             />
 
             {pinError && (
-              <div className="w-full rounded-2xl bg-[#FDE8E8] border border-[#f9b4b4] px-3.5 py-2 text-[13px] text-[#7a1010] text-center">
+              <div className="w-full rounded-control bg-danger-bg border border-danger-border px-3.5 py-2 text-[13px] text-danger-fg text-center">
                 {pinError}
               </div>
             )}

@@ -17,16 +17,58 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { ChevronLeft } from 'lucide-react';
 import { RepairRequest, RequestWithTimeline } from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
 import {
   Chip,
+  ChipTone,
   PinKeypad,
   StatusChip,
+  statusToTone,
 } from '@/components/ui';
 import { api, formatThaiDateTime, readAndCompressImages } from '@/lib/api';
+
+/**
+ * เปรียบเทียบข้อความ "ปัญหา/อาการ" กับ "รายละเอียด"
+ * - หากเหมือนกัน หรืออันหนึ่งเป็นฉบับตัดย่อของอีกอัน ให้แสดงเฉพาะข้อความที่ครบกว่าเพียงอันเดียว
+ * - หากต่างกันจริง ให้แสดงทั้งหัวข้อและรายละเอียดรอง
+ */
+function resolveProblemAndDetail(title: string, detail?: string): {
+  heading: string;
+  subDetail: string | null;
+} {
+  const t = (title || '').trim();
+  const d = (detail || '').trim();
+  if (!d || d === '-') {
+    return { heading: t || '-', subDetail: null };
+  }
+  if (!t) {
+    return { heading: d, subDetail: null };
+  }
+  if (t === d) {
+    return { heading: t, subDetail: null };
+  }
+  const tBase = t.replace(/(\.\.\.|…)+$/, '').trim();
+  const dBase = d.replace(/(\.\.\.|…)+$/, '').trim();
+  if (tBase.length >= 4 && d.includes(tBase) && d.length >= t.length) {
+    return { heading: d, subDetail: null };
+  }
+  if (dBase.length >= 4 && t.includes(dBase) && t.length >= d.length) {
+    return { heading: t, subDetail: null };
+  }
+  return { heading: t, subDetail: d };
+}
+
+function getOfficerInitial(name?: string): string {
+  const cleaned = (name || '')
+    .trim()
+    .replace(/^(นางสาว|นาง|นาย|ด\.ช\.|ด\.ญ\.|ว่าที่\s*ร\.ต\.|จ\.ส\.อ\.|ส\.อ\.)\s*/, '');
+  const chars = Array.from(cleaned || name || 'จ');
+  return chars[0] || 'จ';
+}
 
 export default function StaffRepairsPage() {
   // ดึงข้อมูลบัญชีเจ้าหน้าที่ผู้ใช้งาน
@@ -221,56 +263,14 @@ export default function StaffRepairsPage() {
     }
   };
 
+  const userDisplayChip = account?.nickname || account?.name || 'เจ้าหน้าที่';
+
   return (
     <AppShell
-      title="จัดการงานซ่อมและปัญหา"
-      backHref="/staff"
-      onBack={current ? handleBackToList : undefined}
-      rightLabel={account?.nickname || 'เจ้าหน้าที่'}
-      maxWidth={current ? 'max-w-[1440px]' : 'max-w-[1100px]'}
-      footer={
-        current ? (
-          <div className="flex w-full sm:w-auto gap-2.5">
-            {current.status === 'repair_submitted' ? (
-              <>
-                {/* ปุ่มส่งกลับ / ไม่รับเรื่อง */}
-                <button
-                  type="button"
-                  disabled={submitting}
-                  onClick={() => handleStartAction('reject')}
-                  className="jw-btn-sec border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10 flex-1 sm:min-w-[170px]"
-                >
-                  ส่งกลับ / ไม่รับเรื่อง
-                </button>
-                {/* ปุ่มรับเรื่องซ่อม */}
-                <button
-                  type="button"
-                  disabled={submitting || !confirmed}
-                  onClick={() => handleStartAction('accept')}
-                  className="jw-btn flex-[1.5] sm:min-w-[230px]"
-                >
-                  {submitting ? 'กำลังบันทึก...' : 'รับเรื่องซ่อม (เริ่มดำเนินการ)'}
-                </button>
-              </>
-            ) : current.status === 'repair_in_progress' ? (
-              /* ปุ่มบันทึกซ่อมเสร็จ */
-              <button
-                type="button"
-                disabled={submitting || !confirmed || !resolution.trim() || afterPhotos.length === 0}
-                onClick={() => handleStartAction('finish')}
-                className="jw-btn w-full sm:w-72"
-              >
-                {submitting ? 'กำลังบันทึก...' : 'บันทึกซ่อมเสร็จ (ส่งตรวจรับ)'}
-              </button>
-            ) : (
-              <div className="text-[13px] text-ink-mute flex items-center gap-2">
-                <Icon name="check" className="w-4 h-4 text-brand" />
-                <span>งานซ่อมนี้ดำเนินการเรียบร้อยแล้ว ({current.status === 'repair_done' ? 'ตรวจรับเสร็จสิ้น' : 'รอผู้แจ้งตรวจรับงาน'})</span>
-              </div>
-            )}
-          </div>
-        ) : undefined
-      }
+      title={current ? undefined : 'จัดการงานซ่อมและปัญหา'}
+      backHref={current ? undefined : '/staff'}
+      rightLabel={current ? undefined : userDisplayChip}
+      maxWidth={current ? 'max-w-[1080px]' : 'max-w-[1100px]'}
     >
       {/* แบนเนอร์แจ้งผลการดำเนินการล่าสุด */}
       {lastCompleted && (
@@ -279,7 +279,7 @@ export default function StaffRepairsPage() {
             <b className="text-[14px] text-ink block">
               บันทึกงานซ่อม {lastCompleted.code} เรียบร้อยแล้ว
             </b>
-            <span className="text-[12px] text-ink-mute">
+            <span className="text-[12px] text-ink-soft">
               {lastCompleted.status === 'repair_in_progress'
                 ? 'รับเรื่องเรียบร้อย สถานะเปลี่ยนเป็น "กำลังดำเนินการ"'
                 : lastCompleted.status === 'repair_awaiting_acceptance'
@@ -293,7 +293,7 @@ export default function StaffRepairsPage() {
             <button
               type="button"
               onClick={() => setLastCompleted(null)}
-              className="jw-btn-sec jw-btn-sm"
+              className="jw-btn-sec min-h-[44px] px-4 text-[13px]"
             >
               ปิด
             </button>
@@ -302,7 +302,7 @@ export default function StaffRepairsPage() {
       )}
 
       {errorMsg && (
-        <div className="mb-4 rounded-2xl bg-[#FDE8E8] border border-[#F9B4B4] px-4 py-2.5 text-[13px] text-[#7A1010]">
+        <div className="mb-4 rounded-control bg-danger-bg border border-danger-border px-4 py-3 text-[13px] text-danger-fg font-medium">
           {errorMsg}
         </div>
       )}
@@ -317,7 +317,7 @@ export default function StaffRepairsPage() {
             </div>
             <Link
               href="/history"
-              className="text-[13px] font-semibold text-ink inline-flex items-center gap-1 hover:underline"
+              className="min-h-[44px] text-[13px] font-semibold text-ink inline-flex items-center gap-1 hover:underline"
             >
               ดูประวัติทั้งหมด <Icon name="chevron-right" className="w-4 h-4" />
             </Link>
@@ -340,10 +340,11 @@ export default function StaffRepairsPage() {
           ) : (
             <div className="flex flex-col gap-3">
               {queue.map((r) => (
-                <div
+                <button
                   key={r.id}
+                  type="button"
                   onClick={() => handleSelectRepair(r.id)}
-                  className="jw-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:ring-1 hover:ring-brand transition"
+                  className="jw-card p-4 sm:p-5 w-full text-left flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:ring-1 hover:ring-brand transition"
                 >
                   <div className="min-w-0 flex flex-col gap-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -354,7 +355,7 @@ export default function StaffRepairsPage() {
                     <span className="text-[14px] font-semibold text-ink truncate">
                       {r.building} · {r.floor} · {r.location} — {r.title}
                     </span>
-                    <span className="text-[12.5px] text-ink-mute">
+                    <span className="text-[12.5px] text-ink-soft">
                       ผู้แจ้ง: {r.requesterName} · {r.organization} · แจ้งเมื่อ {formatThaiDateTime(r.createdAt)}
                     </span>
                   </div>
@@ -362,322 +363,648 @@ export default function StaffRepairsPage() {
                     <span>{r.status === 'repair_in_progress' ? 'บันทึกผลการซ่อม' : 'จัดการงานซ่อม'}</span>
                     <Icon name="chevron-right" className="w-4 h-4" />
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
         </div>
       ) : (
-        /* ===================== หน้ารายละเอียดงานซ่อม (Detail View) ===================== */
-        <div className="flex flex-col gap-4 sm:gap-5">
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={handleBackToList}
-              className="text-[13px] font-semibold text-brand hover:underline inline-flex items-center gap-1"
-            >
-              ← กลับไปหน้ารายการงานซ่อม ({queue.length})
-            </button>
-          </div>
+        /* ===================== หน้ารายละเอียดงานซ่อม แบบ B (Detail View) ===================== */
+        (() => {
+          const officerName = current.staffSignerName || account?.name || 'เจ้าหน้าที่';
+          const officerRole = account?.role || 'STAFF';
+          const officerInitial = getOfficerInitial(officerName);
 
-          <div className="flex items-center justify-between">
-            <h1 className="text-[22px] font-bold text-ink">{current.code}</h1>
-            <StatusChip status={current.status} />
-          </div>
+          const heroHeading =
+            current.status === 'repair_submitted'
+              ? 'รอช่างรับเรื่อง'
+              : current.status === 'repair_in_progress'
+                ? 'กำลังดำเนินการ'
+                : current.status === 'repair_awaiting_acceptance'
+                  ? 'รอผู้แจ้งตรวจรับงาน'
+                  : current.status === 'repair_done'
+                    ? 'ตรวจรับเรียบร้อย'
+                    : current.status === 'rejected'
+                      ? 'ส่งกลับ / ไม่รับเรื่อง'
+                      : 'ยกเลิกแล้ว';
 
-          {/* รายละเอียดปัญหาที่แจ้ง */}
-          <div className="jw-card p-4 sm:p-5 flex flex-col gap-3 text-[14px]">
-            <div className="flex items-start gap-2">
-              <b className="w-24 shrink-0 text-ink">ผู้แจ้งซ่อม</b>
-              <span>
-                {current.requesterName} · {current.organization}
-                {current.requesterPhone ? ` · โทร. ${current.requesterPhone}` : ''}
-              </span>
-            </div>
-            <div className="flex items-start gap-2">
-              <b className="w-24 shrink-0 text-ink">สถานที่/อาคาร</b>
-              <span>
-                {current.building} · {current.floor} · {current.location}
-              </span>
-            </div>
-            <div className="flex items-start gap-2">
-              <b className="w-24 shrink-0 text-ink">ปัญหา/อาการ</b>
-              <span className="font-semibold text-ink">{current.title}</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <b className="w-24 shrink-0 text-ink">รายละเอียด</b>
-              <span className="text-ink-mute whitespace-pre-wrap">{current.detail || '-'}</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <b className="w-24 shrink-0 text-ink">วันที่แจ้ง</b>
-              <span>{formatThaiDateTime(current.createdAt)}</span>
-            </div>
-            {current.attachments && current.attachments.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <b className="text-ink">รูปภาพประกอบการแจ้งซ่อม ({current.attachments.length} รูป)</b>
-                <div className="flex flex-wrap gap-2.5">
-                  {current.attachments.map((url, i) => (
-                    <a
-                      key={i}
-                      href={url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block w-24 h-24 rounded-xl border border-line overflow-hidden hover:opacity-90 transition"
+          // ขั้นตอน 3 ขั้นจากข้อมูลจริง อ้างอิงโทนสีผ่าน statusToTone() ของโปรเจกต์
+          type StepNodeState = 'done' | 'current' | 'upcoming' | 'rejected';
+          const step2State: StepNodeState = current.finishedAt
+            ? 'done'
+            : current.status === 'rejected'
+              ? 'rejected'
+              : current.status === 'cancelled'
+                ? 'upcoming'
+                : 'current';
+
+          const step2Tone: ChipTone = current.finishedAt
+            ? statusToTone('repair_done')
+            : current.status === 'rejected'
+              ? statusToTone('rejected')
+              : current.acceptedAt
+                ? statusToTone('repair_in_progress')
+                : statusToTone('repair_submitted');
+
+          const step3State: StepNodeState =
+            current.status === 'repair_done'
+              ? 'done'
+              : current.status === 'repair_awaiting_acceptance'
+                ? 'current'
+                : 'upcoming';
+
+          const step3Tone: ChipTone =
+            current.status === 'repair_done'
+              ? statusToTone('repair_done')
+              : current.status === 'repair_awaiting_acceptance'
+                ? statusToTone('repair_awaiting_acceptance')
+                : 'gray';
+
+          const steps: {
+            num: number;
+            roleLabel: string;
+            personName: string;
+            dateText: string;
+            statusText: string;
+            nodeState: StepNodeState;
+            tone: ChipTone;
+          }[] = [
+            {
+              num: 1,
+              roleLabel: '1. ผู้แจ้งส่งเรื่อง',
+              personName: current.requesterName,
+              dateText: formatThaiDateTime(current.createdAt),
+              statusText: '✓ ส่งเรื่องแล้ว',
+              nodeState: 'done',
+              tone: statusToTone('repair_done'),
+            },
+            {
+              num: 2,
+              roleLabel: '2. เจ้าหน้าที่รับเรื่อง & ซ่อม',
+              personName: current.staffSignerName || account?.name || 'ฝ่ายช่างซ่อมบำรุง',
+              dateText: current.finishedAt
+                ? `เสร็จ: ${formatThaiDateTime(current.finishedAt)}`
+                : current.acceptedAt
+                  ? `รับเรื่อง: ${formatThaiDateTime(current.acceptedAt)}`
+                  : 'รอดำเนินการ',
+              statusText: current.finishedAt
+                ? '✓ ซ่อมเสร็จแล้ว'
+                : current.status === 'rejected'
+                  ? '✕ ส่งกลับ / ไม่รับเรื่อง'
+                  : current.acceptedAt
+                    ? '● กำลังดำเนินการ'
+                    : '● รอช่างรับเรื่อง',
+              nodeState: step2State,
+              tone: step2Tone,
+            },
+            {
+              num: 3,
+              roleLabel: '3. ผู้แจ้งตรวจรับงาน',
+              personName: current.requesterName,
+              dateText: current.acceptedByRequesterAt
+                ? formatThaiDateTime(current.acceptedByRequesterAt)
+                : '-',
+              statusText:
+                current.status === 'repair_done'
+                  ? '✓ ตรวจรับเรียบร้อย'
+                  : current.status === 'repair_awaiting_acceptance'
+                    ? '● รอคุณตรวจรับ'
+                    : '○ รอซ่อมเสร็จ',
+              nodeState: step3State,
+              tone: step3Tone,
+            },
+          ];
+
+          const nodeClasses = (state: StepNodeState, tone: ChipTone) => {
+            if (state === 'done') {
+              return 'bg-ok-bg text-ok-fg ring-2 ring-ok-border';
+            }
+            if (state === 'rejected') {
+              return 'bg-danger-bg text-danger-fg ring-2 ring-danger-border';
+            }
+            if (state === 'current') {
+              return tone === 'info'
+                ? 'bg-info-bg text-info-fg ring-2 ring-info-border'
+                : 'bg-warn-bg text-warn-fg ring-2 ring-warn-border';
+            }
+            return 'bg-transparent text-white border-2 border-white/70';
+          };
+
+          const { heading: problemHeading, subDetail: problemSubDetail } = resolveProblemAndDetail(
+            current.title,
+            current.detail,
+          );
+          const attachments = Array.isArray(current.attachments) ? current.attachments : [];
+          const locationFull = [current.building, current.floor, current.location]
+            .filter(Boolean)
+            .join(' · ');
+
+          return (
+            <div className="flex flex-col gap-5 min-w-0">
+              {/* 1) แถวหัวหน้า (ใช้ div เพื่อไม่ให้ชนกฎ .gov-brand-shell header) */}
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0">
+                  <button
+                    type="button"
+                    onClick={handleBackToList}
+                    aria-label="กลับไปหน้ารายการงานซ่อม"
+                    className="min-w-[44px] min-h-[44px] rounded-control bg-surface border border-line flex items-center justify-center text-ink hover:bg-hover active:scale-95 transition cursor-pointer shrink-0 mt-0.5"
+                  >
+                    <ChevronLeft className="size-5" />
+                  </button>
+                  <div className="flex flex-col min-w-0">
+                    <h1 className="text-[18px] sm:text-[21px] font-bold text-ink leading-tight tracking-tight">
+                      จัดการงานซ่อมและปัญหา
+                    </h1>
+                    <button
+                      type="button"
+                      onClick={handleBackToList}
+                      className="min-h-[44px] -my-1.5 w-fit inline-flex items-center text-[13px] font-semibold text-brand hover:underline cursor-pointer"
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt={`รูปปัญหาที่ ${i + 1}`} className="w-full h-full object-cover" />
-                    </a>
-                  ))}
+                      ← กลับไปหน้ารายการงานซ่อม ({queue.length})
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
 
-          <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1.15fr)_minmax(420px,0.85fr)] gap-4 sm:gap-5 items-start">
-            {/* ซ้าย: ความคืบหน้า 3 ขั้นตอน */}
-            <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
-              <div className="jw-card p-4 flex flex-col gap-2.5">
-                <b className="text-[14px] text-ink">ความคืบหน้าการดำเนินงาน (3 ขั้นตอน)</b>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                  <div className="p-3 rounded-2xl bg-canvas border border-line flex flex-col gap-1">
-                    <span className="text-[12px] font-semibold text-ink-mute">1. ผู้แจ้งส่งเรื่อง</span>
-                    <span className="text-[13.5px] font-bold text-ink">{current.requesterName}</span>
-                    <span className="text-[12px] text-ink-mute">{formatThaiDateTime(current.createdAt)}</span>
-                    <span className="inline-flex items-center gap-1 text-[12px] font-medium text-brand mt-1">✓ ส่งเรื่องแล้ว</span>
-                  </div>
-                  <div className="p-3 rounded-2xl bg-canvas border border-line flex flex-col gap-1">
-                    <span className="text-[12px] font-semibold text-ink-mute">2. เจ้าหน้าที่รับเรื่อง & ซ่อม</span>
-                    <span className="text-[13.5px] font-bold text-ink">{current.staffSignerName || account?.name || 'ฝ่ายช่างซ่อมบำรุง'}</span>
-                    <span className="text-[12px] text-ink-mute">
-                      {current.finishedAt
-                        ? `เสร็จ: ${formatThaiDateTime(current.finishedAt)}`
-                        : current.acceptedAt
-                          ? `รับเรื่อง: ${formatThaiDateTime(current.acceptedAt)}`
-                          : 'รอดำเนินการ'}
-                    </span>
-                    <span
-                      className={`inline-flex items-center gap-1 text-[12px] font-medium mt-1 ${
-                        current.finishedAt
-                          ? 'text-brand'
-                          : current.acceptedAt
-                            ? 'text-amber-600'
-                            : 'text-ink-mute'
-                      }`}
-                    >
-                      {current.finishedAt ? '✓ ซ่อมเสร็จแล้ว' : current.acceptedAt ? '⟳ กำลังดำเนินการ' : '○ รอช่างรับเรื่อง'}
-                    </span>
-                  </div>
-                  <div className="p-3 rounded-2xl bg-canvas border border-line flex flex-col gap-1">
-                    <span className="text-[12px] font-semibold text-ink-mute">3. ผู้แจ้งตรวจรับงาน</span>
-                    <span className="text-[13.5px] font-bold text-ink">{current.requesterName}</span>
-                    <span className="text-[12px] text-ink-mute">
-                      {current.acceptedByRequesterAt ? formatThaiDateTime(current.acceptedByRequesterAt) : '-'}
-                    </span>
-                    <span
-                      className={`inline-flex items-center gap-1 text-[12px] font-medium mt-1 ${
-                        current.status === 'repair_done'
-                          ? 'text-brand'
-                          : current.status === 'repair_awaiting_acceptance'
-                            ? 'text-amber-600'
-                            : 'text-ink-mute'
-                      }`}
-                    >
-                      {current.status === 'repair_done'
-                        ? '✓ ตรวจรับเรียบร้อย'
-                        : current.status === 'repair_awaiting_acceptance'
-                          ? '⟳ รอคุณตรวจรับ'
-                          : '○ รอซ่อมเสร็จ'}
-                    </span>
-                  </div>
-                </div>
+                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-[12.5px] font-semibold text-brand bg-brand-mint border border-brand/20 shrink-0">
+                  {userDisplayChip}
+                </span>
               </div>
-            </div>
 
-            {/* ขวา: ฟอร์มดำเนินการของช่าง */}
-            <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
-              {current.status === 'repair_submitted' ? (
-                <div className="jw-card p-4 sm:p-5 flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <label className="jw-lbl mb-0">เจ้าหน้าที่ผู้รับผิดชอบงาน</label>
-                    <span className="text-[12px] text-ink-mute">{account?.name || 'สุดา มีสุข'}</span>
-                  </div>
-                  <div className="p-3.5 rounded-2xl bg-canvas border border-line text-[13px] text-ink flex flex-col gap-1.5">
-                    <div className="font-semibold text-ink flex items-center gap-1.5">
-                      <Icon name="user" className="w-4 h-4 text-brand" />
-                      <span>{account?.name || 'เจ้าหน้าที่'} ({account?.role || 'STAFF'})</span>
+              {/* 2) การ์ดสถานะปัจจุบัน (Hero) พื้นเขียวเข้ม ตัวอักษรขาว มุมโค้งใหญ่ rounded-card (20px) */}
+              <section className="rounded-card bg-brand-deep text-white p-4 sm:p-6 shadow-high flex flex-col gap-5 min-w-0">
+                {/* แถวบน: รหัสงาน + ชิปสถานะ + หัวข้อสถานะใหญ่ + คำแนะนำ | ขวา: แคปซูลผู้รับผิดชอบ */}
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                  <div className="flex flex-col gap-2 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[14px] font-bold tracking-wide text-white">
+                        {current.code}
+                      </span>
+                      {current.category && <Chip tone="orange">{current.category}</Chip>}
+                      <StatusChip status={current.status} />
                     </div>
-                    <p className="text-[12.5px] text-ink-mute">
-                      ตรวจสอบรายละเอียดปัญหาและกดปุ่ม <b>&quot;รับเรื่องซ่อม (เริ่มดำเนินการ)&quot;</b> ด้านล่างเพื่อเริ่มงาน
-                    </p>
-                  </div>
-                  <label className="flex items-center gap-2 text-[13px] text-ink cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={confirmed}
-                      onChange={(e) => setConfirmed(e.target.checked)}
-                      className="w-4 h-4 rounded text-brand focus:ring-brand"
-                    />
-                    <span>ข้าพเจ้าได้ตรวจสอบรายละเอียดและข้อมูลถูกต้อง</span>
-                  </label>
-                </div>
-              ) : current.status === 'repair_in_progress' ? (
-                <div className="jw-card p-4 sm:p-5 flex flex-col gap-4">
-                  <div className="flex items-center justify-between border-b border-line pb-2.5">
-                    <b className="text-[15px] text-ink">บันทึกผลการซ่อมและส่งตรวจรับ</b>
-                    <span className="text-[12px] text-ink-mute">{account?.name || 'ช่างซ่อมบำรุง'}</span>
-                  </div>
 
-                  <div>
-                    <label className="jw-lbl">
-                      บันทึกผลการซ่อม <span className="text-status-crit font-bold">*</span>
-                      <span className="text-[12px] font-normal text-ink-mute ml-1">(ระบุรายละเอียดการแก้ไข)</span>
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={resolution}
-                      onChange={(e) => {
-                        setResolution(e.target.value);
-                        if (errorMsg) setErrorMsg('');
-                      }}
-                      placeholder="ระบุรายละเอียดการแก้ไข เช่น เปลี่ยนหลอดไฟ LED ใหม่ 2 หลอด, ซ่อมท่อน้ำรั่วและทดสอบระบบเรียบร้อย"
-                      className={`jw-in min-h-20 py-2.5 ${!resolution.trim() ? 'border-amber-300' : ''}`}
-                    />
-                    {!resolution.trim() && (
-                      <p className="mt-1 text-[12px] text-status-crit">
-                        * จำเป็นต้องระบุข้อมูลในบันทึกผลการซ่อม
+                    <h2 className="text-[22px] sm:text-[26px] font-bold text-white leading-tight tracking-tight">
+                      {heroHeading}
+                    </h2>
+
+                    {current.status === 'repair_submitted' ? (
+                      <p className="text-[13.5px] text-white/95 leading-relaxed max-w-2xl">
+                        ตรวจสอบรายละเอียดปัญหาและกดปุ่ม{' '}
+                        <b className="font-bold text-white">&quot;รับเรื่องซ่อม (เริ่มดำเนินการ)&quot;</b>{' '}
+                        ด้านล่างเพื่อเริ่มงาน
+                      </p>
+                    ) : current.status === 'repair_in_progress' ? (
+                      <p className="text-[13.5px] text-white/95 leading-relaxed max-w-2xl">
+                        ระบุรายละเอียดการแก้ไขและแนบรูปภาพหลังซ่อม จากนั้นกดปุ่ม{' '}
+                        <b className="font-bold text-white">&quot;บันทึกซ่อมเสร็จ (ส่งตรวจรับ)&quot;</b>{' '}
+                        เพื่อส่งงานให้ผู้แจ้งตรวจรับ
+                      </p>
+                    ) : (
+                      <p className="text-[13.5px] text-white/95 leading-relaxed">
+                        งานซ่อมนี้ดำเนินการเรียบร้อยแล้ว (
+                        {current.status === 'repair_done'
+                          ? 'ตรวจรับเสร็จสิ้น'
+                          : current.status === 'rejected'
+                            ? 'ส่งกลับ / ไม่รับเรื่อง'
+                            : 'รอผู้แจ้งตรวจรับงาน'}
+                        )
                       </p>
                     )}
                   </div>
 
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="jw-lbl mb-0">
-                        แนบรูปหลังซ่อม <span className="text-status-crit font-bold">*</span>
-                        <span className="text-[12px] font-normal text-ink-mute ml-1">(ไม่เกิน 3 รูป)</span>
-                      </label>
-                      <span className="text-[12px] text-ink-mute">
-                        {afterPhotos.length === 0 ? (
-                          <span className="text-status-crit font-medium">บังคับแนบรูป</span>
-                        ) : (
-                          `แนบแล้ว ${afterPhotos.length}/3 รูป`
-                        )}
+                  {/* แคปซูลผู้รับผิดชอบ */}
+                  <div className="inline-flex items-center gap-3 px-3.5 py-2 rounded-full bg-white/15 border border-white/25 self-start shrink-0">
+                    <span className="size-9 rounded-full bg-white text-brand-deep font-bold text-[14px] flex items-center justify-center shrink-0">
+                      {officerInitial}
+                    </span>
+                    <div className="flex flex-col pr-1">
+                      <span className="text-[11.5px] text-white/90 leading-tight">
+                        ผู้รับผิดชอบงาน
+                      </span>
+                      <span className="text-[13px] font-bold text-white leading-snug">
+                        {officerName} ({officerRole})
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* แถวกลาง: ความคืบหน้า 3 ขั้นตอน เรียงแนวนอน เชื่อมด้วยเส้น */}
+                <div className="rounded-control bg-white/10 border border-white/15 p-3.5 sm:p-4">
+                  <div className="text-[12px] font-semibold text-white/90 mb-3">
+                    ความคืบหน้าการดำเนินงาน (3 ขั้นตอน)
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-3">
+                    {steps.map((st, idx) => {
+                      const prevDone = idx > 0 && steps[idx - 1].nodeState === 'done';
+                      return (
+                        <div key={st.num} className="relative flex sm:flex-col gap-3 sm:gap-2 min-w-0">
+                          <div className="flex sm:w-full items-center gap-2">
+                            <span
+                              className={`size-8 rounded-full flex items-center justify-center shrink-0 font-bold text-[13px] ${nodeClasses(st.nodeState, st.tone)}`}
+                            >
+                              {st.nodeState === 'done' ? (
+                                <Icon name="check" className="w-4 h-4" strokeWidth={3} />
+                              ) : st.nodeState === 'rejected' ? (
+                                <Icon name="x" className="w-4 h-4" strokeWidth={3} />
+                              ) : st.nodeState === 'current' ? (
+                                <span
+                                  className={`size-2.5 rounded-full block ${
+                                    st.tone === 'info' ? 'bg-info-fg' : 'bg-warn-fg'
+                                  }`}
+                                />
+                              ) : (
+                                <span className="text-[12px] font-bold">{st.num}</span>
+                              )}
+                            </span>
+
+                            {/* เส้นเชื่อมแนวนอนบนจอ sm ขึ้นไป */}
+                            {idx < steps.length - 1 && (
+                              <span
+                                aria-hidden="true"
+                                className={`hidden sm:block h-[2px] flex-1 rounded-full ${
+                                  st.nodeState === 'done' || prevDone ? 'bg-ok-border' : 'bg-white/30'
+                                }`}
+                              />
+                            )}
+                          </div>
+
+                          <div className="flex flex-col gap-1 min-w-0">
+                            <span className="text-[12px] font-semibold text-white/90 leading-snug">
+                              {st.roleLabel}
+                            </span>
+                            <b className="text-[14px] font-bold text-white leading-snug break-words">
+                              {st.personName}
+                            </b>
+                            <span className="text-[12px] text-white/90 leading-snug">
+                              {st.dateText}
+                            </span>
+                            <div className="pt-0.5">
+                              <Chip tone={st.tone}>{st.statusText}</Chip>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* ฟอร์มบันทึกผลการซ่อมและรูปหลังซ่อม (แสดงเมื่ออยู่ในสถานะกำลังดำเนินการ) */}
+                {current.status === 'repair_in_progress' && (
+                  <div className="rounded-control bg-surface text-ink p-4 sm:p-5 flex flex-col gap-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2.5">
+                      <b className="text-[15px] text-ink">บันทึกผลการซ่อมและส่งตรวจรับ</b>
+                      <span className="text-[12px] text-ink-soft">
+                        {account?.name || 'ช่างซ่อมบำรุง'}
                       </span>
                     </div>
 
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={handleSelectPhotos}
-                      className="hidden"
-                    />
-
-                    <div className="flex flex-wrap gap-2.5">
-                      {afterPhotos.map((src, idx) => (
-                        <div
-                          key={idx}
-                          className="w-20 h-20 rounded-2xl border border-line bg-brand-mint overflow-hidden relative shadow-sm"
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={src} alt={`รูปหลังซ่อม ${idx + 1}`} className="w-full h-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => removePhoto(idx)}
-                            className="w-5 h-5 rounded-full bg-ink text-white absolute top-1 right-1 flex items-center justify-center shadow hover:bg-status-crit transition"
-                          >
-                            <Icon name="x" className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))}
-                      {afterPhotos.length < 3 && (
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          className={`w-20 h-20 rounded-2xl border-[1.5px] border-dashed text-[12px] flex flex-col items-center justify-center gap-1 transition ${
-                            afterPhotos.length === 0
-                              ? 'border-status-crit/70 bg-red-50/40 text-status-crit hover:border-status-crit hover:bg-red-50'
-                              : 'border-[#7A7A7A] bg-white text-ink-mute hover:border-brand hover:text-brand'
-                          }`}
-                        >
-                          <Icon name="photo" className="w-5 h-5" />
-                          <span>+ เพิ่มรูป</span>
-                        </button>
+                    <div>
+                      <label htmlFor="repair-resolution" className="jw-lbl">
+                        บันทึกผลการซ่อม <span className="text-danger-fg font-bold">*</span>
+                        <span className="text-[12px] font-normal text-ink-soft ml-1">
+                          (ระบุรายละเอียดการแก้ไข)
+                        </span>
+                      </label>
+                      <textarea
+                        id="repair-resolution"
+                        rows={3}
+                        value={resolution}
+                        onChange={(e) => {
+                          setResolution(e.target.value);
+                          if (errorMsg) setErrorMsg('');
+                        }}
+                        placeholder="ระบุรายละเอียดการแก้ไข เช่น เปลี่ยนหลอดไฟ LED ใหม่ 2 หลอด, ซ่อมท่อน้ำรั่วและทดสอบระบบเรียบร้อย"
+                        className={`jw-in min-h-20 py-2.5 ${!resolution.trim() ? 'border-warn-border' : ''}`}
+                      />
+                      {!resolution.trim() && (
+                        <p className="mt-1 text-[12px] text-danger-fg font-medium">
+                          * จำเป็นต้องระบุข้อมูลในบันทึกผลการซ่อม
+                        </p>
                       )}
                     </div>
 
-                    {afterPhotos.length === 0 ? (
-                      <p className="mt-1 text-[12px] text-status-crit">
-                        * จำเป็นต้องแนบรูปหลังซ่อมอย่างน้อย 1 รูป
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div className="pt-2 border-t border-line">
-                    <label className="flex items-center gap-2 text-[13px] text-ink cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={confirmed}
-                        onChange={(e) => setConfirmed(e.target.checked)}
-                        className="w-4 h-4 rounded text-brand focus:ring-brand"
-                      />
-                      <span>ข้าพเจ้าได้ตรวจสอบรายละเอียดและข้อมูลถูกต้อง</span>
-                    </label>
-                  </div>
-                </div>
-              ) : (
-                <div className="jw-card p-4 sm:p-5 flex flex-col gap-3">
-                  <div className="flex items-center justify-between border-b border-line pb-2">
-                    <b className="text-[14px] text-ink">บันทึกผลการซ่อมบำรุง</b>
-                    <span className="text-[12px] text-ink-mute">{current.staffSignerName || 'ฝ่ายช่างซ่อมบำรุง'}</span>
-                  </div>
-                  <div className="p-3.5 rounded-2xl bg-canvas border border-line text-[13px] flex flex-col gap-2.5">
                     <div>
-                      <span className="text-[12px] text-ink-mute block mb-0.5">รายละเอียดผลการซ่อม</span>
-                      <span className="text-ink font-medium whitespace-pre-wrap">{current.resolution || '-'}</span>
-                    </div>
-                    {current.afterPhotos && current.afterPhotos.length > 0 && (
-                      <div>
-                        <span className="text-[12px] text-ink-mute block mb-1.5">
-                          รูปภาพหลังซ่อม ({current.afterPhotos.length} รูป)
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="jw-lbl mb-0">
+                          แนบรูปหลังซ่อม <span className="text-danger-fg font-bold">*</span>
+                          <span className="text-[12px] font-normal text-ink-soft ml-1">
+                            (ไม่เกิน 3 รูป)
+                          </span>
+                        </label>
+                        <span className="text-[12px] text-ink-soft">
+                          {afterPhotos.length === 0 ? (
+                            <span className="text-danger-fg font-semibold">บังคับแนบรูป</span>
+                          ) : (
+                            `แนบแล้ว ${afterPhotos.length}/3 รูป`
+                          )}
                         </span>
-                        <div className="flex flex-wrap gap-2">
-                          {current.afterPhotos.map((url, i) => (
-                            <a
-                              key={i}
-                              href={url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="block w-20 h-20 rounded-xl border border-line overflow-hidden hover:opacity-90 transition shadow-sm"
+                      </div>
+
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleSelectPhotos}
+                        className="hidden"
+                      />
+
+                      <div className="flex flex-wrap gap-2.5">
+                        {afterPhotos.map((src, idx) => (
+                          <div
+                            key={idx}
+                            className="w-20 h-20 rounded-control border border-line bg-brand-mint overflow-hidden relative shadow-xs"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={src}
+                              alt={`รูปหลังซ่อม ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            <button
+                              type="button"
+                              aria-label={`ลบรูปหลังซ่อมที่ ${idx + 1}`}
+                              onClick={() => removePhoto(idx)}
+                              className="w-7 h-7 rounded-full bg-ink text-white absolute top-1 right-1 flex items-center justify-center shadow-xs hover:bg-danger-solid transition cursor-pointer"
                             >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={url} alt={`รูปหลังซ่อมที่ ${i + 1}`} className="w-full h-full object-cover" />
-                            </a>
-                          ))}
-                        </div>
+                              <Icon name="x" className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                        {afterPhotos.length < 3 && (
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className={`w-20 h-20 rounded-control border-[1.5px] border-dashed text-[12px] font-medium flex flex-col items-center justify-center gap-1 transition cursor-pointer ${
+                              afterPhotos.length === 0
+                                ? 'border-danger-border bg-danger-bg/50 text-danger-fg hover:bg-danger-bg'
+                                : 'border-line-input bg-surface text-ink-soft hover:border-brand hover:text-brand'
+                            }`}
+                          >
+                            <Icon name="photo" className="w-5 h-5" />
+                            <span>+ เพิ่มรูป</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {afterPhotos.length === 0 ? (
+                        <p className="mt-1 text-[12px] text-danger-fg font-medium">
+                          * จำเป็นต้องแนบรูปหลังซ่อมอย่างน้อย 1 รูป
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
+
+                {/* แถวล่าง: Checkbox ซ้าย | ปุ่มดำเนินการ ขวา (มือถือ: Checkbox อยู่บน ปุ่มเรียงเต็มกว้างโดยปุ่มหลักอยู่บนสุด) */}
+                {(current.status === 'repair_submitted' ||
+                  current.status === 'repair_in_progress') && (
+                  <div className="pt-4 border-t border-white/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex flex-col gap-1">
+                      <label
+                        htmlFor="staff-repair-confirm"
+                        className="min-h-[44px] inline-flex items-center gap-2.5 text-[13.5px] font-medium text-white cursor-pointer select-none"
+                      >
+                        <input
+                          id="staff-repair-confirm"
+                          type="checkbox"
+                          checked={confirmed}
+                          onChange={(e) => setConfirmed(e.target.checked)}
+                          className="size-5 rounded accent-brand cursor-pointer shrink-0"
+                        />
+                        <span>ข้าพเจ้าได้ตรวจสอบรายละเอียดและข้อมูลถูกต้อง</span>
+                      </label>
+                      {!confirmed && (
+                        <span className="inline-flex items-center w-fit px-2.5 py-0.5 rounded-full text-[12px] font-semibold bg-warn-bg text-warn-fg border border-warn-border">
+                          ติ๊กยืนยันก่อน จึงจะรับเรื่องได้
+                        </span>
+                      )}
+                    </div>
+
+                    {current.status === 'repair_submitted' ? (
+                      <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto shrink-0">
+                        {/* ปุ่มรอง: ส่งกลับ / ไม่รับเรื่อง (destructive outline ตาม token เดิม) */}
+                        <button
+                          type="button"
+                          disabled={submitting}
+                          onClick={() => handleStartAction('reject')}
+                          className="min-h-[44px] px-4 py-2 rounded-control border border-danger-border bg-danger-bg text-danger-fg font-semibold text-[14px] hover:opacity-95 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          ส่งกลับ / ไม่รับเรื่อง
+                        </button>
+
+                        {/* ปุ่มหลักบนพื้นเขียวเข้ม: พื้นขาวตัวอักษรเขียวเข้ม */}
+                        <button
+                          type="button"
+                          disabled={submitting || !confirmed}
+                          onClick={() => handleStartAction('accept')}
+                          className="min-h-[44px] px-5 py-2 rounded-control bg-white text-brand-deep font-bold text-[14px] shadow-xs hover:bg-brand-tint transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {submitting ? 'กำลังบันทึก...' : 'รับเรื่องซ่อม (เริ่มดำเนินการ)'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto shrink-0">
+                        <button
+                          type="button"
+                          disabled={
+                            submitting || !confirmed || !resolution.trim() || afterPhotos.length === 0
+                          }
+                          onClick={() => handleStartAction('finish')}
+                          className="min-h-[44px] px-5 py-2 rounded-control bg-white text-brand-deep font-bold text-[14px] shadow-xs hover:bg-brand-tint transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {submitting ? 'กำลังบันทึก...' : 'บันทึกซ่อมเสร็จ (ส่งตรวจรับ)'}
+                        </button>
                       </div>
                     )}
                   </div>
+                )}
+              </section>
+
+              {/* 3) การ์ดรายละเอียด (พื้นขาว, border + มุมโค้งเหมือนการ์ดอื่นในระบบ) */}
+              <section className="jw-card p-4 sm:p-6 flex flex-col gap-5 min-w-0">
+                <div className="grid grid-cols-1 md:grid-cols-[192px_minmax(0,1fr)] gap-5 sm:gap-6 items-start">
+                  {/* ซ้าย: รูปภาพประกอบ ขนาด 192x192 */}
+                  <div className="flex flex-col gap-2.5">
+                    {attachments.length > 0 ? (
+                      <>
+                        <a
+                          href={attachments[0]}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label="เปิดรูปภาพประกอบการแจ้งซ่อมขนาดเต็ม"
+                          className="block w-[192px] h-[192px] rounded-control border border-line overflow-hidden bg-surface-muted hover:opacity-90 transition"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={attachments[0]}
+                            alt="รูปปัญหาที่ 1"
+                            className="w-full h-full object-cover"
+                          />
+                        </a>
+
+                        {attachments.length > 1 && (
+                          <div className="flex flex-wrap gap-2">
+                            {attachments.slice(1).map((url, idx) => (
+                              <a
+                                key={idx + 1}
+                                href={url}
+                                target="_blank"
+                                rel="noreferrer"
+                                aria-label={`เปิดรูปปัญหาที่ ${idx + 2} ขนาดเต็ม`}
+                                className="block w-14 h-14 rounded-lg border border-line overflow-hidden bg-surface-muted hover:opacity-90 transition"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={url}
+                                  alt={`รูปปัญหาที่ ${idx + 2}`}
+                                  className="w-full h-full object-cover"
+                                />
+                              </a>
+                            ))}
+                          </div>
+                        )}
+
+                        <span className="text-[12.5px] font-medium text-ink-soft">
+                          รูปภาพประกอบการแจ้งซ่อม ({attachments.length} รูป)
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-[192px] h-[192px] rounded-control border border-dashed border-line bg-surface-muted flex flex-col items-center justify-center gap-1.5 text-ink-mute">
+                          <Icon name="photo" className="w-7 h-7" />
+                          <span className="text-[12px] text-ink-soft">ไม่มีรูปภาพแนบ</span>
+                        </div>
+                        <span className="text-[12.5px] font-medium text-ink-soft">
+                          รูปภาพประกอบการแจ้งซ่อม (0 รูป)
+                        </span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* ขวา: ปัญหา/อาการ + รายละเอียด + ตารางข้อมูลคั่นเส้นบาง */}
+                  <div className="flex flex-col gap-3 min-w-0">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[12.5px] font-semibold text-ink-soft">
+                        ปัญหา/อาการ
+                      </span>
+                      <h3 className="text-[20px] sm:text-[22px] font-bold text-ink leading-snug break-words">
+                        {problemHeading}
+                      </h3>
+                      {problemSubDetail && (
+                        <p className="text-[14px] text-ink-soft whitespace-pre-wrap leading-relaxed mt-1">
+                          {problemSubDetail}
+                        </p>
+                      )}
+                    </div>
+
+                    <dl className="divide-y divide-line-soft border-t border-line mt-1 text-[14px]">
+                      <div className="py-2.5 grid grid-cols-1 sm:grid-cols-[150px_minmax(0,1fr)] gap-1 sm:gap-3 items-baseline">
+                        <dt className="font-semibold text-ink-soft">ผู้แจ้งซ่อม</dt>
+                        <dd className="text-ink break-words">
+                          {current.requesterName}
+                          {current.organization ? ` · ${current.organization}` : ''}
+                        </dd>
+                      </div>
+
+                      <div className="py-2.5 grid grid-cols-1 sm:grid-cols-[150px_minmax(0,1fr)] gap-1 sm:gap-3 items-baseline">
+                        <dt className="font-semibold text-ink-soft">โทรศัพท์</dt>
+                        <dd className="text-ink">
+                          {current.requesterPhone ? (
+                            <a
+                              href={`tel:${current.requesterPhone}`}
+                              className="inline-flex items-center min-h-[44px] -my-2 text-brand font-semibold hover:underline"
+                            >
+                              {current.requesterPhone}
+                            </a>
+                          ) : (
+                            '-'
+                          )}
+                        </dd>
+                      </div>
+
+                      <div className="py-2.5 grid grid-cols-1 sm:grid-cols-[150px_minmax(0,1fr)] gap-1 sm:gap-3 items-baseline">
+                        <dt className="font-semibold text-ink-soft">สถานที่/อาคาร</dt>
+                        <dd className="text-ink break-words">{locationFull || '-'}</dd>
+                      </div>
+
+                      <div className="py-2.5 grid grid-cols-1 sm:grid-cols-[150px_minmax(0,1fr)] gap-1 sm:gap-3 items-baseline">
+                        <dt className="font-semibold text-ink-soft">วันที่แจ้ง</dt>
+                        <dd className="text-ink">{formatThaiDateTime(current.createdAt)}</dd>
+                      </div>
+                    </dl>
+                  </div>
                 </div>
-              )}
+
+                {/* แสดงบันทึกผลการซ่อมและรูปหลังซ่อม (กรณีดำเนินการซ่อมเสร็จแล้ว) */}
+                {(current.resolution ||
+                  (current.afterPhotos && current.afterPhotos.length > 0)) &&
+                  current.status !== 'repair_in_progress' && (
+                    <div className="pt-4 border-t border-line flex flex-col gap-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <b className="text-[15px] text-ink">บันทึกผลการซ่อมบำรุง</b>
+                        <span className="text-[12.5px] text-ink-soft">
+                          {current.staffSignerName || 'ฝ่ายช่างซ่อมบำรุง'}
+                        </span>
+                      </div>
+                      <div className="p-3.5 rounded-control bg-surface-muted border border-line text-[13.5px] flex flex-col gap-3">
+                        <div>
+                          <span className="text-[12px] font-semibold text-ink-soft block mb-0.5">
+                            รายละเอียดผลการซ่อม
+                          </span>
+                          <span className="text-ink font-medium whitespace-pre-wrap">
+                            {current.resolution || '-'}
+                          </span>
+                        </div>
+                        {current.afterPhotos && current.afterPhotos.length > 0 && (
+                          <div>
+                            <span className="text-[12px] font-semibold text-ink-soft block mb-1.5">
+                              รูปภาพหลังซ่อม ({current.afterPhotos.length} รูป)
+                            </span>
+                            <div className="flex flex-wrap gap-2">
+                              {current.afterPhotos.map((url, i) => (
+                                <a
+                                  key={i}
+                                  href={url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  aria-label={`เปิดรูปหลังซ่อมที่ ${i + 1} ขนาดเต็ม`}
+                                  className="block w-20 h-20 rounded-control border border-line overflow-hidden hover:opacity-90 transition shadow-xs"
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={url}
+                                    alt={`รูปหลังซ่อมที่ ${i + 1}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+              </section>
             </div>
-          </div>
-        </div>
+          );
+        })()
       )}
 
       {/* Modal ยืนยัน PIN สำหรับเจ้าหน้าที่ */}
       {showPinModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4"
           onClick={() => setShowPinModal(false)}
         >
           <div
-            className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl"
+            className="w-full max-w-sm rounded-card bg-surface border border-line p-6 shadow-pop"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-center mb-4">
               <b className="text-[18px] text-ink block">ยืนยัน PIN 6 หลัก</b>
-              <span className="text-[13px] text-ink-mute">
+              <span className="text-[13px] text-ink-soft">
                 กรอกรหัส PIN ของ {account?.name || 'เจ้าหน้าที่'} เพื่อยืนยันการ
                 {pendingAction === 'accept'
                   ? 'รับเรื่องซ่อม'
@@ -693,7 +1020,7 @@ export default function StaffRepairsPage() {
               onComplete={(enteredPin) => handleExecuteAction(pendingAction, enteredPin)}
             />
             {pinError && (
-              <div className="mt-2 text-center text-[13px] text-status-crit font-medium">
+              <div className="mt-2 text-center text-[13px] text-danger-fg font-medium">
                 {pinError}
               </div>
             )}
@@ -701,7 +1028,7 @@ export default function StaffRepairsPage() {
               <button
                 type="button"
                 onClick={() => setShowPinModal(false)}
-                className="text-[13px] text-ink-mute hover:underline"
+                className="min-h-[44px] px-4 text-[13px] text-ink-soft font-semibold hover:underline cursor-pointer"
               >
                 ยกเลิก
               </button>

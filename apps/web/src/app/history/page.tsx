@@ -21,6 +21,8 @@ import {
   ROLE_META,
   RequestType,
   RequestWithTimeline,
+  canSignRequest,
+  hasPermission,
 } from '@japjong/shared';
 // Context ระบบยืนยันตัวตน
 import { useAuth } from '@/components/auth-context';
@@ -274,16 +276,32 @@ export default function RequestHistoryPage() {
                 req.type !== 'repair' &&
                 (req.status === 'approved' || req.status === 'borrowing' || req.status === 'returned');
 
+              const getRequestHref = () => {
+                if (req.type !== 'repair') {
+                  const signCheck = canSignRequest(account, req);
+                  if (signCheck.allowed) {
+                    if (signCheck.expectedLevel === 'staff') return `/staff/review?id=${req.id}`;
+                    if (signCheck.expectedLevel === 'l2' || signCheck.expectedLevel === 'l1') {
+                      return `/approver/sign/${req.id}`;
+                    }
+                  }
+                  return `/requests/${req.id}`;
+                }
+                if (
+                  account?.role === 'STAFF' &&
+                  hasPermission(account, 'review') &&
+                  (req.status === 'repair_submitted' || req.status === 'repair_in_progress') &&
+                  req.requesterId !== account.id
+                ) {
+                  return `/staff/repairs?id=${req.id}`;
+                }
+                return `/repair?mode=track&id=${req.id}`;
+              };
+
               return (
                 <div
                   key={req.id}
-                  onClick={() =>
-                    router.push(
-                      req.type === 'repair'
-                        ? `/repair?mode=track&id=${req.id}`
-                        : `/requests/${req.id}`,
-                    )
-                  }
+                  onClick={() => router.push(getRequestHref())}
                   className="jw-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:ring-1 hover:ring-brand transition"
                 >
                   {/* ข้อมูลคำขอฝั่งซ้าย */}

@@ -16,6 +16,7 @@ export * from './Feedback';
 export * from './Modal';
 export * from './Table';
 export * from './AttachmentViewer';
+export * from './SigningStepCard';
 
 // วิดเจ็ตเฉพาะทางที่นำเข้าจาก ui-widgets
 export {

@@ -145,7 +145,7 @@ export default function StaffWalkInPage() {
           requesterSignature: citizenSignature,
           createdByStaffSignature: staffSignature,
         });
-        router.push(`/requests/${created.id}`);
+        router.push(`/staff/review?id=${created.id}`);
       } else if (serviceType === 'borrow') {
         const created = await api.createBorrow({
           items: [{ equipmentId, qty: equipmentQty }],
@@ -158,7 +158,7 @@ export default function StaffWalkInPage() {
           requesterSignature: citizenSignature,
           createdByStaffSignature: staffSignature,
         });
-        router.push(`/requests/${created.id}`);
+        router.push(`/staff/review?id=${created.id}`);
       } else {
         const created = await api.createRepair({
           building,
@@ -173,7 +173,7 @@ export default function StaffWalkInPage() {
           requesterSignature: citizenSignature,
           createdByStaffSignature: staffSignature,
         });
-        router.push(`/requests/${created.id}`);
+        router.push(`/staff/repairs?id=${created.id}`);
       }
     } catch (err: any) {
       const errorMsg = err?.message || 'เกิดข้อผิดพลาดในการส่งคำขอ กรุณาตรวจสอบข้อมูล';

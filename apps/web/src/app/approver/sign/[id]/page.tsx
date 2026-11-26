@@ -9,22 +9,39 @@
  * 2. เจ้าหน้าที่ธุรการ (Staff / Reviewer)
  * 3. ปลัด อบต. (Approver L2)
  * 4. นายก อบต. (Approver L1 - ผู้มีอำนาจอนุมัติสูงสุด)
- *
- * ฟีเจอร์ความปลอดภัย:
- * - ตรวจสอบ Signing Session (OTP ยืนยันตัวตนผ่านอีเมล)
- * - การยืนยันด้วยรหัส PIN ดิจิทัล 6 หลัก (PinKeypad)
- * - แสดงสถานะและลายมือชื่อของแต่ละระดับชั้น (SignaturePreviewCard)
- * - แสดงเอกสารแบบฟอร์มราชการแบบเต็มใบ (OfficialGovFormDocument)
  */
 
 import React, { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { ArrowRight, ChevronLeft, FileText, PenLine } from 'lucide-react';
 import { ROLE_LABEL, RequestWithTimeline, SIGN_LEVEL_TITLE, canSignRequest } from '@japjong/shared';
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
-import { AttachmentViewer, Chip, OfficialGovFormDocument, PinKeypad, SignatureBox, SignaturePreviewCard, SignOtpVerifier } from '@/components/ui';
-import { api, formatPeriodRange, formatThaiDate, formatThaiDateTime } from '@/lib/api';
+import {
+  AttachmentViewer,
+  Chip,
+  OfficialGovFormDocument,
+  PinKeypad,
+  RequestTypeChip,
+  SignatureBox,
+  SigningProgressSpotlight,
+  SigningStepStatus,
+  SignOtpVerifier,
+  StatusChip,
+} from '@/components/ui';
+import { api, formatPeriodRange, formatThaiDate } from '@/lib/api';
+import { triggerDocumentPrint } from '@/lib/print';
+
+function formatSignedAt(iso?: string): string | undefined {
+  if (!iso) return undefined;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return undefined;
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${formatThaiDate(iso, true)} เวลา ${hh}:${mm} น.`;
+}
 
 export default function ApproverSignDocumentPage() {
   // ดึง ID ของคำขอจาก URL parameter
@@ -39,6 +56,10 @@ export default function ApproverSignDocumentPage() {
   const [showOfficialForm, setShowOfficialForm] = useState(true);
   // State ข้อมูลภาพลายเซ็น (Base64 data URL)
   const [signature, setSignature] = useState('');
+  // State เหตุผลประกอบกรณีไม่อนุมัติ/ไม่เห็นชอบ
+  const [note, setNote] = useState('');
+  // State เปิด/ปิดถาดกรอกเหตุผลกรณีไม่อนุมัติ
+  const [rejectDrawerOpen, setRejectDrawerOpen] = useState(false);
   // State ติ๊กถูกรับรองว่าได้ตรวจสอบเอกสารแล้ว
   const [confirmed, setConfirmed] = useState(true);
   // State หน้าต่างยืนยัน OTP ก่อนลงนาม
@@ -104,6 +125,7 @@ export default function ApproverSignDocumentPage() {
     try {
       const updated = await api.signRequest(req.id, {
         decision: pendingDecision,
+        note: note || undefined,
         signature,
         pin: enteredPin,
       });
@@ -171,251 +193,469 @@ export default function ApproverSignDocumentPage() {
   const signCheck = canSignRequest(account, req);
 
   // คำนวณลำดับขั้นตอนการลงนามปัจจุบัน
-  const signedCount = req.type !== 'repair' ? req.signatures.length : 0;
-  const currentStepNum = Math.min(3, signedCount + 1);
+  const rawSignedCount = req.type !== 'repair' ? req.signatures.length : 0;
+  const currentStepNum = Math.min(3, rawSignedCount + 1);
   const stepDesc =
     currentStepNum === 1
       ? `ลงนามฝ่ายที่ 2 จาก 4 · ${SIGN_LEVEL_TITLE.staff}`
       : currentStepNum === 2
-      ? `ลงนามฝ่ายที่ 3 จาก 4 · ${SIGN_LEVEL_TITLE.l2}`
-      : `ลงนามฝ่ายที่ 4 จาก 4 · ${SIGN_LEVEL_TITLE.l1}`;
+        ? `ลงนามฝ่ายที่ 3 จาก 4 · ${SIGN_LEVEL_TITLE.l2}`
+        : `ลงนามฝ่ายที่ 4 จาก 4 · ${SIGN_LEVEL_TITLE.l1}`;
 
   // ค้นหาข้อมูลลายเซ็นของแต่ละระดับ
   const sigStaff = req.type !== 'repair' ? req.signatures.find((s) => s.level === 'staff') : undefined;
   const sigL2 = req.type !== 'repair' ? req.signatures.find((s) => s.level === 'l2') : undefined;
   const sigL1 = req.type !== 'repair' ? req.signatures.find((s) => s.level === 'l1') : undefined;
 
+  const isFullyApproved =
+    req.status === 'approved' || req.status === 'borrowing' || req.status === 'returned';
+
   // ตรวจสอบว่าเป็นผู้อนุมัติขั้นสุดท้าย (นายก อบต. / APPROVER_L1) หรือไม่
   const isFinalApprover = account?.role === 'APPROVER_L1';
 
+  const resolveStepStatus = (
+    sig: typeof sigStaff,
+    targetPendingStatus: 'pending_staff' | 'pending_l2' | 'pending_l1',
+  ): SigningStepStatus => {
+    if (sig) return sig.decision === 'approve' ? 'signed' : 'rejected';
+    if (req.status === 'cancelled') return 'cancelled';
+    if (req.status === 'rejected') return 'upcoming';
+    if (req.status === targetPendingStatus) return 'current';
+    return 'upcoming';
+  };
+
+  const approvedPartyCount =
+    1 +
+    (sigStaff?.decision === 'approve' ? 1 : 0) +
+    (sigL2?.decision === 'approve' ? 1 : 0) +
+    (sigL1?.decision === 'approve' ? 1 : 0);
+
+  const waitingStageText =
+    req.status === 'pending_staff'
+      ? 'ขณะนี้รอเจ้าหน้าที่'
+      : req.status === 'pending_l2'
+        ? `ขณะนี้รอ${SIGN_LEVEL_TITLE.l2}`
+        : req.status === 'pending_l1'
+          ? `ขณะนี้รอ${SIGN_LEVEL_TITLE.l1}`
+          : req.status === 'cancelled'
+            ? 'คำขอถูกยกเลิกแล้ว'
+            : req.status === 'rejected'
+              ? 'คำขอไม่ได้รับการอนุมัติ'
+              : 'ลงนามครบถ้วนแล้ว';
+
   return (
     <AppShell
-      title={otpStep ? 'ยืนยัน OTP ก่อนลงนาม' : 'ลงนามเอกสาร'}
-      backHref="/approver"
+      title={otpStep ? 'ยืนยัน OTP ก่อนลงนาม' : undefined}
       onBack={otpStep ? () => setOtpStep(false) : undefined}
-      rightLabel={account?.position || 'ปลัด อบต.'}
-      maxWidth="max-w-[960px]"
-      footer={
-        !otpStep && !successNotice && signCheck.allowed ? (
-          <div className="flex w-full sm:w-auto gap-2.5">
-            {/* ปุ่มลงนามไม่อนุมัติ / ไม่เห็นชอบ */}
-            <button
-              type="button"
-              disabled={submitting || !signature.trim()}
-              onClick={() => handleStartSign('reject')}
-              className="jw-btn-red flex-1 sm:w-40"
-            >
-              ลงนาม{isFinalApprover ? 'ไม่อนุมัติ' : 'ไม่เห็นชอบ'}
-            </button>
-            {/* ปุ่มลงนามอนุมัติ / เห็นชอบ */}
-            <button
-              type="button"
-              disabled={!confirmed || !signature.trim() || submitting}
-              onClick={() => handleStartSign('approve')}
-              className="jw-btn flex-[1.5] sm:w-64"
-            >
-              {submitting
-                ? 'กำลังบันทึก...'
-                : isSessionVerified
-                ? `ลงนาม${isFinalApprover ? 'อนุมัติ' : 'เห็นชอบ'} (มีผลทันที)`
-                : `ลงนามและยืนยัน OTP`}
-            </button>
-          </div>
-        ) : undefined
-      }
+      rightLabel={otpStep ? account?.position || 'ปลัด อบต.' : undefined}
+      maxWidth="max-w-[1280px]"
     >
       {!otpStep ? (
-        <div className="flex flex-col gap-4">
-          {/* ส่วนหัวรหัสคำขอและป้ายสถานะ */}
-          <div className="flex items-center justify-between">
-            <b className="text-[16px]">{req.code}</b>
-            <Chip tone="amber">รอคุณเขียนลายเซ็นลงนาม</Chip>
-          </div>
-
-          {/* แถบสถานะเซสชัน OTP ยืนยันตัวตน */}
-          <SignOtpVerifier
-            initialEmail={account?.email}
-            onVerified={() => {
-              setIsSessionVerified(true);
-            }}
-          />
-
-          {/* สรุปข้อมูลคำขอเบื้องต้น */}
-          <div className="jw-card p-4 flex flex-col gap-2 text-[14px]">
-            <div className="flex gap-2">
-              <b className="w-20 shrink-0 text-ink-mute">ผู้ขอ</b>
-              <span>
-                {req.requesterName} · {req.organization}
-              </span>
-            </div>
-            <div className="flex gap-2">
-              <b className="w-20 shrink-0 text-ink-mute">รายการ</b>
-              <span>
-                {req.title} {req.subtitle ? `(${req.subtitle})` : ''}
-              </span>
-            </div>
-            <div className="flex gap-2">
-              <b className="w-20 shrink-0 text-ink-mute">วัน-เวลา</b>
-              <span>
-                {req.type === 'booking'
-                  ? req.periods.map((p) => formatPeriodRange(p)).join(', ')
-                  : req.type === 'borrow'
-                  ? `${formatThaiDate(req.pickupDate, false)}–${formatThaiDate(req.returnDate, true)}`
-                  : '-'}
-              </span>
-            </div>
-            {req.type !== 'repair' && (
-              <div className="pt-1">
-                <button
-                  type="button"
-                  onClick={() => setShowOfficialForm((v) => !v)}
-                  className="text-[12.5px] font-semibold text-brand hover:underline"
-                >
-                  {showOfficialForm ? 'ซ่อนแบบขอใช้สถานที่ราชการ' : 'ดูแบบขอใช้สถานที่ราชการเต็มใบ'}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* เอกสารแบบฟอร์มราชการขนาด A4 จำลอง */}
-          {req.type !== 'repair' && showOfficialForm && <OfficialGovFormDocument req={req} />}
-
-          {/* รูปภาพและเอกสารแนบประกอบคำขอ (แสดงใต้เอกสาร) */}
-          {'attachments' in req && Array.isArray(req.attachments) && req.attachments.length > 0 && (
-            <div className="jw-card p-4 flex flex-col gap-2.5">
-              <b className="text-[14px] text-ink">รูปภาพ / เอกสารแนบประกอบคำขอ</b>
-              <AttachmentViewer attachments={req.attachments} emptyText="" />
-            </div>
-          )}
-
-          {/* การ์ดแสดงลายเซ็น 4 ฝ่าย */}
-          <div className="jw-card p-4 flex flex-col gap-2.5">
-            <b className="text-[14px] text-ink">สถานะลายมือชื่อบนเอกสารนี้</b>
-            <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5">
-              <SignaturePreviewCard
-                roleLabel="1. ผู้ยื่นคำขอ"
-                signerName={req.requesterName}
-                signature={req.requesterSignature}
-                signedAt={formatThaiDateTime(req.createdAt)}
-                status="signed"
-              />
-              <SignaturePreviewCard
-                roleLabel="2. เจ้าหน้าที่ (ระดับ 1)"
-                signerName={sigStaff?.signerName}
-                signature={sigStaff?.signature}
-                signedAt={sigStaff?.at ? formatThaiDateTime(sigStaff.at) : undefined}
-                decision={sigStaff?.decision}
-                status={sigStaff ? (sigStaff.decision === 'reject' ? 'rejected' : 'signed') : 'pending'}
-              />
-              <SignaturePreviewCard
-                roleLabel="3. ปลัด อบต. (ระดับ 2)"
-                signerName={sigL2?.signerName}
-                signature={sigL2?.signature}
-                signedAt={sigL2?.at ? formatThaiDateTime(sigL2.at) : undefined}
-                decision={sigL2?.decision}
-                status={sigL2 ? (sigL2.decision === 'reject' ? 'rejected' : 'signed') : 'pending'}
-              />
-              <SignaturePreviewCard
-                roleLabel="4. นายก อบต. (ระดับ 3)"
-                signerName={sigL1?.signerName}
-                signature={sigL1?.signature}
-                signedAt={sigL1?.at ? formatThaiDateTime(sigL1.at) : undefined}
-                decision={sigL1?.decision}
-                status={sigL1 ? (sigL1.decision === 'reject' ? 'rejected' : 'signed') : 'pending'}
-              />
-            </div>
-          </div>
-
-          {/* แถบสเต็ปลำดับการลงนาม */}
-          <div className="flex flex-col gap-1.5">
-            <div className="flex gap-1.5">
-              {[1, 2, 3].map((n) => (
-                <i
-                  key={n}
-                  className={`flex-1 h-1.5 rounded-full block ${
-                    n < currentStepNum
-                      ? 'bg-brand'
-                      : n === currentStepNum
-                      ? 'bg-brand-hover'
-                      : 'bg-line'
-                  }`}
-                />
-              ))}
-            </div>
-            <span className="text-[13px] text-ink-mute">{stepDesc}</span>
-          </div>
-
-          {/* ตรวจสอบอำนาจการลงนาม หากไม่ตรงสเต็ปจะแจ้งเตือนและปิดช่องลงนาม */}
-          {!signCheck.allowed ? (
-            <div className="jw-card p-5 border-[#F5B7B1] bg-[#FFFDFD] flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-2">
-                <b className="text-[15px] text-status-crit">ระดับอำนาจการลงนามไม่ตรงกับขั้นตอนปัจจุบัน</b>
-                <Chip tone="red">ต้องลงนามตามลำดับ</Chip>
-              </div>
-              <p className="text-[13.5px] text-ink leading-relaxed">{signCheck.reason}</p>
-              <div className="text-[12.5px] text-ink-mute">
-                บัญชีของคุณขณะนี้: <b>{account ? `${account.name} (${ROLE_LABEL[account.role]})` : '-'}</b>
-              </div>
-              <button
-                type="button"
-                onClick={handleLogoutToLogin}
-                className="jw-btn w-full mt-1"
+        <div className="flex flex-col gap-5 min-w-0">
+          {/* ส่วนหัวหน้า: ปุ่มลูกศรกลับ + รหัสคำขอ + ชิปประเภท + ชิปสถานะ */}
+          <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+            <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+              <Link
+                href="/approver"
+                aria-label="ย้อนกลับ"
+                className="min-w-[44px] min-h-[44px] rounded-control bg-surface border border-line flex items-center justify-center text-ink hover:bg-hover active:scale-95 transition shrink-0"
               >
-                ออกจากระบบเพื่อเข้าสู่ระบบด้วยบัญชีผู้มีอำนาจขั้นตอนนี้
-              </button>
+                <ChevronLeft className="size-5" />
+              </Link>
+              <h1 className="text-[18px] sm:text-[20px] font-bold text-ink leading-tight tracking-tight">
+                คำขอ {req.code}
+              </h1>
+              <RequestTypeChip type={req.type} />
+              <StatusChip status={req.status} />
             </div>
-          ) : (
-            /* กล่องวาดลายเซ็นดิจิทัล */
-            <div className="jw-card p-4 flex flex-col gap-3">
-              <label className="jw-lbl">
-                เขียนลายเซ็นของคุณบนหน้าจอ ({account?.name} · {account?.position})
-              </label>
-              <SignatureBox
-                value={signature}
-                onChange={setSignature}
-                savedSignature={account?.signature}
-                signerLabel={`${account?.name || ''} · ${account?.position || ''}`}
-                height={155}
-                skipPinPrompt
-              />
+            {signCheck.allowed && <Chip tone="amber">รอคุณเขียนลายเซ็นลงนาม</Chip>}
+          </div>
 
-              {/* เช็คบ็อกซ์ยืนยันความถูกต้อง */}
-              <div
-                onClick={() => setConfirmed((v) => !v)}
-                className="flex items-start gap-2.5 cursor-pointer select-none pt-1"
-              >
-                <div
-                  className={`w-[22px] h-[22px] rounded-[6px] border-[1.5px] flex items-center justify-center shrink-0 mt-0.5 ${
-                    confirmed ? 'bg-brand border-brand text-white' : 'bg-white border-[#7A7A7A]'
-                  }`}
-                >
-                  {confirmed && <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} />}
-                </div>
-                <span className="text-[13px] text-ink-mute leading-relaxed">
-                  ข้าพเจ้ายืนยันว่าได้ตรวจเอกสารแล้วและเขียนลายมือชื่อลงนามด้วยตนเอง (ระบบจะยืนยันตัวตนด้วย OTP ทางอีเมล)
+          {/* 1) การ์ด "ความคืบหน้าการลงนาม" ไว้บนสุด */}
+          <section className="jw-card p-4 sm:p-5 flex flex-col gap-4 print:hidden">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h2 className="text-[16px] font-bold text-ink">ความคืบหน้าการลงนาม</h2>
+                <p className="text-[12.5px] text-ink-soft mt-0.5">
+                  คลิกแต่ละลำดับด้านขวาเพื่อดูหลักฐานลายมือชื่อ หรือดูขั้นตอนที่กำลังรอดำเนินการ
+                </p>
+              </div>
+              {req.type !== 'repair' && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12.5px] font-medium bg-surface-muted text-ink-soft border border-line">
+                  <b className="font-bold text-brand">ลงนามแล้ว {approvedPartyCount} จาก 4 ฝ่าย</b>
+                  <span className="text-ink-mute">·</span>
+                  <span>{waitingStageText}</span>
                 </span>
-              </div>
+              )}
             </div>
-          )}
 
-          {error && (
-            <div className="rounded-2xl bg-[#FDE8E8] border border-[#F9B4B4] px-3.5 py-2 text-[13px] text-[#7A1010]">
-              {error}
+            {req.type !== 'repair' && (
+              <SigningProgressSpotlight
+                requestKey={req.id}
+                steps={[
+                  {
+                    stepNumber: 1,
+                    roleTitle: 'ผู้ยื่นคำขอ',
+                    shortRoleTitle: 'ผู้ยื่นคำขอ',
+                    status: 'signed',
+                    signerName: req.requesterName,
+                    signature: req.requesterSignature,
+                    signedAtText: formatSignedAt(req.createdAt),
+                  },
+                  {
+                    stepNumber: 2,
+                    roleTitle: sigStaff?.title || SIGN_LEVEL_TITLE.staff,
+                    shortRoleTitle: 'เจ้าหน้าที่',
+                    status: resolveStepStatus(sigStaff, 'pending_staff'),
+                    signerName: sigStaff?.signerName,
+                    signature: sigStaff?.signature,
+                    signedAtText: formatSignedAt(sigStaff?.at),
+                    hint: 'ตรวจสอบความถูกต้องของข้อมูลคำขอและคิวว่าง',
+                    note: sigStaff?.note,
+                  },
+                  {
+                    stepNumber: 3,
+                    roleTitle: sigL2?.title || SIGN_LEVEL_TITLE.l2,
+                    shortRoleTitle: 'ปลัด อบต.',
+                    status: resolveStepStatus(sigL2, 'pending_l2'),
+                    signerName: sigL2?.signerName,
+                    signature: sigL2?.signature,
+                    signedAtText: formatSignedAt(sigL2?.at),
+                    hint: 'กลั่นกรองและเสนอความเห็นชอบตามระเบียบราชการ',
+                    note: sigL2?.note,
+                  },
+                  {
+                    stepNumber: 4,
+                    roleTitle: sigL1?.title || SIGN_LEVEL_TITLE.l1,
+                    shortRoleTitle: 'นายก อบต.',
+                    status: resolveStepStatus(sigL1, 'pending_l1'),
+                    signerName: sigL1?.signerName,
+                    signature: sigL1?.signature,
+                    signedAtText: formatSignedAt(sigL1?.at),
+                    hint: 'พิจารณาอนุมัติคำขอขั้นสุดท้าย',
+                    note: sigL1?.note,
+                  },
+                  {
+                    stepNumber: 5,
+                    roleTitle: 'ออกเอกสาร PDF และแจ้งผล',
+                    shortRoleTitle: 'ออกใบอนุญาต PDF',
+                    status: isFullyApproved ? 'system_ready' : 'system_pending',
+                    systemNote: 'ออกโดยระบบเมื่อลงนามครบทั้ง 4 ฝ่าย',
+                    actionHref: isFullyApproved ? `/approver/permit/${req.id}` : undefined,
+                    actionLabel: isFullyApproved ? 'เปิดดูใบอนุญาต (PDF)' : undefined,
+                  },
+                ]}
+              />
+            )}
+          </section>
+
+          {/* 2) เนื้อหาหลัก 2 คอลัมน์ (มือถือ: ขวาขึ้นก่อนซ้าย) */}
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px] gap-5 items-start min-w-0">
+            {/* คอลัมน์ซ้าย: เอกสารราชการ + รูปภาพ/เอกสารแนบ */}
+            <div className="order-2 lg:order-1 min-w-0 flex flex-col gap-5">
+              {req.type !== 'repair' && (
+                <section className="flex flex-col gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-1 print:hidden">
+                    <h2 className="text-[16px] font-bold text-ink">
+                      {req.type === 'booking'
+                        ? 'เอกสารราชการ: แบบขอใช้สถานที่ราชการ'
+                        : 'เอกสารราชการ: แบบคำขอใช้อุปกรณ์ราชการ'}
+                    </h2>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {showOfficialForm && (
+                        <button
+                          type="button"
+                          onClick={() => triggerDocumentPrint()}
+                          className="jw-btn-sec min-h-[44px] px-3.5 text-[13px]"
+                        >
+                          พิมพ์แบบฟอร์ม / PDF
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowOfficialForm((v) => !v)}
+                        className="jw-btn-ter min-h-[44px] px-3 text-[13px] text-brand"
+                      >
+                        {showOfficialForm ? 'ซ่อนแบบฟอร์มราชการ' : 'แสดงแบบฟอร์มราชการเต็มใบ'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {showOfficialForm && (
+                    <div className="w-full text-[17px] leading-[1.7]">
+                      <OfficialGovFormDocument req={req} />
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {/* รูปภาพและเอกสารแนบประกอบคำขอ */}
+              {'attachments' in req && Array.isArray(req.attachments) && req.attachments.length > 0 && (
+                <section className="jw-card p-4 sm:p-5 flex flex-col gap-2.5 print:hidden">
+                  <AttachmentViewer
+                    attachments={req.attachments}
+                    emptyText=""
+                    title="รูปภาพ / เอกสารแนบประกอบคำขอ"
+                  />
+                </section>
+              )}
+
+              {/* การ์ดการลงนามของผู้มีอำนาจ (Extra-Tall Touchscreen Stage ต่อท้ายรูปภาพ/เอกสารแนบ) */}
+              {!signCheck.allowed ? (
+                <section className="jw-card p-5 border-danger-border bg-danger-bg/20 flex flex-col gap-3 print:hidden">
+                  <div className="flex items-center justify-between gap-2">
+                    <b className="text-[15px] text-danger-fg">ระดับอำนาจการลงนามไม่ตรงกับขั้นตอนปัจจุบัน</b>
+                    <Chip tone="red">ต้องลงนามตามลำดับ</Chip>
+                  </div>
+                  <p className="text-[13.5px] text-ink leading-relaxed">{signCheck.reason}</p>
+                  <div className="text-[12.5px] text-ink-soft">
+                    บัญชีของคุณขณะนี้: <b>{account ? `${account.name} (${ROLE_LABEL[account.role]})` : '-'}</b>
+                  </div>
+                  <Link href="/approver" className="jw-btn w-full">
+                    กลับ
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={handleLogoutToLogin}
+                    className="jw-btn-sec w-full"
+                  >
+                    ออกจากระบบเพื่อเข้าสู่ระบบด้วยบัญชีผู้มีอำนาจขั้นตอนนี้
+                  </button>
+                </section>
+              ) : (
+                <section className="jw-card overflow-hidden flex flex-col print:hidden">
+                  {/* แถบหัวเรื่องสีเขียวอ่อน (Top Accent Header) */}
+                  <div className="px-4 sm:px-5 py-3.5 bg-brand-tint/65 border-b border-brand/20 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <PenLine className="size-4 text-brand shrink-0" />
+                      <b className="text-[14.5px] sm:text-[15.5px] text-ink truncate">
+                        กระดานลงลายมือชื่ออิเล็กทรอนิกส์ · {account?.name} ({account?.position})
+                      </b>
+                    </div>
+                    <span className="text-[12px] font-semibold text-brand shrink-0">{stepDesc}</span>
+                  </div>
+
+                  <div className="p-4 sm:p-5 flex flex-col gap-4">
+                    {/* Extra-Tall 280px Touchscreen Signature Stage */}
+                    <SignatureBox
+                      value={signature}
+                      onChange={setSignature}
+                      savedSignature={account?.signature}
+                      signerLabel={`${account?.name || ''} · ${account?.position || ''}`}
+                      height={280}
+                      skipPinPrompt
+                      floatingToolbar
+                      hideTopLabel
+                    />
+
+                    {/* เช็คบ็อกซ์ยืนยันความถูกต้อง */}
+                    <button
+                      type="button"
+                      onClick={() => setConfirmed((v) => !v)}
+                      className="flex items-start gap-2.5 text-left cursor-pointer select-none"
+                    >
+                      <span
+                        className={`w-[22px] h-[22px] rounded-[6px] border-[1.5px] flex items-center justify-center shrink-0 mt-0.5 ${
+                          confirmed ? 'bg-brand border-brand text-white' : 'bg-surface border-line-input'
+                        }`}
+                      >
+                        {confirmed && <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} />}
+                      </span>
+                      <span className="text-[13.5px] text-ink-soft leading-relaxed">
+                        ข้าพเจ้ายืนยันว่าได้ตรวจเอกสารแล้วและเขียนลายมือชื่อลงนามด้วยตนเอง (ระบบจะยืนยันตัวตนด้วย OTP ทางอีเมล)
+                      </span>
+                    </button>
+
+                    {error && (
+                      <div className="rounded-control bg-danger-bg border border-danger-border px-3.5 py-2.5 text-[13px] text-danger-fg">
+                        {error}
+                      </div>
+                    )}
+
+                    {/* ถาดกรอกเหตุผลกรณีไม่อนุมัติ/ไม่เห็นชอบ */}
+                    {!successNotice && rejectDrawerOpen && (
+                      <div className="rounded-control border border-danger-border bg-danger-bg/35 p-4 flex flex-col gap-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="text-[13px] font-bold text-danger-fg">
+                            ระบุเหตุผลที่{isFinalApprover ? 'ไม่อนุมัติ' : 'ไม่เห็นชอบ'} (แจ้งผู้ยื่นคำขอ)
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setRejectDrawerOpen(false)}
+                            className="text-[12px] font-medium text-ink-soft hover:text-ink cursor-pointer"
+                          >
+                            ยกเลิก ✕
+                          </button>
+                        </div>
+                        <textarea
+                          rows={2}
+                          value={note}
+                          onChange={(e) => setNote(e.target.value)}
+                          placeholder="พิมพ์เหตุผลหรือข้อเสนอแนะ..."
+                          className="jw-in h-20 py-2.5 bg-surface"
+                        />
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setRejectDrawerOpen(false)}
+                            className="jw-btn-sec !min-h-[38px] px-3.5 text-[12.5px]"
+                          >
+                            ปิดถาดนี้
+                          </button>
+                          <button
+                            type="button"
+                            disabled={submitting || !signature.trim()}
+                            onClick={() => handleStartSign('reject')}
+                            className="min-h-[38px] px-4 rounded-control bg-danger-solid text-white text-[12.5px] font-semibold hover:opacity-95 disabled:opacity-40 transition cursor-pointer"
+                          >
+                            ยืนยันลงนาม{isFinalApprover ? 'ไม่อนุมัติ' : 'ไม่เห็นชอบ'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {!successNotice && (
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 pt-1">
+                        <Link
+                          href="/approver"
+                          className="sm:col-span-3 jw-btn-sec w-full text-[13.5px]"
+                        >
+                          ← กลับหน้ารายการ
+                        </Link>
+
+                        <button
+                          type="button"
+                          onClick={() => setRejectDrawerOpen((v) => !v)}
+                          className={`sm:col-span-3 min-h-[44px] px-4 rounded-control border text-[13.5px] font-semibold transition cursor-pointer ${
+                            rejectDrawerOpen
+                              ? 'border-danger-border bg-danger-bg text-danger-fg'
+                              : 'border-danger-border/70 bg-surface text-danger-fg hover:bg-danger-bg/40'
+                          }`}
+                        >
+                          ลงนาม{isFinalApprover ? 'ไม่อนุมัติ' : 'ไม่เห็นชอบ'}...
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={!confirmed || !signature.trim() || submitting}
+                          onClick={() => handleStartSign('approve')}
+                          className="sm:col-span-6 jw-btn w-full text-[14px] font-bold inline-flex items-center justify-center gap-2"
+                        >
+                          <span>
+                            {submitting
+                              ? 'กำลังบันทึก...'
+                              : isSessionVerified
+                                ? `ลงนาม${isFinalApprover ? 'อนุมัติ' : 'เห็นชอบ'} (มีผลทันที)`
+                                : 'ลงนามและยืนยัน OTP'}
+                          </span>
+                          <ArrowRight className="size-4 shrink-0" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
             </div>
-          )}
+
+            {/* คอลัมน์ขวา (กว้างสุด 400px): เซสชัน OTP + สรุปคำขอ */}
+            <div className="order-1 lg:order-2 min-w-0 flex flex-col gap-4 lg:sticky lg:top-6 print:hidden">
+              {/* แถบสถานะเซสชัน OTP ยืนยันตัวตน */}
+              <SignOtpVerifier
+                initialEmail={account?.email}
+                onVerified={() => {
+                  setIsSessionVerified(true);
+                }}
+              />
+
+              {/* การ์ดสรุปคำขอ */}
+              <section className="jw-card p-4 sm:p-5 flex flex-col gap-3.5">
+                <h2 className="text-[16px] font-bold text-ink">สรุปคำขอ</h2>
+
+                <dl className="grid grid-cols-[96px_minmax(0,1fr)] gap-y-2.5 gap-x-3 text-[14px] items-baseline">
+                  <dt className="font-semibold text-ink-soft">เลขคำขอ</dt>
+                  <dd className="font-semibold text-ink break-words">{req.code}</dd>
+
+                  <dt className="font-semibold text-ink-soft">ประเภท</dt>
+                  <dd>
+                    <RequestTypeChip type={req.type} />
+                  </dd>
+
+                  <dt className="font-semibold text-ink-soft">รายการ</dt>
+                  <dd className="font-semibold text-ink break-words">
+                    {req.title} {req.subtitle ? `(${req.subtitle})` : ''}
+                  </dd>
+
+                  <dt className="font-semibold text-ink-soft">
+                    {req.type === 'borrow' ? 'ช่วงขอใช้' : 'วัน-เวลา'}
+                  </dt>
+                  <dd className="text-ink">
+                    {req.type === 'booking'
+                      ? req.periods.map((p) => formatPeriodRange(p)).join(', ')
+                      : req.type === 'borrow'
+                        ? `${formatThaiDate(req.pickupDate, false)}–${formatThaiDate(req.returnDate, true)}`
+                        : '-'}
+                  </dd>
+
+                  <dt className="font-semibold text-ink-soft">ผู้ขอ</dt>
+                  <dd className="text-ink break-words">{req.requesterName}</dd>
+
+                  <dt className="font-semibold text-ink-soft">หน่วยงาน</dt>
+                  <dd className="text-ink break-words">{req.organization || '-'}</dd>
+
+                  {req.requesterPhone && (
+                    <>
+                      <dt className="font-semibold text-ink-soft">โทรศัพท์</dt>
+                      <dd>
+                        <a
+                          href={`tel:${req.requesterPhone}`}
+                          className="inline-flex items-center min-h-[44px] -my-2 text-brand font-semibold hover:underline"
+                        >
+                          {req.requesterPhone}
+                        </a>
+                      </dd>
+                    </>
+                  )}
+                </dl>
+
+                {req.type !== 'repair' && req.purpose ? (
+                  <div className="flex flex-col gap-1 bg-warn-bg/60 border border-warn-border rounded-control p-3 text-[13px] text-warn-fg">
+                    <b className="font-semibold">ข้อความถึง จนท.</b>
+                    <span className="whitespace-pre-wrap leading-relaxed">{req.purpose}</span>
+                  </div>
+                ) : null}
+
+                <div className="flex items-start gap-2.5 pt-2 border-t border-line text-[13px]">
+                  <FileText className="size-4 text-ink-soft shrink-0 mt-0.5" />
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <span className="font-semibold text-ink break-all">คำขอ_{req.code}.pdf</span>
+                    {isFullyApproved ? (
+                      <Link
+                        href={`/approver/permit/${req.id}`}
+                        className="inline-flex items-center min-h-[44px] -my-2 underline text-brand font-semibold"
+                      >
+                        เปิดดูใบอนุญาต (PDF)
+                      </Link>
+                    ) : (
+                      <span className="text-ink-soft text-[12px]">(ออกใบอนุญาตเมื่อลงนามครบทั้ง 4 ฝ่าย)</span>
+                    )}
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
         </div>
       ) : (
         /* สเต็ปยืนยัน OTP ก่อนเซ็น */
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 max-w-xl mx-auto">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <button
               type="button"
               onClick={() => setOtpStep(false)}
-              className="text-[13px] text-brand font-semibold hover:underline flex items-center gap-1"
+              className="min-h-[44px] text-[13px] text-brand font-semibold hover:underline inline-flex items-center gap-1"
             >
               ← ย้อนกลับไปแก้ไขลายเซ็น
             </button>
-            <span className="text-[12px] text-ink-mute">
+            <span className="text-[12px] text-ink-soft">
               {stepDesc} · เอกสาร {req.code}
             </span>
           </div>
@@ -432,7 +672,7 @@ export default function ApproverSignDocumentPage() {
           />
 
           {error && (
-            <div className="rounded-2xl bg-[#FDE8E8] border border-[#F9B4B4] px-3.5 py-2 text-[13px] text-[#7A1010]">
+            <div className="rounded-control bg-danger-bg border border-danger-border px-3.5 py-2.5 text-[13px] text-danger-fg">
               {error}
             </div>
           )}
@@ -441,19 +681,20 @@ export default function ApproverSignDocumentPage() {
 
       {/* Modal แป้นพิมพ์กรอกรหัส PIN 6 หลัก */}
       {showPinModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-[420px] bg-white rounded-hard p-6 flex flex-col items-center gap-4 shadow-md">
+        <div className="fixed inset-0 bg-ink/50 flex items-center justify-center p-4 z-50">
+          <div className="w-full max-w-[420px] bg-surface rounded-card border border-line p-6 flex flex-col items-center gap-4 shadow-pop">
             <div className="w-full flex items-center justify-between">
               <div>
                 <b className="text-[16px] text-ink block">ยืนยันรหัส PIN 6 หลักเพื่อลงนาม</b>
-                <span className="text-[12px] text-ink-mute">
+                <span className="text-[12px] text-ink-soft">
                   คำขอ {req.code} · {pendingDecision === 'approve' ? 'ลงนามเห็นชอบ/อนุมัติ' : 'ลงนามไม่เห็นชอบ/ไม่อนุมัติ'}
                 </span>
               </div>
               <button
                 type="button"
+                aria-label="ปิดหน้าต่าง PIN"
                 onClick={() => setShowPinModal(false)}
-                className="text-ink-mute hover:text-ink"
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center text-ink-soft hover:text-ink"
               >
                 <Icon name="x" className="w-5 h-5" />
               </button>
@@ -467,7 +708,7 @@ export default function ApproverSignDocumentPage() {
             />
 
             {pinError && (
-              <div className="w-full rounded-2xl bg-[#FDE8E8] border border-[#f9b4b4] px-3.5 py-2 text-[13px] text-[#7a1010] text-center">
+              <div className="w-full rounded-control bg-danger-bg border border-danger-border px-3.5 py-2 text-[13px] text-danger-fg text-center">
                 {pinError}
               </div>
             )}
@@ -480,15 +721,16 @@ export default function ApproverSignDocumentPage() {
           </div>
         </div>
       )}
+
       {/* แจ้งเตือนหลังลงนามเสร็จสิ้นก่อนเด้งกลับหน้าหลัก */}
       {successNotice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-[380px] rounded-2xl bg-surface border border-emerald-500/30 p-6 shadow-xl flex flex-col items-center text-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-emerald-500/15 text-emerald-600 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-[380px] rounded-card bg-surface border border-ok-border p-6 shadow-pop flex flex-col items-center text-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-ok-bg text-ok-fg flex items-center justify-center">
               <Icon name="check" className="w-6 h-6" strokeWidth={3} />
             </div>
             <b className="text-[17px] text-ink">{successNotice}</b>
-            <span className="text-[13px] text-ink-mute">กำลังกลับไปหน้าหลัก...</span>
+            <span className="text-[13px] text-ink-soft">กำลังกลับไปหน้าหลัก...</span>
           </div>
         </div>
       )}

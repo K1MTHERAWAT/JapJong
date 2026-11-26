@@ -531,6 +531,8 @@ export function SignatureBox({
   height = 180,
   skipPinPrompt = true,
   pinAccountId,
+  floatingToolbar = false,
+  hideTopLabel = false,
 }: {
   value: string;
   onChange: (val: string) => void;
@@ -539,6 +541,8 @@ export function SignatureBox({
   height?: number;
   skipPinPrompt?: boolean;
   pinAccountId?: string;
+  floatingToolbar?: boolean;
+  hideTopLabel?: boolean;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const drawingRef = React.useRef(false);
@@ -698,20 +702,24 @@ export function SignatureBox({
     <div className="flex flex-col gap-2.5">
       <div
         style={{ height }}
-        className={`border-[1.5px] rounded-card relative bg-white overflow-hidden select-none transition ${
+        className={`${floatingToolbar ? 'border-2 rounded-2xl' : 'border-[1.5px] rounded-card'} relative bg-white overflow-hidden select-none transition ${
           hasDrawnSignature ? 'border-brand' : 'border-line'
         }`}
       >
-        <div className="absolute left-3.5 right-3.5 top-2.5 grid grid-cols-[minmax(0,1fr)_max-content] items-start gap-2 pointer-events-none z-10">
-          <span className="min-w-0 text-[11px] leading-4 text-ink-mute">
-            {signerLabel ? `ลายเซ็น: ${signerLabel}` : 'ใช้นิ้วหรือเมาส์ลากเขียนลายเซ็นในกรอบนี้ หรือดึงลายเซ็นที่บันทึกไว้'}
+        <div className="absolute left-3.5 right-3.5 top-3 grid grid-cols-[minmax(0,1fr)_max-content] items-start gap-2 pointer-events-none z-10">
+          <span className="min-w-0 text-[11px] leading-4 text-[#667085]">
+            {hideTopLabel
+              ? '\u00A0'
+              : signerLabel
+                ? `ลายเซ็น: ${signerLabel}`
+                : 'ใช้นิ้วหรือเมาส์ลากเขียนลายเซ็นในกรอบนี้ หรือดึงลายเซ็นที่บันทึกไว้'}
           </span>
           {hasDrawnSignature ? (
-            <span className="shrink-0 whitespace-nowrap text-[11px] font-semibold text-brand bg-brand-mint px-2 py-0.5 rounded-full">
+            <span className="shrink-0 whitespace-nowrap text-[11.5px] font-semibold text-[#14532D] bg-[#DCFCE7] px-2.5 py-0.5 rounded-full border border-[#A8C965]/60">
               {usedSavedWithPin ? '✓ ใช้ลายเซ็นที่บันทึกไว้ (ยืนยัน PIN)' : '✓ ลงลายมือชื่อแล้ว'}
             </span>
           ) : (
-            <span className="shrink-0 whitespace-nowrap text-[11px] font-semibold text-[#9A4A08] bg-[#f8842d]/15 px-2 py-0.5 rounded-full">
+            <span className="shrink-0 whitespace-nowrap text-[11.5px] font-semibold text-[#9A4A08] bg-[#FEF3C7] px-2.5 py-0.5 rounded-full border border-[#E8C75C]/70">
               ยังไม่ได้ลงลายเซ็น
             </span>
           )}
@@ -719,18 +727,22 @@ export function SignatureBox({
 
         {!hasDrawnSignature && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="max-w-[280px] px-5 text-center text-[14px] leading-relaxed text-ink-ph">
-              ใช้นิ้วหรือเมาส์ลากเซ็นชื่อในช่องนี้
+            <span className="max-w-[320px] px-5 text-center text-[14.5px] leading-relaxed text-[#98A2B3]">
+              ใช้นิ้ว ปากกา หรือเมาส์ลากเซ็นชื่อในช่องนี้
             </span>
           </div>
         )}
 
-        <div className="absolute left-5 right-5 bottom-8 border-t border-dashed border-[#BBBBBB] pointer-events-none" />
+        <div
+          className={`absolute border-t border-dashed border-[#BBBBBB] pointer-events-none ${
+            floatingToolbar ? 'left-8 right-8 sm:right-72 bottom-7' : 'left-5 right-5 bottom-8'
+          }`}
+        />
 
         <canvas
           ref={canvasRef}
-          width={640}
-          height={220}
+          width={height >= 240 ? 820 : 640}
+          height={Math.max(220, height)}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={finishStroke}
@@ -738,27 +750,52 @@ export function SignatureBox({
           onPointerLeave={finishStroke}
           className="w-full h-full cursor-crosshair touch-none relative z-20"
         />
+
+        {floatingToolbar && (
+          <div className="absolute bottom-3.5 right-3.5 z-30 flex flex-wrap items-center justify-end gap-2">
+            {validSavedSig && (
+              <button
+                type="button"
+                onClick={handleRequestSavedSignature}
+                className="inline-flex items-center gap-1.5 border border-[#1E7D5A]/45 text-[#176548] rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold bg-white/95 shadow-sm hover:bg-[#1E7D5A] hover:text-white transition cursor-pointer"
+              >
+                <Icon name="lock" className="w-3.5 h-3.5" />
+                <span>{skipPinPrompt ? 'ใช้ลายเซ็นที่บันทึกไว้' : 'ใช้ลายเซ็นที่บันทึกไว้ (PIN)'}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleClear}
+              className="inline-flex items-center gap-1.5 border border-[#D0D5DD] text-[#344054] rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold bg-white/95 shadow-sm hover:bg-[#F4F4F1] transition cursor-pointer"
+            >
+              <Icon name="eraser" className="w-3.5 h-3.5" />
+              <span>ล้างเขียนใหม่</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {validSavedSig && (
+      {!floatingToolbar && (
+        <div className="flex flex-wrap items-center gap-2">
+          {validSavedSig && (
+            <button
+              type="button"
+              onClick={handleRequestSavedSignature}
+              className="inline-flex items-center gap-1.5 border border-brand text-brand rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold bg-brand-mint hover:bg-brand hover:text-white transition"
+            >
+              <Icon name="lock" className="w-3.5 h-3.5" />
+              <span>{skipPinPrompt ? 'ใช้ลายเซ็นที่บันทึกไว้' : 'ใช้ลายเซ็นที่บันทึกไว้ (กด PIN 6 หลัก)'}</span>
+            </button>
+          )}
           <button
             type="button"
-            onClick={handleRequestSavedSignature}
-            className="inline-flex items-center gap-1.5 border border-brand text-brand rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold bg-brand-mint hover:bg-brand hover:text-white transition"
+            onClick={handleClear}
+            className="inline-flex items-center gap-1.5 border border-line rounded-full px-3 py-1.5 text-[12.5px] font-medium bg-white hover:bg-soft"
           >
-            <Icon name="lock" className="w-3.5 h-3.5" />
-            <span>{skipPinPrompt ? 'ใช้ลายเซ็นที่บันทึกไว้' : 'ใช้ลายเซ็นที่บันทึกไว้ (กด PIN 6 หลัก)'}</span>
+            <Icon name="eraser" className="w-4 h-4" /> ล้างและเขียนใหม่
           </button>
-        )}
-        <button
-          type="button"
-          onClick={handleClear}
-          className="inline-flex items-center gap-1.5 border border-line rounded-full px-3 py-1.5 text-[12.5px] font-medium bg-white hover:bg-soft"
-        >
-          <Icon name="eraser" className="w-4 h-4" /> ล้างและเขียนใหม่
-        </button>
-      </div>
+        </div>
+      )}
 
       {showPinModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
