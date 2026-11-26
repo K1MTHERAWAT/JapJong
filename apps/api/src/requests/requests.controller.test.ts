@@ -200,6 +200,13 @@ describe('RequestsController Unit Tests', () => {
       expect(mockDb.notifyRole).toHaveBeenCalled();
     });
 
+    it('rejects booking requests that include more than one venue', async () => {
+      const body = validBookingBody();
+      body.venueIds = ['v-01', 'v-02'];
+      await expect(controller.createBooking(citizen, body)).rejects.toThrow(/ครั้งละ 1 สถานที่/);
+      expect(mockDb.persistRequest).not.toHaveBeenCalled();
+    });
+
     it('throws BadRequestException if venue does not exist or is disabled', async () => {
       const body = validBookingBody();
       body.venueIds = ['non-existing'];

@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "prebuild": "pnpm --filter @japjong/shared build",
+    "prebuild": "pnpm --filter @japjong/shared build && pnpm prisma:generate",
+    "predev": "pnpm prisma:generate",
+    "pretypecheck": "pnpm prisma:generate",
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "node dist/main.js",

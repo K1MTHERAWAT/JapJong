@@ -228,8 +228,10 @@ export default function BookingWizardPage() {
 
   const [writtenAt, setWrittenAt] = useState('');
   const [requesterTitle, setRequesterTitle] = useState(() => parseTitleAndName(account?.name).title);
+  const [requesterTitleOther, setRequesterTitleOther] = useState('');
   const [requesterName, setRequesterName] = useState(() => parseTitleAndName(account?.name).name);
-  const fullRequesterName = requesterName.trim() ? `${requesterTitle} ${requesterName.trim()}` : '';
+  const effectiveRequesterTitle = requesterTitle === 'อื่นๆ' ? requesterTitleOther.trim() : requesterTitle;
+  const fullRequesterName = requesterName.trim() ? `${effectiveRequesterTitle} ${requesterName.trim()}` : '';
   const [requesterPhone, setRequesterPhone] = useState(() => sanitizePhoneInput(account?.phone || '', 10));
   const [requesterPosition, setRequesterPosition] = useState(
     account?.position && account.position !== 'ประชาชน'
@@ -279,6 +281,7 @@ export default function BookingWizardPage() {
   const missingRequestFields = [
     ...[
       ['สถานที่เขียนคำขอ', writtenAt],
+      ['คำนำหน้า', effectiveRequesterTitle],
       ['ชื่อ-นามสกุลผู้ยื่นคำขอ', requesterName],
       ['ตำแหน่ง', requesterPosition],
       ['บ้านเลขที่', addressHouseNo],
@@ -309,6 +312,7 @@ export default function BookingWizardPage() {
   const applyAccountFields = (acc: PublicAccount | null) => {
     const { title, name } = parseTitleAndName(acc?.name);
     setRequesterTitle(title);
+    setRequesterTitleOther('');
     setRequesterName(name);
     setRequesterPhone(sanitizePhoneInput(acc?.phone || '', 10));
     setRequesterPosition(acc?.position && acc.position !== 'ประชาชน' ? acc.position : '');
@@ -416,7 +420,12 @@ export default function BookingWizardPage() {
 
   const toggleVenue = (v: Venue) => {
     if (v.status !== 'available' || !v.enabled) return;
-    setSelectedIds((prev) => (prev.includes(v.id) ? prev.filter((id) => id !== v.id) : [...prev, v.id]));
+    setSelectedIds((prev) => (prev.length === 1 && prev[0] === v.id ? [] : [v.id]));
+    // วันเวลาเดิมอาจไม่เข้าเงื่อนไขของสถานที่เพิ่งเลือก จึงเริ่มเลือกใหม่ทุกครั้งที่เปลี่ยนสถานที่
+    setPeriods([]);
+    setActivePeriodIdx(0);
+    setAvailability([]);
+    setConflicts([]);
   };
 
   const filteredVenues = venues.filter((v) => {
@@ -760,7 +769,7 @@ export default function BookingWizardPage() {
                     <span className="text-[11.5px] px-2.5 py-0.5 rounded-full bg-brand-mint text-brand font-semibold">
                       {selectedVenues.length > 0 && minAdvanceDays > 0
                         ? `ต้องจองล่วงหน้าอย่างน้อย ${minAdvanceDays} วัน`
-                        : 'เลือกได้มากกว่า 1 แห่ง'}
+                        : 'เลือกได้ครั้งละ 1 แห่ง'}
                     </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5 mt-1">
@@ -912,7 +921,7 @@ export default function BookingWizardPage() {
         <div className="flex md:hidden flex-col gap-3.5 pb-4">
           {/* คำอธิบาย */}
           <p className="text-body text-ink-soft leading-relaxed px-0.5">
-            เลือกสถานที่ที่ต้องการใช้งาน (สามารถเลือกได้มากกว่า 1 แห่งในคำขอเดียวกัน)
+            เลือกสถานที่ที่ต้องการใช้งาน
           </p>
 
           {/* 3) กล่องข้อมูลรวม (สีโทนเดียวกับระบบ) */}
@@ -1034,7 +1043,8 @@ export default function BookingWizardPage() {
                               >
                                 <input
                                   id={`mob-chk-${v.id}`}
-                                  type="checkbox"
+                                  type="radio"
+                                  name="booking-venue"
                                   checked={isSelected}
                                   disabled={disabled}
                                   onChange={() => toggleVenue(v)}
@@ -1117,7 +1127,7 @@ export default function BookingWizardPage() {
                     </span>
                   </div>
                   <p className="text-[12px] text-ink-mute mt-0.5">
-                    เลือกสถานที่ที่ต้องการใช้งาน (สามารถเลือกได้มากกว่า 1 แห่งในคำขอเดียวกัน)
+                    เลือกสถานที่ที่ต้องการใช้งาน
                   </p>
                 </div>
               </div>
@@ -2370,7 +2380,26 @@ export default function BookingWizardPage() {
                 <option value="นาย">นาย</option>
                 <option value="นาง">นาง</option>
                 <option value="นางสาว">นางสาว</option>
+                <option value="อื่นๆ">อื่นๆ</option>
               </select>
+              {requesterTitle === 'อื่นๆ' && (
+                <div className="mt-2">
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <label className="jw-lbl mb-0">ระบุคำนำหน้า</label>
+                    <NameLengthBadge value={requesterTitleOther} maxLength={NAME_MAX_LENGTH.PERSON_NAME} />
+                  </div>
+                  <input
+                    type="text"
+                    value={requesterTitleOther}
+                    maxLength={NAME_MAX_LENGTH.PERSON_NAME}
+                    onChange={(e) => setRequesterTitleOther(clampNameInput(e.target.value, NAME_MAX_LENGTH.PERSON_NAME))}
+                    className="jw-in"
+                    placeholder="พิมพ์คำนำหน้า"
+                    required
+                  />
+                  <NameLimitWarning value={requesterTitleOther} maxLength={NAME_MAX_LENGTH.PERSON_NAME} />
+                </div>
+              )}
             </div>
             <div className="lg:col-span-3">
               <div className="flex items-center justify-between gap-1 mb-1">

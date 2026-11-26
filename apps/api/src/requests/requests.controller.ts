@@ -503,6 +503,9 @@ export class RequestsController {
       const staffSig = isWalkIn && body.createdByStaffSignature ? requireDrawnSignature(body.createdByStaffSignature, 'เจ้าหน้าที่ผู้กรอกแทน') : undefined;
 
       const venueIds = Array.isArray(body.venueIds) ? body.venueIds : [];
+      if (venueIds.length > 1) {
+        throw new BadRequestException('เลือกจองได้ครั้งละ 1 สถานที่');
+      }
       const periods = Array.isArray(body.periods) ? body.periods : [];
       this.validatePeriodsAndVenues(venueIds, periods);
 

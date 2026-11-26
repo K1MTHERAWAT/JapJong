@@ -193,25 +193,25 @@ export default function HomePage() {
         <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-7 items-start">
           {/* Left Column: My Requests */}
           <section aria-label="คำขอของฉัน" className="flex flex-col gap-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <h2 className="text-heading font-bold text-ink">คำขอของฉัน</h2>
-                <span className="text-caption text-muted">({filtered.length})</span>
+            <Card padding="none" className="flex flex-col gap-3 p-3 sm:p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-heading font-bold text-ink">คำขอของฉัน</h2>
+                  <span className="text-caption text-muted">({filtered.length})</span>
+                </div>
+                <Tabs<TabFilter>
+                  value={tab}
+                  onChange={setTab}
+                  className="w-full sm:w-auto"
+                  options={[
+                    { value: 'all', label: 'ทั้งหมด' },
+                    { value: 'booking', label: 'สถานที่' },
+                    { value: 'borrow', label: 'อุปกรณ์' },
+                    { value: 'repair', label: 'แจ้งซ่อม' },
+                  ]}
+                />
               </div>
-              <Tabs<TabFilter>
-                value={tab}
-                onChange={setTab}
-                className="w-full sm:w-auto"
-                options={[
-                  { value: 'all', label: 'ทั้งหมด' },
-                  { value: 'booking', label: 'สถานที่' },
-                  { value: 'borrow', label: 'อุปกรณ์' },
-                  { value: 'repair', label: 'แจ้งซ่อม' },
-                ]}
-              />
-            </div>
 
-            <Card padding="none" className="p-2 sm:p-4">
               {filtered.length === 0 ? (
                 <EmptyState
                   title="ยังไม่มีคำขอในหมวดนี้"

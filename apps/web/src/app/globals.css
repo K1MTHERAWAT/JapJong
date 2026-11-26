@@ -939,6 +939,11 @@
   border-color: rgb(var(--rgb-line)) !important;
 }
 
+/* หน้าแรก: ให้ aside ข้อมูลประกอบโปร่งใส โดยไม่กระทบ Sidebar */
+.gov-brand-shell aside[aria-label="ข้อมูลประกอบ"] {
+  background: transparent !important;
+}
+
 .gov-brand-shell .sidebar-toggle-btn {
   display: none !important;
 }

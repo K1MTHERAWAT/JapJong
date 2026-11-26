@@ -194,8 +194,10 @@ export default function BorrowWizardPage() {
 
   const [writtenAt, setWrittenAt] = useState('');
   const [requesterTitle, setRequesterTitle] = useState(() => parseTitleAndName(account?.name).title);
+  const [requesterTitleOther, setRequesterTitleOther] = useState('');
   const [requesterName, setRequesterName] = useState(() => parseTitleAndName(account?.name).name);
-  const fullRequesterName = requesterName.trim() ? `${requesterTitle} ${requesterName.trim()}` : '';
+  const effectiveRequesterTitle = requesterTitle === 'อื่นๆ' ? requesterTitleOther.trim() : requesterTitle;
+  const fullRequesterName = requesterName.trim() ? `${effectiveRequesterTitle} ${requesterName.trim()}` : '';
   const [requesterPhone, setRequesterPhone] = useState(() => sanitizePhoneInput(account?.phone || '', 10));
   const [requesterPosition, setRequesterPosition] = useState(
     account?.position && account.position !== 'ประชาชน' ? account.position : '',
@@ -234,6 +236,7 @@ export default function BorrowWizardPage() {
   const applyAccountFields = (acc: PublicAccount | null) => {
     const { title, name } = parseTitleAndName(acc?.name);
     setRequesterTitle(title);
+    setRequesterTitleOther('');
     setRequesterName(name);
     setRequesterPhone(sanitizePhoneInput(acc?.phone || '', 10));
     setRequesterPosition(acc?.position && acc.position !== 'ประชาชน' ? acc.position : '');
@@ -297,6 +300,7 @@ export default function BorrowWizardPage() {
     if (account && !isWalkIn) {
       const { title, name } = parseTitleAndName(account.name);
       setRequesterTitle(title);
+      setRequesterTitleOther('');
       setRequesterName(name);
       setRequesterPhone(sanitizePhoneInput(account.phone || '', 10));
       setOrganization(account.department || '');
@@ -381,6 +385,7 @@ export default function BorrowWizardPage() {
   const missingRequestFields = [
     ...[
       ['สถานที่เขียนคำขอ', writtenAt],
+      ['คำนำหน้า', effectiveRequesterTitle],
       ['ชื่อ-นามสกุลผู้ยื่นคำขอ', requesterName],
       ['ตำแหน่ง', requesterPosition],
       ['บ้านเลขที่', addressHouseNo],
@@ -1580,7 +1585,26 @@ export default function BorrowWizardPage() {
                   <option value="นาย">นาย</option>
                   <option value="นาง">นาง</option>
                   <option value="นางสาว">นางสาว</option>
+                  <option value="อื่นๆ">อื่นๆ</option>
                 </select>
+                {requesterTitle === 'อื่นๆ' && (
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <label className="jw-lbl mb-0">ระบุคำนำหน้า</label>
+                      <NameLengthBadge value={requesterTitleOther} maxLength={NAME_MAX_LENGTH.PERSON_NAME} />
+                    </div>
+                    <input
+                      type="text"
+                      value={requesterTitleOther}
+                      maxLength={NAME_MAX_LENGTH.PERSON_NAME}
+                      onChange={(e) => setRequesterTitleOther(clampNameInput(e.target.value, NAME_MAX_LENGTH.PERSON_NAME))}
+                      className="jw-in"
+                      placeholder="พิมพ์คำนำหน้า"
+                      required
+                    />
+                    <NameLimitWarning value={requesterTitleOther} maxLength={NAME_MAX_LENGTH.PERSON_NAME} />
+                  </div>
+                )}
               </div>
               <div className="lg:col-span-3">
                 <div className="flex items-center justify-between gap-1 mb-1">

@@ -123,7 +123,8 @@ export default function RequestDetailPage() {
               ['pending_staff', 'pending_l2'].includes(req.status) && (
                 <Link
                   href={`/requests/${req.id}/reschedule?mode=reschedule`}
-                  className="jw-btn flex-[1.4] sm:w-48"
+                  className="jw-btn-red flex-[1.4] sm:w-48"
+                  style={{ backgroundColor: '#d9a60e' }}
                 >
                   ขอเลื่อนวัน / แก้ไข
                 </Link>
