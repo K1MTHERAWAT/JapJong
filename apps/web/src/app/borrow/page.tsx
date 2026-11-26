@@ -15,6 +15,8 @@ import {
   OfficialFormPurposeItem,
   PublicAccount,
   clampNameInput,
+  sanitizeHouseNoInput,
+  sanitizeMooInput,
   sanitizePhoneInput,
   validateThaiAddressHierarchy,
   validateThaiPhone,
@@ -205,8 +207,8 @@ export default function BorrowWizardPage() {
   const [requesterPosition, setRequesterPosition] = useState(
     account?.position && account.position !== 'ประชาชน' ? account.position : '',
   );
-  const [addressHouseNo, setAddressHouseNo] = useState(account?.addressHouseNo || '');
-  const [addressMoo, setAddressMoo] = useState(account?.addressMoo || '');
+  const [addressHouseNo, setAddressHouseNo] = useState(() => sanitizeHouseNoInput(account?.addressHouseNo || ''));
+  const [addressMoo, setAddressMoo] = useState(() => sanitizeMooInput(account?.addressMoo || ''));
   const [addressSubdistrict, setAddressSubdistrict] = useState(account?.addressSubdistrict || '');
   const [addressDistrict, setAddressDistrict] = useState(account?.addressDistrict || '');
   const [addressProvince, setAddressProvince] = useState(account?.addressProvince || '');
@@ -244,8 +246,8 @@ export default function BorrowWizardPage() {
     setRequesterPhone(sanitizePhoneInput(acc?.phone || '', 10));
     setRequesterPosition(acc?.position && acc.position !== 'ประชาชน' ? acc.position : '');
     setOrganization(acc?.department || '');
-    setAddressHouseNo(acc?.addressHouseNo || '');
-    setAddressMoo(acc?.addressMoo || '');
+    setAddressHouseNo(sanitizeHouseNoInput(acc?.addressHouseNo || ''));
+    setAddressMoo(sanitizeMooInput(acc?.addressMoo || ''));
     setAddressSubdistrict(acc?.addressSubdistrict || '');
     setAddressDistrict(acc?.addressDistrict || '');
     setAddressProvince(acc?.addressProvince || '');
@@ -308,8 +310,8 @@ export default function BorrowWizardPage() {
       setRequesterPhone(sanitizePhoneInput(account.phone || '', 10));
       setOrganization(account.department || '');
       if (account.position && account.position !== 'ประชาชน') setRequesterPosition(account.position);
-      if (account.addressHouseNo) setAddressHouseNo(account.addressHouseNo);
-      if (account.addressMoo) setAddressMoo(account.addressMoo);
+      if (account.addressHouseNo) setAddressHouseNo(sanitizeHouseNoInput(account.addressHouseNo));
+      if (account.addressMoo) setAddressMoo(sanitizeMooInput(account.addressMoo));
       if (account.addressSubdistrict) setAddressSubdistrict(account.addressSubdistrict);
       if (account.addressDistrict) setAddressDistrict(account.addressDistrict);
       if (account.addressProvince) setAddressProvince(account.addressProvince);
@@ -1695,13 +1697,16 @@ export default function BorrowWizardPage() {
             {/* ที่อยู่ตามทะเบียนราษฎร์ */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
               <div>
-                <label className="jw-lbl">บ้านเลขที่<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
+                <label className="jw-lbl">อยู่บ้านเลขที่<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
                 <input
                   type="text"
+                  pattern="[0-9]+(\/[0-9]+)*"
+                  maxLength={20}
                   value={addressHouseNo}
-                  onChange={(e) => setAddressHouseNo(e.target.value)}
-                  className="jw-in"
-                  placeholder="เช่น 123/4"
+                  onChange={(e) => setAddressHouseNo(sanitizeHouseNoInput(e.target.value))}
+                  onBlur={() => setAddressHouseNo((v) => v.replace(/\/+$/, ''))}
+                  className="jw-in font-mono"
+                  placeholder="เช่น 124/5"
                   required
                 />
               </div>
@@ -1709,10 +1714,13 @@ export default function BorrowWizardPage() {
                 <label className="jw-lbl">หมู่ที่<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
                 <input
                   type="text"
+                  pattern="[0-9]+(\/[0-9]+)*"
+                  maxLength={10}
                   value={addressMoo}
-                  onChange={(e) => setAddressMoo(e.target.value)}
-                  className="jw-in"
-                  placeholder="เช่น 5"
+                  onChange={(e) => setAddressMoo(sanitizeMooInput(e.target.value))}
+                  onBlur={() => setAddressMoo((v) => v.replace(/\/+$/, ''))}
+                  className="jw-in font-mono"
+                  placeholder="เช่น 3 หรือ 14/2"
                   required
                 />
               </div>
@@ -1844,10 +1852,30 @@ export default function BorrowWizardPage() {
                     setAttachmentError(combined.length > 3 ? 'แนบเอกสารได้สูงสุด 3 ไฟล์' : '');
                     setAttachmentFiles(combined.slice(0, 3));
                   }
+                  e.target.value = '';
                 }}
               />
               <label
                 htmlFor="borrow-attachment"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const picked = Array.from(e.dataTransfer.files ?? []);
+                  if (picked.length) {
+                    const unique = picked.filter(
+                      (file) =>
+                        !attachmentFiles.some(
+                          (existing) =>
+                            existing.name === file.name &&
+                            existing.size === file.size &&
+                            existing.lastModified === file.lastModified,
+                        ),
+                    );
+                    const combined = [...attachmentFiles, ...unique];
+                    setAttachmentError(combined.length > 3 ? 'แนบเอกสารได้สูงสุด 3 ไฟล์' : '');
+                    setAttachmentFiles(combined.slice(0, 3));
+                  }
+                }}
                 className="border-[1.5px] border-dashed border-[#7A7A7A] rounded-2xl p-4 text-center text-ink-mute bg-white cursor-pointer block hover:border-brand transition"
               >
                 <div className="font-medium text-ink flex items-center justify-center gap-2">

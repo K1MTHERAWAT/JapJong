@@ -6,6 +6,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -99,11 +100,13 @@ export class CreateBookingDto {
   // ข้อมูลที่อยู่: บ้านเลขที่
   @IsOptional()
   @IsString()
+  @Matches(/^([0-9]+(\/[0-9]+)*)?$/, { message: 'อยู่บ้านเลขที่ต้องเป็นตัวเลข 0-9 หรือ / เท่านั้น (เช่น 124/5)' })
   addressHouseNo?: string;
 
   // ข้อมูลที่อยู่: หมู่ที่
   @IsOptional()
   @IsString()
+  @Matches(/^([0-9]+(\/[0-9]+)*)?$/, { message: 'หมู่ที่ต้องเป็นตัวเลข 0-9 หรือ / เท่านั้น (เช่น 3 หรือ 14/2)' })
   addressMoo?: string;
 
   // ข้อมูลที่อยู่: ตำบล / แขวง
@@ -218,10 +221,12 @@ export class CreateBorrowDto {
   // ข้อมูลที่อยู่ผู้ยืม
   @IsOptional()
   @IsString()
+  @Matches(/^([0-9]+(\/[0-9]+)*)?$/, { message: 'อยู่บ้านเลขที่ต้องเป็นตัวเลข 0-9 หรือ / เท่านั้น (เช่น 124/5)' })
   addressHouseNo?: string;
 
   @IsOptional()
   @IsString()
+  @Matches(/^([0-9]+(\/[0-9]+)*)?$/, { message: 'หมู่ที่ต้องเป็นตัวเลข 0-9 หรือ / เท่านั้น (เช่น 3 หรือ 14/2)' })
   addressMoo?: string;
 
   @IsOptional()

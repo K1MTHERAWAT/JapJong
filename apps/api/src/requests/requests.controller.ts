@@ -33,6 +33,8 @@ import {
   clampNameInput,
   hasPermission,
   overlaps,
+  sanitizeHouseNoInput,
+  sanitizeMooInput,
   sanitizePhoneInput,
   validateThaiAddressHierarchy,
   validateThaiPhone,
@@ -568,8 +570,8 @@ export class RequestsController {
         requesterPosition: body.requesterPosition
           ? clampNameInput(body.requesterPosition, NAME_MAX_LENGTH.POSITION).trim()
           : (user.position || ''),
-        addressHouseNo: body.addressHouseNo ? String(body.addressHouseNo).slice(0, 40) : '',
-        addressMoo: body.addressMoo ? String(body.addressMoo).slice(0, 20) : '',
+        addressHouseNo: body.addressHouseNo ? sanitizeHouseNoInput(body.addressHouseNo, 20).replace(/\/+$/, '') : '',
+        addressMoo: body.addressMoo ? sanitizeMooInput(body.addressMoo, 10).replace(/\/+$/, '') : '',
         addressSubdistrict: resolvedAddr.addressSubdistrict,
         addressDistrict: resolvedAddr.addressDistrict,
         addressProvince: resolvedAddr.addressProvince,
@@ -679,8 +681,12 @@ export class RequestsController {
           requesterPosition: body.requesterPosition
             ? clampNameInput(body.requesterPosition, NAME_MAX_LENGTH.POSITION).trim()
             : (user.position || ''),
-          addressHouseNo: body.addressHouseNo ? String(body.addressHouseNo).slice(0, 40) : (user.addressHouseNo ?? ''),
-          addressMoo: body.addressMoo ? String(body.addressMoo).slice(0, 20) : (user.addressMoo ?? ''),
+          addressHouseNo: body.addressHouseNo
+            ? sanitizeHouseNoInput(body.addressHouseNo, 20).replace(/\/+$/, '')
+            : sanitizeHouseNoInput(user.addressHouseNo ?? '', 20).replace(/\/+$/, ''),
+          addressMoo: body.addressMoo
+            ? sanitizeMooInput(body.addressMoo, 10).replace(/\/+$/, '')
+            : sanitizeMooInput(user.addressMoo ?? '', 10).replace(/\/+$/, ''),
           addressSubdistrict: resolvedAddr.addressSubdistrict,
           addressDistrict: resolvedAddr.addressDistrict,
           addressProvince: resolvedAddr.addressProvince,

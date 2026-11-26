@@ -2,12 +2,10 @@
 
 // นำเข้า React Hooks พื้นฐานสำหรับจัดการ State, Effects และ Memoization
 import React, { useEffect, useMemo, useState } from 'react';
-// นำเข้า createPortal สำหรับเรนเดอร์ Modal นอก DOM Hierarchy ปกติ
-import { createPortal } from 'react-dom';
 // นำเข้า useRouter hook สำหรับสั่งนำทางเปลี่ยนเส้นทางผ่าน Next.js
 import { useRouter } from 'next/navigation';
 // นำเข้าไอคอนจาก lucide-react สำหรับหน้าขอใช้สถานที่
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Clock3, Eye, FileText, Upload, X } from 'lucide-react';
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Clock3, FileText, X } from 'lucide-react';
 // นำเข้า Type ข้อมูล, ค่าคงที่ และฟังก์ชันตรวจสอบความถูกต้องจากแพ็กเกจกลาง shared
 import {
   ConflictInfo,
@@ -24,6 +22,8 @@ import {
   VenueType,
   clampNameInput,
   periodDurationText,
+  sanitizeHouseNoInput,
+  sanitizeMooInput,
   sanitizePhoneInput,
   validateThaiAddressHierarchy,
   validateThaiPhone,
@@ -238,8 +238,8 @@ export default function BookingWizardPage() {
       ? account.position
       : '',
   );
-  const [addressHouseNo, setAddressHouseNo] = useState(account?.addressHouseNo || '');
-  const [addressMoo, setAddressMoo] = useState(account?.addressMoo || '');
+  const [addressHouseNo, setAddressHouseNo] = useState(() => sanitizeHouseNoInput(account?.addressHouseNo || ''));
+  const [addressMoo, setAddressMoo] = useState(() => sanitizeMooInput(account?.addressMoo || ''));
   const [addressSubdistrict, setAddressSubdistrict] = useState(account?.addressSubdistrict || '');
   const [addressDistrict, setAddressDistrict] = useState(account?.addressDistrict || '');
   const [addressProvince, setAddressProvince] = useState(account?.addressProvince || '');
@@ -255,7 +255,6 @@ export default function BookingWizardPage() {
     { item: '', forWhat: '' },
   ]);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
-  const [attachmentPanelOpen, setAttachmentPanelOpen] = useState(false);
   const [attachmentPreview, setAttachmentPreview] = useState<{ file: File; url: string } | null>(null);
   const [attachmentError, setAttachmentError] = useState('');
   const [showRequestErrors, setShowRequestErrors] = useState(false);
@@ -317,8 +316,8 @@ export default function BookingWizardPage() {
     setRequesterPhone(sanitizePhoneInput(acc?.phone || '', 10));
     setRequesterPosition(acc?.position && acc.position !== 'ประชาชน' ? acc.position : '');
     setOrganization(acc?.department || '');
-    setAddressHouseNo(acc?.addressHouseNo || '');
-    setAddressMoo(acc?.addressMoo || '');
+    setAddressHouseNo(sanitizeHouseNoInput(acc?.addressHouseNo || ''));
+    setAddressMoo(sanitizeMooInput(acc?.addressMoo || ''));
     setAddressSubdistrict(acc?.addressSubdistrict || '');
     setAddressDistrict(acc?.addressDistrict || '');
     setAddressProvince(acc?.addressProvince || '');
@@ -367,8 +366,8 @@ export default function BookingWizardPage() {
       setRequesterName(account.name);
       setRequesterPhone(sanitizePhoneInput(account.phone || '', 10));
       setOrganization(account.department);
-      if (account.addressHouseNo) setAddressHouseNo(account.addressHouseNo);
-      if (account.addressMoo) setAddressMoo(account.addressMoo);
+      if (account.addressHouseNo) setAddressHouseNo(sanitizeHouseNoInput(account.addressHouseNo));
+      if (account.addressMoo) setAddressMoo(sanitizeMooInput(account.addressMoo));
       if (account.addressSubdistrict) setAddressSubdistrict(account.addressSubdistrict);
       if (account.addressDistrict) setAddressDistrict(account.addressDistrict);
       if (account.addressProvince) setAddressProvince(account.addressProvince);
@@ -2448,10 +2447,13 @@ export default function BookingWizardPage() {
               <label className="jw-lbl">อยู่บ้านเลขที่<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
               <input
                 type="text"
+                pattern="[0-9]+(\/[0-9]+)*"
+                maxLength={20}
                 value={addressHouseNo}
-                onChange={(e) => setAddressHouseNo(e.target.value)}
-                className="jw-in"
-                placeholder="เลขที่"
+                onChange={(e) => setAddressHouseNo(sanitizeHouseNoInput(e.target.value))}
+                onBlur={() => setAddressHouseNo((v) => v.replace(/\/+$/, ''))}
+                className="jw-in font-mono"
+                placeholder="เช่น 124/5"
                 required
               />
             </div>
@@ -2459,10 +2461,13 @@ export default function BookingWizardPage() {
               <label className="jw-lbl">หมู่ที่<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
               <input
                 type="text"
+                pattern="[0-9]+(\/[0-9]+)*"
+                maxLength={10}
                 value={addressMoo}
-                onChange={(e) => setAddressMoo(e.target.value)}
-                className="jw-in"
-                placeholder="หมู่ที่"
+                onChange={(e) => setAddressMoo(sanitizeMooInput(e.target.value))}
+                onBlur={() => setAddressMoo((v) => v.replace(/\/+$/, ''))}
+                className="jw-in font-mono"
+                placeholder="เช่น 3 หรือ 14/2"
                 required
               />
             </div>
@@ -2545,6 +2550,7 @@ export default function BookingWizardPage() {
             />
           </div>
 
+          {/* แนบสำเนาบัตรประชาชนหรือเอกสารประกอบคำขอ */}
           <div>
             <label className="jw-lbl">แนบสำเนาบัตรประชาชนหรือเอกสารประกอบคำขอ<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
             <input
@@ -2557,7 +2563,15 @@ export default function BookingWizardPage() {
               onChange={(e) => {
                 const picked = Array.from(e.target.files ?? []);
                 if (picked.length) {
-                  const unique = picked.filter((file) => !attachmentFiles.some((existing) => existing.name === file.name && existing.size === file.size && existing.lastModified === file.lastModified));
+                  const unique = picked.filter(
+                    (file) =>
+                      !attachmentFiles.some(
+                        (existing) =>
+                          existing.name === file.name &&
+                          existing.size === file.size &&
+                          existing.lastModified === file.lastModified,
+                      ),
+                  );
                   const combined = [...attachmentFiles, ...unique];
                   setAttachmentError(combined.length > 3 ? 'แนบเอกสารได้สูงสุด 3 ไฟล์' : '');
                   setAttachmentFiles(combined.slice(0, 3));
@@ -2565,73 +2579,83 @@ export default function BookingWizardPage() {
                 e.target.value = '';
               }}
             />
-            <div className="rounded-2xl border-[1.5px] border-dashed border-brand/70 bg-white p-3">
-              {attachmentFiles.length ? (
-                <div className="flex flex-col gap-2">
-                  {attachmentFiles.map((file) => (
-                    <div key={`${file.name}-${file.size}-${file.lastModified}`} className="flex min-w-0 items-center gap-3 rounded-xl border border-line bg-canvas px-3 py-2.5">
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-tint text-brand-ink"><FileText className="size-[18px]" /></div>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-[13px] font-semibold text-ink" title={file.name}>{file.name}</div>
-                        <div className="text-[11px] text-ink-mute">{(file.size / (1024 * 1024)).toFixed(2)} MB</div>
-                      </div>
-                      <button type="button" aria-label={`ดูไฟล์ ${file.name}`} title="ดูไฟล์" onClick={() => setAttachmentPreview({ file, url: URL.createObjectURL(file) })} className="flex size-9 shrink-0 items-center justify-center rounded-full border border-line bg-white text-brand-ink transition hover:bg-brand-tint"><Eye className="size-[18px]" /></button>
-                      <button type="button" aria-label={`นำไฟล์ ${file.name} ออก`} title="นำไฟล์ออก" onClick={() => setAttachmentFiles((current) => current.filter((item) => item !== file))} className="flex size-9 shrink-0 items-center justify-center rounded-full text-ink-mute transition hover:bg-danger-bg hover:text-danger-fg"><X className="size-4" /></button>
+            <label
+              htmlFor="booking-attachment"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                const picked = Array.from(e.dataTransfer.files ?? []);
+                if (picked.length) {
+                  const unique = picked.filter(
+                    (file) =>
+                      !attachmentFiles.some(
+                        (existing) =>
+                          existing.name === file.name &&
+                          existing.size === file.size &&
+                          existing.lastModified === file.lastModified,
+                      ),
+                  );
+                  const combined = [...attachmentFiles, ...unique];
+                  setAttachmentError(combined.length > 3 ? 'แนบเอกสารได้สูงสุด 3 ไฟล์' : '');
+                  setAttachmentFiles(combined.slice(0, 3));
+                }
+              }}
+              className="border-[1.5px] border-dashed border-[#7A7A7A] rounded-2xl p-4 text-center text-ink-mute bg-white cursor-pointer block hover:border-brand transition"
+            >
+              <div className="font-medium text-ink flex items-center justify-center gap-2">
+                <Icon name="upload" className="w-5 h-5 text-brand" />
+                <span>ลากไฟล์มาวาง หรือ แตะเพื่อเลือกสำเนาบัตรประชาชนหรือเอกสารประกอบคำขอ</span>
+              </div>
+              <div className="text-[12px] text-ink-mute mt-1">
+                รองรับ PDF หรือรูปภาพ JPG, PNG (แนบได้สูงสุด 3 ไฟล์)
+              </div>
+            </label>
+
+            {attachmentError ? (
+              <p className="text-[12px] text-status-crit mt-1 font-medium">{attachmentError}</p>
+            ) : null}
+
+            {attachmentFiles.length > 0 && (
+              <div className="mt-2.5 flex flex-col gap-2">
+                {attachmentFiles.map((file, index) => {
+                  const isImg = file.type.startsWith('image/');
+                  return (
+                    <div
+                      key={`${file.name}-${file.size}-${file.lastModified}`}
+                      className="flex items-center justify-between rounded-xl border border-line bg-canvas p-2 text-[13px]"
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAttachmentPreview({ file, url: URL.createObjectURL(file) })
+                        }
+                        className="flex items-center gap-2 text-brand font-medium hover:underline truncate text-left cursor-pointer min-w-0"
+                      >
+                        <Icon name={isImg ? 'photo' : 'file-text'} className="w-4 h-4 shrink-0" />
+                        <span className="truncate">{file.name}</span>
+                        <span className="text-[11px] text-ink-mute shrink-0">
+                          ({(file.size / 1024).toFixed(1)} KB) · กดเพื่อดูตัวอย่าง
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAttachmentFiles((prev) => prev.filter((_, i) => i !== index));
+                          setAttachmentError('');
+                        }}
+                        className="text-status-crit hover:opacity-80 p-1 shrink-0 cursor-pointer"
+                        title="ลบไฟล์นี้"
+                      >
+                        <Icon name="trash" className="w-4 h-4" />
+                      </button>
                     </div>
-                  ))}
-                  {attachmentFiles.length < 3 && <button type="button" onClick={() => setAttachmentPanelOpen(true)} className="self-start px-2 pt-1 text-[12px] font-semibold text-brand-ink hover:underline">+ เพิ่มไฟล์ ({attachmentFiles.length}/3)</button>}
-                </div>
-              ) : (
-                <button type="button" onClick={() => setAttachmentPanelOpen(true)} className="flex min-h-16 w-full items-center justify-center gap-2 rounded-xl px-3 py-4 text-center text-ink-mute transition hover:bg-canvas">
-                  <Upload className="size-4 text-brand" />
-                  <span><span className="font-medium text-ink">คลิกเพื่อเลือกสำเนาบัตรประชาชนหรือเอกสารประกอบคำขอ</span><span className="mt-0.5 block text-[12px]">PDF / JPG / PNG ไม่เกิน 10 MB ต่อไฟล์</span></span>
-                </button>
-              )}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
-
-      {attachmentPanelOpen && createPortal((
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-3 sm:p-6" onMouseDown={(event) => { if (event.target === event.currentTarget) setAttachmentPanelOpen(false); }}>
-          <section role="dialog" aria-modal="true" aria-labelledby="attachment-dialog-title" className="flex max-h-[min(86dvh,680px)] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-high">
-            <header className="flex items-center gap-3 border-b border-line px-4 py-3.5 sm:px-5">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-tint text-brand-ink"><FileText className="size-5" /></span>
-              <div className="min-w-0 flex-1">
-                <h2 id="attachment-dialog-title" className="text-[16px] font-bold text-ink">สำเนาบัตรประชาชนหรือเอกสารประกอบคำขอ</h2>
-                <p className="text-[12px] text-ink-mute">แนบได้สูงสุด 3 ไฟล์ · {attachmentFiles.length}/3</p>
-              </div>
-              <button type="button" aria-label="ปิดหน้าต่างเอกสาร" onClick={() => setAttachmentPanelOpen(false)} className="flex size-9 items-center justify-center rounded-full text-ink-mute hover:bg-soft hover:text-ink"><X className="size-5" /></button>
-            </header>
-            <div className="flex-1 space-y-2 overflow-y-auto p-4 sm:p-5">
-              {attachmentFiles.length ? attachmentFiles.map((file, index) => (
-                <div key={`${file.name}-${file.size}-${file.lastModified}`} className="flex min-w-0 items-center gap-3 rounded-xl border border-line bg-canvas px-3 py-2.5">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-tint text-brand-ink"><FileText className="size-5" /></div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-semibold text-ink" title={file.name}>{file.name}</div>
-                    <div className="text-[11px] text-ink-mute">{(file.size / (1024 * 1024)).toFixed(2)} MB</div>
-                  </div>
-                  <button type="button" aria-label={`ดูไฟล์ ${file.name}`} title="ดูไฟล์" onClick={() => setAttachmentPreview({ file, url: URL.createObjectURL(file) })} className="flex size-9 shrink-0 items-center justify-center rounded-full border border-line bg-white text-brand-ink transition hover:bg-brand-tint"><Eye className="size-[18px]" /></button>
-                  <button type="button" aria-label={`นำไฟล์ ${file.name} ออก`} title="นำไฟล์ออก" onClick={() => setAttachmentFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))} className="flex size-9 shrink-0 items-center justify-center rounded-full text-ink-mute transition hover:bg-danger-bg hover:text-danger-fg"><X className="size-4" /></button>
-                </div>
-              )) : (
-                <div className="rounded-xl border border-dashed border-line p-8 text-center">
-                  <Upload className="mx-auto size-7 text-brand" />
-                  <p className="mt-2 text-[13px] font-semibold text-ink">ยังไม่มีเอกสารแนบ</p>
-                  <p className="mt-1 text-[12px] text-ink-mute">เลือกไฟล์ PDF, JPG หรือ PNG ขนาดไม่เกิน 10 MB</p>
-                </div>
-              )}
-              {attachmentError && <div role="alert" className="text-[12px] font-medium text-danger-fg">{attachmentError}</div>}
-            </div>
-            <footer className="flex flex-col-reverse gap-2 border-t border-line px-4 py-3 sm:flex-row sm:justify-between sm:px-5">
-              {attachmentFiles.length < 3 ? (
-                <label htmlFor="booking-attachment" className="inline-flex h-10 cursor-pointer items-center justify-center rounded-xl border border-line px-4 text-[13px] font-semibold text-brand-ink hover:bg-brand-tint">+ เพิ่มไฟล์</label>
-              ) : <span className="self-center text-[12px] text-ink-mute">แนบครบ 3 ไฟล์แล้ว</span>}
-              <button type="button" onClick={() => setAttachmentPanelOpen(false)} className="jw-btn-sec h-10 px-5">เสร็จสิ้น</button>
-            </footer>
-          </section>
-        </div>
-      ), document.body)}
 
       {attachmentPreview && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-3 sm:p-6" onMouseDown={(event) => { if (event.target === event.currentTarget) setAttachmentPreview(null); }}>

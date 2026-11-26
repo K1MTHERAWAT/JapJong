@@ -101,6 +101,9 @@ export default function RequestDetailPage() {
     ) {
       return `/staff/repairs?id=${req.id}`;
     }
+    if (req.requesterId === account.id) {
+      return `/repair?mode=track&id=${req.id}`;
+    }
     return null;
   })();
 

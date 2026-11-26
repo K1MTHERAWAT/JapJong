@@ -21,6 +21,8 @@ import {
   NAME_MAX_LENGTH,
   clampNameInput,
   classifyLoginIdentifier,
+  sanitizeHouseNoInput,
+  sanitizeMooInput,
   validateEmail,
   validatePassword,
   validateThaiAddressHierarchy,
@@ -460,10 +462,10 @@ export class AuthController {
       }
     }
     if (body.addressHouseNo !== undefined) {
-      user.addressHouseNo = String(body.addressHouseNo).trim().slice(0, 50) || undefined;
+      user.addressHouseNo = sanitizeHouseNoInput(body.addressHouseNo, 20).replace(/\/+$/, '') || undefined;
     }
     if (body.addressMoo !== undefined) {
-      user.addressMoo = String(body.addressMoo).trim().slice(0, 20) || undefined;
+      user.addressMoo = sanitizeMooInput(body.addressMoo, 10).replace(/\/+$/, '') || undefined;
     }
     // ตรวจสอบและจัดเก็บลำดับชั้นของที่อยู่ตามราชการ (จังหวัด -> อำเภอ -> ตำบล)
     const hasAddressInput =

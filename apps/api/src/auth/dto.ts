@@ -1,4 +1,4 @@
-import { IsArray, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Length, MaxLength, Min } from 'class-validator';
+import { IsArray, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Length, Matches, MaxLength, Min } from 'class-validator';
 import { NAME_MAX_LENGTH } from '@japjong/shared';
 
 /**
@@ -166,11 +166,13 @@ export class UpdateProfileDto {
   // บ้านเลขที่
   @IsOptional()
   @IsString()
+  @Matches(/^([0-9]+(\/[0-9]+)*)?$/, { message: 'อยู่บ้านเลขที่ต้องเป็นตัวเลข 0-9 หรือ / เท่านั้น (เช่น 124/5)' })
   addressHouseNo?: string;
 
   // หมู่ที่
   @IsOptional()
   @IsString()
+  @Matches(/^([0-9]+(\/[0-9]+)*)?$/, { message: 'หมู่ที่ต้องเป็นตัวเลข 0-9 หรือ / เท่านั้น (เช่น 3 หรือ 14/2)' })
   addressMoo?: string;
 
   // ตำบล / แขวง

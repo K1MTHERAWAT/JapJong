@@ -28,6 +28,8 @@ import {
   ROLE_TONE,
   clampNameInput,
   getPasswordRuleChecks,
+  sanitizeHouseNoInput,
+  sanitizeMooInput,
   sanitizePhoneInput,
   validatePassword,
   validateThaiAddressHierarchy,
@@ -198,8 +200,8 @@ export default function AccountPage() {
       setDepartment(account.department || '');
       setPhone(sanitizePhoneInput(account.phone || ''));
       setEmail(account.email || '');
-      setAddressHouseNo(account.addressHouseNo || '');
-      setAddressMoo(account.addressMoo || '');
+      setAddressHouseNo(sanitizeHouseNoInput(account.addressHouseNo || ''));
+      setAddressMoo(sanitizeMooInput(account.addressMoo || ''));
       setAddressProvinceId(account.addressProvinceId || '');
       setAddressDistrictId(account.addressDistrictId || '');
       setAddressSubdistrictId(account.addressSubdistrictId || '');
@@ -266,8 +268,8 @@ export default function AccountPage() {
         department: department.trim(),
         phone: phoneCheck.normalized,
         email: email.trim(),
-        addressHouseNo: addressHouseNo.trim(),
-        addressMoo: addressMoo.trim(),
+        addressHouseNo: sanitizeHouseNoInput(addressHouseNo).replace(/\/+$/, ''),
+        addressMoo: sanitizeMooInput(addressMoo).replace(/\/+$/, ''),
         addressProvinceId: addressProvinceId || undefined,
         addressDistrictId: addressDistrictId || undefined,
         addressSubdistrictId: addressSubdistrictId || undefined,
@@ -295,8 +297,8 @@ export default function AccountPage() {
     setPosition(account.position || '');
     setDepartment(account.department || '');
     setPhone(sanitizePhoneInput(account.phone || ''));
-    setAddressHouseNo(account.addressHouseNo || '');
-    setAddressMoo(account.addressMoo || '');
+    setAddressHouseNo(sanitizeHouseNoInput(account.addressHouseNo || ''));
+    setAddressMoo(sanitizeMooInput(account.addressMoo || ''));
     setAddressProvinceId(account.addressProvinceId || '');
     setAddressDistrictId(account.addressDistrictId || '');
     setAddressSubdistrictId(account.addressSubdistrictId || '');
@@ -687,15 +689,25 @@ export default function AccountPage() {
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Input
                       label="อยู่บ้านเลขที่"
+                      pattern="[0-9]+(\/[0-9]+)*"
+                      maxLength={20}
+                      showCount={false}
                       value={addressHouseNo}
-                      onChange={(e) => setAddressHouseNo(e.target.value)}
-                      placeholder="เลขที่"
+                      onChange={(e) => setAddressHouseNo(sanitizeHouseNoInput(e.target.value))}
+                      onBlur={() => setAddressHouseNo((v) => v.replace(/\/+$/, ''))}
+                      className="font-mono"
+                      placeholder="เช่น 124/5"
                     />
                     <Input
                       label="หมู่ที่"
+                      pattern="[0-9]+(\/[0-9]+)*"
+                      maxLength={10}
+                      showCount={false}
                       value={addressMoo}
-                      onChange={(e) => setAddressMoo(e.target.value)}
-                      placeholder="หมู่ที่"
+                      onChange={(e) => setAddressMoo(sanitizeMooInput(e.target.value))}
+                      onBlur={() => setAddressMoo((v) => v.replace(/\/+$/, ''))}
+                      className="font-mono"
+                      placeholder="เช่น 3 หรือ 14/2"
                     />
                   </div>
                   {/* กล่องเลือกที่อยู่ไทยแบบเชื่อมโยง จังหวัด/อำเภอ/ตำบล */}

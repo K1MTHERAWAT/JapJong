@@ -518,9 +518,33 @@ export interface PhoneValidationResult {
   error?: string;
 }
 
+function normalizeThaiDigits(str: string): string {
+  return str.replace(/[๐-๙]/g, (ch) => String(ch.charCodeAt(0) - 0x0e50));
+}
+
 export function sanitizePhoneInput(raw: unknown, maxLength = 10): string {
   if (typeof raw !== 'string' && typeof raw !== 'number') return '';
-  return String(raw).replace(/\D+/g, '').slice(0, maxLength);
+  return normalizeThaiDigits(String(raw)).replace(/\D+/g, '').slice(0, maxLength);
+}
+
+/** กรองบ้านเลขที่ให้รับเฉพาะตัวเลข 0-9 และเครื่องหมาย / (เช่น 124/5) */
+export function sanitizeHouseNoInput(raw: unknown, maxLength = 20): string {
+  if (typeof raw !== 'string' && typeof raw !== 'number') return '';
+  return normalizeThaiDigits(String(raw))
+    .replace(/[^0-9/]/g, '')
+    .replace(/\/+/g, '/')
+    .replace(/^\//, '')
+    .slice(0, maxLength);
+}
+
+/** กรองหมู่ที่ให้รับเฉพาะตัวเลข 0-9 และเครื่องหมาย / (เช่น 3 หรือ 14/2) */
+export function sanitizeMooInput(raw: unknown, maxLength = 10): string {
+  if (typeof raw !== 'string' && typeof raw !== 'number') return '';
+  return normalizeThaiDigits(String(raw))
+    .replace(/[^0-9/]/g, '')
+    .replace(/\/+/g, '/')
+    .replace(/^\//, '')
+    .slice(0, maxLength);
 }
 
 export function validateThaiPhone(phone: unknown): PhoneValidationResult {
