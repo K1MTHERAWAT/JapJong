@@ -44,7 +44,7 @@ const INITIAL_VISIBLE_COUNT = 8;
  * บังคับใช้ Account Isolation เด็ดขาด "บัญชีใครบัญชีมัน" (mine=1) สำหรับประชาชนในการติดตาม, บันทึกรับอุปกรณ์, ส่งคืน, และขอเลื่อนกำหนดส่ง
  */
 export default function MyBorrowsPage() {
-  const { account } = useAuth();
+  const { account, loading: authLoading } = useAuth();
   const [myItems, setMyItems] = useState<ExtendedBorrowRequest[]>([]); // รายการคำขอยืมของฉัน
   const [inspectQueue, setInspectQueue] = useState<ExtendedBorrowRequest[]>([]); // คิวงานตรวจรับคืนของเจ้าหน้าที่ (สถานะ return_inspect)
   const [equipmentList, setEquipmentList] = useState<Equipment[]>([]); // ข้อมูลอุปกรณ์สำหรับอ้างอิง
@@ -80,7 +80,10 @@ export default function MyBorrowsPage() {
   const detailPaneRef = useRef<HTMLElement>(null);
 
   const isStaffOrAdmin =
-    account?.role === 'STAFF' || account?.role === 'ADMIN' || Boolean(account?.permissions?.review);
+    account?.role === 'STAFF' ||
+    account?.role === 'ADMIN' ||
+    Boolean(account?.permissions?.review) ||
+    Boolean(account?.permissions?.handover);
 
   // Load equipment & borrow requests from real API
   const load = useCallback(async () => {
@@ -144,8 +147,9 @@ export default function MyBorrowsPage() {
   }, []);
 
   useEffect(() => {
+    if (authLoading) return;
     load();
-  }, [load]);
+  }, [authLoading, load]);
 
   // Helper to find equipment metadata
   const getEquipmentInfo = useCallback(
@@ -212,9 +216,11 @@ export default function MyBorrowsPage() {
   const hasAutoSelectedTab = useRef(false);
   useEffect(() => {
     const totalCount = borrowingItems.length + inspectItems.length + historyItems.length;
-    if (!loading && !hasAutoSelectedTab.current && totalCount > 0) {
+    if (!authLoading && !loading && !hasAutoSelectedTab.current && totalCount > 0) {
       hasAutoSelectedTab.current = true;
-      if (borrowingItems.length > 0) {
+      if (isStaffOrAdmin && inspectItems.length > 0) {
+        setTab('inspect');
+      } else if (borrowingItems.length > 0) {
         setTab('borrowing');
       } else if (inspectItems.length > 0) {
         setTab('inspect');
@@ -222,7 +228,7 @@ export default function MyBorrowsPage() {
         setTab('history');
       }
     }
-  }, [loading, borrowingItems.length, inspectItems.length, historyItems.length]);
+  }, [authLoading, loading, isStaffOrAdmin, borrowingItems.length, inspectItems.length, historyItems.length]);
 
   // Filter items by active tab and search query
   const tabFiltered = useMemo(() => {
@@ -870,7 +876,7 @@ export default function MyBorrowsPage() {
                           {eqInfo.name}
                         </h2>
                         <div className="text-xs sm:text-sm font-medium text-ink-mute mt-1">
-                          เลขที่คำขอ <span className="font-mono text-ink">{selectedRequest.code}</span> · รหัสครุภัณฑ์ <span className="font-mono text-ink">{eqInfo.code}</span>
+                          เลขที่คำขอ <span className="font-mono text-ink">{selectedRequest.code}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">

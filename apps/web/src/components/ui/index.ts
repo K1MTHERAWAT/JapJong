@@ -17,6 +17,7 @@ export * from './Modal';
 export * from './Table';
 export * from './AttachmentViewer';
 export * from './SigningStepCard';
+export * from './SearchableCombobox';
 
 // วิดเจ็ตเฉพาะทางที่นำเข้าจาก ui-widgets
 export {

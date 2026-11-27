@@ -45,6 +45,7 @@ import {
   ChipTone,
   NameLengthBadge,
   NameLimitWarning,
+  SearchableCombobox,
   StatusChip,
   statusToTone,
 } from '@/components/ui';
@@ -609,33 +610,66 @@ export default function RepairPage() {
 
                 {/* ช่องเลือกสถานที่ / อุปกรณ์ / ระบุเอง */}
                 {targetType === 'venue' && (
-                  <select
+                  <SearchableCombobox
                     value={selectedResourceId}
-                    onChange={(e) => setSelectedResourceId(e.target.value)}
-                    className="jw-in"
-                  >
-                    <option value="">-- กรุณาเลือกสถานที่ --</option>
-                    {venues.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.name} ({v.building || 'อาคารสำนักงาน'} {v.floor && v.floor !== '-' ? `· ${v.floor}` : ''})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setSelectedResourceId}
+                    placeholder="-- กรุณาเลือกสถานที่ --"
+                    searchPlaceholder="ค้นหาชื่อสถานที่ หรือ อาคาร..."
+                    emptyText="ไม่พบสถานที่ที่ตรงกับคำค้นหา"
+                    options={venues.map((v) => {
+                      const building = v.building || 'อาคารสำนักงาน';
+                      const floor = v.floor && v.floor !== '-' ? v.floor : '';
+                      const subtitle = floor ? `${building} · ${floor}` : building;
+                      const venueTypeLabel =
+                        v.type === 'meeting'
+                          ? 'ห้องประชุม'
+                          : v.type === 'training'
+                            ? 'ห้องอบรม'
+                            : v.type === 'field'
+                              ? 'สนามกีฬา'
+                              : v.type === 'pavilion'
+                                ? 'ศาลา/อาคาร'
+                                : v.type === 'yard'
+                                  ? 'ลานกิจกรรม'
+                                  : undefined;
+                      return {
+                        value: v.id,
+                        label: v.name,
+                        subtitle,
+                        badge: venueTypeLabel,
+                        icon: <Building2 className="size-4" />,
+                        keywords: `${v.name} ${building} ${floor} ${venueTypeLabel || ''}`,
+                      };
+                    })}
+                  />
                 )}
 
                 {targetType === 'equipment' && (
-                  <select
+                  <SearchableCombobox
                     value={selectedResourceId}
-                    onChange={(e) => setSelectedResourceId(e.target.value)}
-                    className="jw-in"
-                  >
-                    <option value="">-- กรุณาเลือกอุปกรณ์ / ครุภัณฑ์ --</option>
-                    {equipmentList.map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {e.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setSelectedResourceId}
+                    placeholder="-- กรุณาเลือกอุปกรณ์ / ครุภัณฑ์ --"
+                    searchPlaceholder="ค้นหาชื่ออุปกรณ์ / ครุภัณฑ์..."
+                    emptyText="ไม่พบอุปกรณ์ที่ตรงกับคำค้นหา"
+                    options={equipmentList.map((e) => {
+                      const catLabel =
+                        e.category === 'audio'
+                          ? 'เครื่องเสียง'
+                          : e.category === 'tent'
+                            ? 'เต็นท์/สถานที่'
+                            : e.category === 'it'
+                              ? 'อุปกรณ์ไอที'
+                              : undefined;
+                      return {
+                        value: e.id,
+                        label: e.name,
+                        subtitle: catLabel ? `หมวด${catLabel}` : undefined,
+                        badge: `คงเหลือ ${e.stock}`,
+                        icon: <Package className="size-4" />,
+                        keywords: `${e.name} ${catLabel || ''}`,
+                      };
+                    })}
+                  />
                 )}
 
                 {targetType === 'other' && (

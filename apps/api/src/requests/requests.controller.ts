@@ -1157,7 +1157,7 @@ export class RequestsController {
       'STAFF',
       `ผู้ยืมส่งคืนอุปกรณ์แล้ว รอตรวจสภาพ (${req.code})`,
       `${req.requesterName} ส่งคืนอุปกรณ์แล้ว กรุณาเข้าตรวจสอบสภาพอุปกรณ์`,
-      `/borrow/my`,
+      `/borrow/my?tab=inspect&id=${req.id}`,
     );
 
     return this.enrich(req);
