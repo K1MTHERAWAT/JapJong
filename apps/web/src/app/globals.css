@@ -934,30 +934,50 @@
   ) !important;
 }
 
+/* Sidebar Theme: Royal Navy & Emerald (Light Mode) */
 .gov-brand-shell aside:not([aria-label="ข้อมูลประกอบ"]) {
-  --rgb-bg: 13 15 26;
-  --rgb-surface: 21 25 38;
-  --rgb-surface-muted: 29 36 54;
-  --rgb-hover: 36 44 66;
-  --rgb-line: 43 51 74;
-  --rgb-line-soft: 36 43 61;
+  --rgb-bg: 19 32 56;
+  --rgb-surface: 19 32 56;
+  --rgb-surface-muted: 29 47 79;
+  --rgb-hover: 29 47 79;
+  --rgb-line: 30 49 82;
+  --rgb-line-soft: 30 49 82;
   --rgb-ink: 248 250 252;
-  --rgb-ink-soft: 216 222 233;
+  --rgb-ink-soft: 226 232 240;
   --rgb-ink-mute: 148 163 184;
   --rgb-brand: 30 138 92;
   --rgb-brand-ink: 74 222 128;
   --rgb-brand-tint: 23 50 45;
-  --rgb-danger-fg: 242 166 166;
+  --rgb-danger-fg: 252 165 165;
   --color-alias-color-brand-primary: #4ade80;
   --color-alias-color-brand-text-dark: #f8fafc;
   --color-alias-text-colors-primary: #f8fafc;
-  --color-alias-text-colors-tertiary: #d8dee9;
-  --color-alias-semantic-critical: #f2a6a6;
-  --color-border-colors-neutral: #2b334a;
-  --color-foundations-fuji-pallet-light: #242c42;
-  background: #151926 !important;
-  border-color: #2b334a !important;
+  --color-alias-text-colors-tertiary: #cbd5e1;
+  --color-alias-semantic-critical: #fca5a5;
+  --color-border-colors-neutral: #1e3152;
+  --color-foundations-fuji-pallet-light: #1d2f4f;
+  background: #132038 !important;
+  border-color: #1e3152 !important;
   color: #f8fafc !important;
+}
+
+/* Sidebar Theme: Royal Navy & Emerald (Dark Mode) */
+.dark .gov-brand-shell aside:not([aria-label="ข้อมูลประกอบ"]) {
+  --rgb-bg: 11 17 32;
+  --rgb-surface: 11 17 32;
+  --rgb-surface-muted: 22 32 51;
+  --rgb-hover: 22 32 51;
+  --rgb-line: 30 41 59;
+  --rgb-line-soft: 30 41 59;
+  --color-alias-semantic-critical: #f2a6a6;
+  --color-border-colors-neutral: #1e293b;
+  --color-foundations-fuji-pallet-light: #162033;
+  background: #0b1120 !important;
+  border-color: #1e293b !important;
+}
+
+.gov-brand-shell aside:not([aria-label="ข้อมูลประกอบ"]) button[data-active="true"] {
+  background: rgba(74, 222, 128, 0.15) !important;
 }
 
 /* หน้าแรก: ให้ aside ข้อมูลประกอบโปร่งใส โดยไม่กระทบ Sidebar */
