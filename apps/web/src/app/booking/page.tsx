@@ -1201,7 +1201,7 @@ export default function BookingWizardPage() {
                     const count = val === 'all' ? venues.length : venues.filter((v) => v.type === val).length;
                     return {
                       value: val,
-                      label: count > 1 ? `${label} (${count})` : label,
+                      label,
                       badge: `${count}`,
                     };
                   })}

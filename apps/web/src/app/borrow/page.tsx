@@ -739,7 +739,7 @@ export default function BorrowWizardPage() {
                         : enabledList.filter((e) => e.category === val).length;
                     return {
                       value: val,
-                      label: count > 1 ? `${label} (${count})` : label,
+                      label,
                       badge: `${count}`,
                     };
                   })}

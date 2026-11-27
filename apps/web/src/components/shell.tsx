@@ -102,6 +102,8 @@ function toGovMenuItems(items: NavItem[], unreadCount: number): GovMenuItem[] {
   return result;
 }
 
+let persistedSidebarOpen = false;
+
 export function AppShell({
   title,
   rightLabel,
@@ -126,7 +128,14 @@ export function AppShell({
     unreadCount,
   } = useAuth();
 
-  const [staffSidebarOpen, setStaffSidebarOpen] = useState(false);
+  const [staffSidebarOpen, setStaffSidebarOpenState] = useState<boolean>(() => persistedSidebarOpen);
+  const setStaffSidebarOpen = useCallback((next: boolean | ((prev: boolean) => boolean)) => {
+    setStaffSidebarOpenState((prev) => {
+      const value = typeof next === 'function' ? next(prev) : next;
+      persistedSidebarOpen = value;
+      return value;
+    });
+  }, []);
   const [dbServices, setDbServices] = useState<SidebarServiceItem[]>([]);
   const [showBackToTop, setShowBackToTop] = useState(false);
 
@@ -173,7 +182,6 @@ export function AppShell({
 
   const handleNavigate = useCallback(
     (path: string) => {
-      setStaffSidebarOpen(false);
       router.push(path);
     },
     [router],
@@ -257,8 +265,18 @@ export function AppShell({
           ======================================================== */}
       <div className="print:hidden">
         <div
-          onMouseEnter={() => setStaffSidebarOpen(true)}
-          onMouseLeave={() => setStaffSidebarOpen(false)}
+          onClick={(e) => {
+            const target = e.target as HTMLElement | null;
+            if (!target) return;
+            if (
+              target.closest(
+                'button, a, input, select, textarea, [role="button"], [role="menuitem"], [tabindex]',
+              )
+            ) {
+              return;
+            }
+            setStaffSidebarOpen((prev) => !prev);
+          }}
         >
           <StaffSidebar
             orgLogo="/logo.png"
@@ -284,7 +302,7 @@ export function AppShell({
           ======================================================== */}
       <div
         className={`flex-1 flex flex-col min-w-0 transition-[padding] duration-300 print:pl-0 ${
-          hasLeftSidebar ? 'md:pl-[64px]' : ''
+          hasLeftSidebar ? (staffSidebarOpen ? 'md:pl-[280px]' : 'md:pl-[64px]') : ''
         }`}
       >
         <main
