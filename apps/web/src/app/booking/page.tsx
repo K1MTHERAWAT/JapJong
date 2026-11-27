@@ -44,6 +44,7 @@ import {
   NameLengthBadge,
   NameLimitWarning,
   OfficialGovFormDocument,
+  SearchableCombobox,
   SignatureBox,
   Stepper,
   ThumbnailImage,
@@ -1175,37 +1176,36 @@ export default function BookingWizardPage() {
 
               <div className="flex flex-wrap items-center gap-2">
                 {/* ตัวกรองประเภทสถานที่ (Dropdown List) */}
-                <div className="flex items-center gap-1.5 bg-soft border border-line rounded-xl px-3 h-10">
-                  <Icon name="filter" className="w-3.5 h-3.5 text-brand shrink-0" />
-                  <span className="text-[12.5px] font-bold text-ink leading-none shrink-0">ประเภท:</span>
-                  <div className="relative flex items-center h-full">
-                    <select
-                      value={catFilter}
-                      onChange={(e) => setCatFilter(e.target.value as 'all' | VenueType)}
-                      className="h-full appearance-none bg-transparent text-[12.5px] font-semibold text-ink leading-normal focus:outline-none cursor-pointer pr-5 py-0"
-                    >
-                    {(
-                      [
-                        ['all', 'ทั้งหมด'],
-                        ['meeting', VENUE_TYPE_LABEL.meeting],
-                        ['pavilion', VENUE_TYPE_LABEL.pavilion],
-                        ['field', VENUE_TYPE_LABEL.field],
-                        ['yard', VENUE_TYPE_LABEL.yard],
-                        ['training', VENUE_TYPE_LABEL.training],
-                      ] as const
-                    ).map(([val, label]) => {
-                      const count = val === 'all' ? venues.length : venues.filter((v) => v.type === val).length;
-                      const labelWithCount = count > 1 ? `${label} (${count})` : label;
-                      return (
-                        <option key={val} value={val}>
-                          {labelWithCount}
-                        </option>
-                      );
-                    })}
-                    </select>
-                    <Icon name="chevron-down" className="w-3.5 h-3.5 text-ink-mute pointer-events-none absolute right-0 top-1/2 -translate-y-1/2" />
-                  </div>
-                </div>
+                <SearchableCombobox
+                  size="compact"
+                  searchable={false}
+                  clearable={false}
+                  value={catFilter}
+                  onChange={(val) => setCatFilter(val as 'all' | VenueType)}
+                  prefix={
+                    <>
+                      <Icon name="filter" className="w-3.5 h-3.5 text-brand shrink-0" />
+                      <span className="text-[12.5px] font-bold text-ink leading-none shrink-0">ประเภท:</span>
+                    </>
+                  }
+                  options={(
+                    [
+                      ['all', 'ทั้งหมด'],
+                      ['meeting', VENUE_TYPE_LABEL.meeting],
+                      ['pavilion', VENUE_TYPE_LABEL.pavilion],
+                      ['field', VENUE_TYPE_LABEL.field],
+                      ['yard', VENUE_TYPE_LABEL.yard],
+                      ['training', VENUE_TYPE_LABEL.training],
+                    ] as const
+                  ).map(([val, label]) => {
+                    const count = val === 'all' ? venues.length : venues.filter((v) => v.type === val).length;
+                    return {
+                      value: val,
+                      label: count > 1 ? `${label} (${count})` : label,
+                      badge: `${count}`,
+                    };
+                  })}
+                />
 
                 <button
                   type="button"
@@ -2370,17 +2370,19 @@ export default function BookingWizardPage() {
             </div>
             <div className="lg:col-span-2">
               <label className="jw-lbl">คำนำหน้า<span className="text-[9px] font-semibold leading-none text-status-crit">*</span></label>
-              <select
+              <SearchableCombobox
+                searchable={false}
+                clearable={false}
                 value={requesterTitle}
-                onChange={(e) => setRequesterTitle(e.target.value)}
-                className="jw-in bg-white"
-                required
-              >
-                <option value="นาย">นาย</option>
-                <option value="นาง">นาง</option>
-                <option value="นางสาว">นางสาว</option>
-                <option value="อื่นๆ">อื่นๆ</option>
-              </select>
+                onChange={setRequesterTitle}
+                placeholder="เลือกคำนำหน้า"
+                options={[
+                  { value: 'นาย', label: 'นาย' },
+                  { value: 'นาง', label: 'นาง' },
+                  { value: 'นางสาว', label: 'นางสาว' },
+                  { value: 'อื่นๆ', label: 'อื่นๆ' },
+                ]}
+              />
               {requesterTitle === 'อื่นๆ' && (
                 <div className="mt-2">
                   <div className="flex items-center justify-between gap-1 mb-1">

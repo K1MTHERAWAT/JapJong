@@ -44,7 +44,7 @@ import {
 // นำเข้า AppShell คอมโพเนนต์เลย์เอาต์หลักของหน้าจอ
 import { AppShell } from '@/components/shell';
 // นำเข้าคอมโพเนนต์ UI พื้นฐาน: Button, Card, Chip, Feedback, Input, Toggle
-import { Button, Card, Chip, Feedback, Input, NameLengthBadge, NameLimitWarning, Toggle } from '@/components/ui';
+import { Button, Card, Chip, Feedback, Input, NameLengthBadge, NameLimitWarning, SearchableCombobox, Toggle } from '@/components/ui';
 // นำเข้า API client สำหรับติดต่อ Backend REST API
 import { api } from '@/lib/api';
 // นำเข้าฟังก์ชัน resolveNavIcon สำหรับแปลงชื่อไอคอนเป็น React Component ไอคอนที่ถูกต้อง
@@ -1013,19 +1013,21 @@ export default function AdminServicesPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[13px] font-medium text-ink">หมวดหมู่ / กลุ่มบริการ</label>
-                      <select
+                      <SearchableCombobox
+                        searchable={false}
+                        clearable={false}
                         value={formCategory}
-                        onChange={(e) => setFormCategory(e.target.value)}
-                        className="px-3 py-2 text-[13px] rounded-control border border-line bg-surface focus:outline-none focus:ring-1 focus:ring-brand"
-                      >
-                        <option value="บริการหลัก">บริการหลัก</option>
-                        <option value="รายการและประวัติ">รายการและประวัติ</option>
-                        <option value="งานเจ้าหน้าที่">งานเจ้าหน้าที่</option>
-                        <option value="งานผู้บริหาร">งานผู้บริหาร</option>
-                        <option value="ระบบและผู้ดูแล">ระบบและผู้ดูแล</option>
-                        <option value="บัญชีผู้ใช้งาน">บัญชีผู้ใช้งาน</option>
-                        <option value="CUSTOM">+ เพิ่มหมวดหมู่ใหม่...</option>
-                      </select>
+                        onChange={setFormCategory}
+                        options={[
+                          { value: 'บริการหลัก', label: 'บริการหลัก' },
+                          { value: 'รายการและประวัติ', label: 'รายการและประวัติ' },
+                          { value: 'งานเจ้าหน้าที่', label: 'งานเจ้าหน้าที่' },
+                          { value: 'งานผู้บริหาร', label: 'งานผู้บริหาร' },
+                          { value: 'ระบบและผู้ดูแล', label: 'ระบบและผู้ดูแล' },
+                          { value: 'บัญชีผู้ใช้งาน', label: 'บัญชีผู้ใช้งาน' },
+                          { value: 'CUSTOM', label: '+ เพิ่มหมวดหมู่ใหม่...' },
+                        ]}
+                      />
                     </div>
 
                     {formCategory === 'CUSTOM' && (

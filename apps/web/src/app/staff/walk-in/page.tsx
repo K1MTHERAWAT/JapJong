@@ -26,7 +26,7 @@ import {
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
-import { Chip, NameLengthBadge, NameLimitWarning, SignatureBox, Tabs } from '@/components/ui';
+import { Chip, NameLengthBadge, NameLimitWarning, SearchableCombobox, SignatureBox, Tabs } from '@/components/ui';
 import { api } from '@/lib/api';
 
 export default function StaffWalkInPage() {
@@ -298,13 +298,18 @@ export default function StaffWalkInPage() {
             <>
               <div>
                 <label className="jw-lbl">รายการสถานที่</label>
-                <select value={venueId} onChange={(e) => setVenueId(e.target.value)} className="jw-in">
-                  {venues.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.name} (ความจุ {v.capacity} คน)
-                    </option>
-                  ))}
-                </select>
+                <SearchableCombobox
+                  value={venueId}
+                  onChange={setVenueId}
+                  clearable={false}
+                  placeholder="-- เลือกสถานที่ --"
+                  searchPlaceholder="ค้นหาสถานที่..."
+                  options={venues.map((v) => ({
+                    value: v.id,
+                    label: v.name,
+                    subtitle: `ความจุ ${v.capacity} คน`,
+                  }))}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3.5">
@@ -314,11 +319,17 @@ export default function StaffWalkInPage() {
                 </div>
                 <div>
                   <label className="jw-lbl">เวลา</label>
-                  <select value={timeSlot} onChange={(e) => setTimeSlot(e.target.value)} className="jw-in">
-                    <option value="09:00–12:00">09:00–12:00</option>
-                    <option value="13:00–17:00">13:00–17:00</option>
-                    <option value="08:00–17:00">08:00–17:00</option>
-                  </select>
+                  <SearchableCombobox
+                    searchable={false}
+                    clearable={false}
+                    value={timeSlot}
+                    onChange={setTimeSlot}
+                    options={[
+                      { value: '09:00–12:00', label: '09:00–12:00' },
+                      { value: '13:00–17:00', label: '13:00–17:00' },
+                      { value: '08:00–17:00', label: '08:00–17:00' },
+                    ]}
+                  />
                 </div>
               </div>
 
@@ -341,17 +352,18 @@ export default function StaffWalkInPage() {
               <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-3.5">
                 <div>
                   <label className="jw-lbl">รายการอุปกรณ์ครุภัณฑ์</label>
-                  <select
+                  <SearchableCombobox
                     value={equipmentId}
-                    onChange={(e) => setEquipmentId(e.target.value)}
-                    className="jw-in"
-                  >
-                    {equipment.map((eq) => (
-                      <option key={eq.id} value={eq.id}>
-                        {eq.name} (คงเหลือ {eq.stock})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setEquipmentId}
+                    clearable={false}
+                    placeholder="-- เลือกอุปกรณ์ --"
+                    searchPlaceholder="ค้นหาอุปกรณ์..."
+                    options={equipment.map((eq) => ({
+                      value: eq.id,
+                      label: eq.name,
+                      badge: `คงเหลือ ${eq.stock}`,
+                    }))}
+                  />
                 </div>
                 <div>
                   <label className="jw-lbl">จำนวนที่ยืม</label>
@@ -406,19 +418,31 @@ export default function StaffWalkInPage() {
               <div className="grid grid-cols-2 gap-3.5">
                 <div>
                   <label className="jw-lbl">อาคาร</label>
-                  <select value={building} onChange={(e) => setBuilding(e.target.value)} className="jw-in">
-                    <option>อาคารสำนักงาน</option>
-                    <option>ศาลา หมู่ 5</option>
-                    <option>สนามกีฬากลาง</option>
-                  </select>
+                  <SearchableCombobox
+                    searchable={false}
+                    clearable={false}
+                    value={building}
+                    onChange={setBuilding}
+                    options={[
+                      { value: 'อาคารสำนักงาน', label: 'อาคารสำนักงาน' },
+                      { value: 'ศาลา หมู่ 5', label: 'ศาลา หมู่ 5' },
+                      { value: 'สนามกีฬากลาง', label: 'สนามกีฬากลาง' },
+                    ]}
+                  />
                 </div>
                 <div>
                   <label className="jw-lbl">ชั้น</label>
-                  <select value={floor} onChange={(e) => setFloor(e.target.value)} className="jw-in">
-                    <option>ชั้น 1</option>
-                    <option>ชั้น 2</option>
-                    <option>ชั้น 3</option>
-                  </select>
+                  <SearchableCombobox
+                    searchable={false}
+                    clearable={false}
+                    value={floor}
+                    onChange={setFloor}
+                    options={[
+                      { value: 'ชั้น 1', label: 'ชั้น 1' },
+                      { value: 'ชั้น 2', label: 'ชั้น 2' },
+                      { value: 'ชั้น 3', label: 'ชั้น 3' },
+                    ]}
+                  />
                 </div>
               </div>
 

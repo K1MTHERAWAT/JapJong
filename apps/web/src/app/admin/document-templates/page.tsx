@@ -18,7 +18,7 @@ import {
 import { AppShell } from '@/components/shell';
 // นำเข้า Icon คอมโพเนนต์แสดงไอคอน SVG
 import { Icon } from '@/components/icons';
-import { NameLengthBadge, NameLimitWarning } from '@/components/ui';
+import { NameLengthBadge, NameLimitWarning, SearchableCombobox } from '@/components/ui';
 // นำเข้า API client SDK และฟังก์ชันจัดรูปแบบวันที่ภาษาไทย
 import { api, formatThaiDate } from '@/lib/api';
 
@@ -476,16 +476,18 @@ export default function DocumentTemplatesPage() {
             {/* ตัวเลือกประเภทเอกสาร */}
             <div>
               <label className="jw-lbl">ประเภทเอกสาร</label>
-              <select
+              <SearchableCombobox
+                searchable={false}
+                clearable={false}
                 value={newTemplateCat}
-                onChange={(e) => setNewTemplateCat(e.target.value as DocumentTemplateCategory)}
-                className="jw-in"
-              >
-                <option value="venue">แบบขอใช้สถานที่ราชการ</option>
-                <option value="equipment">แบบคำขอยืมครุภัณฑ์ราชการ</option>
-                <option value="memo">แบบบันทึกข้อความ</option>
-                <option value="general">แบบฟอร์มเอกสารทั่วไป</option>
-              </select>
+                onChange={(val) => setNewTemplateCat(val as DocumentTemplateCategory)}
+                options={[
+                  { value: 'venue', label: 'แบบขอใช้สถานที่ราชการ' },
+                  { value: 'equipment', label: 'แบบคำขอยืมครุภัณฑ์ราชการ' },
+                  { value: 'memo', label: 'แบบบันทึกข้อความ' },
+                  { value: 'general', label: 'แบบฟอร์มเอกสารทั่วไป' },
+                ]}
+              />
             </div>
 
             {/* ช่องกรอกคำอธิบายเพิ่มเติม */}

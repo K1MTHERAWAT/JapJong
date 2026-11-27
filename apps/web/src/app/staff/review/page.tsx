@@ -226,7 +226,7 @@ export default function StaffReviewPage() {
       backHref={isDetailView ? undefined : '/staff'}
       onBack={otpStep ? () => setOtpStep(false) : undefined}
       rightLabel={isDetailView ? undefined : account?.nickname || 'สุดา'}
-      maxWidth={current ? 'max-w-[1280px]' : 'max-w-[1100px]'}
+      maxWidth={current ? 'max-w-[1280px]' : 'max-w-none'}
     >
       {/* แบนเนอร์แจ้งผลการดำเนินการล่าสุด */}
       {lastCompleted && (

@@ -300,7 +300,7 @@ export function AppShell({
             <div
               className={`print:hidden mb-4 w-full ${
                 noPadding ? 'px-3.5 pt-3.5 sm:px-5 sm:pt-5 lg:px-6 lg:pt-6' : ''
-              } ${maxWidth && maxWidth !== 'max-w-none' ? `${maxWidth} mx-auto` : ''}`}
+              }`}
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -431,11 +431,7 @@ export function AppShell({
               </div>
             </Card>
           ) : (
-            <div
-              className={`flex-1 flex flex-col justify-between gap-5 w-full ${
-                maxWidth && maxWidth !== 'max-w-none' ? `${maxWidth} mx-auto` : ''
-              }`}
-            >
+            <div className="flex-1 flex flex-col justify-between gap-5 w-full">
               <div className="w-full flex-1 flex flex-col">{children}</div>
             </div>
           )}
@@ -443,11 +439,7 @@ export function AppShell({
 
         {footer && (
           <div className="print:hidden w-full sticky bottom-0 z-30 bg-surface/98 backdrop-blur-md border-t border-line shadow-[0_-4px_16px_rgba(20,35,31,0.06)] px-3.5 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom,0px))] lg:bg-transparent lg:backdrop-blur-none lg:border-none lg:shadow-none lg:px-6 lg:pb-3 lg:pt-0 lg:pointer-events-none transition-colors">
-            <div
-              className={`w-full ${
-                maxWidth && maxWidth !== 'max-w-none' ? `${maxWidth} mx-auto` : ''
-              } lg:pointer-events-auto lg:rounded-card lg:bg-surface/95 lg:backdrop-blur-md lg:border lg:border-line lg:shadow-float lg:px-4 lg:py-3 lg:flex lg:items-center lg:justify-end`}
-            >
+            <div className="w-full lg:pointer-events-auto lg:rounded-card lg:bg-surface/95 lg:backdrop-blur-md lg:border lg:border-line lg:shadow-float lg:px-4 lg:py-3 lg:flex lg:items-center lg:justify-end">
               {footer}
             </div>
           </div>

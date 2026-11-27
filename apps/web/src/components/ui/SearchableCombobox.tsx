@@ -19,9 +19,14 @@ export interface SearchableComboboxProps {
   placeholder?: string;
   searchPlaceholder?: string;
   emptyText?: string;
+  searchable?: boolean;
   clearable?: boolean;
   disabled?: boolean;
+  size?: 'md' | 'compact';
+  prefix?: React.ReactNode;
   className?: string;
+  triggerClassName?: string;
+  menuClassName?: string;
 }
 
 export function SearchableCombobox({
@@ -31,9 +36,14 @@ export function SearchableCombobox({
   placeholder = '-- กรุณาเลือกรายการ --',
   searchPlaceholder = 'ค้นหารายการ...',
   emptyText = 'ไม่พบรายการที่ตรงกับคำค้นหา',
+  searchable = true,
   clearable = true,
   disabled = false,
+  size = 'md',
+  prefix,
   className = '',
+  triggerClassName = '',
+  menuClassName = '',
 }: SearchableComboboxProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -46,13 +56,14 @@ export function SearchableCombobox({
   );
 
   const filtered = useMemo(() => {
+    if (!searchable) return options;
     const q = query.trim().toLowerCase();
     if (!q) return options;
     return options.filter((opt) => {
       const haystack = `${opt.label} ${opt.subtitle || ''} ${opt.badge || ''} ${opt.keywords || ''}`.toLowerCase();
       return haystack.includes(q);
     });
-  }, [options, query]);
+  }, [options, query, searchable]);
 
   useEffect(() => {
     if (!open) return;
@@ -75,12 +86,14 @@ export function SearchableCombobox({
   }, [open]);
 
   useEffect(() => {
-    if (open) {
+    if (open && searchable) {
       setTimeout(() => searchInputRef.current?.focus(), 0);
-    } else {
+    } else if (!open) {
       setQuery('');
     }
-  }, [open]);
+  }, [open, searchable]);
+
+  const isCompact = size === 'compact';
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
@@ -103,31 +116,40 @@ export function SearchableCombobox({
             setOpen(true);
           }
         }}
-        className={`w-full min-h-[44px] flex items-center justify-between gap-2.5 px-3.5 py-2 rounded-xl border bg-surface text-left transition select-none ${
+        className={`w-full flex items-center justify-between gap-2 rounded-xl border text-left transition select-none ${
+          isCompact
+            ? 'h-10 px-3 bg-soft text-[12.5px]'
+            : 'min-h-[44px] px-3.5 py-2 bg-surface text-sm'
+        } ${
           disabled
             ? 'opacity-60 cursor-not-allowed border-line'
             : open
               ? 'border-brand ring-2 ring-brand/15 cursor-pointer'
               : 'border-line hover:border-brand/60 cursor-pointer'
-        }`}
+        } ${triggerClassName}`}
       >
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {prefix && <div className="flex items-center gap-1.5 shrink-0">{prefix}</div>}
           {selected ? (
             <>
-              {selected.icon && (
+              {!isCompact && selected.icon && (
                 <span className="w-7 h-7 rounded-lg bg-brand/12 text-brand flex items-center justify-center shrink-0">
                   {selected.icon}
                 </span>
               )}
-              <span className="text-sm font-semibold text-ink truncate">{selected.label}</span>
-              {selected.subtitle && (
+              <span className={`font-semibold text-ink truncate ${isCompact ? 'text-[12.5px]' : 'text-sm'}`}>
+                {selected.label}
+              </span>
+              {!isCompact && selected.subtitle && (
                 <span className="hidden sm:inline-flex text-xs px-2 py-0.5 rounded-md bg-surface-muted border border-line text-ink-mute shrink-0">
                   {selected.subtitle}
                 </span>
               )}
             </>
           ) : (
-            <span className="text-sm text-ink-mute truncate">{placeholder}</span>
+            <span className={`text-ink-mute truncate ${isCompact ? 'text-[12.5px]' : 'text-sm'}`}>
+              {placeholder}
+            </span>
           )}
         </div>
 
@@ -157,32 +179,36 @@ export function SearchableCombobox({
       {open && (
         <div
           role="listbox"
-          className="absolute left-0 right-0 top-full mt-2 z-40 rounded-2xl border border-line bg-surface shadow-xl overflow-hidden"
+          className={`absolute left-0 top-full mt-2 z-50 rounded-2xl border border-line bg-surface shadow-xl overflow-hidden ${
+            isCompact ? 'min-w-[230px] w-max max-w-[90vw]' : 'right-0'
+          } ${menuClassName}`}
         >
           {/* Search Input */}
-          <div className="p-2.5 border-b border-line bg-surface">
-            <div className="relative">
-              <Search className="size-4 text-ink-mute absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={searchPlaceholder}
-                className="w-full pl-9 pr-8 py-2 text-sm rounded-xl bg-surface-muted/60 border border-line text-ink placeholder:text-ink-mute focus:outline-none focus:border-brand focus:bg-surface transition"
-              />
-              {query && (
-                <button
-                  type="button"
-                  aria-label="ล้างคำค้นหา"
-                  onClick={() => setQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-mute hover:text-ink cursor-pointer"
-                >
-                  <X className="size-3.5" />
-                </button>
-              )}
+          {searchable && (
+            <div className="p-2.5 border-b border-line bg-surface">
+              <div className="relative">
+                <Search className="size-4 text-ink-mute absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={searchPlaceholder}
+                  className="w-full pl-9 pr-8 py-2 text-sm rounded-xl bg-surface-muted/60 border border-line text-ink placeholder:text-ink-mute focus:outline-none focus:border-brand focus:bg-surface transition"
+                />
+                {query && (
+                  <button
+                    type="button"
+                    aria-label="ล้างคำค้นหา"
+                    onClick={() => setQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-mute hover:text-ink cursor-pointer"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Options List */}
           <div className="max-h-72 overflow-y-auto p-1.5 space-y-1">

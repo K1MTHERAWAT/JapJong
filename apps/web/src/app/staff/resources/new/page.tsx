@@ -26,7 +26,7 @@ import {
 } from '@japjong/shared';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
-import { NameLengthBadge, NameLimitWarning, Stepper, Tabs, Toggle } from '@/components/ui';
+import { NameLengthBadge, NameLimitWarning, SearchableCombobox, Stepper, Tabs, Toggle } from '@/components/ui';
 import { FreeformTemplateEditorModal } from '@/components/freeform-a4-editor';
 import { api, readAndCompressImages } from '@/lib/api';
 
@@ -471,15 +471,17 @@ export default function AddResourcePage() {
               {/* หมวดหมู่อุปกรณ์ */}
               <div>
                 <label className="jw-lbl">หมวดหมู่อุปกรณ์</label>
-                <select
+                <SearchableCombobox
+                  searchable={false}
+                  clearable={false}
                   value={eqCategory}
-                  onChange={(e) => setEqCategory(e.target.value as EquipmentCategory)}
-                  className="jw-in"
-                >
-                  <option value="audio">เครื่องเสียง / ไมโครโฟน</option>
-                  <option value="tent">เต็นท์ / โต๊ะ / เก้าอี้</option>
-                  <option value="it">โปรเจกเตอร์ / จอภาพ</option>
-                </select>
+                  onChange={(val) => setEqCategory(val as EquipmentCategory)}
+                  options={[
+                    { value: 'audio', label: 'เครื่องเสียง / ไมโครโฟน' },
+                    { value: 'tent', label: 'เต็นท์ / โต๊ะ / เก้าอี้' },
+                    { value: 'it', label: 'โปรเจกเตอร์ / จอภาพ' },
+                  ]}
+                />
               </div>
 
               {/* จำนวนสต็อกคงเหลือ */}
@@ -678,20 +680,19 @@ export default function AddResourcePage() {
               </button>
             </div>
             <div className="flex gap-2">
-              <select
+              <SearchableCombobox
+                clearable={false}
                 value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-                className="jw-in flex-1"
-              >
-                {availableForms.length === 0 && (
-                  <option value={formName}>{formName}</option>
-                )}
-                {availableForms.map((f) => (
-                  <option key={f.id} value={f.name}>
-                    {f.name}
-                  </option>
-                ))}
-              </select>
+                onChange={setFormName}
+                className="flex-1"
+                placeholder="เลือกแบบฟอร์ม"
+                searchPlaceholder="ค้นหาแบบฟอร์ม..."
+                options={
+                  availableForms.length === 0
+                    ? [{ value: formName, label: formName }]
+                    : availableForms.map((f) => ({ value: f.name, label: f.name }))
+                }
+              />
               <button
                 type="button"
                 onClick={() => {

@@ -11,7 +11,7 @@ import {
 import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 import { Icon } from '@/components/icons';
-import { Toggle } from '@/components/ui';
+import { SearchableCombobox, Toggle } from '@/components/ui';
 import { api } from '@/lib/api';
 
 const TONE_STYLES: Record<
@@ -626,20 +626,21 @@ export default function AdminPermissionsPage() {
             </div>
 
             <div className="flex items-center gap-2 ml-auto">
-              <select
+              <SearchableCombobox
+                size="compact"
+                searchable={false}
                 value={bulkTargetRole}
-                onChange={(e) => setBulkTargetRole(e.target.value)}
-                className="jw-in h-9 rounded-xl text-xs font-semibold border-line py-0 px-3"
-              >
-                <option value="">-- เลือกบทบาท --</option>
-                {sortedRoles
+                onChange={setBulkTargetRole}
+                placeholder="-- เลือกบทบาท --"
+                triggerClassName="h-9 bg-surface"
+                options={sortedRoles
                   .filter((r) => r.enabled)
-                  .map((r) => (
-                    <option key={r.id} value={r.key}>
-                      {r.name} ({r.key})
-                    </option>
-                  ))}
-              </select>
+                  .map((r) => ({
+                    value: r.key,
+                    label: r.name,
+                    badge: r.key,
+                  }))}
+              />
 
               <button
                 type="button"
