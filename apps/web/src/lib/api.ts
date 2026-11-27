@@ -470,8 +470,29 @@ export const api = {
   ) =>
     request<RequestWithTimeline>(`/requests/${id}/inspect-return`, { method: 'POST', body: JSON.stringify(payload) }),
   /** ผู้ขอแนบสลิปโอนเงินชำระค่าธรรมเนียม / ค่ามัดจำ */
-  submitPaymentSlip: (id: string, payload: { slipUrl: string; note?: string }) =>
+  submitPaymentSlip: (
+    id: string,
+    payload: {
+      slipUrl: string;
+      note?: string;
+      refundMethod?: 'transfer' | 'cash';
+      refundBankName?: string;
+      refundAccountNumber?: string;
+      refundAccountName?: string;
+    },
+  ) =>
     request<RequestWithTimeline>(`/requests/${id}/payment-slip`, { method: 'POST', body: JSON.stringify(payload) }),
+  /** ผู้ขอหรือเจ้าหน้าที่บันทึก/แก้ไขช่องทางรับเงินมัดจำคืน */
+  updateRefundAccount: (
+    id: string,
+    payload: {
+      refundMethod: 'transfer' | 'cash';
+      refundBankName?: string;
+      refundAccountNumber?: string;
+      refundAccountName?: string;
+    },
+  ) =>
+    request<RequestWithTimeline>(`/requests/${id}/refund-account`, { method: 'POST', body: JSON.stringify(payload) }),
   /** เจ้าหน้าที่ตรวจสอบสลิป / รับชำระเงินสด / ยกเว้นค่าธรรมเนียม / คืนเงินมัดจำ */
   verifyPayment: (
     id: string,
@@ -480,6 +501,8 @@ export const api = {
       method?: 'transfer' | 'cash';
       receiptNo?: string;
       note?: string;
+      refundAmount?: number;
+      refundSlipUrl?: string;
     },
   ) =>
     request<RequestWithTimeline>(`/requests/${id}/payment-verify`, { method: 'POST', body: JSON.stringify(payload) }),

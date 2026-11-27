@@ -154,9 +154,9 @@ export default function GeneratedDocumentsPage() {
               ))}
             </div>
 
-            {/* มุมมองตารางสำหรับหน้าจอกว้าง */}
+            {/* มุมมองตารางสำหรับหน้าจอกว้าง (Container >= 960px) */}
             <div className="cq-table-view overflow-x-auto">
-              <table className="w-full min-w-[760px] text-left text-sm border-collapse">
+              <table className="w-full text-left text-sm border-collapse">
                 <thead className="bg-soft/60 border-b border-line text-xs font-semibold text-ink-mute uppercase tracking-wider">
                   <tr>
                     <th className="px-4 py-3 whitespace-nowrap">เลขที่เอกสาร</th>

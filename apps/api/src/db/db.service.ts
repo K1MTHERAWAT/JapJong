@@ -255,7 +255,18 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
            ADD COLUMN IF NOT EXISTS "receipt_no" TEXT,
            ADD COLUMN IF NOT EXISTS "paid_at" TIMESTAMPTZ(3),
            ADD COLUMN IF NOT EXISTS "payment_verified_by_id" TEXT,
-           ADD COLUMN IF NOT EXISTS "payment_verified_by_name" TEXT`,
+           ADD COLUMN IF NOT EXISTS "payment_verified_by_name" TEXT,
+           ADD COLUMN IF NOT EXISTS "refund_method" TEXT,
+           ADD COLUMN IF NOT EXISTS "refund_bank_name" TEXT,
+           ADD COLUMN IF NOT EXISTS "refund_account_number" TEXT,
+           ADD COLUMN IF NOT EXISTS "refund_account_name" TEXT,
+           ADD COLUMN IF NOT EXISTS "refund_amount" DOUBLE PRECISION,
+           ADD COLUMN IF NOT EXISTS "refund_slip_url" TEXT,
+           ADD COLUMN IF NOT EXISTS "refunded_at" TIMESTAMPTZ(3),
+           ADD COLUMN IF NOT EXISTS "refunded_by_id" TEXT,
+           ADD COLUMN IF NOT EXISTS "refunded_by_name" TEXT,
+           ADD COLUMN IF NOT EXISTS "refund_receipt_no" TEXT,
+           ADD COLUMN IF NOT EXISTS "refund_note" TEXT`,
         `CREATE TABLE IF NOT EXISTS "payment_settings" (
            "id" TEXT PRIMARY KEY,
            "config" JSONB NOT NULL,
@@ -1339,7 +1350,18 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
           "receipt_no" = ${r.receiptNo ?? null},
           "paid_at" = ${paidAtDate},
           "payment_verified_by_id" = ${r.paymentVerifiedById ?? null},
-          "payment_verified_by_name" = ${r.paymentVerifiedByName ?? null}
+          "payment_verified_by_name" = ${r.paymentVerifiedByName ?? null},
+          "refund_method" = ${r.refundMethod ?? null},
+          "refund_bank_name" = ${r.refundBankName ?? null},
+          "refund_account_number" = ${r.refundAccountNumber ?? null},
+          "refund_account_name" = ${r.refundAccountName ?? null},
+          "refund_amount" = ${r.refundAmount != null ? Math.max(0, Number(r.refundAmount)) : null},
+          "refund_slip_url" = ${r.refundSlipUrl ?? null},
+          "refunded_at" = ${r.refundedAt ? new Date(r.refundedAt) : null},
+          "refunded_by_id" = ${r.refundedById ?? null},
+          "refunded_by_name" = ${r.refundedByName ?? null},
+          "refund_receipt_no" = ${r.refundReceiptNo ?? null},
+          "refund_note" = ${r.refundNote ?? null}
       WHERE "id" = ${r.id}
     `.catch((err) => this.logger.warn('Failed to persist extra request columns', err));
   }
@@ -2789,7 +2811,18 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
             "receipt_no",
             "paid_at",
             "payment_verified_by_id",
-            "payment_verified_by_name"
+            "payment_verified_by_name",
+            "refund_method",
+            "refund_bank_name",
+            "refund_account_number",
+            "refund_account_name",
+            "refund_amount",
+            "refund_slip_url",
+            "refunded_at",
+            "refunded_by_id",
+            "refunded_by_name",
+            "refund_receipt_no",
+            "refund_note"
           FROM "requests"
         `,
       ]);
@@ -2907,6 +2940,17 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         paidAt: extra?.paid_at ? new Date(extra.paid_at).toISOString() : undefined,
         paymentVerifiedById: extra?.payment_verified_by_id ?? undefined,
         paymentVerifiedByName: extra?.payment_verified_by_name ?? undefined,
+        refundMethod: extra?.refund_method ?? undefined,
+        refundBankName: extra?.refund_bank_name ?? undefined,
+        refundAccountNumber: extra?.refund_account_number ?? undefined,
+        refundAccountName: extra?.refund_account_name ?? undefined,
+        refundAmount: extra?.refund_amount != null ? Number(extra.refund_amount) : undefined,
+        refundSlipUrl: extra?.refund_slip_url ?? undefined,
+        refundedAt: extra?.refunded_at ? new Date(extra.refunded_at).toISOString() : undefined,
+        refundedById: extra?.refunded_by_id ?? undefined,
+        refundedByName: extra?.refunded_by_name ?? undefined,
+        refundReceiptNo: extra?.refund_receipt_no ?? undefined,
+        refundNote: extra?.refund_note ?? undefined,
       };
 
       const currentRound = r.approvalRound ?? 1;
@@ -3146,6 +3190,37 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
               .catch(() => {});
           }
         }
+        // เพิ่มเมนูใหม่ที่เพิ่มเข้ามาในระบบ (เช่น /payments, /staff/payment-settings) หากยังไม่มีในฐานข้อมูล
+        const existingHrefs = new Set(this.sidebarServices.map((s) => s.href));
+        for (const seedSvc of mockSidebarServices) {
+          if (!existingHrefs.has(seedSvc.href)) {
+            const copy = clone(seedSvc);
+            this.sidebarServices.push(copy);
+            await this.prisma
+              .$executeRawUnsafe(
+                `INSERT INTO "sidebar_services" ("id", "slug", "label", "description", "icon", "href", "category", "sort_order", "enabled", "is_system", "roles", "allowed_user_ids", "denied_user_ids", "permissions", "exact", "created_at", "updated_at")
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                 ON CONFLICT ("id") DO NOTHING`,
+                copy.id,
+                copy.slug || copy.id,
+                copy.label,
+                copy.description || '',
+                copy.icon,
+                copy.href,
+                copy.category,
+                copy.sortOrder,
+                copy.enabled,
+                copy.isSystem ?? false,
+                copy.roles,
+                copy.allowedUserIds,
+                copy.deniedUserIds || [],
+                JSON.stringify(copy.permissions),
+                copy.exact ?? false,
+              )
+              .catch(() => {});
+          }
+        }
+        this.sidebarServices.sort((a, b) => a.sortOrder - b.sortOrder);
       } else {
         this.sidebarServices = clone(mockSidebarServices);
         for (const s of this.sidebarServices) {

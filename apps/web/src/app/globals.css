@@ -1053,20 +1053,32 @@ table th {
   }
 }
 
-.cq-table-view {
+.cq-table-view,
+.cq-table-view-wide {
   display: none;
 }
 
-.cq-card-view {
+.cq-card-view,
+.cq-card-view-wide {
   display: block;
 }
 
-@container (min-width: 820px) {
+@container (min-width: 960px) {
   .cq-table-view {
     display: block;
   }
 
   .cq-card-view {
+    display: none;
+  }
+}
+
+@container (min-width: 900px) {
+  .cq-table-view-wide {
+    display: block;
+  }
+
+  .cq-card-view-wide {
     display: none;
   }
 }

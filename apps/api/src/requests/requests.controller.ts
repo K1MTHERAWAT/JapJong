@@ -1432,12 +1432,20 @@ export class RequestsController {
     return this.enrich(req);
   }
 
-  /** ผู้ขอแนบหลักฐานสลิปโอนเงินชำระค่าธรรมเนียม / ค่ามัดจำ */
+  /** ผู้ขอแนบหลักฐานสลิปโอนเงินชำระค่าธรรมเนียม / ค่ามัดจำ (พร้อมระบุช่องทางรับคืนมัดจำถ้ามี) */
   @Post(':id/payment-slip')
   async submitPaymentSlip(
     @CurrentUser() user: Account,
     @Param('id') id: string,
-    @Body() body: { slipUrl?: string; note?: string },
+    @Body()
+    body: {
+      slipUrl?: string;
+      note?: string;
+      refundMethod?: 'transfer' | 'cash';
+      refundBankName?: string;
+      refundAccountNumber?: string;
+      refundAccountName?: string;
+    },
   ) {
     const req = this.db.requests.find((r) => r.id === id || r.code === id);
     if (!req) throw new NotFoundException('ไม่พบคำขอ');
@@ -1460,6 +1468,18 @@ export class RequestsController {
     req.paymentNote = String(body.note ?? '').trim().slice(0, 500) || undefined;
     req.paymentSubmittedAt = now;
     req.paymentStatus = 'verifying';
+    if ((req.depositAmount || 0) > 0 && body.refundMethod) {
+      req.refundMethod = body.refundMethod === 'cash' ? 'cash' : 'transfer';
+      if (req.refundMethod === 'transfer') {
+        req.refundBankName = String(body.refundBankName ?? '').trim().slice(0, 120) || undefined;
+        req.refundAccountNumber = String(body.refundAccountNumber ?? '').trim().slice(0, 60) || undefined;
+        req.refundAccountName = String(body.refundAccountName ?? '').trim().slice(0, 150) || undefined;
+      } else {
+        req.refundBankName = undefined;
+        req.refundAccountNumber = undefined;
+        req.refundAccountName = undefined;
+      }
+    }
     req.updatedAt = now;
 
     await this.db.persistRequest(req);
@@ -1467,13 +1487,61 @@ export class RequestsController {
       'STAFF',
       `ตรวจสอบสลิปชำระเงิน ${req.code}`,
       `${req.requesterName} แนบสลิปยอด ${formatBaht(req.totalAmount)}`,
-      `/requests/${req.id}`,
+      `/payments`,
     );
     await this.db.log('request', `แนบสลิปชำระเงิน ${req.code}`, `${user.name} · ${formatBaht(req.totalAmount)}`, {
       id: user.id,
       name: user.name,
       role: user.role,
     });
+    return this.enrich(req);
+  }
+
+  /** ผู้ขอ (หรือเจ้าหน้าที่) บันทึก/แก้ไขช่องทางรับเงินมัดจำคืน */
+  @Post(':id/refund-account')
+  async updateRefundAccount(
+    @CurrentUser() user: Account,
+    @Param('id') id: string,
+    @Body()
+    body: {
+      refundMethod?: 'transfer' | 'cash';
+      refundBankName?: string;
+      refundAccountNumber?: string;
+      refundAccountName?: string;
+    },
+  ) {
+    const req = this.db.requests.find((r) => r.id === id || r.code === id);
+    if (!req) throw new NotFoundException('ไม่พบคำขอ');
+    if (req.requesterId !== user.id && user.role !== 'STAFF' && user.role !== 'ADMIN') {
+      throw new ForbiddenException('เฉพาะเจ้าของคำขอหรือเจ้าหน้าที่เท่านั้นที่สามารถแก้ไขช่องทางรับเงินคืนได้');
+    }
+    if ((req.depositAmount || 0) <= 0) {
+      throw new BadRequestException('คำขอนี้ไม่มีค่ามัดจำ');
+    }
+    if (req.paymentStatus === 'refunded') {
+      throw new BadRequestException('คำขอนี้คืนเงินมัดจำเรียบร้อยแล้ว ไม่สามารถแก้ไขช่องทางรับคืนได้');
+    }
+
+    const method = body.refundMethod === 'cash' ? 'cash' : 'transfer';
+    if (method === 'transfer') {
+      const bank = String(body.refundBankName ?? '').trim().slice(0, 120);
+      const accNo = String(body.refundAccountNumber ?? '').trim().slice(0, 60);
+      const accName = String(body.refundAccountName ?? '').trim().slice(0, 150);
+      if (!bank || !accNo || !accName) {
+        throw new BadRequestException('กรุณากรอกธนาคาร เลขที่บัญชี/พร้อมเพย์ และชื่อบัญชีให้ครบถ้วน');
+      }
+      req.refundMethod = 'transfer';
+      req.refundBankName = bank;
+      req.refundAccountNumber = accNo;
+      req.refundAccountName = accName;
+    } else {
+      req.refundMethod = 'cash';
+      req.refundBankName = undefined;
+      req.refundAccountNumber = undefined;
+      req.refundAccountName = undefined;
+    }
+    req.updatedAt = new Date().toISOString();
+    await this.db.persistRequest(req);
     return this.enrich(req);
   }
 
@@ -1488,6 +1556,8 @@ export class RequestsController {
       method?: 'transfer' | 'cash';
       receiptNo?: string;
       note?: string;
+      refundAmount?: number;
+      refundSlipUrl?: string;
     },
   ) {
     if (
@@ -1541,15 +1611,32 @@ export class RequestsController {
         req.type === 'borrow' ? `/borrow/my` : `/requests/${req.id}`,
       );
     } else if (action === 'refund') {
+      const maxDeposit = Math.max(0, Number(req.depositAmount || 0));
+      const actualRefund =
+        body.refundAmount != null && Number.isFinite(Number(body.refundAmount))
+          ? Math.max(0, Math.min(maxDeposit, Number(body.refundAmount)))
+          : maxDeposit;
+      const actualMethod = body.method === 'cash' ? 'cash' : body.method === 'transfer' ? 'transfer' : req.refundMethod || 'transfer';
+      const refundSlip = String(body.refundSlipUrl ?? '').trim();
+
       req.paymentStatus = 'refunded';
-      req.paymentNote = note || `คืนเงินมัดจำ ${formatBaht(req.depositAmount)} เรียบร้อยแล้ว`;
-      req.paymentVerifiedById = user.id;
-      req.paymentVerifiedByName = user.name;
+      req.refundMethod = actualMethod;
+      req.refundAmount = actualRefund;
+      if (refundSlip) {
+        req.refundSlipUrl = refundSlip.slice(0, 2_500_000);
+      }
+      req.refundReceiptNo = String(body.receiptNo ?? '').trim().slice(0, 100) || `RF-${req.code}`;
+      req.refundNote =
+        note ||
+        `คืนเงินมัดจำ ${formatBaht(actualRefund)} (${actualMethod === 'cash' ? 'เงินสด ณ สำนักงาน' : 'โอนเงินคืน'}) เรียบร้อยแล้ว`;
+      req.refundedAt = now;
+      req.refundedById = user.id;
+      req.refundedByName = user.name;
       this.db.notify(
         req.requesterId,
         `คืนเงินมัดจำ ${req.code} เรียบร้อยแล้ว`,
-        req.paymentNote,
-        `/requests/${req.id}`,
+        req.refundNote,
+        `/payments`,
       );
     } else {
       throw new BadRequestException('รูปแบบการดำเนินการไม่ถูกต้อง');

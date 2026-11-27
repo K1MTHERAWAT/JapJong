@@ -237,6 +237,18 @@ interface BaseRequest {
   paidAt?: string;
   paymentVerifiedById?: string;
   paymentVerifiedByName?: string;
+  /** ข้อมูลช่องทางรับคืนและการคืนเงินมัดจำ */
+  refundMethod?: 'transfer' | 'cash';
+  refundBankName?: string;
+  refundAccountNumber?: string;
+  refundAccountName?: string;
+  refundAmount?: number;
+  refundSlipUrl?: string;
+  refundedAt?: string;
+  refundedById?: string;
+  refundedByName?: string;
+  refundReceiptNo?: string;
+  refundNote?: string;
 }
 
 export interface BookingRequest extends BaseRequest {

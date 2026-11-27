@@ -56,6 +56,8 @@ const POPULAR_ICONS = [
   { name: 'Building2', label: 'สถานที่ / อาคาร' },
   { name: 'Package', label: 'อุปกรณ์ / พัสดุ' },
   { name: 'Wrench', label: 'แจ้งซ่อม / ปัญหา' },
+  { name: 'Banknote', label: 'ชำระเงิน / ค่าธรรมเนียม' },
+  { name: 'WalletCards', label: 'บัญชีรับเงิน' },
   { name: 'FileText', label: 'รายการ / ประวัติ' },
   { name: 'Clock', label: 'เวลา / ประวัติ' },
   { name: 'Bell', label: 'แจ้งเตือน' },
@@ -508,11 +510,14 @@ export default function AdminServicesPage() {
             '/borrow',
             '/repair',
             '/borrow/my',
+            '/payments',
             '/history',
             '/notifications',
             '/account',
             '/staff/review',
             '/staff/repairs',
+            '/staff/resources',
+            '/staff/payment-settings',
             '/staff/walk-in',
             '/staff/verify',
           ].includes(s.href);
@@ -755,90 +760,95 @@ export default function AdminServicesPage() {
             </div>
           ) : (
             <>
-              {/* มุมมองการ์ดสำหรับหน้าจอแคบ / มือถือ / เมื่อเปิด Sidebar ค้างไว้ */}
-              <div className="cq-card-view divide-y divide-line-soft">
+              {/* มุมมองการ์ดสำหรับหน้าจอแคบ / มือถือ / แท็บเล็ต (Container < 900px) — จัดเป็น 2 คอลัมน์บนจอขนาดกลางเพื่อใช้พื้นที่ให้คุ้ม */}
+              <div className="cq-card-view-wide p-3.5 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {filteredServices.map((item, idx) => {
                   const IconComp = resolveNavIcon(item.icon);
                   return (
                     <div
                       key={item.id}
-                      className={`p-3.5 sm:p-4 flex flex-col gap-2.5 transition-colors ${
-                        !item.enabled ? 'bg-ground/40 opacity-80' : 'hover:bg-hover/40'
+                      className={`rounded-xl border border-line bg-surface p-3.5 flex flex-col justify-between gap-2.5 transition-colors ${
+                        !item.enabled ? 'bg-ground/40 opacity-80' : 'hover:border-brand/40'
                       }`}
                     >
-                      {/* แถวบน: ลำดับขึ้น/ลง + ไอคอน + ชื่อบริการ + สวิตช์เปิดปิด */}
-                      <div className="flex items-start justify-between gap-2.5">
-                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                          <div className="flex flex-col items-center justify-center pt-0.5 shrink-0">
-                            <button
-                              type="button"
-                              disabled={idx === 0}
-                              onClick={() => handleMoveOrder(idx, 'up')}
-                              title="เลื่อนขึ้น"
-                              className="p-0.5 text-ink-mute hover:text-ink disabled:opacity-20"
-                            >
-                              <ArrowUp className="size-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              disabled={idx === filteredServices.length - 1}
-                              onClick={() => handleMoveOrder(idx, 'down')}
-                              title="เลื่อนลง"
-                              className="p-0.5 text-ink-mute hover:text-ink disabled:opacity-20"
-                            >
-                              <ArrowDown className="size-3.5" />
-                            </button>
-                          </div>
-
-                          <div className="size-9 rounded-control bg-brand-tint text-brand flex items-center justify-center shrink-0 border border-brand/20">
-                            <IconComp className="size-4" />
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <div className="font-semibold text-[14px] text-ink flex flex-wrap items-center gap-1.5 leading-snug">
-                              <span className="break-words">{item.label}</span>
-                              {item.isSystem && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 font-normal whitespace-nowrap">
-                                  ระบบหลัก
-                                </span>
-                              )}
+                      <div className="flex flex-col gap-2">
+                        {/* แถวบน: ลำดับขึ้น/ลง + ไอคอน + ชื่อบริการ + สวิตช์เปิดปิด */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2 min-w-0 flex-1">
+                            <div className="flex flex-col items-center justify-center pt-0.5 shrink-0">
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                onClick={() => handleMoveOrder(idx, 'up')}
+                                title="เลื่อนขึ้น"
+                                className="p-0.5 text-ink-mute hover:text-ink disabled:opacity-20"
+                              >
+                                <ArrowUp className="size-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={idx === filteredServices.length - 1}
+                                onClick={() => handleMoveOrder(idx, 'down')}
+                                title="เลื่อนลง"
+                                className="p-0.5 text-ink-mute hover:text-ink disabled:opacity-20"
+                              >
+                                <ArrowDown className="size-3.5" />
+                              </button>
                             </div>
-                            {item.description && (
-                              <p className="text-[12px] text-ink-mute mt-0.5 line-clamp-2">
-                                {item.description}
-                              </p>
-                            )}
+
+                            <div className="size-8 rounded-control bg-brand-tint text-brand flex items-center justify-center shrink-0 border border-brand/20">
+                              <IconComp className="size-4" />
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-[13.5px] text-ink flex flex-wrap items-center gap-1.5 leading-snug">
+                                <span className="break-words">{item.label}</span>
+                                {item.isSystem && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 font-normal whitespace-nowrap">
+                                    ระบบหลัก
+                                  </span>
+                                )}
+                              </div>
+                              <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                                <span className="font-mono text-[11px] text-ink-soft bg-ground px-1.5 py-0.2 rounded border border-line-soft whitespace-nowrap">
+                                  {item.href}
+                                </span>
+                                <span className="px-1.5 py-0.2 rounded text-[10.5px] font-medium bg-surface border border-line text-ink-soft whitespace-nowrap">
+                                  {item.category}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="shrink-0 pt-0.5">
+                            <Toggle
+                              checked={item.enabled}
+                              onChange={() => handleToggle(item)}
+                            />
                           </div>
                         </div>
 
-                        <div className="shrink-0 flex items-center gap-1.5 pt-0.5">
-                          <Toggle
-                            checked={item.enabled}
-                            onChange={() => handleToggle(item)}
-                          />
-                        </div>
-                      </div>
+                        {item.description && (
+                          <p className="text-[11.5px] text-ink-mute line-clamp-1 pl-6">
+                            {item.description}
+                          </p>
+                        )}
 
-                      {/* แถวกลาง: URL + หมวดหมู่ + บทบาท */}
-                      <div className="flex flex-wrap items-center gap-1.5 pl-7">
-                        <span className="font-mono text-[11px] text-ink-soft bg-surface px-2 py-0.5 rounded border border-line-soft whitespace-nowrap">
-                          {item.href}
-                        </span>
-                        <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-surface border border-line text-ink whitespace-nowrap">
-                          {item.category}
-                        </span>
-                        {item.roles.map((r) => {
-                          const meta = ROLES_LIST.find((m) => m.role === r);
-                          return (
-                            <Chip key={r} tone={meta?.tone || 'gray'} className="text-[10px] py-0 px-1.5 whitespace-nowrap">
-                              {r}
-                            </Chip>
-                          );
-                        })}
+                        {/* บทบาทที่เห็น */}
+                        <div className="flex flex-wrap items-center gap-1 pl-6">
+                          {item.roles.map((r) => {
+                            const meta = ROLES_LIST.find((m) => m.role === r);
+                            return (
+                              <Chip key={r} tone={meta?.tone || 'gray'} className="text-[10px] py-0 px-1.5 whitespace-nowrap">
+                                {r}
+                              </Chip>
+                            );
+                          })}
+                        </div>
                       </div>
 
                       {/* แถวล่าง: สถานะ + ปุ่มจัดการ */}
-                      <div className="flex items-center justify-between gap-2 pl-7 pt-1 border-t border-line-soft/70">
+                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-line-soft/80">
                         <span
                           className={`text-[11px] font-medium whitespace-nowrap ${
                             item.enabled ? 'text-emerald-700' : 'text-ink-mute'
@@ -851,7 +861,7 @@ export default function AdminServicesPage() {
                           <button
                             type="button"
                             onClick={() => handleOpenEdit(item)}
-                            className="px-3 py-1 text-[12px] font-medium rounded-control border border-line hover:bg-hover text-ink transition whitespace-nowrap"
+                            className="px-2.5 py-1 text-[12px] font-medium rounded-control border border-line hover:bg-hover text-ink transition whitespace-nowrap"
                           >
                             แก้ไข
                           </button>
@@ -870,18 +880,17 @@ export default function AdminServicesPage() {
                 })}
               </div>
 
-              {/* มุมมองตารางสำหรับหน้าจอกว้าง (Container >= 820px) */}
-              <div className="cq-table-view overflow-x-auto">
-                <table className="w-full min-w-[820px] text-left text-[13px] border-collapse">
+              {/* มุมมองตารางสำหรับหน้าจอกว้าง (Container >= 900px) — 6 คอลัมน์กระชับ เต็มพื้นที่ ไม่มีคอลัมน์ว่างหรือตกขอบ */}
+              <div className="cq-table-view-wide">
+                <table className="w-full text-left text-[13px] border-collapse">
                   <thead>
                     <tr className="bg-ground/60 border-b border-line text-[11px] font-semibold text-ink-mute uppercase tracking-wider">
-                      <th className="py-3 px-2.5 w-14 text-center whitespace-nowrap">ลำดับ</th>
-                      <th className="py-3 px-3 whitespace-nowrap">บริการ / เมนู</th>
-                      <th className="py-3 px-3 whitespace-nowrap">URL / Route</th>
-                      <th className="py-3 px-3 whitespace-nowrap">หมวดหมู่</th>
-                      <th className="py-3 px-3 whitespace-nowrap">บทบาทที่เห็น (Roles)</th>
-                      <th className="py-3 px-3 text-center whitespace-nowrap">สถานะ</th>
-                      <th className="py-3 px-3 text-right whitespace-nowrap">จัดการ</th>
+                      <th className="py-2.5 px-2.5 w-14 text-center whitespace-nowrap">ลำดับ</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap">บริการ / เมนู & เส้นทาง</th>
+                      <th className="py-2.5 px-2.5 whitespace-nowrap">หมวดหมู่</th>
+                      <th className="py-2.5 px-2.5 whitespace-nowrap">บทบาทที่เห็น (Roles)</th>
+                      <th className="py-2.5 px-2.5 text-center whitespace-nowrap">สถานะ</th>
+                      <th className="py-2.5 px-3 text-right whitespace-nowrap">จัดการ</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line-soft">
@@ -930,26 +939,29 @@ export default function AdminServicesPage() {
                             </div>
                           </td>
 
-                          {/* คอลัมน์ที่ 2: ไอคอนและชื่อบริการ */}
+                          {/* คอลัมน์ที่ 2: ไอคอน ชื่อบริการ เส้นทาง URL และคำอธิบาย */}
                           <td className="py-2.5 px-3 align-middle">
-                            <div className="flex items-center gap-2.5">
+                            <div className="flex items-center gap-2.5 min-w-0">
                               <div className="size-8 rounded-control bg-brand-tint text-brand flex items-center justify-center shrink-0 border border-brand/20">
                                 <IconComp className="size-4" />
                               </div>
-                              <div className="min-w-0">
-                                <div className="font-semibold text-ink flex items-center gap-1.5">
-                                  <span className="truncate max-w-[180px]">{item.label}</span>
+                              <div className="min-w-0 flex-1">
+                                <div className="font-semibold text-ink flex flex-wrap items-center gap-1.5">
+                                  <span>{item.label}</span>
+                                  <span className="font-mono text-[11px] font-normal text-ink-soft bg-ground px-1.5 py-0.2 rounded border border-line-soft whitespace-nowrap">
+                                    {item.href}
+                                  </span>
                                   {item.isSystem && (
                                     <span
                                       title="เมนูระบบหลัก"
-                                      className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 font-normal whitespace-nowrap shrink-0"
+                                      className="px-1.5 py-0.2 rounded text-[10px] bg-slate-100 text-slate-600 font-normal whitespace-nowrap shrink-0"
                                     >
                                       ระบบหลัก
                                     </span>
                                   )}
                                 </div>
                                 {item.description && (
-                                  <div className="text-[11px] text-ink-mute truncate max-w-[220px]">
+                                  <div className="text-[11.5px] text-ink-mute truncate max-w-[380px] mt-0.5">
                                     {item.description}
                                   </div>
                                 )}
@@ -957,27 +969,20 @@ export default function AdminServicesPage() {
                             </div>
                           </td>
 
-                          {/* คอลัมน์ที่ 3: เส้นทาง URL Route */}
-                          <td className="py-2.5 px-3 font-mono text-[12px] text-ink-soft whitespace-nowrap align-middle">
-                            <span className="bg-surface px-2 py-0.5 rounded border border-line-soft">
-                              {item.href}
-                            </span>
-                          </td>
-
-                          {/* คอลัมน์ที่ 4: ชื่อหมวดหมู่ */}
-                          <td className="py-2.5 px-3 whitespace-nowrap align-middle">
+                          {/* คอลัมน์ที่ 3: ชื่อหมวดหมู่ */}
+                          <td className="py-2.5 px-2.5 whitespace-nowrap align-middle">
                             <span className="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-surface border border-line text-ink">
                               {item.category}
                             </span>
                           </td>
 
-                          {/* คอลัมน์ที่ 5: ป้ายบทบาทที่ได้รับสิทธิ์ */}
-                          <td className="py-2.5 px-3 align-middle">
-                            <div className="flex flex-wrap gap-1 max-w-[220px]">
+                          {/* คอลัมน์ที่ 4: ป้ายบทบาทที่ได้รับสิทธิ์ */}
+                          <td className="py-2.5 px-2.5 align-middle">
+                            <div className="flex flex-wrap gap-1">
                               {item.roles.map((r) => {
                                 const meta = ROLES_LIST.find((m) => m.role === r);
                                 return (
-                                  <Chip key={r} tone={meta?.tone || 'gray'} className="text-[10px] py-0 px-1.5 whitespace-nowrap">
+                                  <Chip key={r} tone={meta?.tone || 'gray'} className="text-[10.5px] py-0 px-1.5 whitespace-nowrap">
                                     {r}
                                   </Chip>
                                 );
@@ -985,8 +990,8 @@ export default function AdminServicesPage() {
                             </div>
                           </td>
 
-                          {/* คอลัมน์ที่ 6: สวิตช์สลับสถานะเปิด/ปิด */}
-                          <td className="py-2.5 px-3 text-center whitespace-nowrap align-middle">
+                          {/* คอลัมน์ที่ 5: สวิตช์สลับสถานะเปิด/ปิด */}
+                          <td className="py-2.5 px-2.5 text-center whitespace-nowrap align-middle">
                             <div className="inline-flex items-center gap-1.5">
                               <Toggle
                                 checked={item.enabled}
@@ -1002,7 +1007,7 @@ export default function AdminServicesPage() {
                             </div>
                           </td>
 
-                          {/* คอลัมน์ที่ 7: ปุ่มแก้ไขและปุ่มลบ */}
+                          {/* คอลัมน์ที่ 6: ปุ่มแก้ไขและปุ่มลบ */}
                           <td className="py-2.5 px-3 text-right whitespace-nowrap align-middle">
                             <div className="inline-flex items-center gap-1">
                               <button
