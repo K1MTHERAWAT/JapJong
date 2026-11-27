@@ -934,8 +934,8 @@
   ) !important;
 }
 
-/* Sidebar Theme: Royal Navy & Emerald (Light Mode) */
-.gov-brand-shell aside:not([aria-label="ข้อมูลประกอบ"]) {
+/* Sidebar Theme: Royal Navy & Emerald (Light Mode) — เฉพาะ Sidebar หลักเท่านั้น ไม่กระทบ <aside> ในหน้าอื่น */
+.japjong-left-sidebar aside {
   --rgb-bg: 19 32 56;
   --rgb-surface: 19 32 56;
   --rgb-surface-muted: 29 47 79;
@@ -962,7 +962,7 @@
 }
 
 /* Sidebar Theme: Royal Navy & Emerald (Dark Mode) */
-.dark .gov-brand-shell aside:not([aria-label="ข้อมูลประกอบ"]) {
+.dark .japjong-left-sidebar aside {
   --rgb-bg: 11 17 32;
   --rgb-surface: 11 17 32;
   --rgb-surface-muted: 22 32 51;
@@ -976,11 +976,11 @@
   border-color: #1e293b !important;
 }
 
-.gov-brand-shell aside:not([aria-label="ข้อมูลประกอบ"]) button[data-active="true"] {
+.japjong-left-sidebar aside button[data-active="true"] {
   background: rgba(74, 222, 128, 0.15) !important;
 }
 
-.gov-brand-shell aside button:has(.sidebar-section-marker) {
+.japjong-left-sidebar aside button:has(.sidebar-section-marker) {
   padding: 6px 14px 2px !important;
   font-size: 11px !important;
   font-weight: 700 !important;
@@ -993,31 +993,82 @@
   gap: 0 !important;
 }
 
-.gov-brand-shell aside button:has(.sidebar-section-marker) > span:first-child {
+.japjong-left-sidebar aside button:has(.sidebar-section-marker) > span:first-child {
   display: none !important;
 }
 
 /* ซ่อนแถบ Scrollbar สีขาวใน Sidebar (ยังเลื่อนด้วยลูกกลิ้งเมาส์ได้) + กระชับระยะเมนูให้พอดีจอ */
-.gov-brand-shell aside:not([aria-label="ข้อมูลประกอบ"]),
-.gov-brand-shell aside:not([aria-label="ข้อมูลประกอบ"]) * {
+.japjong-left-sidebar aside,
+.japjong-left-sidebar aside * {
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
 }
 
-.gov-brand-shell aside:not([aria-label="ข้อมูลประกอบ"])::-webkit-scrollbar,
-.gov-brand-shell aside:not([aria-label="ข้อมูลประกอบ"]) *::-webkit-scrollbar {
+.japjong-left-sidebar aside::-webkit-scrollbar,
+.japjong-left-sidebar aside *::-webkit-scrollbar {
   display: none !important;
   width: 0 !important;
   height: 0 !important;
 }
 
-.gov-brand-shell aside:not([aria-label="ข้อมูลประกอบ"]) nav button:not(:has(.sidebar-section-marker)) {
+.japjong-left-sidebar aside nav button:not(:has(.sidebar-section-marker)) {
   padding-top: 8px !important;
   padding-bottom: 8px !important;
 }
 
-.gov-brand-shell aside:not([aria-label="ข้อมูลประกอบ"]) nav hr {
+.japjong-left-sidebar aside nav hr {
   margin: 5px 0 !important;
+}
+
+/* Global Responsive Safety Net: ป้องกันหัวตาราง/คอลัมน์ถูกบีบหักทีละตัวอักษรเวลาย่อหน้าจอหรือขยาย Sidebar */
+table th {
+  white-space: nowrap;
+}
+
+.jw-card {
+  min-width: 0;
+}
+
+/* Container-Query Responsive Helpers (ตอบสนองตามความกว้างพื้นที่จริงแม้ตอนขยาย Sidebar 280px) */
+.cq-shell {
+  container-type: inline-size;
+}
+
+.cq-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+@container (min-width: 520px) {
+  .cq-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+}
+
+@container (min-width: 1020px) {
+  .cq-kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.cq-table-view {
+  display: none;
+}
+
+.cq-card-view {
+  display: block;
+}
+
+@container (min-width: 820px) {
+  .cq-table-view {
+    display: block;
+  }
+
+  .cq-card-view {
+    display: none;
+  }
 }
 
 /* หน้าแรก: ให้ aside ข้อมูลประกอบโปร่งใส โดยไม่กระทบ Sidebar */

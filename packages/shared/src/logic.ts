@@ -311,12 +311,10 @@ export function canAccessRoute(
     };
   }
 
-  // 3. หน้าโฮมแอดมิน (/admin), จัดการบริการ (/admin/services), ระบบแจ้งเตือน (/admin/notifications) และ LINE Rich Menu (/admin/line)
+  // 3. หน้าโฮมแอดมิน (/admin) และจัดการบริการ (/admin/services)
   if (
     pathname === '/admin' ||
-    pathname.startsWith('/admin/services') ||
-    pathname.startsWith('/admin/notifications') ||
-    pathname.startsWith('/admin/line')
+    pathname.startsWith('/admin/services')
   ) {
     const ok = account.role === 'ADMIN' || hasPermission(account, 'manageUsers');
     return {

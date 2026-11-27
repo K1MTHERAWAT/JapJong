@@ -21,6 +21,7 @@ import {
   Venue,
   VenueType,
   clampNameInput,
+  formatPricingSummary,
   periodDurationText,
   sanitizeHouseNoInput,
   sanitizeMooInput,
@@ -199,7 +200,11 @@ export default function BookingWizardPage() {
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [search, setSearch] = useState('');
   const [cardView, setCardView] = useState<'grid' | 'list'>('grid');
+  const [expandedVenueId, setExpandedVenueId] = useState<string | null>(null);
   const [inspectedVenue, setInspectedVenue] = useState<Venue | null>(null);
+  const toggleVenueDetail = (id: string) => {
+    setExpandedVenueId((prev) => (prev === id ? null : id));
+  };
 
   // Step 2 state (ค่าเริ่มต้น 1 ช่วงเวลา)
   const [month, setMonth] = useState(() => {
@@ -1030,73 +1035,120 @@ export default function BookingWizardPage() {
                           const firstTwo = facLabels.slice(0, 2).join(' · ');
                           const extraCount = facLabels.length - 2;
 
+                          const isExpanded = expandedVenueId === v.id;
                           return (
                             <div
                               key={v.id}
-                              className={`min-h-[64px] flex items-stretch transition ${
+                              className={`flex flex-col transition ${
                                 isSelected ? 'bg-brand-tint/40' : 'bg-surface'
                               } ${disabled ? 'opacity-60' : ''}`}
                             >
-                              <label
-                                htmlFor={`mob-chk-${v.id}`}
-                                className="flex-1 min-w-0 flex items-center gap-3 py-3 pl-4 pr-1.5 cursor-pointer select-none"
-                              >
-                                <input
-                                  id={`mob-chk-${v.id}`}
-                                  type="radio"
-                                  name="booking-venue"
-                                  checked={isSelected}
-                                  disabled={disabled}
-                                  onChange={() => toggleVenue(v)}
-                                  className="w-5 h-5 rounded-[6px] accent-brand shrink-0 cursor-pointer"
-                                />
-                                <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-                                  <div className="text-body font-semibold text-ink leading-snug">
-                                    {v.name}
-                                  </div>
-                                  <div className="text-caption font-medium text-ink-soft leading-snug">
-                                    {v.building}
-                                    {v.floor ? ` · ${v.floor}` : ''} · {v.capacity} คน
-                                  </div>
-                                  <div className="text-[12px] text-ink-mute leading-snug flex flex-wrap items-center gap-1">
-                                    {facLabels.length === 0 ? (
-                                      <span>ไม่มีสิ่งอำนวยความสะดวกเพิ่มเติม</span>
-                                    ) : (
-                                      <>
-                                        <span>{firstTwo}</span>
-                                        {extraCount > 0 && (
-                                          <span className="text-[11px] font-semibold bg-surface-muted border border-line-soft text-ink-soft px-1.5 py-0.2 rounded">
-                                            +{extraCount}
-                                          </span>
-                                        )}
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                              </label>
-                              <button
-                                type="button"
-                                aria-label={`รายละเอียด ${v.name}`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setInspectedVenue(v);
-                                }}
-                                className="w-[52px] min-h-[44px] shrink-0 flex items-center justify-center text-ink-mute hover:text-brand transition cursor-pointer"
-                              >
-                                <svg
-                                  width="18"
-                                  height="18"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2.2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  aria-hidden="true"
+                              <div className="min-h-[64px] flex items-stretch">
+                                <label
+                                  htmlFor={`mob-chk-${v.id}`}
+                                  className="w-3/4 min-w-0 flex items-center gap-3 py-3 pl-4 pr-1.5 cursor-pointer select-none"
                                 >
-                                  <polyline points="9 18 15 12 9 6" />
-                                </svg>
-                              </button>
+                                  <input
+                                    id={`mob-chk-${v.id}`}
+                                    type="radio"
+                                    name="booking-venue"
+                                    checked={isSelected}
+                                    disabled={disabled}
+                                    onChange={() => toggleVenue(v)}
+                                    className="w-5 h-5 rounded-[6px] accent-brand shrink-0 cursor-pointer"
+                                  />
+                                  <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                                    <div className="text-body font-semibold text-ink leading-snug">
+                                      {v.name}
+                                    </div>
+                                    <div className="text-caption font-medium text-ink-soft leading-snug">
+                                      {v.building}
+                                      {v.floor ? ` · ${v.floor}` : ''} · {v.capacity} คน
+                                    </div>
+                                    <div className="text-[12px] text-ink-mute leading-snug flex flex-wrap items-center gap-1">
+                                      {facLabels.length === 0 ? (
+                                        <span>ไม่มีสิ่งอำนวยความสะดวกเพิ่มเติม</span>
+                                      ) : (
+                                        <>
+                                          <span>{firstTwo}</span>
+                                          {extraCount > 0 && (
+                                            <span className="text-[11px] font-semibold bg-surface-muted border border-line-soft text-ink-soft px-1.5 py-0.2 rounded">
+                                              +{extraCount}
+                                            </span>
+                                          )}
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                </label>
+                                <button
+                                  type="button"
+                                  aria-label={`รายละเอียด ${v.name}`}
+                                  aria-expanded={isExpanded}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleVenueDetail(v.id);
+                                  }}
+                                  className="w-1/4 min-h-[44px] shrink-0 flex items-center justify-end pr-4 text-ink-mute hover:text-brand transition cursor-pointer"
+                                >
+                                  <svg
+                                    width="18"
+                                    height="18"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    aria-hidden="true"
+                                    className={`transition-transform duration-150 ${isExpanded ? 'rotate-90 text-brand' : ''}`}
+                                  >
+                                    <polyline points="9 18 15 12 9 6" />
+                                  </svg>
+                                </button>
+                              </div>
+
+                              {isExpanded && (
+                                <div className="px-4 pb-3.5 pt-2 border-t border-line-soft bg-soft/60 space-y-2.5 text-[12px]">
+                                  {v.images?.[0] && (
+                                    <div className="aspect-[4/3] w-full rounded-xl overflow-hidden border border-line bg-brand-mint">
+                                      <ThumbnailImage
+                                        src={v.images[0]}
+                                        alt={v.name}
+                                        iconName={venueIconName(v.type)}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    </div>
+                                  )}
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div className="p-2 rounded-lg bg-surface border border-line">
+                                      <span className="text-ink-mute block text-[11px]">เวลาเปิดทำการ</span>
+                                      <b className="text-ink">{v.openTime}–{v.closeTime} น.</b>
+                                    </div>
+                                    <div className="p-2 rounded-lg bg-surface border border-line">
+                                      <span className="text-ink-mute block text-[11px]">เปิดให้บริการ</span>
+                                      <b className="text-ink">{formatOpenDaysText(v.openDays)}</b>
+                                    </div>
+                                    <div className="p-2 rounded-lg bg-surface border border-line">
+                                      <span className="text-ink-mute block text-[11px]">จองล่วงหน้า</span>
+                                      <b className="text-brand">{v.advanceDays > 0 ? `≥ ${v.advanceDays} วัน` : 'ไม่กำหนด'}</b>
+                                    </div>
+                                    <div className="p-2 rounded-lg bg-surface border border-line">
+                                      <span className="text-ink-mute block text-[11px]">ค่าบริการ / มัดจำ</span>
+                                      <b className="text-brand">{formatPricingSummary(v.pricingMode, v.feeAmount, v.depositAmount)}</b>
+                                    </div>
+                                  </div>
+                                  {facLabels.length > 0 && (
+                                    <div className="flex flex-wrap gap-1">
+                                      {facLabels.map((lbl) => (
+                                        <span key={lbl} className="px-2 py-0.5 rounded-md bg-surface border border-line text-[11px] text-ink">
+                                          {lbl}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -1367,7 +1419,7 @@ export default function BookingWizardPage() {
                           e.stopPropagation();
                           setInspectedVenue(v);
                         }}
-                        className="text-[12px] font-semibold text-ink-mute hover:text-ink underline-offset-2 hover:underline px-2 py-1"
+                        className="text-[12px] font-semibold text-ink-mute hover:text-ink underline-offset-2 hover:underline px-2 py-1 cursor-pointer"
                       >
                         ดูรายละเอียด
                       </button>
@@ -1518,7 +1570,7 @@ export default function BookingWizardPage() {
                           e.stopPropagation();
                           setInspectedVenue(v);
                         }}
-                        className="text-[12px] font-semibold text-ink-mute hover:text-ink transition py-1"
+                        className="text-[12px] font-semibold text-ink-mute hover:text-ink transition py-1 cursor-pointer"
                       >
                         ดูรายละเอียด
                       </button>
@@ -1555,161 +1607,145 @@ export default function BookingWizardPage() {
         </div>
       )}
 
-      {/* หน้าต่างแสดงรายละเอียดสถานที่ (Detail Modal - รองรับทั้งมือถือและคอมพิวเตอร์) */}
-      {step === 1 && (
-        <div>
-          {inspectedVenue && (
-            <div
-              className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
-              onClick={() => setInspectedVenue(null)}
-            >
-              <div
-                className="bg-surface border border-line rounded-3xl w-[92vw] sm:w-[85vw] lg:w-[75vw] h-[88vh] sm:h-[75vh] max-w-5xl overflow-hidden shadow-pop flex flex-col my-auto"
-                onClick={(e) => e.stopPropagation()}
+      {/* หน้าต่างแสดงรายละเอียดสถานที่บนคอมพิวเตอร์ (Detail Modal) */}
+      {step === 1 && inspectedVenue && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+          onClick={() => setInspectedVenue(null)}
+        >
+          <div
+            className="bg-surface border border-line rounded-3xl w-[92vw] sm:w-[85vw] lg:w-[75vw] h-[88vh] sm:h-[75vh] max-w-5xl overflow-hidden shadow-pop flex flex-col my-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative h-[52%] sm:h-[58%] bg-brand-mint text-brand overflow-hidden shrink-0">
+              <ThumbnailImage
+                src={inspectedVenue.images?.[0]}
+                alt={inspectedVenue.name}
+                iconName={venueIconName(inspectedVenue.type)}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent pointer-events-none" />
+              <button
+                type="button"
+                onClick={() => setInspectedVenue(null)}
+                className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/45 hover:bg-black/70 backdrop-blur text-white flex items-center justify-center transition shadow-lg cursor-pointer"
+                title="ปิดหน้าต่าง"
               >
-                {/* ส่วนหัวภาพใหญ่พิเศษ พาโนรามา (กินพื้นที่ 55% ของความสูง Modal) */}
-                <div className="relative h-[52%] sm:h-[58%] bg-brand-mint text-brand overflow-hidden shrink-0">
-                  <ThumbnailImage
-                    src={inspectedVenue.images?.[0]}
-                    alt={inspectedVenue.name}
-                    iconName={venueIconName(inspectedVenue.type)}
-                    className="w-full h-full object-cover"
-                  />
-                  {/* แถบ Gradient ดำช่วยให้อ่านข้อความชัดเจน */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent pointer-events-none" />
-
-                  {/* ปุ่มปิด Modal มุมบนขวา */}
-                  <button
-                    type="button"
-                    onClick={() => setInspectedVenue(null)}
-                    className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/45 hover:bg-black/70 backdrop-blur text-white flex items-center justify-center transition shadow-lg"
-                    title="ปิดหน้าต่าง"
-                  >
-                    <Icon name="x" className="w-5 h-5" />
-                  </button>
-
-                  {/* ป้ายด้านบนซ้าย */}
-                  <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-2">
-                    {inspectedVenue.status !== 'available' || !inspectedVenue.enabled ? (
-                      <Chip tone="red">ปิดปรับปรุง</Chip>
-                    ) : (
-                      <Chip tone="green">พร้อมใช้งาน</Chip>
-                    )}
-                    <span className="px-3 py-1 rounded-full text-[12px] font-semibold bg-surface/95 backdrop-blur text-ink shadow-sm">
-                      {VENUE_TYPE_LABEL[inspectedVenue.type]}
-                    </span>
-                  </div>
-
-                  {/* ข้อมูลชื่อและอาคารซ้อนด้านล่างภาพ */}
-                  <div className="absolute bottom-4 inset-x-5 sm:inset-x-7 text-white z-10">
-                    <h3 className="text-[22px] sm:text-[28px] lg:text-[32px] font-extrabold leading-snug drop-shadow-md text-white">
-                      {inspectedVenue.name}
-                    </h3>
-                    <p className="text-[13.5px] sm:text-[15px] text-white/90 flex items-center gap-2 mt-1 drop-shadow-sm">
-                      <Icon name="building" className="w-4 h-4 text-white/80 shrink-0" />
-                      <span>
-                        {inspectedVenue.building}
-                        {inspectedVenue.floor ? ` · ${inspectedVenue.floor}` : ''}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-
-                {/* ส่วนเนื้อหาข้อมูลใน Modal */}
-                <div className="p-4 sm:p-6 overflow-y-auto flex-1 flex flex-col justify-between gap-4 bg-surface">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[12.5px]">
-                    <div className="p-3.5 rounded-2xl bg-soft border border-line">
-                      <span className="text-ink-mute block text-[12px]">ความจุสูงสุด</span>
-                      <b className="text-[15.5px] text-ink inline-flex items-center gap-1.5 mt-1">
-                        <Icon name="users" className="w-4 h-4 text-brand shrink-0" />
-                        <span>{inspectedVenue.capacity} คน</span>
-                      </b>
-                    </div>
-                    <div className="p-3.5 rounded-2xl bg-soft border border-line">
-                      <span className="text-ink-mute block text-[12px]">เวลาเปิดทำการ</span>
-                      <b className="text-[15.5px] text-ink inline-flex items-center gap-1.5 mt-1">
-                        <Icon name="clock" className="w-4 h-4 text-brand shrink-0" />
-                        <span>{inspectedVenue.openTime}–{inspectedVenue.closeTime} น.</span>
-                      </b>
-                    </div>
-                    <div className="p-3.5 rounded-2xl bg-soft border border-line">
-                      <span className="text-ink-mute block text-[12px]">เปิดให้บริการ</span>
-                      <b className="text-[15px] text-ink inline-flex items-center gap-1.5 mt-1">
-                        <Icon name="calendar" className="w-4 h-4 text-brand shrink-0" />
-                        <span>{formatOpenDaysText(inspectedVenue.openDays)}</span>
-                      </b>
-                    </div>
-                    <div className="p-3.5 rounded-2xl bg-soft border border-line">
-                      <span className="text-ink-mute block text-[12px]">จองล่วงหน้า</span>
-                      <b className="text-[15.5px] text-brand inline-flex items-center gap-1.5 mt-1">
-                        <Icon name="info" className="w-4 h-4 text-brand shrink-0" />
-                        <span>
-                          {inspectedVenue.advanceDays > 0
-                            ? `≥ ${inspectedVenue.advanceDays} วัน`
-                            : 'ไม่กำหนด'}
-                        </span>
-                      </b>
-                    </div>
-                  </div>
-
-                  {inspectedVenue.facilities && inspectedVenue.facilities.length > 0 && (
-                    <div className="text-[12.5px]">
-                      <span className="font-bold text-ink block mb-2 text-[13px]">
-                        สิ่งอำนวยความสะดวกประจำสถานที่:
-                      </span>
-                      <div className="flex flex-wrap gap-2">
-                        {inspectedVenue.facilities.map((f) => (
-                          <span
-                            key={f}
-                            className="px-3.5 py-1.5 rounded-xl bg-soft border border-line text-ink font-medium text-[12.5px] flex items-center gap-2"
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-brand" />
-                            <span>{formatFacilityLabel(f)}</span>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ส่วนท้าย Modal ปุ่มควบคุม */}
-                  <div className="pt-3 border-t border-line flex items-center justify-between gap-3 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setInspectedVenue(null)}
-                      className="h-11 px-5 rounded-xl border border-line bg-surface hover:bg-soft text-[13px] font-semibold text-ink transition"
-                    >
-                      ปิดหน้าต่าง
-                    </button>
-                    <button
-                      type="button"
-                      disabled={inspectedVenue.status !== 'available' || !inspectedVenue.enabled}
-                      onClick={() => {
-                        toggleVenue(inspectedVenue);
-                        setInspectedVenue(null);
-                      }}
-                      className={`h-11 px-6 rounded-xl text-[13.5px] font-bold disabled:opacity-40 disabled:pointer-events-none transition flex items-center gap-2 shadow-sm ${
-                        selectedIds.includes(inspectedVenue.id)
-                          ? 'border border-status-crit/30 bg-danger-bg text-status-crit hover:bg-status-crit hover:text-white'
-                          : 'bg-brand hover:bg-brand-ink text-white'
-                      }`}
-                    >
-                      {selectedIds.includes(inspectedVenue.id) ? (
-                        <>
-                          <Icon name="x" className="w-4 h-4" />
-                          <span>นำออกจากรายการที่เลือก</span>
-                        </>
-                      ) : (
-                        <>
-                          <Icon name="plus" className="w-4 h-4" />
-                          <span>เลือกสถานที่นี้เข้าในคำขอ</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
+                <Icon name="x" className="w-5 h-5" />
+              </button>
+              <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-2">
+                {inspectedVenue.status !== 'available' || !inspectedVenue.enabled ? (
+                  <Chip tone="red">ปิดปรับปรุง</Chip>
+                ) : (
+                  <Chip tone="green">พร้อมใช้งาน</Chip>
+                )}
+                <span className="px-3 py-1 rounded-full text-[12px] font-semibold bg-surface/95 backdrop-blur text-ink shadow-sm">
+                  {VENUE_TYPE_LABEL[inspectedVenue.type]}
+                </span>
+              </div>
+              <div className="absolute bottom-4 inset-x-5 sm:inset-x-7 text-white z-10">
+                <h3 className="text-[22px] sm:text-[28px] lg:text-[32px] font-extrabold leading-snug drop-shadow-md text-white">
+                  {inspectedVenue.name}
+                </h3>
+                <p className="text-[13.5px] sm:text-[15px] text-white/90 flex items-center gap-2 mt-1 drop-shadow-sm">
+                  <Icon name="building" className="w-4 h-4 text-white/80 shrink-0" />
+                  <span>
+                    {inspectedVenue.building}
+                    {inspectedVenue.floor ? ` · ${inspectedVenue.floor}` : ''}
+                  </span>
+                </p>
               </div>
             </div>
-          )}
+
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 flex flex-col justify-between gap-4 bg-surface">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[12.5px]">
+                <div className="p-3.5 rounded-2xl bg-soft border border-line">
+                  <span className="text-ink-mute block text-[12px]">ความจุสูงสุด</span>
+                  <b className="text-[15.5px] text-ink inline-flex items-center gap-1.5 mt-1">
+                    <Icon name="users" className="w-4 h-4 text-brand shrink-0" />
+                    <span>{inspectedVenue.capacity} คน</span>
+                  </b>
+                </div>
+                <div className="p-3.5 rounded-2xl bg-soft border border-line">
+                  <span className="text-ink-mute block text-[12px]">เวลาเปิดทำการ</span>
+                  <b className="text-[15.5px] text-ink inline-flex items-center gap-1.5 mt-1">
+                    <Icon name="clock" className="w-4 h-4 text-brand shrink-0" />
+                    <span>{inspectedVenue.openTime}–{inspectedVenue.closeTime} น.</span>
+                  </b>
+                </div>
+                <div className="p-3.5 rounded-2xl bg-soft border border-line">
+                  <span className="text-ink-mute block text-[12px]">เปิดให้บริการ</span>
+                  <b className="text-[15px] text-ink inline-flex items-center gap-1.5 mt-1">
+                    <Icon name="calendar" className="w-4 h-4 text-brand shrink-0" />
+                    <span>{formatOpenDaysText(inspectedVenue.openDays)}</span>
+                  </b>
+                </div>
+                <div className="p-3.5 rounded-2xl bg-soft border border-line">
+                  <span className="text-ink-mute block text-[12px]">จองล่วงหน้า / ค่าบริการ</span>
+                  <b className="text-[14.5px] text-brand inline-flex items-center gap-1.5 mt-1">
+                    <span>
+                      {inspectedVenue.advanceDays > 0 ? `≥ ${inspectedVenue.advanceDays} วัน` : 'ไม่กำหนด'} ·{' '}
+                      {formatPricingSummary(inspectedVenue.pricingMode, inspectedVenue.feeAmount, inspectedVenue.depositAmount)}
+                    </span>
+                  </b>
+                </div>
+              </div>
+
+              {inspectedVenue.facilities && inspectedVenue.facilities.length > 0 && (
+                <div className="text-[12.5px]">
+                  <span className="font-bold text-ink block mb-2 text-[13px]">
+                    สิ่งอำนวยความสะดวกประจำสถานที่:
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {inspectedVenue.facilities.map((f) => (
+                      <span
+                        key={f}
+                        className="px-3.5 py-1.5 rounded-xl bg-soft border border-line text-ink font-medium text-[12.5px] flex items-center gap-2"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-brand" />
+                        <span>{formatFacilityLabel(f)}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-3 border-t border-line flex items-center justify-between gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setInspectedVenue(null)}
+                  className="h-11 px-5 rounded-xl border border-line bg-surface hover:bg-soft text-[13px] font-semibold text-ink transition cursor-pointer"
+                >
+                  ปิดหน้าต่าง
+                </button>
+                <button
+                  type="button"
+                  disabled={inspectedVenue.status !== 'available' || !inspectedVenue.enabled}
+                  onClick={() => {
+                    toggleVenue(inspectedVenue);
+                    setInspectedVenue(null);
+                  }}
+                  className={`h-11 px-6 rounded-xl text-[13.5px] font-bold disabled:opacity-40 disabled:pointer-events-none transition flex items-center gap-2 shadow-sm cursor-pointer ${
+                    selectedIds.includes(inspectedVenue.id)
+                      ? 'border border-status-crit/30 bg-danger-bg text-status-crit hover:bg-status-crit hover:text-white'
+                      : 'bg-brand hover:bg-brand-ink text-white'
+                  }`}
+                >
+                  {selectedIds.includes(inspectedVenue.id) ? (
+                    <>
+                      <Icon name="x" className="w-4 h-4" />
+                      <span>นำออกจากรายการที่เลือก</span>
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="plus" className="w-4 h-4" />
+                      <span>เลือกสถานที่นี้เข้าในคำขอ</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

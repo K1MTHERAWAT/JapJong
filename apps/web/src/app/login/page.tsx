@@ -76,8 +76,8 @@ function GovIcon({ className = 'w-5 h-5' }: { className?: string }) {
 export default function LoginPage() {
   // เครื่องมือสำหรับนำทางเปลี่ยนหน้าของ Next.js
   const router = useRouter();
-  // ดึงฟังก์ชันล็อกอินและรีเฟรชข้อมูลโปรไฟล์จาก Auth Context
-  const { loginWithCredentials, loginWithDemo, refreshMe } = useAuth();
+  // ดึงข้อมูลบัญชีปัจจุบัน สถานะโหลด และฟังก์ชันล็อกอินจาก Auth Context
+  const { account, loading: authLoading, loginWithCredentials, loginWithDemo, refreshMe } = useAuth();
   // จัดการโหมดกลางวัน/กลางคืน
   const { actualTheme, toggleTheme } = useTheme();
 
@@ -105,6 +105,24 @@ export default function LoginPage() {
 
   // ตรวจสอบการเปิดใช้งานโหมด Demo จาก Environment Variables
   const isDemo = process.env.NEXT_PUBLIC_DEMO === 'true';
+
+  /**
+   * หากผู้ใช้เข้าสู่ระบบอยู่แล้ว ไม่ต้องแสดงหน้า Login ซ้ำ ให้พาเข้าหน้าหลักทันที
+   */
+  useEffect(() => {
+    if (authLoading || !account) return;
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('line_token') || params.get('line_status') === 'unlinked' || params.get('line_error')) {
+        return;
+      }
+    }
+    if (account.mustChangePassword) {
+      router.replace('/account?tab=password&force=1');
+    } else {
+      router.replace(roleHomePath(account.role));
+    }
+  }, [account, authLoading, router]);
 
   /**
    * Effect ดักจับพารามิเตอร์ URL Callback จาก LINE Login หรือ OAuth Redirect
@@ -319,6 +337,18 @@ export default function LoginPage() {
       setGovSubmitting(false);
     }
   };
+
+  // ระหว่างกำลังพาผู้ใช้ที่ล็อกอินอยู่แล้วเข้าหน้าหลัก ไม่ต้องแฟลชฟอร์ม Login
+  if (!authLoading && account && !unlinkedNotice.show && !error) {
+    return (
+      <div className="min-h-screen w-full bg-[#f6f5f0] dark:bg-bg text-ink flex items-center justify-center p-6">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="w-9 h-9 rounded-full border-3 border-brand/25 border-t-brand animate-spin" />
+          <p className="text-sm font-medium text-ink-mute">กำลังเข้าสู่หน้าหลัก...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full bg-[#f6f5f0] dark:bg-bg text-[#14231f] dark:text-ink flex flex-col lg:flex-row font-sans relative">

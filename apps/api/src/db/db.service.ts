@@ -3119,6 +3119,16 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
           createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
           updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : new Date().toISOString(),
         }));
+        // ลบเมนู /admin/line และ /admin/notifications ที่ถูกนำออกจากระบบแล้ว
+        const removedHrefs = new Set(['/admin/line', '/admin/notifications']);
+        if (this.sidebarServices.some((s) => removedHrefs.has(s.href))) {
+          this.sidebarServices = this.sidebarServices.filter((s) => !removedHrefs.has(s.href));
+          await this.prisma
+            .$executeRawUnsafe(
+              `DELETE FROM "sidebar_services" WHERE "href" IN ('/admin/line', '/admin/notifications')`,
+            )
+            .catch(() => {});
+        }
         for (const s of this.sidebarServices) {
           if (s.href === '/admin/resources') {
             s.href = '/staff/resources';

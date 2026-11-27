@@ -608,7 +608,7 @@ export default function MyBorrowsPage() {
         )}
 
         {/* ==================== MASTER–DETAIL SPLIT GRID (from borrow-split.html) ==================== */}
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)] gap-6 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(280px,350px)_minmax(0,1fr)] gap-6 items-start">
           {/* -------------------- LEFT COLUMN: MASTER LIST -------------------- */}
           <section className="flex flex-col gap-3 min-w-0">
             {/* 3 Category Pill Tabs */}

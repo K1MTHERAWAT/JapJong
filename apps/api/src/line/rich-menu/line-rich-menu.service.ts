@@ -5,6 +5,8 @@ import {
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 import * as zlib from 'zlib';
 import { DbService } from '../../db/db.service';
 import { LineMessagingService } from '../messaging/line-messaging.service';
@@ -284,236 +286,95 @@ export class LineRichMenuService implements OnModuleInit {
     return { valid: true, width, height };
   }
 
+  /**
+   * โหลดไฟล์ภาพ Rich Menu "เข้าสู่ระบบ" (2500x843 PNG) จาก assets
+   */
+  loadDefaultLoginRichMenuImage(): Buffer | null {
+    const candidates = [
+      path.resolve(process.cwd(), 'assets/rich-menu-login.png'),
+      path.resolve(process.cwd(), 'apps/api/assets/rich-menu-login.png'),
+      path.resolve(__dirname, '../../../assets/rich-menu-login.png'),
+      path.resolve(__dirname, '../../../../assets/rich-menu-login.png'),
+    ];
+    for (const filePath of candidates) {
+      try {
+        if (fs.existsSync(filePath)) {
+          return fs.readFileSync(filePath);
+        }
+      } catch {
+        // ignore and try next candidate
+      }
+    }
+    return null;
+  }
+
   // ==========================================
   // Rich Menu Seed & Defaults
   // ==========================================
 
   async seedDefaultMenus(): Promise<void> {
     const existing = await this.listRichMenus();
-    if (existing.length > 0) {
-      this.logger.log(`Found ${existing.length} existing Rich Menus. Skipping default seed.`);
+    const isAlreadySingleLogin =
+      existing.length === 1 &&
+      existing[0].menuType === 'DEFAULT' &&
+      existing[0].width === 2500 &&
+      existing[0].height === 843 &&
+      existing[0].actions.length === 1 &&
+      existing[0].actions[0].actionData === '/login' &&
+      Boolean(existing[0].imageData);
+
+    if (isAlreadySingleLogin) {
+      this.logger.log('Single Login Rich Menu is already configured.');
       return;
     }
 
-    this.logger.log('Seeding default Rich Menus for JapJong (Citizen, Staff, Admin, Guest)...');
+    // ลบ Rich Menu ชุดเก่าออกทั้งหมดเพื่อให้เหลือเฉพาะเมนู "เข้าสู่ระบบ" เพียง 1 รายการ
+    for (const oldMenu of existing) {
+      try {
+        await this.deleteRichMenu(oldMenu.id);
+      } catch (err: any) {
+        this.logger.warn(`Failed to remove legacy rich menu ${oldMenu.id}: ${err.message}`);
+      }
+    }
 
-    // 1. Citizen Menu (เมนูประชาชน - 6 ช่อง)
-    await this.createRichMenu({
-      name: 'เมนูสำหรับประชาชน (Citizen)',
-      menuType: 'CITIZEN',
-      chatBarText: 'บริการประชาชน',
-      width: 2500,
-      height: 1686,
-      isDefault: false,
-      actions: [
-        {
-          label: 'จองสถานที่',
-          actionType: 'URI',
-          actionData: '/booking',
-          area: { x: 0, y: 0, width: 833, height: 843 },
-          sortOrder: 1,
-        },
-        {
-          label: 'ยืมอุปกรณ์',
-          actionType: 'URI',
-          actionData: '/borrow',
-          area: { x: 833, y: 0, width: 834, height: 843 },
-          sortOrder: 2,
-        },
-        {
-          label: 'แจ้งปัญหา',
-          actionType: 'URI',
-          actionData: '/repair',
-          area: { x: 1667, y: 0, width: 833, height: 843 },
-          sortOrder: 3,
-        },
-        {
-          label: 'รายการยืมของฉัน',
-          actionType: 'URI',
-          actionData: '/borrow/my',
-          area: { x: 0, y: 843, width: 833, height: 843 },
-          sortOrder: 4,
-        },
-        {
-          label: 'ประวัติคำขอทั้งหมด',
-          actionType: 'URI',
-          actionData: '/history',
-          area: { x: 833, y: 843, width: 834, height: 843 },
-          sortOrder: 5,
-        },
-        {
-          label: 'ติดต่อเจ้าหน้าที่',
-          actionType: 'MESSAGE',
-          actionData: 'ติดต่อเจ้าหน้าที่ อบต.',
-          area: { x: 1667, y: 843, width: 833, height: 843 },
-          sortOrder: 6,
-        },
-      ],
-    });
+    this.logger.log('Seeding single Login Rich Menu for JapJong...');
 
-    // 2. Staff Menu (เมนูเจ้าหน้าที่ - 6 ช่อง)
-    await this.createRichMenu({
-      name: 'เมนูสำหรับเจ้าหน้าที่ (Staff)',
-      menuType: 'STAFF',
-      chatBarText: 'งานเจ้าหน้าที่',
-      width: 2500,
-      height: 1686,
-      isDefault: false,
-      actions: [
-        {
-          label: 'จองสถานที่',
-          actionType: 'URI',
-          actionData: '/booking',
-          area: { x: 0, y: 0, width: 833, height: 843 },
-          sortOrder: 1,
-        },
-        {
-          label: 'ยืมอุปกรณ์',
-          actionType: 'URI',
-          actionData: '/borrow',
-          area: { x: 833, y: 0, width: 834, height: 843 },
-          sortOrder: 2,
-        },
-        {
-          label: 'แจ้งปัญหา',
-          actionType: 'URI',
-          actionData: '/repair',
-          area: { x: 1667, y: 0, width: 833, height: 843 },
-          sortOrder: 3,
-        },
-        {
-          label: 'เอกสารรอลงนาม',
-          actionType: 'URI',
-          actionData: '/staff/review',
-          area: { x: 0, y: 843, width: 833, height: 843 },
-          sortOrder: 4,
-        },
-        {
-          label: 'ประวัติคำขอทั้งหมด',
-          actionType: 'URI',
-          actionData: '/history',
-          area: { x: 833, y: 843, width: 834, height: 843 },
-          sortOrder: 5,
-        },
-        {
-          label: 'กรอกคำขอแทน',
-          actionType: 'URI',
-          actionData: '/staff/walk-in',
-          area: { x: 1667, y: 843, width: 833, height: 843 },
-          sortOrder: 6,
-        },
-      ],
-    });
-
-    // 3. Admin Menu (เมนูผู้ดูแลระบบ - 6 ช่อง)
-    await this.createRichMenu({
-      name: 'เมนูสำหรับผู้ดูแลระบบ (Admin)',
-      menuType: 'ADMIN',
-      chatBarText: 'จัดการระบบ',
-      width: 2500,
-      height: 1686,
-      isDefault: false,
-      actions: [
-        {
-          label: 'Dashboard สรุปภาพรวม',
-          actionType: 'URI',
-          actionData: '/admin',
-          area: { x: 0, y: 0, width: 833, height: 843 },
-          sortOrder: 1,
-        },
-        {
-          label: 'จัดการผู้ใช้งาน',
-          actionType: 'URI',
-          actionData: '/admin/users',
-          area: { x: 833, y: 0, width: 834, height: 843 },
-          sortOrder: 2,
-        },
-        {
-          label: 'จัดการบริการและทรัพยากร',
-          actionType: 'URI',
-          actionData: '/admin/venues',
-          area: { x: 1667, y: 0, width: 833, height: 843 },
-          sortOrder: 3,
-        },
-        {
-          label: 'จัดการ Rich Menu',
-          actionType: 'URI',
-          actionData: '/admin/line',
-          area: { x: 0, y: 843, width: 833, height: 843 },
-          sortOrder: 4,
-        },
-        {
-          label: 'ประวัติการแจ้งเตือน',
-          actionType: 'URI',
-          actionData: '/admin/notifications',
-          area: { x: 833, y: 843, width: 834, height: 843 },
-          sortOrder: 5,
-        },
-        {
-          label: 'ตั้งค่าระบบ',
-          actionType: 'URI',
-          actionData: '/admin/settings',
-          area: { x: 1667, y: 843, width: 833, height: 843 },
-          sortOrder: 6,
-        },
-      ],
-    });
-
-    // 4. Default / Guest Menu (เมนูทั่วไปสำหรับผู้ที่ยังไม่ได้ยืนยันตัวตน - Default Rich Menu)
-    await this.createRichMenu({
-      name: 'เมนูหลักเริ่มต้น (Default / Guest)',
+    const created = await this.createRichMenu({
+      name: 'เมนูเข้าสู่ระบบจับจอง',
       menuType: 'DEFAULT',
-      chatBarText: 'เมนูจับจอง',
+      chatBarText: 'เข้าสู่ระบบ',
       width: 2500,
-      height: 1686,
+      height: 843,
       isDefault: true,
       actions: [
         {
-          label: 'เข้าสู่ระบบ / เชื่อมต่อบัญชี',
+          label: 'เข้าสู่ระบบ',
           actionType: 'URI',
           actionData: '/login',
-          area: { x: 0, y: 0, width: 833, height: 843 },
+          area: { x: 0, y: 0, width: 2500, height: 843 },
           sortOrder: 1,
-        },
-        {
-          label: 'จองสถานที่',
-          actionType: 'URI',
-          actionData: '/booking',
-          area: { x: 833, y: 0, width: 834, height: 843 },
-          sortOrder: 2,
-        },
-        {
-          label: 'ยืมอุปกรณ์',
-          actionType: 'URI',
-          actionData: '/borrow',
-          area: { x: 1667, y: 0, width: 833, height: 843 },
-          sortOrder: 3,
-        },
-        {
-          label: 'แจ้งซ่อมบำรุง',
-          actionType: 'URI',
-          actionData: '/repair',
-          area: { x: 0, y: 843, width: 833, height: 843 },
-          sortOrder: 4,
-        },
-        {
-          label: 'วิธีการใช้งานระบบ',
-          actionType: 'MESSAGE',
-          actionData: 'วิธีใช้งานระบบจับจอง',
-          area: { x: 833, y: 843, width: 834, height: 843 },
-          sortOrder: 5,
-        },
-        {
-          label: 'ติดต่อ อบต.',
-          actionType: 'MESSAGE',
-          actionData: 'ติดต่อ อบต. น้ำชำ',
-          area: { x: 1667, y: 843, width: 833, height: 843 },
-          sortOrder: 6,
         },
       ],
     });
 
-    this.logger.log('Default Rich Menus created successfully.');
+    // แนบรูปภาพ Rich Menu "เข้าสู่ระบบ" (2500x843 PNG)
+    const loginImage = this.loadDefaultLoginRichMenuImage();
+    if (loginImage) {
+      await this.uploadRichMenuImage(created.id, loginImage, 'image/png');
+    }
+
+    // หากมีการตั้งค่า LINE_CHANNEL_ACCESS_TOKEN จริง ให้ Publish และตั้งเป็น Default บน LINE OA ทันที
+    if (process.env.LINE_CHANNEL_ACCESS_TOKEN && process.env.NODE_ENV !== 'test') {
+      try {
+        await this.publishRichMenu(created.id);
+        await this.setDefaultRichMenu(created.id);
+        this.logger.log('Published and set single Login Rich Menu as default on LINE OA.');
+      } catch (err: any) {
+        this.logger.warn(`Could not auto-publish Login Rich Menu to LINE OA: ${err.message}`);
+      }
+    }
+
+    this.logger.log('Single Login Rich Menu created successfully.');
   }
 
   // ==========================================
@@ -942,35 +803,20 @@ export class LineRichMenuService implements OnModuleInit {
    */
   async switchUserRichMenuByRole(
     lineUserId: string,
-    role?: string,
+    _role?: string,
   ): Promise<{ switched: boolean; menuType: RichMenuType; richMenuId?: string }> {
     if (!lineUserId) return { switched: false, menuType: 'DEFAULT' };
 
-    // กำหนด Target Menu Type ตาม Role ที่บันทึกไว้ใน DB
-    let targetType: RichMenuType = 'CITIZEN';
-    if (!role) {
-      targetType = 'DEFAULT';
-    } else if (role === 'ADMIN') {
-      targetType = 'ADMIN';
-    } else if (role === 'STAFF' || role === 'APPROVER_L1' || role === 'APPROVER_L2') {
-      targetType = 'STAFF';
-    } else {
-      targetType = 'CITIZEN';
-    }
-
+    // ใช้ Rich Menu กลางเพียงรายการเดียว ("เข้าสู่ระบบ") สำหรับผู้ใช้ทุกบทบาท
+    const targetType: RichMenuType = 'DEFAULT';
     const allMenus = await this.listRichMenus();
-    // หา Menu ที่ตรงกับ Role และมีสถานะ PUBLISHED
-    const matched = allMenus.find((m) => m.menuType === targetType && m.lineRichMenuId && m.status === 'PUBLISHED');
+    const matched = allMenus.find((m) => m.menuType === 'DEFAULT' && m.lineRichMenuId && m.status === 'PUBLISHED');
 
     if (matched && matched.lineRichMenuId) {
       await this.lineMessagingService.linkRichMenuToUser(lineUserId, matched.lineRichMenuId);
-      this.logger.log(
-        `Switched rich menu for LINE user ${lineUserId.slice(0, 6)}... to ${targetType} (Menu ID: ${matched.id})`,
-      );
       return { switched: true, menuType: targetType, richMenuId: matched.id };
     }
 
-    // หากไม่มีเมนูเฉพาะ หรือเป็น guest/unverified ให้ Unlink เพื่อกลับไปใช้ Default Menu ของ LINE OA
     await this.lineMessagingService.unlinkRichMenuFromUser(lineUserId);
     return { switched: true, menuType: targetType };
   }

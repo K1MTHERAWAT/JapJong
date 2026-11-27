@@ -57,7 +57,7 @@ export default function GeneratedDocumentsPage() {
       backHref="/admin/document-templates"
       rightLabel="แอดมิน"
     >
-      <div className="w-full space-y-6">
+      <div className="cq-shell w-full space-y-6">
         {/* ส่วนหัวหน้าจอ */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -116,55 +116,96 @@ export default function GeneratedDocumentsPage() {
           </div>
         ) : (
           <div className="jw-card overflow-hidden">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-soft/60 border-b border-line text-xs font-semibold text-ink-mute uppercase tracking-wider">
-                <tr>
-                  <th className="px-4 py-3">เลขที่เอกสาร</th>
-                  <th className="px-4 py-3">ชื่อเอกสารคำขอ</th>
-                  <th className="px-4 py-3">รหัสคำขอที่ผูก</th>
-                  <th className="px-4 py-3">สถานะ</th>
-                  <th className="px-4 py-3">วันที่สร้าง</th>
-                  <th className="px-4 py-3 text-right">การจัดการ</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line text-ink">
-                {documents.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-soft/30 transition">
-                    <td className="px-4 py-3 font-mono font-medium text-brand">
+            {/* มุมมองการ์ดสำหรับหน้าจอแคบ / มือถือ */}
+            <div className="cq-card-view divide-y divide-line">
+              {documents.map((doc) => (
+                <div key={doc.id} className="p-4 flex flex-col gap-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-sm font-semibold text-brand">
                       {doc.documentNumber}
-                    </td>
-                    <td className="px-4 py-3 font-semibold">
-                      {doc.snapshot?.title || 'เอกสารราชการ'}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs">
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 whitespace-nowrap">
+                      {doc.status}
+                    </span>
+                  </div>
+                  <div className="font-semibold text-sm text-ink">
+                    {doc.snapshot?.title || 'เอกสารราชการ'}
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-mute pt-1 border-t border-line/60">
+                    <div className="flex items-center gap-2 min-w-0">
                       <Link
                         href={`/requests/${doc.requestId}`}
-                        className="hover:underline text-ink-mute hover:text-brand"
+                        className="font-mono hover:underline hover:text-brand truncate"
                       >
                         {doc.requestId}
                       </Link>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                        {doc.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-ink-mute">
-                      {formatThaiDate(doc.createdAt, true)}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Link
-                        href={`/admin/document-templates/${doc.templateId}/preview`}
-                        className="px-3 py-1 rounded-lg border border-line text-xs font-medium hover:bg-soft transition inline-flex items-center gap-1"
-                      >
-                        <Icon name="eye" className="w-3.5 h-3.5" />
-                        <span>ดูเอกสาร</span>
-                      </Link>
-                    </td>
+                      <span>·</span>
+                      <span className="whitespace-nowrap">{formatThaiDate(doc.createdAt, true)}</span>
+                    </div>
+                    <Link
+                      href={`/admin/document-templates/${doc.templateId}/preview`}
+                      className="px-3 py-1 rounded-lg border border-line text-xs font-medium text-ink hover:bg-soft transition inline-flex items-center gap-1 shrink-0"
+                    >
+                      <Icon name="eye" className="w-3.5 h-3.5" />
+                      <span>ดูเอกสาร</span>
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* มุมมองตารางสำหรับหน้าจอกว้าง */}
+            <div className="cq-table-view overflow-x-auto">
+              <table className="w-full min-w-[760px] text-left text-sm border-collapse">
+                <thead className="bg-soft/60 border-b border-line text-xs font-semibold text-ink-mute uppercase tracking-wider">
+                  <tr>
+                    <th className="px-4 py-3 whitespace-nowrap">เลขที่เอกสาร</th>
+                    <th className="px-4 py-3 whitespace-nowrap">ชื่อเอกสารคำขอ</th>
+                    <th className="px-4 py-3 whitespace-nowrap">รหัสคำขอที่ผูก</th>
+                    <th className="px-4 py-3 whitespace-nowrap">สถานะ</th>
+                    <th className="px-4 py-3 whitespace-nowrap">วันที่สร้าง</th>
+                    <th className="px-4 py-3 text-right whitespace-nowrap">การจัดการ</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-line text-ink">
+                  {documents.map((doc) => (
+                    <tr key={doc.id} className="hover:bg-soft/30 transition">
+                      <td className="px-4 py-3 font-mono font-medium text-brand whitespace-nowrap">
+                        {doc.documentNumber}
+                      </td>
+                      <td className="px-4 py-3 font-semibold min-w-[180px]">
+                        {doc.snapshot?.title || 'เอกสารราชการ'}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">
+                        <Link
+                          href={`/requests/${doc.requestId}`}
+                          className="hover:underline text-ink-mute hover:text-brand"
+                        >
+                          {doc.requestId}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                          {doc.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-ink-mute whitespace-nowrap">
+                        {formatThaiDate(doc.createdAt, true)}
+                      </td>
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <Link
+                          href={`/admin/document-templates/${doc.templateId}/preview`}
+                          className="px-3 py-1 rounded-lg border border-line text-xs font-medium hover:bg-soft transition inline-flex items-center gap-1"
+                        >
+                          <Icon name="eye" className="w-3.5 h-3.5" />
+                          <span>ดูเอกสาร</span>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

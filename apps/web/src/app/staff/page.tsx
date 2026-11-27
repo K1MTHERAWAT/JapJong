@@ -186,8 +186,9 @@ export default function StaffHomePage() {
           </div>
         </div>
 
-        {/* 2. การ์ดสถิติสรุปงานหลัก 4 ด้าน (สีและสไตล์เดิม + มือถือเป็น 2×2 Grid) */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
+        {/* 2. การ์ดสถิติสรุปงานหลัก 4 ด้าน (Container Query: ปรับคอลัมน์ตามพื้นที่จริงไม่ตัดคำ) */}
+        <div className="cq-shell">
+          <div className="cq-kpi-grid">
           {/* การ์ด 1: รอตรวจคำขอสถานที่/อุปกรณ์ */}
           <Link
             href="/staff/review"
@@ -311,13 +312,14 @@ export default function StaffHomePage() {
               </span>
             </div>
           </Link>
+          </div>
         </div>
 
         {/* 3. ผังสองคอลัมน์: ซ้าย = ตารางคิวงาน (8 คอลัมน์), ขวา = เมนูบริการด่วน (4 คอลัมน์) */}
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+        <div className="grid grid-cols-1 2xl:grid-cols-12 gap-6 items-start">
           {/* คอลัมน์ซ้าย: รายการตารางคิวงาน */}
-          <div className="xl:col-span-8 flex flex-col gap-4 min-w-0">
-            <div className="jw-card overflow-hidden">
+          <div className="2xl:col-span-8 flex flex-col gap-4 min-w-0">
+            <div className="jw-card overflow-hidden cq-shell">
               {/* แถบหัวเรื่องและตัวกรองคิวงาน */}
               <div className="p-4 sm:p-5 border-b border-line flex flex-col gap-3.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -404,17 +406,17 @@ export default function StaffHomePage() {
                 </div>
               ) : (
                 <>
-                  {/* แสดงผลแบบตารางบนจอ Desktop */}
-                  <div className="hidden md:block overflow-x-auto">
+                  {/* แสดงผลแบบตารางเมื่อพื้นที่การ์ดกว้าง >= 820px */}
+                  <div className="cq-table-view overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead>
-                        <tr className="bg-surface-muted/70 border-b border-line text-[12px] font-semibold text-ink-mute">
-                          <th className="py-3 px-2.5 lg:px-3">เลขที่คำขอ</th>
-                          <th className="py-3 px-2.5 lg:px-3">ประเภท</th>
-                          <th className="py-3 px-2.5 lg:px-3">รายการ / เรื่อง</th>
-                          <th className="py-3 px-2.5 lg:px-3">ผู้ยื่นคำขอ</th>
-                          <th className="py-3 px-2.5 lg:px-3">กำหนดการใช้ / วันที่</th>
-                          <th className="py-3 px-2.5 lg:px-3">สถานะ</th>
+                        <tr className="bg-surface-muted/70 border-b border-line text-[12px] font-semibold text-ink-mute whitespace-nowrap">
+                          <th className="py-3 px-3">เลขที่คำขอ</th>
+                          <th className="py-3 px-3">ประเภท</th>
+                          <th className="py-3 px-3">รายการ / เรื่อง</th>
+                          <th className="py-3 px-3">ผู้ยื่นคำขอ</th>
+                          <th className="py-3 px-3">วันที่ / กำหนดใช้</th>
+                          <th className="py-3 px-3">สถานะ</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-line text-[13.5px]">
@@ -433,13 +435,13 @@ export default function StaffHomePage() {
                               onClick={() => handleRowNavigate(r)}
                               className="hover:bg-brand-tint/20 cursor-pointer transition"
                             >
-                              <td className="py-3.5 px-2.5 lg:px-3 font-bold text-brand whitespace-nowrap">
+                              <td className="py-3.5 px-3 font-bold text-brand whitespace-nowrap">
                                 {r.code}
                               </td>
-                              <td className="py-3.5 px-2.5 lg:px-3 whitespace-nowrap">
+                              <td className="py-3.5 px-3 whitespace-nowrap">
                                 <RequestTypeChip type={r.type} />
                               </td>
-                              <td className="py-3.5 px-2.5 lg:px-3 max-w-[180px] xl:max-w-[240px]">
+                              <td className="py-3.5 px-3 max-w-[240px]">
                                 <b className="text-ink font-semibold block truncate">{r.title}</b>
                                 {r.subtitle && (
                                   <span className="text-[12px] text-ink-mute block truncate">
@@ -447,16 +449,16 @@ export default function StaffHomePage() {
                                   </span>
                                 )}
                               </td>
-                              <td className="py-3.5 px-2.5 lg:px-3 max-w-[155px]">
+                              <td className="py-3.5 px-3 max-w-[180px]">
                                 <span className="font-medium text-ink block truncate">{r.requesterName}</span>
                                 <span className="text-[11.5px] text-ink-mute block truncate">
                                   {r.organization || 'ประชาชน/หน่วยงาน'}
                                 </span>
                               </td>
-                              <td className="py-3.5 px-2.5 lg:px-3 text-[12.5px] text-ink-mute">
+                              <td className="py-3.5 px-3 text-[12.5px] text-ink-mute whitespace-nowrap">
                                 {scheduleText}
                               </td>
-                              <td className="py-3.5 px-2.5 lg:px-3 whitespace-nowrap">
+                              <td className="py-3.5 px-3 whitespace-nowrap">
                                 <StatusChip status={r.status} />
                               </td>
                             </tr>
@@ -466,31 +468,43 @@ export default function StaffHomePage() {
                     </table>
                   </div>
 
-                  {/* แสดงผลแบบการ์ดรายการบนจอมือถือ Mobile */}
-                  <div className="md:hidden divide-y divide-line">
+                  {/* แสดงผลแบบการ์ดอ่านง่ายเมื่อพื้นที่การ์ดแคบกว่า 820px */}
+                  <div className="cq-card-view divide-y divide-line">
                     {filteredItems.map((r) => {
-                      const sub =
+                      const scheduleText =
                         r.type === 'booking'
-                          ? `${r.title} · ${formatPeriodRange(r.periods?.[0])} · ${r.requesterName}`
+                          ? formatPeriodRange(r.periods?.[0])
                           : r.type === 'borrow'
-                            ? `${r.title} · ${formatThaiDate(r.pickupDate, false)}–${formatThaiDate(r.returnDate, true)}`
-                            : `${r.title} · ${r.requesterName}`;
+                            ? `${formatThaiDate(r.pickupDate, false)} – ${formatThaiDate(r.returnDate, true)}`
+                            : formatThaiDateTime(r.createdAt);
                       return (
                         <div
                           key={r.id}
                           onClick={() => handleRowNavigate(r)}
-                          className="p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-brand-tint/20 transition"
+                          className="p-4 flex flex-col gap-2 cursor-pointer hover:bg-brand-tint/20 transition"
                         >
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              <b className="text-[14.5px] text-brand">{r.code}</b>
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <b className="text-[14.5px] text-brand font-mono shrink-0">{r.code}</b>
                               <RequestTypeChip type={r.type} />
                             </div>
-                            <span className="text-[13px] text-ink font-medium truncate block">
-                              {sub}
+                            <StatusChip status={r.status} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-[14px] font-semibold text-ink truncate">{r.title}</div>
+                            {r.subtitle && (
+                              <div className="text-[12px] text-ink-mute truncate">{r.subtitle}</div>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 pt-1 text-[12px] text-ink-mute">
+                            <span className="truncate">
+                              ผู้ยื่น: <b className="font-medium text-ink-soft">{r.requesterName}</b>
+                              {r.organization ? ` · ${r.organization}` : ''}
+                            </span>
+                            <span className="whitespace-nowrap font-medium text-ink-soft shrink-0">
+                              {scheduleText}
                             </span>
                           </div>
-                          <StatusChip status={r.status} />
                         </div>
                       );
                     })}
@@ -501,7 +515,7 @@ export default function StaffHomePage() {
           </div>
 
           {/* คอลัมน์ขวา: ทางลัดเมนูปฏิบัติงานและบริการด่วน */}
-          <div className="xl:col-span-4 flex flex-col gap-4">
+          <div className="2xl:col-span-4 flex flex-col gap-4">
             <div className="jw-card p-5 flex flex-col gap-3.5">
               <div>
                 <h2 className="text-[16px] font-bold text-ink">เมนูปฏิบัติงานและบริการด่วน</h2>
@@ -510,7 +524,7 @@ export default function StaffHomePage() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-1 gap-2.5">
                 {/* ลิงก์จัดการสถานที่และอุปกรณ์ */}
                 <Link
                   href="/staff/resources"

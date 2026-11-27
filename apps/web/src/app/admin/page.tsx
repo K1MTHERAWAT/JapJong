@@ -101,7 +101,7 @@ export default function AdminHomePage() {
         {/* การ์ดเมนูทางลัดจัดการระบบ */}
         <div>
           <h2 className="text-[16px] sm:text-[18px] font-bold text-ink mb-3">จัดการระบบ</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {/* เมนูจัดการบริการ & เมนูแถบข้าง */}
             <Link
               href="/admin/services"
@@ -142,20 +142,6 @@ export default function AdminHomePage() {
               <div>
                 <b className="text-[15px] block text-ink">จัดการสิทธิ์</b>
                 <span className="text-[12px] text-ink-mute">บัญชีผู้ใช้ & บทบาท</span>
-              </div>
-            </Link>
-
-            {/* เมนูประวัติและคิวการแจ้งเตือน */}
-            <Link
-              href="/admin/notifications"
-              className="jw-card p-4 flex items-center gap-3 hover:ring-1 hover:ring-brand transition"
-            >
-              <div className="w-11 h-11 rounded-2xl bg-brand-mint text-brand flex items-center justify-center shrink-0">
-                <Icon name="bell" className="w-6 h-6" />
-              </div>
-              <div>
-                <b className="text-[15px] block text-ink">ประวัติแจ้งเตือน</b>
-                <span className="text-[12px] text-ink-mute">LINE OA & Outbox</span>
               </div>
             </Link>
 

@@ -122,9 +122,10 @@ describe('Navigation Menu Access Control (getVisibleNav)', () => {
   it('renders admin and governance menus for Admin role and hides citizen/staff services', () => {
     const visible = getVisibleNav(baseAdmin);
     expect(visible.some((i) => i.href === '/admin')).toBe(true);
-    expect(visible.some((i) => i.href === '/admin/line')).toBe(true);
-    expect(visible.some((i) => i.href === '/admin/notifications')).toBe(true);
+    expect(visible.some((i) => i.href === '/admin/services')).toBe(true);
     expect(visible.some((i) => i.href === '/admin/permissions')).toBe(true);
+    expect(visible.some((i) => i.href === '/admin/line')).toBe(false);
+    expect(visible.some((i) => i.href === '/admin/notifications')).toBe(false);
 
     // Citizen & Staff services must be hidden for Admin
     expect(visible.some((i) => i.href === '/')).toBe(false);

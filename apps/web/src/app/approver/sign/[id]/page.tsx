@@ -350,7 +350,7 @@ export default function ApproverSignDocumentPage() {
           </section>
 
           {/* 2) เนื้อหาหลัก 2 คอลัมน์ (มือถือ: ขวาขึ้นก่อนซ้าย) */}
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px] gap-5 items-start min-w-0">
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-5 items-start min-w-0">
             {/* คอลัมน์ซ้าย: เอกสารราชการ + รูปภาพ/เอกสารแนบ */}
             <div className="order-2 lg:order-1 min-w-0 flex flex-col gap-5">
               {req.type !== 'repair' && (

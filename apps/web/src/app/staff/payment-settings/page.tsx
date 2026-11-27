@@ -204,7 +204,7 @@ export default function StaffPaymentSettingsPage() {
 
           {/* Part B: Split Form (Left) + Live Citizen Preview (Right) */}
           {selected && (
-            <div className="grid grid-cols-1 lg:grid-cols-[1.25fr_0.95fr] gap-5 items-start">
+            <div className="grid grid-cols-1 xl:grid-cols-[1.25fr_0.95fr] gap-5 items-start">
               {/* Left Form */}
               <section className="jw-card p-5 sm:p-6 space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-3 pb-3.5 border-b border-line">

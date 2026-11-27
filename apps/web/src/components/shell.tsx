@@ -274,7 +274,7 @@ export function AppShell({
       {/* ========================================================
           1. Navigation Shell ฝั่งซ้ายเสมอทุกบทบาท (StaffSidebar จาก gov-layout)
           ======================================================== */}
-      <div className="print:hidden">
+      <div className="print:hidden japjong-left-sidebar">
         <div
           onClick={(e) => {
             const target = e.target as HTMLElement | null;

@@ -110,8 +110,6 @@ export const NAV: NavItem[] = [
   // แอดมินและทรัพยากร
   { href: '/admin', label: 'ภาพรวมผู้ดูแลระบบ', icon: LayoutDashboard, section: 'ระบบและผู้ดูแล', roles: ['ADMIN'], exact: true },
   { href: '/admin/services', label: 'จัดการบริการ & เมนู', icon: Layers, section: 'ระบบและผู้ดูแล', roles: ['ADMIN'] },
-  { href: '/admin/line', label: 'จัดการ LINE & Rich Menu', icon: Smartphone, section: 'ระบบและผู้ดูแล', roles: ['ADMIN'] },
-  { href: '/admin/notifications', label: 'บันทึกแจ้งเตือน & LINE', icon: BellRing, section: 'ระบบและผู้ดูแล', roles: ['ADMIN'] },
   { href: '/admin/permissions', label: 'บัญชีผู้ใช้ & สิทธิ์', icon: Users, section: 'ระบบและผู้ดูแล', roles: ['ADMIN'] },
 
   // บัญชีของฉัน

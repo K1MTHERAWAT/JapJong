@@ -529,7 +529,7 @@ export default function AdminServicesPage() {
   return (
     // โครงเลย์เอาต์หลักของหน้าจอจัดการบริการ
     <AppShell title="จัดการบริการและเมนูระบบ" maxWidth="max-w-[1240px]">
-      <div className="flex flex-col gap-6">
+      <div className="cq-shell flex flex-col gap-6">
         {/* แถบเส้นทาง (Breadcrumb) และส่วนหัวหน้าจอ */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex flex-col gap-1">
@@ -732,17 +732,17 @@ export default function AdminServicesPage() {
 
         {/* ตารางแสดงรายการบริการทั้งหมด (Services Table List) */}
         <div className="jw-card overflow-hidden">
-          <div className="p-4 border-b border-line flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="p-4 border-b border-line flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
               <b className="text-[15px] text-ink">รายการบริการและเมนู Sidebar</b>
               <span className="text-[12px] text-ink-mute">
-                ({filteredServices.length} รายการ - ลากที่แถบไอคอน ⠿ เพื่อจัดเรียงลำดับ)
+                ({filteredServices.length} รายการ<span className="hidden sm:inline"> · ลากไอคอน ⠿ หรือกดลูกศรเพื่อจัดเรียง</span>)
               </span>
             </div>
             <button
               onClick={loadData}
               title="รีเฟรชข้อมูล"
-              className="size-8 grid place-items-center rounded-control hover:bg-hover text-ink-soft transition"
+              className="size-8 grid place-items-center rounded-control hover:bg-hover text-ink-soft transition shrink-0"
             >
               <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
@@ -754,161 +754,279 @@ export default function AdminServicesPage() {
               <span>ไม่พบข้อมูลบริการตามเงื่อนไขที่เลือก</span>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px] border-collapse">
-                <thead>
-                  <tr className="bg-ground/60 border-b border-line text-[11px] font-semibold text-ink-mute uppercase tracking-wider">
-                    <th className="py-3 px-3 w-10 text-center">ลำดับ</th>
-                    <th className="py-3 px-3 min-w-[200px]">บริการ / เมนู</th>
-                    <th className="py-3 px-3 min-w-[130px]">URL / Route</th>
-                    <th className="py-3 px-3 min-w-[120px]">หมวดหมู่</th>
-                    <th className="py-3 px-3 min-w-[180px]">บทบาทที่เห็น (Roles)</th>
-                    <th className="py-3 px-3 w-28 text-center">สถานะ</th>
-                    <th className="py-3 px-3 w-28 text-right">จัดการ</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line-soft">
-                  {filteredServices.map((item, idx) => {
-                    const IconComp = resolveNavIcon(item.icon);
-                    const isDragging = draggedId === item.id;
-
-                    return (
-                      <tr
-                        key={item.id}
-                        draggable
-                        onDragStart={() => handleDragStart(item.id)}
-                        onDragOver={handleDragOver}
-                        onDrop={() => handleDrop(item.id)}
-                        className={`hover:bg-hover/60 transition-colors ${
-                          isDragging ? 'opacity-40 bg-brand-tint/20' : ''
-                        } ${!item.enabled ? 'bg-ground/40 text-ink-mute' : ''}`}
-                      >
-                        {/* คอลัมน์ที่ 1: ด้ามจับลาก (Drag Handle) และปุ่มเลื่อนขึ้น/ลง */}
-                        <td className="py-3 px-2 text-center align-middle">
-                          <div className="flex items-center justify-center gap-0.5">
-                            <span
-                              title="ลากเพื่อจัดลำดับ"
-                              className="cursor-grab active:cursor-grabbing text-ink-mute hover:text-brand p-1"
+            <>
+              {/* มุมมองการ์ดสำหรับหน้าจอแคบ / มือถือ / เมื่อเปิด Sidebar ค้างไว้ */}
+              <div className="cq-card-view divide-y divide-line-soft">
+                {filteredServices.map((item, idx) => {
+                  const IconComp = resolveNavIcon(item.icon);
+                  return (
+                    <div
+                      key={item.id}
+                      className={`p-3.5 sm:p-4 flex flex-col gap-2.5 transition-colors ${
+                        !item.enabled ? 'bg-ground/40 opacity-80' : 'hover:bg-hover/40'
+                      }`}
+                    >
+                      {/* แถวบน: ลำดับขึ้น/ลง + ไอคอน + ชื่อบริการ + สวิตช์เปิดปิด */}
+                      <div className="flex items-start justify-between gap-2.5">
+                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                          <div className="flex flex-col items-center justify-center pt-0.5 shrink-0">
+                            <button
+                              type="button"
+                              disabled={idx === 0}
+                              onClick={() => handleMoveOrder(idx, 'up')}
+                              title="เลื่อนขึ้น"
+                              className="p-0.5 text-ink-mute hover:text-ink disabled:opacity-20"
                             >
-                              <GripVertical className="size-4" />
-                            </span>
-                            <div className="flex flex-col">
-                              <button
-                                disabled={idx === 0}
-                                onClick={() => handleMoveOrder(idx, 'up')}
-                                title="เลื่อนขึ้น"
-                                className="text-ink-mute hover:text-ink disabled:opacity-20"
-                              >
-                                <ArrowUp className="size-3" />
-                              </button>
-                              <button
-                                disabled={idx === filteredServices.length - 1}
-                                onClick={() => handleMoveOrder(idx, 'down')}
-                                title="เลื่อนลง"
-                                className="text-ink-mute hover:text-ink disabled:opacity-20"
-                              >
-                                <ArrowDown className="size-3" />
-                              </button>
-                            </div>
+                              <ArrowUp className="size-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={idx === filteredServices.length - 1}
+                              onClick={() => handleMoveOrder(idx, 'down')}
+                              title="เลื่อนลง"
+                              className="p-0.5 text-ink-mute hover:text-ink disabled:opacity-20"
+                            >
+                              <ArrowDown className="size-3.5" />
+                            </button>
                           </div>
-                        </td>
 
-                        {/* คอลัมน์ที่ 2: ไอคอนและชื่อบริการ */}
-                        <td className="py-3 px-3">
-                          <div className="flex items-center gap-3">
-                            <div className="size-9 rounded-control bg-brand-tint text-brand flex items-center justify-center shrink-0 border border-brand/20">
-                              <IconComp className="size-4" />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="font-semibold text-ink flex items-center gap-1.5">
-                                <span className="truncate">{item.label}</span>
-                                {item.isSystem && (
-                                  <span
-                                    title="เมนูระบบหลัก"
-                                    className="px-1.5 py-0.2 rounded text-[10px] bg-slate-100 text-slate-600 font-normal"
-                                  >
-                                    ระบบหลัก
-                                  </span>
-                                )}
-                              </div>
-                              {item.description && (
-                                <div className="text-[11px] text-ink-mute truncate max-w-xs">
-                                  {item.description}
-                                </div>
+                          <div className="size-9 rounded-control bg-brand-tint text-brand flex items-center justify-center shrink-0 border border-brand/20">
+                            <IconComp className="size-4" />
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-[14px] text-ink flex flex-wrap items-center gap-1.5 leading-snug">
+                              <span className="break-words">{item.label}</span>
+                              {item.isSystem && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 font-normal whitespace-nowrap">
+                                  ระบบหลัก
+                                </span>
                               )}
                             </div>
+                            {item.description && (
+                              <p className="text-[12px] text-ink-mute mt-0.5 line-clamp-2">
+                                {item.description}
+                              </p>
+                            )}
                           </div>
-                        </td>
+                        </div>
 
-                        {/* คอลัมน์ที่ 3: เส้นทาง URL Route */}
-                        <td className="py-3 px-3 font-mono text-[12px] text-ink-soft">
-                          <span className="bg-surface px-2 py-0.5 rounded border border-line-soft">
-                            {item.href}
-                          </span>
-                        </td>
+                        <div className="shrink-0 flex items-center gap-1.5 pt-0.5">
+                          <Toggle
+                            checked={item.enabled}
+                            onChange={() => handleToggle(item)}
+                          />
+                        </div>
+                      </div>
 
-                        {/* คอลัมน์ที่ 4: ชื่อหมวดหมู่ */}
-                        <td className="py-3 px-3">
-                          <span className="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-surface border border-line text-ink">
-                            {item.category}
-                          </span>
-                        </td>
+                      {/* แถวกลาง: URL + หมวดหมู่ + บทบาท */}
+                      <div className="flex flex-wrap items-center gap-1.5 pl-7">
+                        <span className="font-mono text-[11px] text-ink-soft bg-surface px-2 py-0.5 rounded border border-line-soft whitespace-nowrap">
+                          {item.href}
+                        </span>
+                        <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-surface border border-line text-ink whitespace-nowrap">
+                          {item.category}
+                        </span>
+                        {item.roles.map((r) => {
+                          const meta = ROLES_LIST.find((m) => m.role === r);
+                          return (
+                            <Chip key={r} tone={meta?.tone || 'gray'} className="text-[10px] py-0 px-1.5 whitespace-nowrap">
+                              {r}
+                            </Chip>
+                          );
+                        })}
+                      </div>
 
-                        {/* คอลัมน์ที่ 5: ป้ายบทบาทที่ได้รับสิทธิ์ */}
-                        <td className="py-3 px-3">
-                          <div className="flex flex-wrap gap-1">
-                            {item.roles.map((r) => {
-                              const meta = ROLES_LIST.find((m) => m.role === r);
-                              return (
-                                <Chip key={r} tone={meta?.tone || 'gray'} className="text-[11px] py-0 px-1.5">
-                                  {r}
-                                </Chip>
-                              );
-                            })}
-                          </div>
-                        </td>
+                      {/* แถวล่าง: สถานะ + ปุ่มจัดการ */}
+                      <div className="flex items-center justify-between gap-2 pl-7 pt-1 border-t border-line-soft/70">
+                        <span
+                          className={`text-[11px] font-medium whitespace-nowrap ${
+                            item.enabled ? 'text-emerald-700' : 'text-ink-mute'
+                          }`}
+                        >
+                          {item.enabled ? '● เปิดใช้งาน' : '○ ปิดชั่วคราว'}
+                        </span>
 
-                        {/* คอลัมน์ที่ 6: สวิตช์สลับสถานะเปิด/ปิด */}
-                        <td className="py-3 px-3 text-center">
-                          <div className="inline-flex items-center gap-1.5">
-                            <Toggle
-                              checked={item.enabled}
-                              onChange={() => handleToggle(item)}
-                            />
-                            <span
-                              className={`text-[11px] font-medium ${
-                                item.enabled ? 'text-emerald-700' : 'text-ink-mute'
-                              }`}
-                            >
-                              {item.enabled ? 'เปิดใช้งาน' : 'ปิดชั่วคราว'}
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(item)}
+                            className="px-3 py-1 text-[12px] font-medium rounded-control border border-line hover:bg-hover text-ink transition whitespace-nowrap"
+                          >
+                            แก้ไข
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenDelete(item)}
+                            title="ลบบริการ"
+                            className="size-7 grid place-items-center rounded-control border border-line hover:bg-danger-fg/10 text-danger-fg transition"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* มุมมองตารางสำหรับหน้าจอกว้าง (Container >= 820px) */}
+              <div className="cq-table-view overflow-x-auto">
+                <table className="w-full min-w-[820px] text-left text-[13px] border-collapse">
+                  <thead>
+                    <tr className="bg-ground/60 border-b border-line text-[11px] font-semibold text-ink-mute uppercase tracking-wider">
+                      <th className="py-3 px-2.5 w-14 text-center whitespace-nowrap">ลำดับ</th>
+                      <th className="py-3 px-3 whitespace-nowrap">บริการ / เมนู</th>
+                      <th className="py-3 px-3 whitespace-nowrap">URL / Route</th>
+                      <th className="py-3 px-3 whitespace-nowrap">หมวดหมู่</th>
+                      <th className="py-3 px-3 whitespace-nowrap">บทบาทที่เห็น (Roles)</th>
+                      <th className="py-3 px-3 text-center whitespace-nowrap">สถานะ</th>
+                      <th className="py-3 px-3 text-right whitespace-nowrap">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line-soft">
+                    {filteredServices.map((item, idx) => {
+                      const IconComp = resolveNavIcon(item.icon);
+                      const isDragging = draggedId === item.id;
+
+                      return (
+                        <tr
+                          key={item.id}
+                          draggable
+                          onDragStart={() => handleDragStart(item.id)}
+                          onDragOver={handleDragOver}
+                          onDrop={() => handleDrop(item.id)}
+                          className={`hover:bg-hover/60 transition-colors ${
+                            isDragging ? 'opacity-40 bg-brand-tint/20' : ''
+                          } ${!item.enabled ? 'bg-ground/40 text-ink-mute' : ''}`}
+                        >
+                          {/* คอลัมน์ที่ 1: ด้ามจับลาก (Drag Handle) และปุ่มเลื่อนขึ้น/ลง */}
+                          <td className="py-2.5 px-2 text-center align-middle whitespace-nowrap">
+                            <div className="flex items-center justify-center gap-0.5">
+                              <span
+                                title="ลากเพื่อจัดลำดับ"
+                                className="cursor-grab active:cursor-grabbing text-ink-mute hover:text-brand p-1"
+                              >
+                                <GripVertical className="size-4" />
+                              </span>
+                              <div className="flex flex-col">
+                                <button
+                                  disabled={idx === 0}
+                                  onClick={() => handleMoveOrder(idx, 'up')}
+                                  title="เลื่อนขึ้น"
+                                  className="text-ink-mute hover:text-ink disabled:opacity-20"
+                                >
+                                  <ArrowUp className="size-3" />
+                                </button>
+                                <button
+                                  disabled={idx === filteredServices.length - 1}
+                                  onClick={() => handleMoveOrder(idx, 'down')}
+                                  title="เลื่อนลง"
+                                  className="text-ink-mute hover:text-ink disabled:opacity-20"
+                                >
+                                  <ArrowDown className="size-3" />
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* คอลัมน์ที่ 2: ไอคอนและชื่อบริการ */}
+                          <td className="py-2.5 px-3 align-middle">
+                            <div className="flex items-center gap-2.5">
+                              <div className="size-8 rounded-control bg-brand-tint text-brand flex items-center justify-center shrink-0 border border-brand/20">
+                                <IconComp className="size-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-semibold text-ink flex items-center gap-1.5">
+                                  <span className="truncate max-w-[180px]">{item.label}</span>
+                                  {item.isSystem && (
+                                    <span
+                                      title="เมนูระบบหลัก"
+                                      className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 font-normal whitespace-nowrap shrink-0"
+                                    >
+                                      ระบบหลัก
+                                    </span>
+                                  )}
+                                </div>
+                                {item.description && (
+                                  <div className="text-[11px] text-ink-mute truncate max-w-[220px]">
+                                    {item.description}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* คอลัมน์ที่ 3: เส้นทาง URL Route */}
+                          <td className="py-2.5 px-3 font-mono text-[12px] text-ink-soft whitespace-nowrap align-middle">
+                            <span className="bg-surface px-2 py-0.5 rounded border border-line-soft">
+                              {item.href}
                             </span>
-                          </div>
-                        </td>
+                          </td>
 
-                        {/* คอลัมน์ที่ 7: ปุ่มแก้ไขและปุ่มลบ */}
-                        <td className="py-3 px-3 text-right">
-                          <div className="inline-flex items-center gap-1">
-                            <button
-                              onClick={() => handleOpenEdit(item)}
-                              className="px-2.5 py-1 text-[12px] font-medium rounded-control border border-line hover:bg-hover text-ink transition"
-                            >
-                              แก้ไข
-                            </button>
-                            <button
-                              onClick={() => handleOpenDelete(item)}
-                              title="ลบบริการ"
-                              className="size-7 grid place-items-center rounded-control hover:bg-danger-fg/10 text-danger-fg transition"
-                            >
-                              <Trash2 className="size-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          {/* คอลัมน์ที่ 4: ชื่อหมวดหมู่ */}
+                          <td className="py-2.5 px-3 whitespace-nowrap align-middle">
+                            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-surface border border-line text-ink">
+                              {item.category}
+                            </span>
+                          </td>
+
+                          {/* คอลัมน์ที่ 5: ป้ายบทบาทที่ได้รับสิทธิ์ */}
+                          <td className="py-2.5 px-3 align-middle">
+                            <div className="flex flex-wrap gap-1 max-w-[220px]">
+                              {item.roles.map((r) => {
+                                const meta = ROLES_LIST.find((m) => m.role === r);
+                                return (
+                                  <Chip key={r} tone={meta?.tone || 'gray'} className="text-[10px] py-0 px-1.5 whitespace-nowrap">
+                                    {r}
+                                  </Chip>
+                                );
+                              })}
+                            </div>
+                          </td>
+
+                          {/* คอลัมน์ที่ 6: สวิตช์สลับสถานะเปิด/ปิด */}
+                          <td className="py-2.5 px-3 text-center whitespace-nowrap align-middle">
+                            <div className="inline-flex items-center gap-1.5">
+                              <Toggle
+                                checked={item.enabled}
+                                onChange={() => handleToggle(item)}
+                              />
+                              <span
+                                className={`text-[11px] font-medium whitespace-nowrap ${
+                                  item.enabled ? 'text-emerald-700' : 'text-ink-mute'
+                                }`}
+                              >
+                                {item.enabled ? 'เปิดใช้งาน' : 'ปิดชั่วคราว'}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* คอลัมน์ที่ 7: ปุ่มแก้ไขและปุ่มลบ */}
+                          <td className="py-2.5 px-3 text-right whitespace-nowrap align-middle">
+                            <div className="inline-flex items-center gap-1">
+                              <button
+                                onClick={() => handleOpenEdit(item)}
+                                className="px-2.5 py-1 text-[12px] font-medium rounded-control border border-line hover:bg-hover text-ink transition whitespace-nowrap"
+                              >
+                                แก้ไข
+                              </button>
+                              <button
+                                onClick={() => handleOpenDelete(item)}
+                                title="ลบบริการ"
+                                className="size-7 grid place-items-center rounded-control hover:bg-danger-fg/10 text-danger-fg transition"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </div>

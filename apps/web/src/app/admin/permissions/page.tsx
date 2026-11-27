@@ -281,15 +281,15 @@ export default function AdminPermissionsPage() {
         )}
 
         {/* 2-Column Split Workspace */}
-        <div className="flex flex-col lg:flex-row gap-5 items-start">
+        <div className="flex flex-col xl:flex-row gap-5 items-start">
           {/* LEFT PANE: Role Directory & Context */}
-          <aside className="w-full lg:w-72 shrink-0 flex flex-col gap-4 lg:sticky lg:top-20">
+          <aside className="w-full xl:w-72 shrink-0 flex flex-col gap-4 xl:sticky xl:top-20">
             <div className="jw-card p-3 flex flex-col gap-1">
               <div className="px-2.5 py-1.5 text-xs font-bold text-ink-mute uppercase tracking-wide">
                 กลุ่มบทบาทในระบบ
               </div>
 
-              <div className="flex lg:flex-col gap-1 overflow-x-auto pb-1 lg:pb-0">
+              <div className="flex xl:flex-col gap-1 overflow-x-auto pb-1 xl:pb-0">
                 {/* ผู้ใช้งานทั้งหมด */}
                 <button
                   type="button"
@@ -297,7 +297,7 @@ export default function AdminPermissionsPage() {
                     setActiveFilter('all');
                     setOpenPopoverUserId(null);
                   }}
-                  className={`shrink-0 lg:w-full px-3 py-2 rounded-xl flex items-center justify-between gap-3 text-left transition cursor-pointer ${
+                  className={`shrink-0 xl:w-full px-3 py-2 rounded-xl flex items-center justify-between gap-3 text-left transition cursor-pointer ${
                     activeFilter === 'all'
                       ? 'bg-brand-mint text-brand font-bold'
                       : 'hover:bg-soft text-ink font-medium'
@@ -308,7 +308,7 @@ export default function AdminPermissionsPage() {
                     <span className="text-xs sm:text-sm truncate">ผู้ใช้งานทั้งหมด</span>
                   </div>
                   <span
-                    className={`px-2 py-0.5 rounded-full text-xs ${
+                    className={`px-2 py-0.5 rounded-full text-xs shrink-0 whitespace-nowrap ${
                       activeFilter === 'all'
                         ? 'bg-brand text-white'
                         : 'bg-soft text-ink-mute'
@@ -331,7 +331,7 @@ export default function AdminPermissionsPage() {
                         setActiveFilter(r.key);
                         setOpenPopoverUserId(null);
                       }}
-                      className={`shrink-0 lg:w-full px-3 py-2 rounded-xl flex items-center justify-between gap-3 text-left transition cursor-pointer ${
+                      className={`shrink-0 xl:w-full px-3 py-2 rounded-xl flex items-center justify-between gap-3 text-left transition cursor-pointer ${
                         isActive
                           ? 'bg-brand-mint text-brand font-bold'
                           : 'hover:bg-soft text-ink font-medium'
@@ -342,7 +342,7 @@ export default function AdminPermissionsPage() {
                         <span className="text-xs sm:text-sm truncate">{r.name}</span>
                       </div>
                       <span
-                        className={`px-2 py-0.5 rounded-full text-xs ${
+                        className={`px-2 py-0.5 rounded-full text-xs shrink-0 whitespace-nowrap ${
                           isActive ? 'bg-brand text-white' : 'bg-soft text-ink-mute'
                         }`}
                       >
@@ -352,7 +352,7 @@ export default function AdminPermissionsPage() {
                   );
                 })}
 
-                <div className="hidden lg:block my-1 border-t border-line" />
+                <div className="hidden xl:block my-1 border-t border-line" />
 
                 {/* บัญชีที่ถูกระงับ */}
                 <button
@@ -361,7 +361,7 @@ export default function AdminPermissionsPage() {
                     setActiveFilter('suspended');
                     setOpenPopoverUserId(null);
                   }}
-                  className={`shrink-0 lg:w-full px-3 py-2 rounded-xl flex items-center justify-between gap-3 text-left transition cursor-pointer ${
+                  className={`shrink-0 xl:w-full px-3 py-2 rounded-xl flex items-center justify-between gap-3 text-left transition cursor-pointer ${
                     activeFilter === 'suspended'
                       ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 font-bold'
                       : 'hover:bg-soft text-ink font-medium'
@@ -372,7 +372,7 @@ export default function AdminPermissionsPage() {
                     <span className="text-xs sm:text-sm truncate">บัญชีที่ถูกระงับ</span>
                   </div>
                   <span
-                    className={`px-2 py-0.5 rounded-full text-xs ${
+                    className={`px-2 py-0.5 rounded-full text-xs shrink-0 whitespace-nowrap ${
                       activeFilter === 'suspended'
                         ? 'bg-rose-600 text-white'
                         : 'bg-soft text-ink-mute'
@@ -385,7 +385,7 @@ export default function AdminPermissionsPage() {
             </div>
 
             {/* Role Context Card (Desktop) */}
-            <div className="hidden lg:flex jw-card p-4 flex-col gap-2">
+            <div className="hidden xl:flex jw-card p-4 flex-col gap-2">
               {selectedRoleContext ? (
                 <>
                   <div className="flex items-center justify-between gap-2">

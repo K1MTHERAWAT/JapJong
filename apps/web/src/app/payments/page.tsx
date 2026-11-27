@@ -193,7 +193,7 @@ export default function PaymentsPage() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-5 items-start">
+          <div className="grid grid-cols-1 xl:grid-cols-[340px_minmax(0,1fr)] gap-5 items-start">
             {/* Left Master List */}
             <div className="flex flex-col gap-2.5 max-h-[75vh] overflow-y-auto pr-0.5">
               {filtered.map((r) => {

@@ -13,6 +13,7 @@ describe('Phase 5 — LINE Rich Menu & Flex Message Integration', () => {
   let mockDb: any;
 
   beforeEach(async () => {
+    delete process.env.LINE_CHANNEL_ACCESS_TOKEN;
     // Mock Database
     mockDb = {
       prisma: {
@@ -38,54 +39,21 @@ describe('Phase 5 — LINE Rich Menu & Flex Message Integration', () => {
   });
 
   describe('1. Rich Menu Blueprint & Defaults Seeding', () => {
-    it('seeds 4 distinct default rich menus (Citizen, Staff, Admin, Guest)', async () => {
+    it('seeds a single default login rich menu with 1 action and custom image', async () => {
       const menus = await richMenuService.listRichMenus();
-      expect(menus.length).toBe(4);
+      expect(menus.length).toBe(1);
 
-      const citizen = menus.find((m) => m.menuType === 'CITIZEN');
-      expect(citizen).toBeDefined();
-      expect(citizen?.actions.length).toBe(6);
-      expect(citizen?.chatBarText).toBe('บริการประชาชน');
-
-      const staff = menus.find((m) => m.menuType === 'STAFF');
-      expect(staff).toBeDefined();
-      expect(staff?.actions.length).toBe(6);
-      expect(staff?.chatBarText).toBe('งานเจ้าหน้าที่');
-
-      const admin = menus.find((m) => m.menuType === 'ADMIN');
-      expect(admin).toBeDefined();
-      expect(admin?.actions.length).toBe(6);
-      expect(admin?.chatBarText).toBe('จัดการระบบ');
-
-      const guest = menus.find((m) => m.menuType === 'DEFAULT');
-      expect(guest).toBeDefined();
-      expect(guest?.isDefault).toBe(true);
-      expect(guest?.chatBarText).toBe('เมนูจับจอง');
-    });
-
-    it('verifies citizen menu routes point to legitimate JapJong LIFF targets', async () => {
-      const menus = await richMenuService.listRichMenus();
-      const citizen = menus.find((m) => m.menuType === 'CITIZEN');
-      const actionUris = citizen?.actions.map((a) => a.actionData) || [];
-
-      expect(actionUris).toContain('/booking');
-      expect(actionUris).toContain('/borrow');
-      expect(actionUris).toContain('/repair');
-      expect(actionUris).toContain('/borrow/my');
-      expect(actionUris).toContain('/history');
-    });
-
-    it('verifies staff menu routes point to staff operations and review targets', async () => {
-      const menus = await richMenuService.listRichMenus();
-      const staff = menus.find((m) => m.menuType === 'STAFF');
-      const actionUris = staff?.actions.map((a) => a.actionData) || [];
-
-      expect(actionUris).toContain('/booking');
-      expect(actionUris).toContain('/borrow');
-      expect(actionUris).toContain('/repair');
-      expect(actionUris).toContain('/staff/review');
-      expect(actionUris).toContain('/history');
-      expect(actionUris).toContain('/staff/walk-in');
+      const loginMenu = menus[0];
+      expect(loginMenu.menuType).toBe('DEFAULT');
+      expect(loginMenu.isDefault).toBe(true);
+      expect(loginMenu.width).toBe(2500);
+      expect(loginMenu.height).toBe(843);
+      expect(loginMenu.chatBarText).toBe('เข้าสู่ระบบ');
+      expect(loginMenu.actions.length).toBe(1);
+      expect(loginMenu.actions[0].label).toBe('เข้าสู่ระบบ');
+      expect(loginMenu.actions[0].actionType).toBe('URI');
+      expect(loginMenu.actions[0].actionData).toBe('/login');
+      expect(loginMenu.imageData).toBeTruthy();
     });
   });
 
@@ -170,9 +138,9 @@ describe('Phase 5 — LINE Rich Menu & Flex Message Integration', () => {
   describe('3. Publishing & Default Settings', () => {
     it('publishes rich menu to LINE and assigns lineRichMenuId', async () => {
       const menus = await richMenuService.listRichMenus();
-      const citizen = menus.find((m) => m.menuType === 'CITIZEN')!;
+      const loginMenu = menus.find((m) => m.menuType === 'DEFAULT')!;
 
-      const published = await richMenuService.publishRichMenu(citizen.id);
+      const published = await richMenuService.publishRichMenu(loginMenu.id);
       expect(published.status).toBe('PUBLISHED');
       expect(published.lineRichMenuId).toBeDefined();
       expect(published.lineRichMenuId).toContain('mock');
@@ -180,56 +148,32 @@ describe('Phase 5 — LINE Rich Menu & Flex Message Integration', () => {
 
     it('sets a published menu as default for LINE OA', async () => {
       const menus = await richMenuService.listRichMenus();
-      const guest = menus.find((m) => m.menuType === 'DEFAULT')!;
+      const loginMenu = menus.find((m) => m.menuType === 'DEFAULT')!;
 
-      const def = await richMenuService.setDefaultRichMenu(guest.id);
+      const def = await richMenuService.setDefaultRichMenu(loginMenu.id);
       expect(def.isDefault).toBe(true);
       expect(def.lineRichMenuId).toBeDefined();
     });
   });
 
-  describe('4. Role-Based Rich Menu Switching (Security Strict)', () => {
-    it('switches citizen to CITIZEN rich menu when role is USER', async () => {
-      // Publish citizen menu first
+  describe('4. Role-Based Rich Menu Switching (Unified Single Login Menu)', () => {
+    it('links all user roles to the single DEFAULT login rich menu', async () => {
       const menus = await richMenuService.listRichMenus();
-      const citizen = menus.find((m) => m.menuType === 'CITIZEN')!;
-      await richMenuService.publishRichMenu(citizen.id);
+      const loginMenu = menus.find((m) => m.menuType === 'DEFAULT')!;
+      await richMenuService.publishRichMenu(loginMenu.id);
 
-      const res = await richMenuService.switchUserRichMenuByRole('U-citizen-01', 'USER');
-      expect(res.switched).toBe(true);
-      expect(res.menuType).toBe('CITIZEN');
-      expect(res.richMenuId).toBe(citizen.id);
-    });
-
-    it('switches staff to STAFF rich menu when role is STAFF or APPROVER', async () => {
-      const menus = await richMenuService.listRichMenus();
-      const staff = menus.find((m) => m.menuType === 'STAFF')!;
-      await richMenuService.publishRichMenu(staff.id);
-
-      const resStaff = await richMenuService.switchUserRichMenuByRole('U-staff-01', 'STAFF');
-      expect(resStaff.switched).toBe(true);
-      expect(resStaff.menuType).toBe('STAFF');
-
-      const resApprover = await richMenuService.switchUserRichMenuByRole('U-palad-01', 'APPROVER_L2');
-      expect(resApprover.switched).toBe(true);
-      expect(resApprover.menuType).toBe('STAFF');
-    });
-
-    it('switches admin to ADMIN rich menu when role is ADMIN', async () => {
-      const menus = await richMenuService.listRichMenus();
-      const admin = menus.find((m) => m.menuType === 'ADMIN')!;
-      await richMenuService.publishRichMenu(admin.id);
-
-      const res = await richMenuService.switchUserRichMenuByRole('U-admin-01', 'ADMIN');
-      expect(res.switched).toBe(true);
-      expect(res.menuType).toBe('ADMIN');
-      expect(res.richMenuId).toBe(admin.id);
-    });
-
-    it('unlinks rich menu for unauthenticated guests so LINE shows default menu', async () => {
-      const res = await richMenuService.switchUserRichMenuByRole('U-guest-01', undefined);
-      expect(res.switched).toBe(true);
-      expect(res.menuType).toBe('DEFAULT');
+      for (const [uid, role] of [
+        ['U-citizen-01', 'USER'],
+        ['U-staff-01', 'STAFF'],
+        ['U-palad-01', 'APPROVER_L2'],
+        ['U-admin-01', 'ADMIN'],
+        ['U-guest-01', undefined],
+      ] as const) {
+        const res = await richMenuService.switchUserRichMenuByRole(uid, role);
+        expect(res.switched).toBe(true);
+        expect(res.menuType).toBe('DEFAULT');
+        expect(res.richMenuId).toBe(loginMenu.id);
+      }
     });
   });
 
@@ -269,7 +213,7 @@ describe('Phase 5 — LINE Rich Menu & Flex Message Integration', () => {
   describe('6. Admin Controller Endpoints Integration', () => {
     it('provides CRUD endpoints for rich menu management', async () => {
       const all = await adminController.listRichMenus();
-      expect(all.length).toBe(4);
+      expect(all.length).toBe(1);
 
       const first = all[0];
       const detail = await adminController.getRichMenu(first.id);
@@ -283,12 +227,12 @@ describe('Phase 5 — LINE Rich Menu & Flex Message Integration', () => {
 
     it('supports direct user link and unlink API for testing', async () => {
       const all = await adminController.listRichMenus();
-      const citizen = all.find((m) => m.menuType === 'CITIZEN')!;
-      await adminController.publishRichMenu(citizen.id);
+      const loginMenu = all.find((m) => m.menuType === 'DEFAULT')!;
+      await adminController.publishRichMenu(loginMenu.id);
 
       const linkRes = await adminController.linkUser({
         lineUserId: 'U11112222',
-        richMenuId: citizen.id,
+        richMenuId: loginMenu.id,
       });
       expect(linkRes.success).toBe(true);
 
