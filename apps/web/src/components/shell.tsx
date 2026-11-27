@@ -64,7 +64,11 @@ export interface AppShellProps {
   noPadding?: boolean;
 }
 
-function toGovMenuItems(items: NavItem[], unreadCount: number): GovMenuItem[] {
+function toGovMenuItems(
+  items: NavItem[],
+  unreadCount: number,
+  showSectionHeaders = false,
+): GovMenuItem[] {
   const sections: string[] = [];
   const grouped = new Map<string, NavItem[]>();
 
@@ -81,6 +85,13 @@ function toGovMenuItems(items: NavItem[], unreadCount: number): GovMenuItem[] {
   sections.forEach((sec, secIdx) => {
     const group = grouped.get(sec)!;
     const isLastSection = secIdx === sections.length - 1;
+    if (showSectionHeaders) {
+      result.push({
+        id: `__section__${sec}`,
+        title: sec,
+        icon: <span className="sidebar-section-marker" aria-hidden="true" />,
+      });
+    }
     group.forEach((item, idx) => {
       const IconComp = item.icon;
       const isLastInGroup = idx === group.length - 1;
@@ -225,8 +236,8 @@ export function AppShell({
     const mainItems = visibleNav.filter(
       (item) => item.href !== '/account' && item.href !== '/notifications',
     );
-    return toGovMenuItems(mainItems, unreadCount);
-  }, [visibleNav, unreadCount]);
+    return toGovMenuItems(mainItems, unreadCount, staffSidebarOpen);
+  }, [visibleNav, unreadCount, staffSidebarOpen]);
 
   const staffBottomMenuItems = useMemo<GovMenuItem[]>(() => {
     const notifTitle =
