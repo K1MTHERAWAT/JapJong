@@ -2,7 +2,22 @@
 
 // นำเข้า React Hooks พื้นฐานสำหรับจัดการ State, Effects, Callbacks และ Refs
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ClipboardList, Plus, Search, X } from 'lucide-react';
+import {
+  Armchair,
+  Building2,
+  ChevronLeft,
+  ClipboardList,
+  Droplets,
+  MapPin,
+  Package,
+  Plus,
+  Search,
+  Upload,
+  Wind,
+  Wrench,
+  X,
+  Zap,
+} from 'lucide-react';
 // นำเข้า Type และข้อมูลคงที่ของงานแจ้งซ่อมบำรุงจากแพ็กเกจกลาง shared
 import {
   Equipment,
@@ -62,6 +77,14 @@ function getOfficerInitial(name?: string): string {
     .replace(/^(นางสาว|นาง|นาย|ด\.ช\.|ด\.ญ\.|ว่าที่\s*ร\.ต\.|จ\.ส\.อ\.|ส\.อ\.)\s*/, '');
   const chars = Array.from(cleaned || name || 'ช');
   return chars[0] || 'ช';
+}
+
+function renderRepairCategoryIcon(category: string) {
+  if (category.includes('ไฟ')) return <Zap className="size-4 shrink-0" />;
+  if (category.includes('ประปา') || category.includes('น้ำ')) return <Droplets className="size-4 shrink-0" />;
+  if (category.includes('ปรับอากาศ') || category.includes('แอร์')) return <Wind className="size-4 shrink-0" />;
+  if (category.includes('เฟอร์นิเจอร์')) return <Armchair className="size-4 shrink-0" />;
+  return <Wrench className="size-4 shrink-0" />;
 }
 
 // กำหนดโหมดหน้าจอ: 'form' (ฟอร์มแจ้งซ่อมใหม่) หรือ 'track' (ติดตามสถานะแจ้งซ่อม)
@@ -232,13 +255,17 @@ export default function RepairPage() {
   /**
    * ฟังก์ชันเลือกไฟล์ภาพจากอุปกรณ์ พร้อมบีบอัดภาพให้อัตโนมัติ (จำกัดสูงสุด 3 รูป)
    */
-  const handleSelectFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const addImageFiles = async (files: FileList | null) => {
     const remaining = Math.max(0, 3 - images.length);
-    if (remaining === 0) return;
-    const newDataUrls = await readAndCompressImages(e.target.files, remaining);
+    if (remaining === 0 || !files || files.length === 0) return;
+    const newDataUrls = await readAndCompressImages(files, remaining);
     if (newDataUrls.length) {
       setImages((prev) => [...prev, ...newDataUrls].slice(0, 3));
     }
+  };
+
+  const handleSelectFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    await addImageFiles(e.target.files);
     e.target.value = '';
   };
 
@@ -403,31 +430,6 @@ export default function RepairPage() {
       backHref={current ? undefined : account ? roleHomePath(account.role) : '/'}
       rightLabel={current ? undefined : mode === 'track' ? userDisplayChip : undefined}
       maxWidth="max-w-[1080px]"
-      footer={
-        mode === 'form' ? (
-          // ปุ่มควบคุมด้านล่างในโหมดฟอร์ม (บันทึกร่าง / ส่งเรื่อง)
-          <div className="flex w-full sm:w-auto gap-2.5">
-            <button
-              type="button"
-              onClick={() => {
-                setDraftSaved(true);
-                setTimeout(() => setDraftSaved(false), 2500);
-              }}
-              className="jw-btn-sec flex-1 sm:w-40"
-            >
-              บันทึกร่าง
-            </button>
-            <button
-              type="button"
-              disabled={submitting || !isFormValid}
-              onClick={handleSubmit}
-              className="jw-btn flex-[1.5] sm:w-56"
-            >
-              {submitting ? 'กำลังส่ง...' : 'ส่งเรื่องแจ้งซ่อม'}
-            </button>
-          </div>
-        ) : undefined
-      }
     >
       <div className="flex flex-col gap-4">
         {/* แถบส่วนหัวสลับโหมดแบบปุ่มทางลัดชัดเจน (แทนการใช้แถบ Tabs ซ้อนกัน 2 ชั้น) */}
@@ -472,160 +474,141 @@ export default function RepairPage() {
         )}
 
         {mode === 'form' ? (
-          // ==================== MODE 1: ฟอร์มแจ้งซ่อมใหม่ ====================
-          <div className="jw-card p-5 sm:p-6 flex flex-col gap-4">
-            {/* กล่องเลือกโหมดกรอกแทน (เฉพาะเจ้าหน้าที่ / แอดมิน) */}
-            {isStaff && (
-              <div className="rounded-2xl border border-brand/30 bg-brand-mint/25 p-4 flex flex-col gap-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <b className="text-[14px] text-ink block">สำหรับเจ้าหน้าที่: รูปแบบการแจ้งซ่อม</b>
-                    <span className="text-[12px] text-ink-mute">
-                      เลือกว่าต้องการแจ้งซ่อมในนามตนเอง หรือกรอกแจ้งซ่อมแทนผู้มาติดต่อ
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleWalkIn(false)}
-                      className={`h-9 px-3.5 rounded-full text-[12.5px] font-semibold border transition ${
-                        !isWalkIn
-                          ? 'bg-brand border-brand text-white'
-                          : 'bg-white border-line text-ink hover:border-brand'
-                      }`}
-                    >
-                      แจ้งในนามตนเอง
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleWalkIn(true)}
-                      className={`h-9 px-3.5 rounded-full text-[12.5px] font-semibold border transition ${
-                        isWalkIn
-                          ? 'bg-brand border-brand text-white'
-                          : 'bg-white border-line text-ink hover:border-brand'
-                      }`}
-                    >
-                      กรอกคำขอแทนผู้มาติดต่อ
-                    </button>
-                  </div>
-                </div>
-
-                {/* ช่องค้นหาข้อมูลผู้มาติดต่อ (เมื่อเปิดโหมด Walk-in) */}
-                {isWalkIn && (
-                  <div className="pt-2 border-t border-brand/15 flex flex-col gap-2.5">
-                    <label className="jw-lbl mb-0">ค้นหาข้อมูลผู้มาติดต่อ (เบอร์โทรหรือชื่อ)</label>
+          // ==================== MODE 1: ฟอร์มแจ้งซ่อมใหม่ (2-Column Split Workspace) ====================
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+            {/* คอลัมน์ซ้าย (8 ส่วน): รายละเอียดจุดชำรุด หมวดหมู่ อาการ และรูปภาพประกอบ */}
+            <div className="lg:col-span-8 jw-card p-5 sm:p-6 flex flex-col gap-5 min-w-0">
+              {/* กล่องเลือกโหมดกรอกแทน (เฉพาะเจ้าหน้าที่ / แอดมิน) */}
+              {isStaff && (
+                <div className="rounded-2xl border border-brand/30 bg-brand-mint/25 p-4 flex flex-col gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <b className="text-[14px] text-ink block">สำหรับเจ้าหน้าที่: รูปแบบการแจ้งซ่อม</b>
+                      <span className="text-[12px] text-ink-mute">
+                        เลือกว่าต้องการแจ้งซ่อมในนามตนเอง หรือกรอกแจ้งซ่อมแทนผู้มาติดต่อ
+                      </span>
+                    </div>
                     <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={walkInQuery}
-                        onChange={(e) => setWalkInQuery(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleSearchWalkInUser();
-                          }
-                        }}
-                        placeholder="กรอกเบอร์โทรหรือชื่อเพื่อดึงข้อมูลอัตโนมัติ หรือพิมพ์ข้อมูลด้านล่างโดยตรง"
-                        className="jw-in flex-1 bg-white"
-                      />
                       <button
                         type="button"
-                        onClick={handleSearchWalkInUser}
-                        className="jw-btn jw-btn-sm shrink-0"
+                        onClick={() => handleToggleWalkIn(false)}
+                        className={`h-9 px-3.5 rounded-full text-[12.5px] font-semibold border transition cursor-pointer ${
+                          !isWalkIn
+                            ? 'bg-brand border-brand text-white'
+                            : 'bg-surface border-line text-ink hover:border-brand'
+                        }`}
                       >
-                        ค้นหา
+                        แจ้งในนามตนเอง
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleWalkIn(true)}
+                        className={`h-9 px-3.5 rounded-full text-[12.5px] font-semibold border transition cursor-pointer ${
+                          isWalkIn
+                            ? 'bg-brand border-brand text-white'
+                            : 'bg-surface border-line text-ink hover:border-brand'
+                        }`}
+                      >
+                        กรอกคำขอแทนผู้มาติดต่อ
                       </button>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {foundUser ? (
-                        <Chip tone="green">
-                          <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} /> พบผู้ใช้ในระบบ: {foundUser.name} ({foundUser.phone})
-                        </Chip>
-                      ) : (
-                        <Chip tone="amber">ผู้มาติดต่อทั่วไป (กรอกชื่อและเบอร์โทรด้านล่างได้เลย)</Chip>
-                      )}
-                    </div>
                   </div>
-                )}
-              </div>
-            )}
 
-            {/* ข้อมูลชื่อและเบอร์โทรศัพท์ผู้แจ้ง */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <label className="jw-lbl mb-0">ชื่อ-นามสกุลผู้แจ้ง</label>
-                  <NameLengthBadge value={requesterName} maxLength={NAME_MAX_LENGTH.PERSON_NAME} />
+                  {/* ช่องค้นหาข้อมูลผู้มาติดต่อ (เมื่อเปิดโหมด Walk-in) */}
+                  {isWalkIn && (
+                    <div className="pt-2 border-t border-brand/15 flex flex-col gap-2.5">
+                      <label className="jw-lbl mb-0">ค้นหาข้อมูลผู้มาติดต่อ (เบอร์โทรหรือชื่อ)</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={walkInQuery}
+                          onChange={(e) => setWalkInQuery(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSearchWalkInUser();
+                            }
+                          }}
+                          placeholder="กรอกเบอร์โทรหรือชื่อเพื่อดึงข้อมูลอัตโนมัติ หรือพิมพ์ข้อมูลด้านขวาโดยตรง"
+                          className="jw-in flex-1 bg-surface"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSearchWalkInUser}
+                          className="jw-btn jw-btn-sm shrink-0"
+                        >
+                          ค้นหา
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {foundUser ? (
+                          <Chip tone="green">
+                            <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} /> พบผู้ใช้ในระบบ: {foundUser.name} ({foundUser.phone})
+                          </Chip>
+                        ) : (
+                          <Chip tone="amber">ผู้มาติดต่อทั่วไป (กรอกชื่อและเบอร์โทรที่การ์ดด้านขวาได้เลย)</Chip>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <input
-                  type="text"
-                  value={requesterName}
-                  maxLength={NAME_MAX_LENGTH.PERSON_NAME}
-                  onChange={(e) => setRequesterName(clampNameInput(e.target.value, NAME_MAX_LENGTH.PERSON_NAME))}
-                  placeholder="ระบุชื่อ-นามสกุลผู้แจ้ง"
-                  className="jw-in"
-                />
-                <NameLimitWarning value={requesterName} maxLength={NAME_MAX_LENGTH.PERSON_NAME} />
-              </div>
-              <Phone10DigitInput
-                label="เบอร์โทรศัพท์ติดต่อ (ตัวเลข 10 หลัก)"
-                required
-                value={requesterPhone}
-                onChange={setRequesterPhone}
-              />
-            </div>
+              )}
 
-            {/* เลือกหมวดหมู่ของสิ่งที่ชำรุด (สถานที่ / ครุภัณฑ์ / อื่น ๆ) */}
-            <div>
-              <label className="jw-lbl">รายการที่ต้องการแจ้งปัญหา / ซ่อมแซม</label>
-              <div className="flex flex-wrap gap-2 mb-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTargetType('venue');
-                    setSelectedResourceId('');
-                  }}
-                  className={`h-9 px-4 rounded-full border-[1.5px] text-[13px] font-semibold transition ${
-                    targetType === 'venue'
-                      ? 'bg-brand border-brand text-white'
-                      : 'bg-white border-line text-ink hover:border-brand'
-                  }`}
-                >
-                  สถานที่ ({venues.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTargetType('equipment');
-                    setSelectedResourceId('');
-                  }}
-                  className={`h-9 px-4 rounded-full border-[1.5px] text-[13px] font-semibold transition ${
-                    targetType === 'equipment'
-                      ? 'bg-brand border-brand text-white'
-                      : 'bg-white border-line text-ink hover:border-brand'
-                  }`}
-                >
-                  อุปกรณ์ / ครุภัณฑ์ ({equipmentList.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTargetType('other');
-                    setSelectedResourceId('');
-                  }}
-                  className={`h-9 px-4 rounded-full border-[1.5px] text-[13px] font-semibold transition ${
-                    targetType === 'other'
-                      ? 'bg-brand border-brand text-white'
-                      : 'bg-white border-line text-ink hover:border-brand'
-                  }`}
-                >
-                  อื่น ๆ / ระบุเอง
-                </button>
-              </div>
+              {/* 1. จุดหรือรายการที่ชำรุด */}
+              <div className="flex flex-col gap-2.5">
+                <label className="jw-lbl mb-0">
+                  1. จุดหรือรายการที่ชำรุด<span className="text-[9px] font-semibold leading-none text-status-crit">*</span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetType('venue');
+                      setSelectedResourceId('');
+                    }}
+                    className={`min-h-[42px] px-3 py-2 rounded-xl border text-[13px] font-semibold inline-flex items-center justify-center gap-2 transition cursor-pointer ${
+                      targetType === 'venue'
+                        ? 'bg-brand border-brand text-white shadow-xs'
+                        : 'bg-surface-muted/45 border-line text-ink hover:border-brand'
+                    }`}
+                  >
+                    <Building2 className="size-4 shrink-0" />
+                    <span className="truncate">สถานที่ ({venues.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetType('equipment');
+                      setSelectedResourceId('');
+                    }}
+                    className={`min-h-[42px] px-3 py-2 rounded-xl border text-[13px] font-semibold inline-flex items-center justify-center gap-2 transition cursor-pointer ${
+                      targetType === 'equipment'
+                        ? 'bg-brand border-brand text-white shadow-xs'
+                        : 'bg-surface-muted/45 border-line text-ink hover:border-brand'
+                    }`}
+                  >
+                    <Package className="size-4 shrink-0" />
+                    <span className="truncate">อุปกรณ์ / ครุภัณฑ์ ({equipmentList.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetType('other');
+                      setSelectedResourceId('');
+                    }}
+                    className={`min-h-[42px] px-3 py-2 rounded-xl border text-[13px] font-semibold inline-flex items-center justify-center gap-2 transition cursor-pointer ${
+                      targetType === 'other'
+                        ? 'bg-brand border-brand text-white shadow-xs'
+                        : 'bg-surface-muted/45 border-line text-ink hover:border-brand'
+                    }`}
+                  >
+                    <MapPin className="size-4 shrink-0" />
+                    <span className="truncate">อื่น ๆ / ระบุเอง</span>
+                  </button>
+                </div>
 
-              {/* กรณีเลือกสถานที่ */}
-              {targetType === 'venue' && (
-                <div>
+                {/* ช่องเลือกสถานที่ / อุปกรณ์ / ระบุเอง */}
+                {targetType === 'venue' && (
                   <select
                     value={selectedResourceId}
                     onChange={(e) => setSelectedResourceId(e.target.value)}
@@ -638,12 +621,9 @@ export default function RepairPage() {
                       </option>
                     ))}
                   </select>
-                </div>
-              )}
+                )}
 
-              {/* กรณีเลือกอุปกรณ์/ครุภัณฑ์ */}
-              {targetType === 'equipment' && (
-                <div>
+                {targetType === 'equipment' && (
                   <select
                     value={selectedResourceId}
                     onChange={(e) => setSelectedResourceId(e.target.value)}
@@ -656,121 +636,226 @@ export default function RepairPage() {
                       </option>
                     ))}
                   </select>
-                </div>
-              )}
+                )}
 
-              {/* กรณีเลือกระบุเอง */}
-              {targetType === 'other' && (
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="text-[12px] text-ink-mute font-medium">ชื่อสถานที่ / จุดเกิดเหตุ / อุปกรณ์</span>
-                    <NameLengthBadge value={customLocation} maxLength={NAME_MAX_LENGTH.LOCATION_NAME} />
+                {targetType === 'other' && (
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-[12px] text-ink-mute font-medium">ชื่อสถานที่ / จุดเกิดเหตุ / อุปกรณ์</span>
+                      <NameLengthBadge value={customLocation} maxLength={NAME_MAX_LENGTH.LOCATION_NAME} />
+                    </div>
+                    <input
+                      type="text"
+                      value={customLocation}
+                      maxLength={NAME_MAX_LENGTH.LOCATION_NAME}
+                      onChange={(e) => setCustomLocation(clampNameInput(e.target.value, NAME_MAX_LENGTH.LOCATION_NAME))}
+                      placeholder="ระบุสถานที่ จุดเกิดเหตุ หรืออุปกรณ์ที่ต้องการแจ้งซ่อม"
+                      className="jw-in"
+                    />
+                    <NameLimitWarning value={customLocation} maxLength={NAME_MAX_LENGTH.LOCATION_NAME} />
                   </div>
-                  <input
-                    type="text"
-                    value={customLocation}
-                    maxLength={NAME_MAX_LENGTH.LOCATION_NAME}
-                    onChange={(e) => setCustomLocation(clampNameInput(e.target.value, NAME_MAX_LENGTH.LOCATION_NAME))}
-                    placeholder="ระบุสถานที่ จุดเกิดเหตุ หรืออุปกรณ์ที่ต้องการแจ้งซ่อม"
-                    className="jw-in"
-                  />
-                  <NameLimitWarning value={customLocation} maxLength={NAME_MAX_LENGTH.LOCATION_NAME} />
-                </div>
-              )}
-            </div>
-
-            {/* ตัวเลือกหมวดหมู่ประเภทปัญหา */}
-            <div>
-              <label className="jw-lbl">ประเภทปัญหา</label>
-              <div className="flex flex-wrap gap-2">
-                {REPAIR_CATEGORIES.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setCategory(c)}
-                    className={`h-[38px] px-4 rounded-full border-[1.5px] text-[13px] font-semibold transition ${
-                      category === c
-                        ? 'bg-brand border-brand text-white'
-                        : 'bg-white border-line text-ink hover:border-brand'
-                    }`}
-                  >
-                    {c}
-                  </button>
-                ))}
+                )}
               </div>
-            </div>
 
-            {/* ช่องกรอกรายละเอียดอาการชำรุด */}
-            <div>
-              <label className="jw-lbl">รายละเอียด</label>
-              <textarea
-                rows={3}
-                value={detail}
-                onChange={(e) => setDetail(e.target.value)}
-                placeholder="ระบุอาการชำรุดหรือรายละเอียดปัญหาที่พบ..."
-                className="jw-in h-24 py-2.5"
-              />
-            </div>
+              {/* 2. ประเภทปัญหาแบบการ์ดไอคอน */}
+              <div className="flex flex-col gap-2.5">
+                <label className="jw-lbl mb-0">2. ประเภทปัญหา</label>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {REPAIR_CATEGORIES.map((c) => {
+                    const active = category === c;
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setCategory(c)}
+                        className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border text-[12.5px] font-semibold transition cursor-pointer ${
+                          active
+                            ? 'bg-brand-tint text-brand-ink border-brand ring-1 ring-brand/30'
+                            : 'bg-surface text-ink border-line hover:bg-hover'
+                        }`}
+                      >
+                        <span className={active ? 'text-brand' : 'text-ink-mute'}>
+                          {renderRepairCategoryIcon(c)}
+                        </span>
+                        <span className="text-center leading-tight">{c}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-            {/* ส่วนอัปโหลดรูปภาพประกอบ (ไม่เกิน 3 รูป) */}
-            <div>
-              <label className="jw-lbl">รูปภาพประกอบ (ไม่เกิน 3 รูป)</label>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleSelectFiles}
-                className="hidden"
-              />
-              <div className="flex flex-wrap gap-3">
-                {images.map((src, idx) => (
-                  <div
-                    key={idx}
-                    className="w-20 h-20 rounded-2xl bg-brand-mint text-brand relative border border-line"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setPreviewImg(src)}
-                      className="w-full h-full rounded-2xl overflow-hidden block"
-                      title="คลิกเพื่อดูรูปขนาดใหญ่"
-                    >
-                      <img src={src} alt={`รูปประกอบ ${idx + 1}`} className="w-full h-full object-cover" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeImage(idx)}
-                      className="w-5 h-5 rounded-full bg-ink text-white absolute -top-1.5 -right-1.5 flex items-center justify-center shadow"
-                      title="ลบรูป"
-                    >
-                      <Icon name="x" className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+              {/* 3. รายละเอียดอาการชำรุด */}
+              <div className="flex flex-col gap-1.5">
+                <label className="jw-lbl mb-0">
+                  3. รายละเอียดอาการชำรุด<span className="text-[9px] font-semibold leading-none text-status-crit">*</span>
+                </label>
+                <textarea
+                  rows={4}
+                  value={detail}
+                  onChange={(e) => setDetail(e.target.value)}
+                  placeholder="ระบุอาการชำรุด ตำแหน่งที่พบ หรือช่วงเวลาที่สะดวกให้ช่างเข้าตรวจสอบ..."
+                  className="jw-in min-h-[110px] py-2.5"
+                />
+              </div>
+
+              {/* 4. รูปภาพประกอบแบบ Dropzone เต็มความกว้าง (มาตรฐานเดียวกับหน้าจองสถานที่/ยืมอุปกรณ์) */}
+              <div className="flex flex-col gap-2">
+                <label className="jw-lbl mb-0">
+                  4. รูปภาพประกอบ{' '}
+                  <span className="font-normal text-[12px] text-ink-mute">
+                    (ไม่เกิน 3 รูป · ช่วยให้ช่างเตรียมอะไหล่ได้ตรงจุด)
+                  </span>
+                </label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleSelectFiles}
+                  className="hidden"
+                />
+
                 {images.length < 3 && (
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-20 h-20 rounded-2xl bg-white border-[1.5px] border-dashed border-[#7A7A7A] text-ink-mute text-[13px] flex flex-col items-center justify-center gap-1 hover:border-brand hover:text-brand transition"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      addImageFiles(e.dataTransfer.files);
+                    }}
+                    className="w-full border-[1.5px] border-dashed border-[#7A7A7A] rounded-2xl p-4 text-center text-ink-mute bg-surface hover:border-brand transition cursor-pointer"
                   >
-                    <Icon name="plus" className="w-5 h-5" />
-                    <span>+ รูป</span>
+                    <div className="font-medium text-[13.5px] text-ink flex items-center justify-center gap-2">
+                      <Upload className="size-4 text-brand shrink-0" />
+                      <span>ลากรูปภาพมาวาง หรือ แตะเพื่อเลือกรูปจุดชำรุด</span>
+                    </div>
+                    <div className="text-[12px] text-ink-mute mt-1">
+                      รองรับรูปภาพ JPG, PNG (แนบแล้ว {images.length}/3 รูป)
+                    </div>
                   </button>
+                )}
+
+                {images.length > 0 && (
+                  <div className="flex flex-wrap gap-2.5 pt-1">
+                    {images.map((src, idx) => (
+                      <div
+                        key={idx}
+                        className="w-20 h-20 rounded-xl bg-brand-mint text-brand relative border border-line shadow-xs"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setPreviewImg(src)}
+                          className="w-full h-full rounded-xl overflow-hidden block cursor-pointer"
+                          title="คลิกเพื่อดูรูปขนาดใหญ่"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={src} alt={`รูปประกอบ ${idx + 1}`} className="w-full h-full object-cover" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeImage(idx)}
+                          className="w-6 h-6 rounded-full bg-ink text-white absolute -top-2 -right-2 flex items-center justify-center shadow hover:bg-danger-solid transition cursor-pointer"
+                          title="ลบรูป"
+                        >
+                          <Icon name="x" className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* คำอธิบายโฟลว์งานแจ้งซ่อม */}
-            <p className="text-[13px] text-ink-mute">
-              ขั้นตอนงานแจ้งซ่อม: (1) ผู้แจ้งส่งเรื่อง → (2) เจ้าหน้าที่รับเรื่อง & ซ่อมแซม → (3) ผู้แจ้งตรวจรับงาน (ไม่ต้องลงนาม)
-            </p>
+            {/* คอลัมน์ขวา (4 ส่วน Sticky): ข้อมูลผู้แจ้งซ่อม + ขั้นตอน 3 ขั้น + ปุ่มส่งเรื่อง */}
+            <div className="lg:col-span-4 flex flex-col gap-4 lg:sticky lg:top-6 min-w-0">
+              {/* การ์ดข้อมูลผู้แจ้งซ่อม */}
+              <section className="jw-card p-4 sm:p-5 flex flex-col gap-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <b className="text-[15px] text-ink">ข้อมูลผู้แจ้งซ่อม</b>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11.5px] font-semibold bg-brand-tint text-brand border border-brand/20 shrink-0">
+                    {isWalkIn ? 'กรอกแทนผู้มาติดต่อ' : 'ดึงจากโปรไฟล์'}
+                  </span>
+                </div>
 
-            {/* ข้อความแจ้งเตือนบันทึกร่างสำเร็จ */}
-            {draftSaved && (
-              <div className="rounded-2xl bg-brand-mint text-brand px-3.5 py-2 text-[13px] font-semibold">
-                บันทึกร่างการแจ้งซ่อมเรียบร้อยแล้ว
-              </div>
-            )}
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <label className="jw-lbl mb-0">ชื่อ-นามสกุลผู้แจ้ง</label>
+                    <NameLengthBadge value={requesterName} maxLength={NAME_MAX_LENGTH.PERSON_NAME} />
+                  </div>
+                  <input
+                    type="text"
+                    value={requesterName}
+                    maxLength={NAME_MAX_LENGTH.PERSON_NAME}
+                    onChange={(e) => setRequesterName(clampNameInput(e.target.value, NAME_MAX_LENGTH.PERSON_NAME))}
+                    placeholder="ระบุชื่อ-นามสกุลผู้แจ้ง"
+                    className="jw-in"
+                  />
+                  <NameLimitWarning value={requesterName} maxLength={NAME_MAX_LENGTH.PERSON_NAME} />
+                </div>
+
+                <Phone10DigitInput
+                  label="เบอร์โทรศัพท์ติดต่อ (ตัวเลข 10 หลัก)"
+                  required
+                  value={requesterPhone}
+                  onChange={setRequesterPhone}
+                />
+              </section>
+
+              {/* การ์ดขั้นตอนงานแจ้งซ่อม + ปุ่มส่งเรื่อง */}
+              <section className="jw-card p-4 sm:p-5 flex flex-col gap-4">
+                <div className="flex flex-col gap-2.5">
+                  <b className="text-[14.5px] text-ink">ขั้นตอนงานแจ้งซ่อม (ไม่ต้องลงนาม)</b>
+                  <ol className="flex flex-col gap-2 text-[12.5px] text-ink-soft">
+                    <li className="flex items-center gap-2.5">
+                      <span className="size-5 rounded-full bg-brand text-white text-[11.5px] font-bold flex items-center justify-center shrink-0">
+                        1
+                      </span>
+                      <span className="text-ink font-medium">ผู้แจ้งส่งเรื่องพร้อมรูปประกอบ</span>
+                    </li>
+                    <li className="flex items-center gap-2.5">
+                      <span className="size-5 rounded-full bg-surface-muted border border-line text-ink-mute text-[11.5px] font-bold flex items-center justify-center shrink-0">
+                        2
+                      </span>
+                      <span>เจ้าหน้าที่รับเรื่องและเข้าซ่อมแซม</span>
+                    </li>
+                    <li className="flex items-center gap-2.5">
+                      <span className="size-5 rounded-full bg-surface-muted border border-line text-ink-mute text-[11.5px] font-bold flex items-center justify-center shrink-0">
+                        3
+                      </span>
+                      <span>ผู้แจ้งตรวจรับงานเสร็จสิ้น</span>
+                    </li>
+                  </ol>
+                </div>
+
+                {draftSaved && (
+                  <div className="rounded-xl bg-brand-mint text-brand px-3.5 py-2 text-[12.5px] font-semibold">
+                    บันทึกร่างการแจ้งซ่อมเรียบร้อยแล้ว
+                  </div>
+                )}
+
+                <div className="pt-3 border-t border-line flex flex-col gap-2">
+                  <button
+                    type="button"
+                    disabled={submitting || !isFormValid}
+                    onClick={handleSubmit}
+                    className="jw-btn w-full"
+                  >
+                    {submitting ? 'กำลังส่ง...' : 'ส่งเรื่องแจ้งซ่อม'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraftSaved(true);
+                      setTimeout(() => setDraftSaved(false), 2500);
+                    }}
+                    className="jw-btn-sec w-full"
+                  >
+                    บันทึกร่าง
+                  </button>
+                </div>
+              </section>
+            </div>
           </div>
         ) : !current ? (
           // ==================== MODE 2A: หน้ารายการแจ้งซ่อมของฉัน (การ์ดสรุปตัวเลข + ตัวกรองชัดเจน) ====================

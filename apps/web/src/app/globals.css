@@ -971,3 +971,9 @@
   max-width: 100%;
   overflow-wrap: anywhere;
 }
+
+/* ซ่อนปุ่มแสดง/ซ่อนรหัสผ่านเดิมของเบราว์เซอร์ (Edge) ไม่ให้ซ้อนกับปุ่มลูกตาของระบบ */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none !important;
+}
