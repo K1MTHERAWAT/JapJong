@@ -11,6 +11,8 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   Home,
+  Banknote,
+  WalletCards,
   Building2,
   Package,
   Wrench,
@@ -74,6 +76,13 @@ export const NAV: NavItem[] = [
     roles: ['USER', 'STAFF', 'APPROVER_L2', 'APPROVER_L1', 'ADMIN'],
   },
   {
+    href: '/payments',
+    label: 'ชำระเงิน',
+    icon: Banknote,
+    section: 'รายการและประวัติ',
+    roles: ['USER', 'STAFF', 'ADMIN'],
+  },
+  {
     href: '/history',
     label: 'ประวัติคำขอทั้งหมด',
     icon: Clock,
@@ -92,6 +101,7 @@ export const NAV: NavItem[] = [
   { href: '/staff/review', label: 'ตรวจคำขอ (สถานที่/อุปกรณ์)', icon: ClipboardList, section: 'งานเจ้าหน้าที่', roles: ['STAFF', 'ADMIN'] },
   { href: '/staff/repairs', label: 'จัดการงานซ่อม', icon: Wrench, section: 'งานเจ้าหน้าที่', roles: ['STAFF', 'ADMIN'] },
   { href: '/staff/resources', label: 'จัดการสถานที่/อุปกรณ์', icon: Shield, section: 'งานเจ้าหน้าที่', roles: ['STAFF', 'ADMIN'] },
+  { href: '/staff/payment-settings', label: 'ตั้งค่าบัญชีรับเงิน', icon: WalletCards, section: 'งานเจ้าหน้าที่', roles: ['STAFF', 'ADMIN'] },
   { href: '/staff/verify', label: 'ตรวจสอบเอกสาร QR Code', icon: QrCode, section: 'งานเจ้าหน้าที่', roles: ['STAFF', 'ADMIN'] },
 
   // ผู้อนุมัติ (ปลัด / นายก)
@@ -135,7 +145,7 @@ export function serviceToNavItem(service: SidebarServiceItem): NavItem {
 export function getVisibleNav(account: PublicAccount | null, services?: SidebarServiceItem[]): NavItem[] {
   // หากได้รับข้อมูลบริการจากฐานข้อมูล ให้ใช้ข้อมูลบริการจากฐานข้อมูล
   if (services && services.length > 0) {
-    return services
+    const dbItems = services
       .filter((s) => {
         if (!s.enabled) return false;
 
@@ -174,6 +184,30 @@ export function getVisibleNav(account: PublicAccount | null, services?: SidebarS
         }
       })
       .map(serviceToNavItem);
+
+    // เพิ่มเมนูชำระเงินและตั้งค่าบัญชีรับเงินให้อัตโนมัติหากยังไม่มีในตารางบริการ
+    if (account && (account.role === 'USER' || account.role === 'STAFF') && !dbItems.some((i) => i.href === '/payments')) {
+      const insertIdx = dbItems.findIndex((i) => i.href === '/history');
+      const payItem: NavItem = {
+        href: '/payments',
+        label: account.role === 'STAFF' ? 'จัดการการชำระเงิน' : 'ชำระเงิน',
+        icon: Banknote,
+        section: 'รายการและประวัติ',
+        roles: ['USER', 'STAFF', 'ADMIN'],
+      };
+      if (insertIdx >= 0) dbItems.splice(insertIdx, 0, payItem);
+      else dbItems.push(payItem);
+    }
+    if (account && account.role === 'STAFF' && !dbItems.some((i) => i.href === '/staff/payment-settings')) {
+      dbItems.push({
+        href: '/staff/payment-settings',
+        label: 'ตั้งค่าบัญชีรับเงิน',
+        icon: WalletCards,
+        section: 'งานเจ้าหน้าที่',
+        roles: ['STAFF', 'ADMIN'],
+      });
+    }
+    return dbItems;
   }
 
   // กรณีใช้ Fallback Static Menu

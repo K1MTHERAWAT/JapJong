@@ -37,6 +37,7 @@ import type {
   LoginResponse,
   NotificationCategory,
   NotificationChannel,
+  PaymentSettings,
   Period,
   PermissionKey,
   PublicAccount,
@@ -290,6 +291,9 @@ export const api = {
   venues: () => request<Venue[]>('/resources/venues'),
   /** ดึงรายชื่ออุปกรณ์และพัสดุราชการทั้งหมด (เต็นท์, โต๊ะ, เก้าอี้, เครื่องเสียง) */
   equipment: () => request<Equipment[]>('/resources/equipment'),
+  getPaymentSettings: () => request<PaymentSettings>('/resources/payment-settings'),
+  updatePaymentSettings: (payload: Partial<PaymentSettings>) =>
+    request<PaymentSettings>('/resources/payment-settings', { method: 'PATCH', body: JSON.stringify(payload) }),
   /** เพิ่มสถานที่ราชการใหม่ */
   createVenue: (payload: Partial<Venue>) =>
     request<Venue>('/resources/venues', { method: 'POST', body: JSON.stringify(payload) }),
@@ -465,6 +469,20 @@ export const api = {
     payload: { result: 'normal' | 'damaged' | 'incomplete'; note?: string; photos?: string[] },
   ) =>
     request<RequestWithTimeline>(`/requests/${id}/inspect-return`, { method: 'POST', body: JSON.stringify(payload) }),
+  /** ผู้ขอแนบสลิปโอนเงินชำระค่าธรรมเนียม / ค่ามัดจำ */
+  submitPaymentSlip: (id: string, payload: { slipUrl: string; note?: string }) =>
+    request<RequestWithTimeline>(`/requests/${id}/payment-slip`, { method: 'POST', body: JSON.stringify(payload) }),
+  /** เจ้าหน้าที่ตรวจสอบสลิป / รับชำระเงินสด / ยกเว้นค่าธรรมเนียม / คืนเงินมัดจำ */
+  verifyPayment: (
+    id: string,
+    payload: {
+      action: 'approve' | 'reject' | 'waive' | 'refund';
+      method?: 'transfer' | 'cash';
+      receiptNo?: string;
+      note?: string;
+    },
+  ) =>
+    request<RequestWithTimeline>(`/requests/${id}/payment-verify`, { method: 'POST', body: JSON.stringify(payload) }),
   /** บันทึกรายงานการตรวจรับ-ส่งมอบสถานที่ราชการ (ก่อนใช้/หลังใช้) พร้อมลายเซ็น 2 ฝ่าย */
   handover: (
     id: string,

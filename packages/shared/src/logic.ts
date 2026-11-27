@@ -854,5 +854,172 @@ export function classifyLoginIdentifier(raw: unknown): LoginIdentifierClassifica
   };
 }
 
+// ===== Pricing & Fee Calculation (Approve-then-Pay) =====
+
+export interface CostBreakdownItem {
+  label: string;
+  amount: number;
+  kind: 'fee' | 'deposit';
+}
+
+export interface CostCalculationResult {
+  feeAmount: number;
+  depositAmount: number;
+  totalAmount: number;
+  breakdown: CostBreakdownItem[];
+}
+
+export function formatBaht(amount?: number): string {
+  const num = Number(amount || 0);
+  if (!Number.isFinite(num) || num <= 0) return 'ฟรี';
+  return `${Math.round(num).toLocaleString('th-TH')} บาท`;
+}
+
+export function formatPricingSummary(
+  pricingMode?: import('./types').PricingMode,
+  feeAmount?: number,
+  depositAmount?: number,
+): string {
+  const mode = pricingMode || 'free';
+  const fee = Math.max(0, Number(feeAmount || 0));
+  const dep = Math.max(0, Number(depositAmount || 0));
+  if (mode === 'free' && fee <= 0 && dep <= 0) return 'ฟรี';
+  const parts: string[] = [];
+  if (mode !== 'free' && fee > 0) {
+    const unit = mode === 'per_hour' ? '/ชม.' : mode === 'per_day' ? '/วัน' : '/ครั้ง';
+    parts.push(`${fee.toLocaleString('th-TH')} บ.${unit}`);
+  }
+  if (dep > 0) {
+    parts.push(`มัดจำ ${dep.toLocaleString('th-TH')} บ.`);
+  }
+  return parts.length > 0 ? parts.join(' · ') : 'ฟรี';
+}
+
+export function calculateBookingCost(
+  venues: import('./types').Venue[],
+  periods: import('./types').Period[],
+  extraItems: { equipment: import('./types').Equipment; qty: number }[] = [],
+): CostCalculationResult {
+  let feeAmount = 0;
+  let depositAmount = 0;
+  const breakdown: CostBreakdownItem[] = [];
+
+  // คำนวณจำนวนชั่วโมงรวมและจำนวนวันจาก periods
+  let totalHours = 0;
+  const uniqueDays = new Set<string>();
+  for (const p of periods || []) {
+    const s = new Date(p.start).getTime();
+    const e = new Date(p.end).getTime();
+    if (Number.isFinite(s) && Number.isFinite(e) && e > s) {
+      totalHours += Math.max(1, Math.ceil((e - s) / 3600000));
+      uniqueDays.add(new Date(s).toISOString().slice(0, 10));
+    }
+  }
+  const days = Math.max(1, uniqueDays.size || 1);
+  const hours = Math.max(1, totalHours || 1);
+
+  for (const v of venues || []) {
+    const mode = v.pricingMode || 'free';
+    const fee = Math.max(0, Number(v.feeAmount || 0));
+    const dep = Math.max(0, Number(v.depositAmount || 0));
+    if (mode !== 'free' && fee > 0) {
+      const mult = mode === 'per_hour' ? hours : mode === 'per_day' ? days : 1;
+      const sub = Math.round(fee * mult);
+      feeAmount += sub;
+      const unitLabel =
+        mode === 'per_hour'
+          ? `${hours} ชม. × ${fee.toLocaleString('th-TH')} บ.`
+          : mode === 'per_day'
+            ? `${days} วัน × ${fee.toLocaleString('th-TH')} บ.`
+            : 'เหมาต่อครั้ง';
+      breakdown.push({ label: `ค่าบริการสถานที่ ${v.name} (${unitLabel})`, amount: sub, kind: 'fee' });
+    }
+    if (dep > 0) {
+      depositAmount += Math.round(dep);
+      breakdown.push({ label: `ค่ามัดจำสถานที่ ${v.name}`, amount: Math.round(dep), kind: 'deposit' });
+    }
+  }
+
+  for (const { equipment, qty } of extraItems || []) {
+    const q = Math.max(0, Math.floor(Number(qty || 0)));
+    if (!q) continue;
+    const mode = equipment.pricingMode || 'free';
+    const fee = Math.max(0, Number(equipment.feeAmount || 0));
+    const dep = Math.max(0, Number(equipment.depositAmount || 0));
+    if (mode !== 'free' && fee > 0) {
+      const mult = mode === 'per_day' ? q * days : q;
+      const sub = Math.round(fee * mult);
+      feeAmount += sub;
+      breakdown.push({
+        label: `ค่าอุปกรณ์เสริม ${equipment.name} ×${q}${mode === 'per_day' ? ` (${days} วัน)` : ''}`,
+        amount: sub,
+        kind: 'fee',
+      });
+    }
+    if (dep > 0) {
+      const subDep = Math.round(dep * q);
+      depositAmount += subDep;
+      breakdown.push({ label: `ค่ามัดจำอุปกรณ์ ${equipment.name} ×${q}`, amount: subDep, kind: 'deposit' });
+    }
+  }
+
+  return {
+    feeAmount,
+    depositAmount,
+    totalAmount: feeAmount + depositAmount,
+    breakdown,
+  };
+}
+
+export function calculateBorrowCost(
+  items: { equipment: import('./types').Equipment; qty: number }[],
+  pickupDate?: string,
+  returnDate?: string,
+): CostCalculationResult & { days: number } {
+  let days = 1;
+  if (pickupDate && returnDate) {
+    const s = new Date(pickupDate).getTime();
+    const e = new Date(returnDate).getTime();
+    if (Number.isFinite(s) && Number.isFinite(e) && e >= s) {
+      days = Math.max(1, Math.floor((e - s) / 86400000) + 1);
+    }
+  }
+
+  let feeAmount = 0;
+  let depositAmount = 0;
+  const breakdown: CostBreakdownItem[] = [];
+
+  for (const { equipment, qty } of items || []) {
+    const q = Math.max(0, Math.floor(Number(qty || 0)));
+    if (!q) continue;
+    const mode = equipment.pricingMode || 'free';
+    const fee = Math.max(0, Number(equipment.feeAmount || 0));
+    const dep = Math.max(0, Number(equipment.depositAmount || 0));
+    if (mode !== 'free' && fee > 0) {
+      const mult = mode === 'per_day' ? q * days : q;
+      const sub = Math.round(fee * mult);
+      feeAmount += sub;
+      breakdown.push({
+        label: `ค่าธรรมเนียม ${equipment.name} ×${q}${mode === 'per_day' ? ` × ${days} วัน` : ''}`,
+        amount: sub,
+        kind: 'fee',
+      });
+    }
+    if (dep > 0) {
+      const subDep = Math.round(dep * q);
+      depositAmount += subDep;
+      breakdown.push({ label: `ค่ามัดจำ ${equipment.name} ×${q}`, amount: subDep, kind: 'deposit' });
+    }
+  }
+
+  return {
+    days,
+    feeAmount,
+    depositAmount,
+    totalAmount: feeAmount + depositAmount,
+    breakdown,
+  };
+}
+
 
 

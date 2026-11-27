@@ -23,6 +23,7 @@ import { AppShell, roleHomePath } from '@/components/shell';
 import {
   AttachmentViewer,
   OfficialGovFormDocument,
+  PaymentStatusCard,
   RequestTypeChip,
   SignaturePreviewCard,
   SigningProgressSpotlight,
@@ -77,8 +78,15 @@ export default function RequestDetailPage() {
     api.equipment().then(setEquipmentList).catch(() => {});
   }, [load]);
 
-  // เส้นทางย้อนกลับตามบทบาทของผู้ใช้งาน
+  // เส้นทางย้อนกลับตามบทบาทของผู้ใช้งาน (fallback เมื่อไม่มี history)
   const backHref = roleHomePath(account?.role);
+  const handleGoBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push(backHref);
+    }
+  };
 
   // คำนวณเส้นทางหน้าลงนาม/จัดการงานทันที หากเจ้าหน้าที่หรือผู้บริหารเปิดดูคำขอที่ถึงคิวตนเอง
   const directActionHref = (() => {
@@ -171,13 +179,14 @@ export default function RequestDetailPage() {
         {/* ส่วนหัวหน้า: ปุ่มลูกศรกลับ + รหัสคำขอ + ชิปประเภท + ชิปสถานะ อยู่ในแถวเดียวกัน */}
         <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
           <div className="flex flex-wrap items-center gap-2.5 min-w-0">
-            <Link
-              href={backHref}
+            <button
+              type="button"
+              onClick={handleGoBack}
               aria-label="ย้อนกลับ"
-              className="min-w-[44px] min-h-[44px] rounded-control bg-surface border border-line flex items-center justify-center text-ink hover:bg-hover active:scale-95 transition shrink-0"
+              className="min-w-[44px] min-h-[44px] rounded-control bg-surface border border-line flex items-center justify-center text-ink hover:bg-hover active:scale-95 transition cursor-pointer shrink-0"
             >
               <ChevronLeft className="size-5" />
-            </Link>
+            </button>
             <h1 className="text-[18px] sm:text-[20px] font-bold text-ink leading-tight tracking-tight">
               คำขอ {req.code}
             </h1>
@@ -391,13 +400,15 @@ export default function RequestDetailPage() {
             )}
           </div>
 
-          {/* คอลัมน์ขวา (กว้างสุด 400px): สรุปคำขอ + ปุ่มดำเนินการ */}
-          <div className="order-1 lg:order-2 min-w-0 flex flex-col gap-4 lg:sticky lg:top-6 print:hidden">
-            {/* การ์ดสรุปคำขอ */}
-            <section className="jw-card p-4 sm:p-5 flex flex-col gap-3.5">
-              <h2 className="text-[16px] font-bold text-ink">สรุปคำขอ</h2>
+          {/* คอลัมน์ขวา (กว้างสุด 400px): สรุปคำขอ + ชำระเงิน + ปุ่มดำเนินการ */}
+          <div className="order-1 lg:order-2 min-w-0 flex flex-col gap-3 lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto print:hidden">
+            <PaymentStatusCard req={req} account={account} onUpdated={load} summaryOnly />
 
-              <dl className="grid grid-cols-[96px_minmax(0,1fr)] gap-y-2.5 gap-x-3 text-[14px] items-baseline">
+            {/* การ์ดสรุปคำขอ */}
+            <section className="jw-card p-3.5 sm:p-4 flex flex-col gap-2.5">
+              <h2 className="text-[15px] font-bold text-ink">สรุปคำขอ</h2>
+
+              <dl className="grid grid-cols-[88px_minmax(0,1fr)] gap-y-1.5 gap-x-2.5 text-[13px] items-baseline">
                 <dt className="font-semibold text-ink-soft">เลขคำขอ</dt>
                 <dd className="font-semibold text-ink break-words">{req.code}</dd>
 
@@ -468,7 +479,7 @@ export default function RequestDetailPage() {
                     <dd>
                       <a
                         href={`tel:${req.requesterPhone}`}
-                        className="inline-flex items-center min-h-[44px] -my-2 text-brand font-semibold hover:underline"
+                        className="inline-flex items-center text-brand font-semibold hover:underline"
                       >
                         {req.requesterPhone}
                       </a>
@@ -479,21 +490,21 @@ export default function RequestDetailPage() {
 
               {/* กล่องเน้นข้อความถึงเจ้าหน้าที่ */}
               {req.type !== 'repair' && req.purpose ? (
-                <div className="flex flex-col gap-1 bg-warn-bg/60 border border-warn-border rounded-control p-3 text-[13px] text-warn-fg">
+                <div className="flex flex-col gap-0.5 bg-warn-bg/60 border border-warn-border rounded-control p-2.5 text-[12.5px] text-warn-fg">
                   <b className="font-semibold">ข้อความถึง จนท.</b>
-                  <span className="whitespace-pre-wrap leading-relaxed">{req.purpose}</span>
+                  <span className="whitespace-pre-wrap leading-snug">{req.purpose}</span>
                 </div>
               ) : null}
 
               {/* แถวไฟล์ PDF */}
-              <div className="flex items-start gap-2.5 pt-2 border-t border-line text-[13px]">
+              <div className="flex items-start gap-2 pt-2 border-t border-line text-[12.5px]">
                 <FileText className="size-4 text-ink-soft shrink-0 mt-0.5" />
                 <div className="flex flex-col gap-0.5 min-w-0">
                   <span className="font-semibold text-ink break-all">คำขอ_{req.code}.pdf</span>
                   {isFullyApproved ? (
                     <Link
                       href={`/approver/permit/${req.id}`}
-                      className="inline-flex items-center min-h-[44px] -my-2 underline text-brand font-semibold"
+                      className="inline-flex items-center underline text-brand font-semibold"
                     >
                       เปิดดูใบอนุญาต (PDF)
                     </Link>
@@ -505,25 +516,29 @@ export default function RequestDetailPage() {
 
               {/* กรณีคำขอถูกปฏิเสธ แสดงเหตุผลการปฏิเสธ */}
               {req.rejectReason && (
-                <div className="rounded-control bg-danger-bg border border-danger-border px-3.5 py-2.5 text-[13px] text-danger-fg">
+                <div className="rounded-control bg-danger-bg border border-danger-border px-3 py-2 text-[12.5px] text-danger-fg">
                   <b>หมายเหตุ:</b> {req.rejectReason}
                 </div>
               )}
             </section>
 
             {/* การ์ดปุ่มดำเนินการ เรียงตามความสำคัญ */}
-            <section className="jw-card p-4 flex flex-col gap-2.5">
+            <section className="jw-card p-3.5 flex flex-col gap-2">
               {/* 1. ปุ่มหลัก: กลับ */}
-              <Link href={backHref} className="jw-btn w-full">
+              <button
+                type="button"
+                onClick={handleGoBack}
+                className="jw-btn w-full min-h-[38px] py-2 text-[13px]"
+              >
                 กลับ
-              </Link>
+              </button>
 
               {!isTerminalNegative && (
                 <>
                   {/* ทางลัดไปหน้ารับมอบ/ส่งคืนอุปกรณ์สำหรับงานขอยืม */}
                   {req.type === 'borrow' &&
                     (req.status === 'approved' || req.status === 'borrowing' || req.status === 'return_inspect') && (
-                      <Link href="/borrow/my" className="jw-btn-sec w-full">
+                      <Link href="/borrow/my" className="jw-btn-sec w-full min-h-[38px] py-2 text-[13px]">
                         {req.status === 'approved'
                           ? 'ไปหน้ายืนยันรับมอบอุปกรณ์'
                           : req.status === 'borrowing'
@@ -534,7 +549,7 @@ export default function RequestDetailPage() {
 
                   {/* ปุ่มเปิดดูใบอนุญาตราชการ PDF เมื่อลงนามอนุมัติครบสมบูรณ์ */}
                   {isFullyApproved && (
-                    <Link href={`/approver/permit/${req.id}`} className="jw-btn-sec w-full">
+                    <Link href={`/approver/permit/${req.id}`} className="jw-btn-sec w-full min-h-[38px] py-2 text-[13px]">
                       ดูใบอนุญาต (PDF)
                     </Link>
                   )}
@@ -544,7 +559,7 @@ export default function RequestDetailPage() {
                     ['pending_staff', 'pending_l2'].includes(req.status) && (
                       <Link
                         href={`/requests/${req.id}/reschedule?mode=reschedule`}
-                        className="jw-btn-sec w-full"
+                        className="jw-btn-sec w-full min-h-[38px] py-2 text-[13px]"
                       >
                         ขอเลื่อนวัน / แก้ไข
                       </Link>
@@ -555,7 +570,7 @@ export default function RequestDetailPage() {
                     ['pending_staff', 'pending_l2', 'pending_l1', 'approved'].includes(req.status) && (
                       <Link
                         href={`/requests/${req.id}/reschedule?mode=cancel`}
-                        className="jw-btn-ter w-full text-danger-fg hover:bg-danger-bg/60"
+                        className="jw-btn-ter w-full min-h-[34px] py-1.5 text-[13px] text-danger-fg hover:bg-danger-bg/60"
                       >
                         ยกเลิกคำขอ
                       </Link>

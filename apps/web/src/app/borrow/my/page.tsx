@@ -18,6 +18,7 @@ import { useAuth } from '@/components/auth-context';
 import { AppShell } from '@/components/shell';
 // นำเข้า Icon แสดงรูปไอคอน SVG
 import { Icon } from '@/components/icons';
+import { PaymentStatusCard } from '@/components/ui';
 // นำเข้า API client, ฟังก์ชันจัดรูปแบบวันเวลาภาษาไทย, และฟังก์ชันบีบอัดรูปภาพ
 import { api, formatThaiDate, formatThaiDateTime, readAndCompressImages } from '@/lib/api';
 
@@ -1128,6 +1129,16 @@ export default function MyBorrowsPage() {
                         </div>
                       </div>
                     </div>
+
+                    {/* 2.5 การ์ดค่าธรรมเนียมและการชำระเงิน (แสดงเฉพาะรายการที่มีค่าใช้จ่าย) */}
+                    <PaymentStatusCard
+                      req={selectedRequest}
+                      account={account}
+                      summaryOnly
+                      onUpdated={() => {
+                        void load();
+                      }}
+                    />
 
                     {/* 3. Status-Specific Action Box */}
                     {/* 3.1 หมวด "ที่กำลังใช้งาน" — สถานะ: รอรับมอบ (approved) */}

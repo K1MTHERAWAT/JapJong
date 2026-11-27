@@ -18,6 +18,7 @@ export * from './Table';
 export * from './AttachmentViewer';
 export * from './SigningStepCard';
 export * from './SearchableCombobox';
+export * from './PaymentStatusCard';
 
 // วิดเจ็ตเฉพาะทางที่นำเข้าจาก ui-widgets
 export {

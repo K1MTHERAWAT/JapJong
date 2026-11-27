@@ -66,6 +66,30 @@ export interface DemoAccountSummary {
 // ===== Resources =====
 export type VenueType = 'meeting' | 'pavilion' | 'field' | 'yard' | 'training';
 
+export type PricingMode = 'free' | 'flat' | 'per_hour' | 'per_day';
+export type PaymentStatus = 'not_required' | 'awaiting_payment' | 'verifying' | 'paid' | 'refunded';
+export type PaymentMethod = 'transfer' | 'cash';
+
+export interface PaymentAccount {
+  id: string;
+  bankName: string;
+  accountNo: string;
+  accountName: string;
+  promptpayId?: string;
+  qrImageUrl?: string;
+  purpose: string;
+  isDefault: boolean;
+  enabled: boolean;
+}
+
+export interface PaymentSettings {
+  accounts: PaymentAccount[];
+  cashEnabled: boolean;
+  cashCounterLocation: string;
+  receiptPrefix: string;
+  paymentDeadlineHours: number;
+}
+
 export interface Venue {
   id: string;
   name: string;
@@ -85,6 +109,12 @@ export interface Venue {
   approvalLevels: number;
   /** รูปภาพสถานที่ (ไม่เกิน 3 รูป, data URL หรือ URL) */
   images?: string[];
+  /** รูปแบบการคิดค่าบริการ */
+  pricingMode?: PricingMode;
+  /** ค่าบริการ / ค่าบำรุง (บาท) */
+  feeAmount?: number;
+  /** ค่ามัดจำความเสียหาย (บาท) */
+  depositAmount?: number;
 }
 
 export type EquipmentCategory = 'audio' | 'tent' | 'it';
@@ -97,6 +127,12 @@ export interface Equipment {
   enabled: boolean;
   /** รูปภาพอุปกรณ์/ครุภัณฑ์ (ไม่เกิน 3 รูป, data URL หรือ URL) */
   images?: string[];
+  /** รูปแบบการคิดค่าบริการ (free / flat / per_day) */
+  pricingMode?: PricingMode;
+  /** ค่าบริการต่อชิ้น หรือต่อชิ้น/วัน (บาท) */
+  feeAmount?: number;
+  /** ค่ามัดจำต่อชิ้น (บาท) */
+  depositAmount?: number;
 }
 
 // ===== Requests =====
@@ -186,6 +222,21 @@ interface BaseRequest {
   addressDistrictId?: string;
   addressProvinceId?: string;
   purposeItems?: OfficialFormPurposeItem[];
+  /** ข้อมูลค่าใช้จ่ายและการชำระเงิน (Approve-then-Pay) */
+  feeAmount?: number;
+  depositAmount?: number;
+  totalAmount?: number;
+  feeWaived?: boolean;
+  feeWaiverReason?: string;
+  paymentStatus?: PaymentStatus;
+  paymentMethod?: PaymentMethod;
+  paymentSlipUrl?: string;
+  paymentNote?: string;
+  paymentSubmittedAt?: string;
+  receiptNo?: string;
+  paidAt?: string;
+  paymentVerifiedById?: string;
+  paymentVerifiedByName?: string;
 }
 
 export interface BookingRequest extends BaseRequest {

@@ -28,9 +28,12 @@ import {
   ROLE_LABEL,
   SIGN_LEVEL_TITLE,
   SignLevel,
+  calculateBookingCost,
+  calculateBorrowCost,
   canSignRequest,
   checkBorrowReceiveEligibility,
   clampNameInput,
+  formatBaht,
   hasPermission,
   overlaps,
   sanitizeHouseNoInput,
@@ -539,6 +542,17 @@ export class RequestsController {
       );
       const resolvedAddr = this.resolveAndValidateAddress(body, user);
 
+      const selectedVenues = venueIds
+        .map((vid) => this.db.venues.find((v) => v.id === vid))
+        .filter((v): v is NonNullable<typeof v> => Boolean(v));
+      const selectedExtraEquipment = extraItems
+        .map((it) => {
+          const eq = this.db.equipment.find((e) => e.id === it.equipmentId);
+          return eq ? { equipment: eq, qty: it.qty } : null;
+        })
+        .filter((x): x is NonNullable<typeof x> => Boolean(x));
+      const cost = calculateBookingCost(selectedVenues, periods, selectedExtraEquipment);
+
       const walkInRequesterId = `u-walkin-${code.toLowerCase()}`;
       const req: BookingRequest = {
         id: `r-${code.toLowerCase()}`,
@@ -546,6 +560,11 @@ export class RequestsController {
         type: 'booking',
         status: 'pending_staff',
         approvalRound: 1,
+        feeAmount: cost.feeAmount,
+        depositAmount: cost.depositAmount,
+        totalAmount: cost.totalAmount,
+        feeWaived: false,
+        paymentStatus: 'not_required',
         requesterId: isWalkIn ? body.requesterId || walkInRequesterId : user.id,
         requesterName: clampNameInput(body.requesterName, NAME_MAX_LENGTH.PERSON_NAME).trim() || user.name,
         requesterPhone: validatedPhone,
@@ -652,6 +671,18 @@ export class RequestsController {
         );
         const resolvedAddr = this.resolveAndValidateAddress(body, user);
 
+        const selectedItems = items
+          .map((it) => {
+            const eq = this.db.equipment.find((e) => e.id === it.equipmentId);
+            return eq ? { equipment: eq, qty: it.qty } : null;
+          })
+          .filter((x): x is NonNullable<typeof x> => Boolean(x));
+        const borrowCost = calculateBorrowCost(
+          selectedItems,
+          String(body.pickupDate).slice(0, 10),
+          String(body.returnDate).slice(0, 10),
+        );
+
         const walkInRequesterId = `u-walkin-${code.toLowerCase()}`;
         const req: BorrowRequest = {
           id: `r-${code.toLowerCase()}`,
@@ -659,6 +690,11 @@ export class RequestsController {
           type: 'borrow',
           status: 'pending_staff',
           approvalRound: 1,
+          feeAmount: borrowCost.feeAmount,
+          depositAmount: borrowCost.depositAmount,
+          totalAmount: borrowCost.totalAmount,
+          feeWaived: false,
+          paymentStatus: 'not_required',
           requesterId: isWalkIn ? body.requesterId || walkInRequesterId : user.id,
           requesterName: clampNameInput(body.requesterName, NAME_MAX_LENGTH.PERSON_NAME).trim() || user.name,
           requesterPhone: validatedPhone,
@@ -904,10 +940,24 @@ export class RequestsController {
       }
     } else {
       // เมื่อผ่านการอนุมัติครบ 3 ระดับ (L1 นายก อบต.):
-      // ทั้งคำขอสถานที่ (booking) และคำขอยืมอุปกรณ์ (borrow) เปลี่ยนเป็น 'approved' (สำหรับ borrow คือสถานะ "รอรับมอบ")
+      // ทั้งคำขอสถานที่ (booking) และคำขอยืมอุปกรณ์ (borrow) เปลี่ยนเป็น 'approved'
+      // หากมีค่าธรรมเนียม/มัดจำที่ต้องชำระ (> 0 และไม่ได้รับการยกเว้น) -> ตั้งสถานะรอชำระเงิน (Approve-then-Pay)
       req.status = 'approved';
+      const needsPayment = (req.totalAmount || 0) > 0 && !req.feeWaived;
+      if (needsPayment) {
+        req.paymentStatus = 'awaiting_payment';
+      } else {
+        req.paymentStatus = 'not_required';
+      }
       if (!this.notificationEvents) {
-        if (req.type === 'borrow') {
+        if (needsPayment) {
+          this.db.notify(
+            req.requesterId,
+            `คำขอ ${req.code} อนุมัติแล้ว — รอชำระเงิน ${formatBaht(req.totalAmount)}`,
+            'กรุณาชำระค่าธรรมเนียม/มัดจำและแนบสลิปการโอนเงินในหน้ารายละเอียดคำขอ',
+            `/requests/${req.id}`,
+          );
+        } else if (req.type === 'borrow') {
           this.db.notify(
             req.requesterId,
             `คำขอยืมอุปกรณ์ ${req.code} อนุมัติครบแล้ว (รอรับมอบ)`,
@@ -1070,6 +1120,11 @@ export class RequestsController {
     }
     if (req.status !== 'approved') {
       throw new BadRequestException('คำขอยืมต้องผ่านการอนุมัติครบและอยู่ในสถานะอนุมัติแล้ว (รอรับมอบ) เท่านั้นจึงจะรับมอบได้');
+    }
+    if (req.paymentStatus === 'awaiting_payment' || req.paymentStatus === 'verifying') {
+      throw new BadRequestException(
+        'กรุณาชำระค่าธรรมเนียม/ค่ามัดจำ และรอเจ้าหน้าที่ยืนยันการรับชำระเงินก่อนรับมอบอุปกรณ์',
+      );
     }
 
     // ตรวจสอบเงื่อนไขวันรับมอบครุภัณฑ์: สามารถกดยืนยันรับมอบได้ตั้งแต่วันที่ (pickupDate - 1 วัน) เป็นต้นไป
@@ -1370,6 +1425,139 @@ export class RequestsController {
       await this.notificationEvents.onRepairStatusUpdated(req, body.action);
     }
     await this.db.log('request', `อัปเดตงานซ่อม ${req.code}`, user.name, {
+      id: user.id,
+      name: user.name,
+      role: user.role,
+    });
+    return this.enrich(req);
+  }
+
+  /** ผู้ขอแนบหลักฐานสลิปโอนเงินชำระค่าธรรมเนียม / ค่ามัดจำ */
+  @Post(':id/payment-slip')
+  async submitPaymentSlip(
+    @CurrentUser() user: Account,
+    @Param('id') id: string,
+    @Body() body: { slipUrl?: string; note?: string },
+  ) {
+    const req = this.db.requests.find((r) => r.id === id || r.code === id);
+    if (!req) throw new NotFoundException('ไม่พบคำขอ');
+    if (req.requesterId !== user.id && user.role !== 'STAFF' && user.role !== 'ADMIN') {
+      throw new ForbiddenException('เฉพาะเจ้าของคำขอหรือเจ้าหน้าที่เท่านั้นที่สามารถแนบสลิปชำระเงินได้');
+    }
+    if ((req.totalAmount || 0) <= 0 || req.feeWaived) {
+      throw new BadRequestException('คำขอนี้ไม่มีค่าใช้จ่ายที่ต้องชำระ');
+    }
+    if (req.paymentStatus === 'paid' || req.paymentStatus === 'refunded') {
+      throw new BadRequestException('คำขอนี้ชำระเงินเรียบร้อยแล้ว');
+    }
+    const slip = String(body.slipUrl ?? '').trim();
+    if (!slip) {
+      throw new BadRequestException('กรุณาอัปโหลดรูปภาพสลิปการโอนเงิน');
+    }
+    const now = new Date().toISOString();
+    req.paymentMethod = 'transfer';
+    req.paymentSlipUrl = slip.slice(0, 2_500_000);
+    req.paymentNote = String(body.note ?? '').trim().slice(0, 500) || undefined;
+    req.paymentSubmittedAt = now;
+    req.paymentStatus = 'verifying';
+    req.updatedAt = now;
+
+    await this.db.persistRequest(req);
+    this.db.notifyRole(
+      'STAFF',
+      `ตรวจสอบสลิปชำระเงิน ${req.code}`,
+      `${req.requesterName} แนบสลิปยอด ${formatBaht(req.totalAmount)}`,
+      `/requests/${req.id}`,
+    );
+    await this.db.log('request', `แนบสลิปชำระเงิน ${req.code}`, `${user.name} · ${formatBaht(req.totalAmount)}`, {
+      id: user.id,
+      name: user.name,
+      role: user.role,
+    });
+    return this.enrich(req);
+  }
+
+  /** เจ้าหน้าที่ตรวจสอบสลิป / บันทึกรับชำระเงินสด / ยกเว้นค่าธรรมเนียม / คืนเงินมัดจำ */
+  @Post(':id/payment-verify')
+  async verifyPayment(
+    @CurrentUser() user: Account,
+    @Param('id') id: string,
+    @Body()
+    body: {
+      action?: 'approve' | 'reject' | 'waive' | 'refund';
+      method?: 'transfer' | 'cash';
+      receiptNo?: string;
+      note?: string;
+    },
+  ) {
+    if (
+      user.role !== 'STAFF' &&
+      user.role !== 'ADMIN' &&
+      !hasPermission(user, 'review') &&
+      !hasPermission(user, 'handover')
+    ) {
+      throw new ForbiddenException('เฉพาะเจ้าหน้าที่หรือผู้ดูแลระบบเท่านั้นที่สามารถจัดการการชำระเงินได้');
+    }
+    const req = this.db.requests.find((r) => r.id === id || r.code === id);
+    if (!req) throw new NotFoundException('ไม่พบคำขอ');
+
+    const action = body.action || 'approve';
+    const now = new Date().toISOString();
+    const note = String(body.note ?? '').trim().slice(0, 500);
+
+    if (action === 'approve') {
+      req.paymentStatus = 'paid';
+      req.paymentMethod = body.method === 'cash' ? 'cash' : req.paymentMethod || 'transfer';
+      req.receiptNo = String(body.receiptNo ?? '').trim().slice(0, 100) || `RC-${req.code}`;
+      req.paidAt = now;
+      req.paymentVerifiedById = user.id;
+      req.paymentVerifiedByName = user.name;
+      if (note) req.paymentNote = note;
+      this.db.notify(
+        req.requesterId,
+        `ยืนยันการชำระเงิน ${req.code} แล้ว`,
+        `เลขที่ใบเสร็จ ${req.receiptNo} · ยอด ${formatBaht(req.totalAmount)}`,
+        req.type === 'borrow' ? `/borrow/my` : `/requests/${req.id}`,
+      );
+    } else if (action === 'reject') {
+      req.paymentStatus = 'awaiting_payment';
+      req.paymentNote = note || 'สลิปไม่ถูกต้องหรือไม่ชัดเจน กรุณาอัปโหลดใหม่';
+      this.db.notify(
+        req.requesterId,
+        `สลิปชำระเงิน ${req.code} ไม่ผ่านการตรวจสอบ`,
+        req.paymentNote,
+        `/requests/${req.id}`,
+      );
+    } else if (action === 'waive') {
+      req.feeWaived = true;
+      req.feeWaiverReason = note || 'ได้รับการยกเว้นค่าธรรมเนียมโดยเจ้าหน้าที่';
+      req.paymentStatus = 'not_required';
+      req.paymentVerifiedById = user.id;
+      req.paymentVerifiedByName = user.name;
+      this.db.notify(
+        req.requesterId,
+        `อนุมัติยกเว้นค่าธรรมเนียม ${req.code}`,
+        req.feeWaiverReason,
+        req.type === 'borrow' ? `/borrow/my` : `/requests/${req.id}`,
+      );
+    } else if (action === 'refund') {
+      req.paymentStatus = 'refunded';
+      req.paymentNote = note || `คืนเงินมัดจำ ${formatBaht(req.depositAmount)} เรียบร้อยแล้ว`;
+      req.paymentVerifiedById = user.id;
+      req.paymentVerifiedByName = user.name;
+      this.db.notify(
+        req.requesterId,
+        `คืนเงินมัดจำ ${req.code} เรียบร้อยแล้ว`,
+        req.paymentNote,
+        `/requests/${req.id}`,
+      );
+    } else {
+      throw new BadRequestException('รูปแบบการดำเนินการไม่ถูกต้อง');
+    }
+
+    req.updatedAt = now;
+    await this.db.persistRequest(req);
+    await this.db.log('request', `อัปเดตการชำระเงิน ${req.code} (${action})`, `${user.name}${req.receiptNo ? ` · ${req.receiptNo}` : ''}`, {
       id: user.id,
       name: user.name,
       role: user.role,

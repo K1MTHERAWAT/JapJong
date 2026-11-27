@@ -28,6 +28,7 @@ import {
   NotificationCategory,
   NotificationChannel,
   OfficialFormPurposeItem,
+  PaymentSettings,
   PermissionKey,
   PublicAccount,
   RepairRequest,
@@ -105,6 +106,25 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   handovers: HandoverRecord[] = [];
   verifications: DocumentVerification[] = [];
   scanLogs: DocumentScanLog[] = [];
+  paymentSettings: PaymentSettings = {
+    accounts: [
+      {
+        id: 'pa-default',
+        bankName: 'ธนาคารกรุงไทย (KTB)',
+        accountNo: '678-0-12345-6',
+        accountName: 'องค์การบริหารส่วนตำบล (เงินรายได้)',
+        promptpayId: '099-4-00012-3456',
+        qrImageUrl: '',
+        purpose: 'ค่าบริการสถานที่และอุปกรณ์',
+        isDefault: true,
+        enabled: true,
+      },
+    ],
+    cashEnabled: true,
+    cashCounterLocation: 'กองคลัง ชั้น 1 ที่ทำการ อบต. (จ.–ศ. 08:30–16:30 น.)',
+    receiptPrefix: 'RC',
+    paymentDeadlineHours: 48,
+  };
   signOtpCodes: {
     id: string;
     accountId: string;
@@ -192,9 +212,15 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
            ADD COLUMN IF NOT EXISTS "email_verified" BOOLEAN NOT NULL DEFAULT false,
            ADD COLUMN IF NOT EXISTS "avatar" TEXT`,
         `ALTER TABLE "venues"
-           ADD COLUMN IF NOT EXISTS "images" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]`,
+           ADD COLUMN IF NOT EXISTS "images" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+           ADD COLUMN IF NOT EXISTS "pricing_mode" TEXT NOT NULL DEFAULT 'free',
+           ADD COLUMN IF NOT EXISTS "fee_amount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+           ADD COLUMN IF NOT EXISTS "deposit_amount" DOUBLE PRECISION NOT NULL DEFAULT 0`,
         `ALTER TABLE "equipments"
-           ADD COLUMN IF NOT EXISTS "images" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]`,
+           ADD COLUMN IF NOT EXISTS "images" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+           ADD COLUMN IF NOT EXISTS "pricing_mode" TEXT NOT NULL DEFAULT 'free',
+           ADD COLUMN IF NOT EXISTS "fee_amount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+           ADD COLUMN IF NOT EXISTS "deposit_amount" DOUBLE PRECISION NOT NULL DEFAULT 0`,
         `ALTER TABLE "requests"
            ADD COLUMN IF NOT EXISTS "requester_phone" TEXT,
            ADD COLUMN IF NOT EXISTS "address_subdistrict_id" TEXT,
@@ -215,7 +241,26 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
            ADD COLUMN IF NOT EXISTS "inspector_name" TEXT,
            ADD COLUMN IF NOT EXISTS "inspect_result" TEXT,
            ADD COLUMN IF NOT EXISTS "inspect_note" TEXT,
-           ADD COLUMN IF NOT EXISTS "inspect_photos" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]`,
+           ADD COLUMN IF NOT EXISTS "inspect_photos" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+           ADD COLUMN IF NOT EXISTS "fee_amount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+           ADD COLUMN IF NOT EXISTS "deposit_amount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+           ADD COLUMN IF NOT EXISTS "total_amount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+           ADD COLUMN IF NOT EXISTS "fee_waived" BOOLEAN NOT NULL DEFAULT false,
+           ADD COLUMN IF NOT EXISTS "fee_waiver_reason" TEXT,
+           ADD COLUMN IF NOT EXISTS "payment_status" TEXT NOT NULL DEFAULT 'not_required',
+           ADD COLUMN IF NOT EXISTS "payment_method" TEXT,
+           ADD COLUMN IF NOT EXISTS "payment_slip_url" TEXT,
+           ADD COLUMN IF NOT EXISTS "payment_note" TEXT,
+           ADD COLUMN IF NOT EXISTS "payment_submitted_at" TIMESTAMPTZ(3),
+           ADD COLUMN IF NOT EXISTS "receipt_no" TEXT,
+           ADD COLUMN IF NOT EXISTS "paid_at" TIMESTAMPTZ(3),
+           ADD COLUMN IF NOT EXISTS "payment_verified_by_id" TEXT,
+           ADD COLUMN IF NOT EXISTS "payment_verified_by_name" TEXT`,
+        `CREATE TABLE IF NOT EXISTS "payment_settings" (
+           "id" TEXT PRIMARY KEY,
+           "config" JSONB NOT NULL,
+           "updated_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+         )`,
         `CREATE TABLE IF NOT EXISTS "thai_provinces" (
            "id" TEXT PRIMARY KEY,
            "name_th" TEXT NOT NULL
@@ -965,8 +1010,16 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       },
     });
     const imgs = Array.isArray(v.images) ? v.images.filter(Boolean).slice(0, 3) : [];
+    const pricingMode = v.pricingMode || 'free';
+    const feeAmount = Math.max(0, Number(v.feeAmount || 0));
+    const depositAmount = Math.max(0, Number(v.depositAmount || 0));
     await this.prisma.$executeRaw`
-      UPDATE "venues" SET "images" = ${imgs}::text[] WHERE "id" = ${v.id}
+      UPDATE "venues"
+      SET "images" = ${imgs}::text[],
+          "pricing_mode" = ${pricingMode},
+          "fee_amount" = ${feeAmount},
+          "deposit_amount" = ${depositAmount}
+      WHERE "id" = ${v.id}
     `.catch(() => {});
   }
 
@@ -1003,9 +1056,28 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       },
     });
     const imgs = Array.isArray(e.images) ? e.images.filter(Boolean).slice(0, 3) : [];
+    const pricingMode = e.pricingMode || 'free';
+    const feeAmount = Math.max(0, Number(e.feeAmount || 0));
+    const depositAmount = Math.max(0, Number(e.depositAmount || 0));
     await this.prisma.$executeRaw`
-      UPDATE "equipments" SET "images" = ${imgs}::text[] WHERE "id" = ${e.id}
+      UPDATE "equipments"
+      SET "images" = ${imgs}::text[],
+          "pricing_mode" = ${pricingMode},
+          "fee_amount" = ${feeAmount},
+          "deposit_amount" = ${depositAmount}
+      WHERE "id" = ${e.id}
     `.catch(() => {});
+  }
+
+  async persistPaymentSettings(settings: PaymentSettings) {
+    this.paymentSettings = settings;
+    if (!this.dbAvailable) return;
+    await this.prisma.$executeRaw`
+      INSERT INTO "payment_settings" ("id", "config", "updated_at")
+      VALUES ('default', ${JSON.stringify(settings)}::jsonb, NOW())
+      ON CONFLICT ("id") DO UPDATE
+      SET "config" = EXCLUDED."config", "updated_at" = NOW()
+    `.catch((err) => this.logger.warn('Failed to persist payment_settings', err));
   }
 
   async persistRequest(r: AnyRequest) {
@@ -1229,6 +1301,9 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     const inspectNote = r.type === 'borrow' ? (r.inspectNote ?? null) : null;
     const inspectPhotos = r.type === 'borrow' && Array.isArray(r.inspectPhotos) ? r.inspectPhotos.filter(Boolean) : [];
 
+    const paymentSubmittedAtDate = parseDateSafe(r.paymentSubmittedAt);
+    const paidAtDate = parseDateSafe(r.paidAt);
+
     await this.prisma.$executeRaw`
       UPDATE "requests"
       SET "requester_phone" = ${r.requesterPhone ?? null},
@@ -1250,7 +1325,21 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
           "inspector_name" = ${inspectorName},
           "inspect_result" = ${inspectResult},
           "inspect_note" = ${inspectNote},
-          "inspect_photos" = ${inspectPhotos}::text[]
+          "inspect_photos" = ${inspectPhotos}::text[],
+          "fee_amount" = ${Math.max(0, Number(r.feeAmount || 0))},
+          "deposit_amount" = ${Math.max(0, Number(r.depositAmount || 0))},
+          "total_amount" = ${Math.max(0, Number(r.totalAmount || 0))},
+          "fee_waived" = ${Boolean(r.feeWaived)},
+          "fee_waiver_reason" = ${r.feeWaiverReason ?? null},
+          "payment_status" = ${r.paymentStatus ?? 'not_required'},
+          "payment_method" = ${r.paymentMethod ?? null},
+          "payment_slip_url" = ${r.paymentSlipUrl ?? null},
+          "payment_note" = ${r.paymentNote ?? null},
+          "payment_submitted_at" = ${paymentSubmittedAtDate},
+          "receipt_no" = ${r.receiptNo ?? null},
+          "paid_at" = ${paidAtDate},
+          "payment_verified_by_id" = ${r.paymentVerifiedById ?? null},
+          "payment_verified_by_name" = ${r.paymentVerifiedByName ?? null}
       WHERE "id" = ${r.id}
     `.catch((err) => this.logger.warn('Failed to persist extra request columns', err));
   }
@@ -2657,13 +2746,13 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       };
     });
 
-    let venueImagesMap = new Map<string, string[]>();
-    let equipmentImagesMap = new Map<string, string[]>();
+    let venueExtraMap = new Map<string, any>();
+    let equipmentExtraMap = new Map<string, any>();
     let reqExtraMap = new Map<string, any>();
     try {
       const [vRows, eRows, rExtraRows] = await Promise.all([
-        this.prisma.$queryRaw<{ id: string; images: string[] | null }[]>`SELECT "id", "images" FROM "venues"`,
-        this.prisma.$queryRaw<{ id: string; images: string[] | null }[]>`SELECT "id", "images" FROM "equipments"`,
+        this.prisma.$queryRaw<any[]>`SELECT "id", "images", "pricing_mode", "fee_amount", "deposit_amount" FROM "venues"`,
+        this.prisma.$queryRaw<any[]>`SELECT "id", "images", "pricing_mode", "fee_amount", "deposit_amount" FROM "equipments"`,
         this.prisma.$queryRaw<any[]>`
           SELECT
             "id",
@@ -2686,44 +2775,91 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
             "inspector_name",
             "inspect_result",
             "inspect_note",
-            "inspect_photos"
+            "inspect_photos",
+            "fee_amount",
+            "deposit_amount",
+            "total_amount",
+            "fee_waived",
+            "fee_waiver_reason",
+            "payment_status",
+            "payment_method",
+            "payment_slip_url",
+            "payment_note",
+            "payment_submitted_at",
+            "receipt_no",
+            "paid_at",
+            "payment_verified_by_id",
+            "payment_verified_by_name"
           FROM "requests"
         `,
       ]);
-      venueImagesMap = new Map((vRows || []).map((r) => [r.id, Array.isArray(r.images) ? r.images : []]));
-      equipmentImagesMap = new Map((eRows || []).map((r) => [r.id, Array.isArray(r.images) ? r.images : []]));
+      venueExtraMap = new Map((vRows || []).map((r) => [r.id, r]));
+      equipmentExtraMap = new Map((eRows || []).map((r) => [r.id, r]));
       reqExtraMap = new Map((rExtraRows || []).map((r) => [r.id, r]));
     } catch {
       // ignore if column not yet migrated
     }
 
-    this.venues = (dbVenues || []).map((v: any) => ({
-      id: v.id,
-      name: v.name,
-      type: v.type,
-      building: v.building,
-      floor: v.floor,
-      capacity: v.capacity,
-      status: v.status,
-      enabled: v.enabled,
-      facilities: v.facilities,
-      openTime: v.openTime,
-      closeTime: v.closeTime,
-      openDays: v.openDays,
-      advanceDays: v.advanceDays,
-      formName: v.formName,
-      approvalLevels: v.approvalLevels,
-      images: venueImagesMap.get(v.id) ?? [],
-    }));
+    this.venues = (dbVenues || []).map((v: any) => {
+      const extra = venueExtraMap.get(v.id);
+      return {
+        id: v.id,
+        name: v.name,
+        type: v.type,
+        building: v.building,
+        floor: v.floor,
+        capacity: v.capacity,
+        status: v.status,
+        enabled: v.enabled,
+        facilities: v.facilities,
+        openTime: v.openTime,
+        closeTime: v.closeTime,
+        openDays: v.openDays,
+        advanceDays: v.advanceDays,
+        formName: v.formName,
+        approvalLevels: v.approvalLevels,
+        images: Array.isArray(extra?.images) ? extra.images : [],
+        pricingMode: extra?.pricing_mode || 'free',
+        feeAmount: Number(extra?.fee_amount || 0),
+        depositAmount: Number(extra?.deposit_amount || 0),
+      };
+    });
 
-    this.equipment = (dbEquipment || []).map((e: any) => ({
-      id: e.id,
-      name: e.name,
-      category: e.category,
-      stock: e.stock,
-      enabled: e.enabled,
-      images: equipmentImagesMap.get(e.id) ?? [],
-    }));
+    this.equipment = (dbEquipment || []).map((e: any) => {
+      const extra = equipmentExtraMap.get(e.id);
+      return {
+        id: e.id,
+        name: e.name,
+        category: e.category,
+        stock: e.stock,
+        enabled: e.enabled,
+        images: Array.isArray(extra?.images) ? extra.images : [],
+        pricingMode: extra?.pricing_mode || 'free',
+        feeAmount: Number(extra?.fee_amount || 0),
+        depositAmount: Number(extra?.deposit_amount || 0),
+      };
+    });
+
+    try {
+      const psRows = await this.prisma.$queryRaw<{ config: any }[]>`
+        SELECT "config" FROM "payment_settings" WHERE "id" = 'default' LIMIT 1
+      `;
+      if (psRows?.[0]?.config && typeof psRows[0].config === 'object') {
+        const cfg = psRows[0].config;
+        this.paymentSettings = {
+          accounts: Array.isArray(cfg.accounts) ? cfg.accounts : this.paymentSettings.accounts,
+          cashEnabled: typeof cfg.cashEnabled === 'boolean' ? cfg.cashEnabled : true,
+          cashCounterLocation:
+            typeof cfg.cashCounterLocation === 'string'
+              ? cfg.cashCounterLocation
+              : this.paymentSettings.cashCounterLocation,
+          receiptPrefix: typeof cfg.receiptPrefix === 'string' && cfg.receiptPrefix.trim() ? cfg.receiptPrefix.trim() : 'RC',
+          paymentDeadlineHours: Number(cfg.paymentDeadlineHours) > 0 ? Number(cfg.paymentDeadlineHours) : 48,
+        };
+      }
+    } catch {
+      // ignore if table not yet created
+    }
 
     this.requests = (dbRequests || []).map((r: any): AnyRequest => {
       const extra = reqExtraMap.get(r.id);
@@ -2755,6 +2891,22 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         purposeItems: Array.isArray(r.purposeItems)
           ? (r.purposeItems as unknown as OfficialFormPurposeItem[])
           : undefined,
+        feeAmount: Number(extra?.fee_amount || 0),
+        depositAmount: Number(extra?.deposit_amount || 0),
+        totalAmount: Number(extra?.total_amount || 0),
+        feeWaived: Boolean(extra?.fee_waived),
+        feeWaiverReason: extra?.fee_waiver_reason ?? undefined,
+        paymentStatus: extra?.payment_status ?? 'not_required',
+        paymentMethod: extra?.payment_method ?? undefined,
+        paymentSlipUrl: extra?.payment_slip_url ?? undefined,
+        paymentNote: extra?.payment_note ?? undefined,
+        paymentSubmittedAt: extra?.payment_submitted_at
+          ? new Date(extra.payment_submitted_at).toISOString()
+          : undefined,
+        receiptNo: extra?.receipt_no ?? undefined,
+        paidAt: extra?.paid_at ? new Date(extra.paid_at).toISOString() : undefined,
+        paymentVerifiedById: extra?.payment_verified_by_id ?? undefined,
+        paymentVerifiedByName: extra?.payment_verified_by_name ?? undefined,
       };
 
       const currentRound = r.approvalRound ?? 1;

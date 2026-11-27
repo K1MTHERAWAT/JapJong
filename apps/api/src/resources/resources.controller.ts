@@ -22,7 +22,9 @@ import {
   Equipment,
   EquipmentCategory,
   NAME_MAX_LENGTH,
+  PaymentSettings,
   Period,
+  PricingMode,
   Venue,
   VenueType,
   clampNameInput,
@@ -39,6 +41,8 @@ import { DbService } from '../db/db.service';
 const VALID_VENUE_TYPES: VenueType[] = ['meeting', 'pavilion', 'field', 'yard', 'training'];
 // หมวดหมู่อุปกรณ์ที่ถูกต้องตามเกณฑ์ของระบบ
 const VALID_EQUIPMENT_CATEGORIES: EquipmentCategory[] = ['audio', 'tent', 'it'];
+// รูปแบบการคิดค่าบริการที่รองรับ
+const VALID_PRICING_MODES: PricingMode[] = ['free', 'flat', 'per_hour', 'per_day'];
 
 /**
  * Controller บริหารจัดการทรัพยากรส่วนกลางขององค์กรปกครองส่วนท้องถิ่น (อบต.)
@@ -67,6 +71,67 @@ export class ResourcesController {
   @Get('equipment')
   listEquipment() {
     return this.db.equipment;
+  }
+
+  /**
+   * ดึงข้อมูลตั้งค่าบัญชีรับเงินของหน่วยงาน (Public เพื่อให้หน้าชำระเงินของประชาชนแสดงบัญชี/QR ได้)
+   * GET /resources/payment-settings
+   */
+  @Public()
+  @Get('payment-settings')
+  getPaymentSettings(): PaymentSettings {
+    return this.db.paymentSettings;
+  }
+
+  /**
+   * บันทึกการตั้งค่าบัญชีรับเงินของหน่วยงาน (สำหรับเจ้าหน้าที่ / ผู้ดูแลระบบ)
+   * PATCH /resources/payment-settings
+   */
+  @Patch('payment-settings')
+  async updatePaymentSettings(@CurrentUser() user: Account, @Body() body: Partial<PaymentSettings>) {
+    if (user.role !== 'STAFF' && user.role !== 'ADMIN') {
+      throw new BadRequestException('เฉพาะเจ้าหน้าที่หรือผู้ดูแลระบบเท่านั้นที่สามารถตั้งค่าบัญชีรับเงินได้');
+    }
+    const rawAccounts = Array.isArray(body.accounts) ? body.accounts : this.db.paymentSettings.accounts;
+    const cleanedAccounts = rawAccounts.slice(0, 10).map((a, idx) => ({
+      id: String(a?.id || `pa-${Date.now()}-${idx}`).trim(),
+      bankName: String(a?.bankName || 'ธนาคารกรุงไทย (KTB)').trim().slice(0, 120),
+      accountNo: String(a?.accountNo || '').trim().slice(0, 60),
+      accountName: String(a?.accountName || '').trim().slice(0, 160),
+      promptpayId: String(a?.promptpayId || '').trim().slice(0, 60),
+      qrImageUrl: String(a?.qrImageUrl || '').trim().slice(0, 2_500_000),
+      purpose: String(a?.purpose || 'ค่าบริการทั่วไป').trim().slice(0, 160),
+      isDefault: Boolean(a?.isDefault),
+      enabled: a?.enabled !== false,
+    }));
+    if (cleanedAccounts.length > 0 && !cleanedAccounts.some((a) => a.isDefault)) {
+      cleanedAccounts[0].isDefault = true;
+    }
+
+    const next: PaymentSettings = {
+      accounts: cleanedAccounts,
+      cashEnabled: typeof body.cashEnabled === 'boolean' ? body.cashEnabled : this.db.paymentSettings.cashEnabled,
+      cashCounterLocation: String(body.cashCounterLocation ?? this.db.paymentSettings.cashCounterLocation)
+        .trim()
+        .slice(0, 240),
+      receiptPrefix:
+        String(body.receiptPrefix ?? this.db.paymentSettings.receiptPrefix)
+          .trim()
+          .replace(/[^A-Za-z0-9_-]/g, '')
+          .slice(0, 12) || 'RC',
+      paymentDeadlineHours: Math.max(
+        1,
+        Math.min(720, Math.floor(Number(body.paymentDeadlineHours ?? this.db.paymentSettings.paymentDeadlineHours) || 48)),
+      ),
+    };
+
+    await this.db.persistPaymentSettings(next);
+    await this.db.log('resource', 'อัปเดตการตั้งค่าบัญชีรับเงิน', `${next.accounts.length} บัญชี · คำนำหน้า ${next.receiptPrefix}`, {
+      id: user.id,
+      name: user.name,
+      role: user.role,
+    });
+    return next;
   }
 
   /**
@@ -104,6 +169,10 @@ export class ResourcesController {
       images: Array.isArray(body.images)
         ? body.images.map((img) => String(img).trim()).filter(Boolean).slice(0, 3)
         : [],
+      pricingMode:
+        body.pricingMode && VALID_PRICING_MODES.includes(body.pricingMode) ? body.pricingMode : 'free',
+      feeAmount: Math.max(0, Math.min(1000000, Number(body.feeAmount ?? 0) || 0)),
+      depositAmount: Math.max(0, Math.min(1000000, Number(body.depositAmount ?? 0) || 0)),
     };
 
     // บันทึกลงหน่วยความจำและฐานข้อมูลถาวร
@@ -157,6 +226,18 @@ export class ResourcesController {
     }
     if (Array.isArray(body.images)) {
       venue.images = body.images.map((img) => String(img).trim()).filter(Boolean).slice(0, 3);
+    }
+    if (body.pricingMode && VALID_PRICING_MODES.includes(body.pricingMode)) {
+      venue.pricingMode = body.pricingMode;
+      if (body.pricingMode === 'free') venue.feeAmount = 0;
+    }
+    if (body.feeAmount !== undefined) {
+      const fee = Number(body.feeAmount);
+      if (Number.isFinite(fee) && fee >= 0 && fee <= 1000000) venue.feeAmount = Math.round(fee);
+    }
+    if (body.depositAmount !== undefined) {
+      const dep = Number(body.depositAmount);
+      if (Number.isFinite(dep) && dep >= 0 && dep <= 1000000) venue.depositAmount = Math.round(dep);
     }
     if (typeof body.enabled === 'boolean') {
       venue.enabled = body.enabled;
@@ -213,6 +294,10 @@ export class ResourcesController {
       images: Array.isArray(body.images)
         ? body.images.map((img) => String(img).trim()).filter(Boolean).slice(0, 3)
         : [],
+      pricingMode:
+        body.pricingMode && VALID_PRICING_MODES.includes(body.pricingMode) ? body.pricingMode : 'free',
+      feeAmount: Math.max(0, Math.min(1000000, Number(body.feeAmount ?? 0) || 0)),
+      depositAmount: Math.max(0, Math.min(1000000, Number(body.depositAmount ?? 0) || 0)),
     };
     this.db.equipment.push(eq);
     await this.db.persistEquipment(eq);
@@ -249,6 +334,18 @@ export class ResourcesController {
     if (typeof body.enabled === 'boolean') eq.enabled = body.enabled;
     if (Array.isArray(body.images)) {
       eq.images = body.images.map((img) => String(img).trim()).filter(Boolean).slice(0, 3);
+    }
+    if (body.pricingMode && VALID_PRICING_MODES.includes(body.pricingMode)) {
+      eq.pricingMode = body.pricingMode;
+      if (body.pricingMode === 'free') eq.feeAmount = 0;
+    }
+    if (body.feeAmount !== undefined) {
+      const fee = Number(body.feeAmount);
+      if (Number.isFinite(fee) && fee >= 0 && fee <= 1000000) eq.feeAmount = Math.round(fee);
+    }
+    if (body.depositAmount !== undefined) {
+      const dep = Number(body.depositAmount);
+      if (Number.isFinite(dep) && dep >= 0 && dep <= 1000000) eq.depositAmount = Math.round(dep);
     }
     await this.db.persistEquipment(eq);
     return eq;

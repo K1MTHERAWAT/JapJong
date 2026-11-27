@@ -1,6 +1,9 @@
 import type {
   EquipmentCategory,
+  PaymentMethod,
+  PaymentStatus,
   PermissionKey,
+  PricingMode,
   RequestStatus,
   RequestType,
   Role,
@@ -11,6 +14,26 @@ import type {
 } from './types';
 
 export type { Tone };
+
+export const PRICING_MODE_LABEL: Record<PricingMode, string> = {
+  free: 'ฟรี (ไม่มีค่าใช้จ่าย)',
+  flat: 'เหมาต่อครั้ง',
+  per_hour: 'รายชั่วโมง',
+  per_day: 'รายวัน',
+};
+
+export const PAYMENT_STATUS_LABEL: Record<PaymentStatus, string> = {
+  not_required: 'ไม่มีค่าใช้จ่าย',
+  awaiting_payment: 'รอชำระเงิน',
+  verifying: 'รอเจ้าหน้าที่ตรวจสลิป',
+  paid: 'ชำระเงินแล้ว',
+  refunded: 'คืนเงินมัดจำแล้ว',
+};
+
+export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+  transfer: 'โอนเงิน / PromptPay',
+  cash: 'ชำระเงินสดที่สำนักงาน',
+};
 
 export const ROLE_LABEL: Record<Role, string> = {
   USER: 'ผู้ใช้งานทั่วไป',

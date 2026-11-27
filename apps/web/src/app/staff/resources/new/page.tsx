@@ -20,6 +20,7 @@ import {
   EquipmentCategory,
   FACILITIES,
   NAME_MAX_LENGTH,
+  PricingMode,
   VENUE_TYPE_LABEL,
   VenueType,
   clampNameInput,
@@ -83,6 +84,11 @@ export default function AddResourcePage() {
   // ฟิลด์ข้อมูลอุปกรณ์/ครุภัณฑ์
   const [eqCategory, setEqCategory] = useState<EquipmentCategory>('audio');
   const [stock, setStock] = useState(1);
+
+  // ฟิลด์ค่าธรรมเนียมและค่ามัดจำ
+  const [pricingMode, setPricingMode] = useState<PricingMode>('free');
+  const [feeAmount, setFeeAmount] = useState(0);
+  const [depositAmount, setDepositAmount] = useState(0);
 
   // State การส่งบันทึกและข้อผิดพลาด
   const [submitting, setSubmitting] = useState(false);
@@ -154,6 +160,9 @@ export default function AddResourcePage() {
           formName,
           enabled,
           images,
+          pricingMode,
+          feeAmount: pricingMode === 'free' ? 0 : feeAmount,
+          depositAmount,
         });
       } else {
         await api.createEquipment({
@@ -162,6 +171,9 @@ export default function AddResourcePage() {
           stock,
           enabled,
           images,
+          pricingMode,
+          feeAmount: pricingMode === 'free' ? 0 : feeAmount,
+          depositAmount,
         });
       }
       router.push('/staff/resources');
@@ -710,6 +722,71 @@ export default function AddResourcePage() {
             <p className="text-[12px] text-ink-mute mt-1.5">
               กด <b>+ เพิ่มแบบฟอร์มใหม่</b> หรือ <b>เปิดตัวจัดการแบบฟอร์ม</b> เพื่อแก้ไขและปรับแต่งเนื้อหากระดาษราชการ
             </p>
+          </div>
+
+          {/* ค่าธรรมเนียมและค่ามัดจำ */}
+          <div className="border border-line rounded-2xl p-4 bg-surface-muted/35 space-y-3">
+            <div>
+              <b className="block text-[14px] text-ink">ค่าธรรมเนียมและค่ามัดจำ</b>
+              <span className="text-[12px] text-ink-mute">
+                ตั้งค่าเป็น &quot;ฟรี&quot; หากไม่มีค่าใช้จ่าย (หากมีค่าใช้จ่าย ระบบจะแจ้งให้ชำระหลังอนุมัติ)
+              </span>
+            </div>
+            <div>
+              <label className="jw-lbl">รูปแบบการคิดค่าบริการ</label>
+              <SearchableCombobox
+                searchable={false}
+                clearable={false}
+                value={pricingMode}
+                onChange={(val) => {
+                  const m = val as PricingMode;
+                  setPricingMode(m);
+                  if (m === 'free') setFeeAmount(0);
+                }}
+                options={
+                  kind === 'venue'
+                    ? [
+                        { value: 'free', label: 'ฟรี (ไม่มีค่าใช้จ่าย)' },
+                        { value: 'flat', label: 'เหมาต่อครั้ง' },
+                        { value: 'per_hour', label: 'รายชั่วโมง' },
+                        { value: 'per_day', label: 'รายวัน' },
+                      ]
+                    : [
+                        { value: 'free', label: 'ฟรี (ไม่มีค่าใช้จ่าย)' },
+                        { value: 'flat', label: 'เหมาต่อชิ้น / ครั้ง' },
+                        { value: 'per_day', label: 'รายวัน (ต่อชิ้น/วัน)' },
+                      ]
+                }
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {pricingMode !== 'free' && (
+                <div>
+                  <label className="jw-lbl">
+                    ค่าบริการ (บาท{pricingMode === 'per_hour' ? '/ชม.' : pricingMode === 'per_day' ? '/วัน' : '/ครั้ง'})
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={1000000}
+                    value={feeAmount}
+                    onChange={(e) => setFeeAmount(Math.max(0, Number(e.target.value) || 0))}
+                    className="jw-in"
+                  />
+                </div>
+              )}
+              <div>
+                <label className="jw-lbl">ค่ามัดจำความเสียหาย (บาท{kind === 'equipment' ? '/ชิ้น' : ''})</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={1000000}
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(Math.max(0, Number(e.target.value) || 0))}
+                  className="jw-in"
+                />
+              </div>
+            </div>
           </div>
 
           {/* สวิตช์เปิดให้จอง */}

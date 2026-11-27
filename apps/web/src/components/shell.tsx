@@ -322,23 +322,25 @@ export function AppShell({
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  {onBack ? (
+                  {onBack || backHref ? (
                     <button
                       type="button"
-                      onClick={onBack}
+                      onClick={() => {
+                        if (onBack) {
+                          onBack();
+                          return;
+                        }
+                        if (typeof window !== 'undefined' && window.history.length > 1) {
+                          router.back();
+                        } else if (backHref) {
+                          router.push(backHref);
+                        }
+                      }}
                       aria-label="ย้อนกลับ"
                       className="size-9 rounded-xl bg-surface border border-line flex items-center justify-center text-ink hover:bg-hover active:scale-95 transition cursor-pointer shrink-0"
                     >
                       <ChevronLeft className="size-5" />
                     </button>
-                  ) : backHref ? (
-                    <Link
-                      href={backHref}
-                      aria-label="ย้อนกลับ"
-                      className="size-9 rounded-xl bg-surface border border-line flex items-center justify-center text-ink hover:bg-hover active:scale-95 transition shrink-0"
-                    >
-                      <ChevronLeft className="size-5" />
-                    </Link>
                   ) : null}
 
                   <div className="min-w-0">
